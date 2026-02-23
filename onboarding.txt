@@ -1,0 +1,75 @@
+Weather_global Cluster Onboarding (Della)
+
+Project root:
+/scratch/gpfs/DABANIN/iv9432/Weather_global
+
+1) One-time setup
+
+From the cluster login node (e.g. della.princeton.edu)
+
+cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+source scripts/graphcast_env.sh --setup
+
+This creates conda env `graphcast311` (Python 3.11), installs:
+- jax[cuda12]
+- graphcast (from GitHub)
+- netCDF4, xarray (for NetCDF data exploration, e.g. scripts/explore_graphcast_dataset.ipynb)
+
+2) Use environment in each new shell
+
+cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+source scripts/graphcast_env.sh
+
+2b) Show graphcast311 in Jupyter/notebook kernel list (one-time, with env activated)
+
+pip install ipykernel
+python -m ipykernel install --user --name graphcast311 --display-name "Python (graphcast311)"
+Then in Cursor/VS Code: notebook kernel picker → "Python (graphcast311)" or "Select Another Kernel" → Jupyter Kernel → graphcast311.
+
+3) Submit GPU verification job
+
+cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+sbatch scripts/verify_gpu_jax.slurm
+
+4) GPU compute node allocation:
+use 
+
+example: `sinfo -o "%P %G %f"`
+
+then use salloc to get a GPU node.
+example: salloc --nodes=1 --ntasks=1 --mem=32G --time=02:00:00 --gres=gpu:a100:1
+
+to get a GPU node.
+
+To use notebook:
+http://della-l04g4:8888/?token=e2951779957f4999e647ff17d04044225d01096678f1b500
+
+5) Check logs
+
+- logs/verify-gpu-jax-<jobid>.out
+- logs/verify-gpu-jax-<jobid>.err
+
+Expected in `.out`:
+- `nvidia-smi` lists GPU
+- `Using conda env: graphcast311`
+- `jax_backend: gpu`
+- `jax_devices` contains at least one `CudaDevice(...)`
+
+Reference successful output on this cluster:
+- node example: `della-l05g4`
+- gpu example: `NVIDIA A100 80GB PCIe`
+- jax example: `jax_backend: gpu`, `jax_devices: [CudaDevice(id=0)]`
+
+5) If JAX shows CPU only
+
+- Confirm the job actually ran on a GPU node.
+- Confirm `nvidia-smi` succeeds inside that job.
+- Re-run `source scripts/graphcast_env.sh` and submit again.
+
+6) For Python jobs in Slurm
+
+Use the same environment script at the start of your job script:
+
+cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+source scripts/graphcast_env.sh
+python your_script.py

@@ -143,12 +143,53 @@ For a strict toy run, train only 1-step lead time first (`targets.time = [6h]`) 
 2. For long inference rollout without backprop: use `rollout.py`.
 3. Save/load checkpoints with `checkpoint.py` if needed.
 
-## 3) Minimal practical recipe for your first toy run
-1. Keep only 13 levels, 1-degree data, mesh size 2-3, latent 32.
-2. Train on a single lead time (`6h`) first.
-3. Include only core target vars you can reliably load.
-4. Add forcings (`day/year progress` and optionally `toa_incident_solar_radiation`) only after baseline works.
-5. Once stable, increase `gnn_msg_steps`, mesh size, and forecast horizon.
+## 2b) Current project architecture boundaries (`src/`)
+
+### Shared model contract
+- `src/models/base.py`
+  - `TrainState`
+  - `LossAndPredictions`
+  - `ForecastModel` protocol with `init`, `loss_and_predictions`, and `predict`
+
+### Canonical batch schema
+- `src/data/contracts.py`
+  - `CanonicalBatch(inputs, targets, forcings, coords, metadata)`
+  - `validate_canonical_batch(...)` performs essential required-field checks
+
+### Registry and model selection
+- `src/models/registry.py`
+  - `build_model(config)` parses `config["model"]["name"]` (fallback `config["model_name"]`)
+  - maps `"graphcast"` to `src.models.graphcast.adapter.build_graphcast`
+
+### GraphCast adapter boundary
+- `src/models/graphcast/adapter.py` is the single GraphCast runtime implementation file and handles:
+  - GraphCast config parsing
+  - backend mode selection (`stub` and real `graphcast`)
+  - wrapper order contract:
+    1. `GraphCast(...)`
+    2. optional `casting.Bfloat16Cast(...)`
+    3. optional `normalization.InputsAndResiduals(...)`
+    4. `autoregressive.Predictor(...)`
+  - canonical-batch conversion for real GraphCast runtime
+
+### Model-agnostic pipelines
+- `src/pipelines/train.py`
+- `src/pipelines/evaluate.py`
+- `src/pipelines/rollout.py`
+
+These call only the registry + base contract and do not import GraphCast directly.
+
+## 3) Minimal changes, big payoff plan
+1. Start from the repo's `GraphCast_small` checkpoint (1.0 degree / fewer levels).
+2. Fine-tune on a recent slice of ERA5 (for example, the last 2-5 years) with the exact same preprocessing.
+3. Evaluate on held-out months with 1-5 day rollouts.
+4. Compare with the baseline model before and after fine-tuning.
+
+## 4) Budget expectation and 24h-fit settings
+1. Budget expectation on `1xA100`: usually hours to less than 1 day, depending on batch size, rollout length, and whether long autoregressive rollouts are used during training.
+2. Use short rollout objective (4 steps) (+6h) each.
+3. Keep rollout evaluation separate and occasional.
+
 
 ## Sources examined
 - https://github.com/google-deepmind/graphcast

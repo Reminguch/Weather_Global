@@ -1,0 +1,13 @@
+# Install inside conda env `graphcast311` (Python 3.11).
+# This file mirrors:
+#   pip install -U "jax[cuda12]"
+#   pip install "git+https://github.com/google-deepmind/graphcast.git"
+
+jax[cuda12]
+git+https://github.com/google-deepmind/graphcast.git
+ipykernel
+notebook
+# Data exploration (NetCDF + xarray)
+netCDF4
+xarray
+
