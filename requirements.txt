@@ -11,3 +11,4 @@ notebook
 # Data exploration (NetCDF + xarray)
 netCDF4
 xarray
+gcsfs

@@ -19,7 +19,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -32,8 +32,9 @@ python --version
 which python
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
-TRAIN_PATH=${TRAIN_PATH:-data/graphcast/graphcast/dataset/source-era5_wb13_latest-1y_res-1.0_levels-13_steps-all.zarr}
-EVAL_PATH=${EVAL_PATH:-data/graphcast/graphcast/dataset/source-era5_cds_rolling-last30d_res-1.0_levels-13_steps-04.nc}
+WB2_STREAM_URI=${WB2_STREAM_URI:-gs://weatherbench2/datasets/era5/1959-2023_01_10-wb13-6h-1440x721_with_derived_variables.zarr}
+TRAIN_PATH=${TRAIN_PATH:-${WB2_STREAM_URI}}
+EVAL_PATH=${EVAL_PATH:-${WB2_STREAM_URI}}
 CKPT_IN=${CKPT_IN:-"data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"}
 OUT_DIR=${OUT_DIR:-artifacts/checkpoints/graphcast_finetune_1y}
 RUN_NAME=${RUN_NAME:-a100_full}
@@ -59,7 +60,7 @@ if [[ -n "${EXTRA_ARGS}" ]]; then
   EXTRA_ARGS_ARR=(${EXTRA_ARGS})
 fi
 
-python -u scripts/finetune_graphcast.py \
+python -u scripts/training/finetune_graphcast.py \
   --train-path "${TRAIN_PATH}" \
   --eval-path "${EVAL_PATH}" \
   --ckpt-in "${CKPT_IN}" \
@@ -79,10 +80,10 @@ python -u scripts/finetune_graphcast.py \
   "${EXTRA_ARGS_ARR[@]}"
 
 # Example submissions:
-#   sbatch scripts/finetune_graphcast.slurm
-#   sbatch --export=BATCH_SIZE=2,RUN_NAME=a100_bs2 scripts/finetune_graphcast.slurm
-#   sbatch --export=EXTRA_ARGS="--no-rollout",RUN_NAME=a100_full_noroll scripts/finetune_graphcast.slurm
-#   sbatch --export=EPOCHS=0,RUN_NAME=full_smoke_init scripts/finetune_graphcast.slurm
-#   sbatch --export=EVAL_BATCH_SIZE=4,RUN_NAME=a100_eval4 scripts/finetune_graphcast.slurm
+#   sbatch scripts/training/finetune_graphcast.slurm
+#   sbatch --export=BATCH_SIZE=2,RUN_NAME=a100_bs2 scripts/training/finetune_graphcast.slurm
+#   sbatch --export=EXTRA_ARGS="--no-rollout",RUN_NAME=a100_full_noroll scripts/training/finetune_graphcast.slurm
+#   sbatch --export=EPOCHS=0,RUN_NAME=full_smoke_init scripts/training/finetune_graphcast.slurm
+#   sbatch --export=EVAL_BATCH_SIZE=4,RUN_NAME=a100_eval4 scripts/training/finetune_graphcast.slurm
 #   6-day forecast (24 rollout steps; may need BATCH_SIZE=1 and more memory/time):
-#   sbatch --export=FORECAST_DAYS=6,RUN_NAME=a100_6d scripts/finetune_graphcast.slurm
+#   sbatch --export=FORECAST_DAYS=6,RUN_NAME=a100_6d scripts/training/finetune_graphcast.slurm

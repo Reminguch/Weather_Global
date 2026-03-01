@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fine-tune GraphCast_small on ERA5.
+"""Train GraphCast on streamed WeatherBench2 ERA5 at 2.0-degree resolution.
 
 This script:
- - loads train/eval datasets (Zarr / NetCDF) in GraphCast-compatible layout
- - restores GraphCast_small params + configs from a GraphCast checkpoint
- - runs one-step (+6h) training with optional short rollout loss
- - logs train/eval loss, step time, memory usage
- - saves checkpoints and plots validation loss
+ - streams WeatherBench2 ERA5 Zarr from GCS (no full local materialization)
+ - slices train/val by date ranges
+ - downsamples grid from 0.25deg to target resolution (default 2.0deg)
+ - trains one-step (+6h) objective with fixed max optimizer steps
+ - logs losses, timings, GPU/CPU memory, checkpoints, and run metadata
 """
 
 from __future__ import annotations
@@ -28,11 +28,9 @@ import optax
 import pandas as pd
 import xarray as xr
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-from src.data.graphcast_dataset import open_graphcast_era5
 
 
 def _require_graphcast() -> None:
@@ -71,80 +69,112 @@ warnings.filterwarnings(
 )
 
 
-DEFAULT_TRAIN = "data/graphcast/graphcast/dataset/source-era5_wb13_latest-1y_res-1.0_levels-13_steps-all.zarr"
-DEFAULT_EVAL = "data/graphcast/graphcast/dataset/source-era5_cds_rolling-last30d_res-1.0_levels-13_steps-04.nc"
+DEFAULT_WB2_URI = "gs://weatherbench2/datasets/era5/1959-2023_01_10-wb13-6h-1440x721_with_derived_variables.zarr"
 DEFAULT_CKPT = (
     "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - "
     "pressure levels 13 - mesh 2to5 - precipitation input and output.npz"
 )
 DEFAULT_STATS_DIR = "data/graphcast/graphcast/stats"
-DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_finetune_1y"
+DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_res2_stream"
+
+GRAPHCAST_VARS = [
+    "2m_temperature",
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "mean_sea_level_pressure",
+    "total_precipitation_6hr",
+    "temperature",
+    "geopotential",
+    "u_component_of_wind",
+    "v_component_of_wind",
+    "vertical_velocity",
+    "specific_humidity",
+    "geopotential_at_surface",
+    "land_sea_mask",
+    # Optional in source data.
+    "toa_incident_solar_radiation",
+]
 
 
 @dataclasses.dataclass
 class RunConfig:
-    train_path: str
-    eval_path: str
+    wb2_uri: str
+    train_start: str
+    train_end: str
+    val_start: str
+    val_end: str
+    resolution: float
+    mesh_size: int
+    width: int
+    processor_msg_steps: int
     ckpt_in: str
+    stats_dir: str
     out_dir: str
     run_name: str
     batch_size: int
-    epochs: int
-    tiny: bool
-    tiny_days: int
+    max_steps: int
     eval_every: int
     eval_batch_size: int
     checkpoint_every: int
     lr: float
     weight_decay: float
     seed: int
-    rollout_steps: int
-    rollout_weight: float
-    enable_rollout: bool
     precision: str
 
 
 def parse_args() -> RunConfig:
-    parser = argparse.ArgumentParser(description="Fine-tune GraphCast_small on ERA5.")
-    parser.add_argument("--train-path", default=DEFAULT_TRAIN)
-    parser.add_argument("--eval-path", default=DEFAULT_EVAL)
+    parser = argparse.ArgumentParser(description="Train GraphCast at 2.0deg from streamed WB2 Zarr.")
+    parser.add_argument("--wb2-uri", default=DEFAULT_WB2_URI)
+    parser.add_argument("--train-start", default="1979-01-01")
+    parser.add_argument("--train-end", default="2020-12-31")
+    parser.add_argument("--val-start", default="2021-01-01")
+    parser.add_argument("--val-end", default="2021-12-31")
+    parser.add_argument("--resolution", type=float, default=2.0)
+    parser.add_argument("--mesh-size", type=int, default=4)
+    parser.add_argument("--width", type=int, choices=[128, 256], default=128)
+    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2], default=1)
     parser.add_argument("--ckpt-in", default=DEFAULT_CKPT)
+    parser.add_argument("--stats-dir", default=DEFAULT_STATS_DIR)
     parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
-    parser.add_argument("--run-name", default="h100_full")
-    parser.add_argument("--batch-size", type=int, default=2)
-    parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--tiny", action="store_true")
-    parser.add_argument("--tiny-days", type=int, default=14)
-    parser.add_argument("--eval-every", type=int, default=100)
-    parser.add_argument("--eval-batch-size", type=int, default=2)
-    parser.add_argument("--checkpoint-every", type=int, default=200)
+    parser.add_argument("--run-name", default="res2_m4_w128_mp1_h6_bs4")
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--max-steps", type=int, default=10000)
+    parser.add_argument("--eval-every", type=int, default=1000)
+    parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--rollout-steps", type=int, default=4)
-    parser.add_argument("--rollout-weight", type=float, default=0.5)
-    parser.add_argument("--no-rollout", action="store_true", help="Disable rollout loss term.")
     parser.add_argument("--precision", choices=["bf16", "fp16", "fp32"], default="bf16")
     args = parser.parse_args()
+
+    if args.max_steps <= 0:
+        raise ValueError("--max-steps must be > 0")
+    if args.batch_size <= 0:
+        raise ValueError("--batch-size must be > 0")
+
     return RunConfig(
-        train_path=args.train_path,
-        eval_path=args.eval_path,
+        wb2_uri=args.wb2_uri,
+        train_start=args.train_start,
+        train_end=args.train_end,
+        val_start=args.val_start,
+        val_end=args.val_end,
+        resolution=args.resolution,
+        mesh_size=args.mesh_size,
+        width=args.width,
+        processor_msg_steps=args.processor_msg_steps,
         ckpt_in=args.ckpt_in,
+        stats_dir=args.stats_dir,
         out_dir=args.out_dir,
         run_name=args.run_name,
         batch_size=args.batch_size,
-        epochs=args.epochs,
-        tiny=args.tiny,
-        tiny_days=args.tiny_days,
+        max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
         seed=args.seed,
-        rollout_steps=args.rollout_steps,
-        rollout_weight=args.rollout_weight,
-        enable_rollout=not args.no_rollout,
         precision=args.precision,
     )
 
@@ -207,10 +237,35 @@ def validate_stats_coverage(task_cfg: gc.TaskConfig, stats: dict[str, xr.Dataset
         )
 
 
+def _to_graphcast_layout(ds: xr.Dataset) -> xr.Dataset:
+    """Add batch dimension and expand static 2D vars to (batch=1, time, lat, lon)."""
+    out_vars: dict[str, xr.DataArray] = {}
+    time_coord = ds.coords["time"]
+
+    for name in list(ds.data_vars):
+        var = ds[name]
+        dims = list(var.dims)
+
+        if "batch" in dims:
+            out_vars[name] = var
+            continue
+
+        if "time" in dims:
+            out_vars[name] = var.expand_dims(batch=[0]).transpose("batch", *dims)
+        else:
+            expanded = var.expand_dims(batch=[0], time=time_coord)
+            out_vars[name] = expanded.transpose("batch", "time", "lat", "lon")
+
+    coords = dict(ds.coords)
+    if "batch" not in coords:
+        coords["batch"] = [0]
+
+    return xr.Dataset(data_vars=out_vars, coords=coords, attrs=ds.attrs)
+
+
 def _ensure_datetime_coord(ds: xr.Dataset) -> xr.Dataset:
     def _with_datetime_coord(dataset: xr.Dataset, time_values: np.ndarray) -> xr.Dataset:
         if "batch" in dataset.dims:
-            # GraphCast derived forcing helpers expect datetime to match (batch, time) when batch exists.
             bt = np.broadcast_to(np.asarray(time_values)[None, :], (dataset.sizes["batch"], len(time_values)))
             return dataset.assign_coords(datetime=(("batch", "time"), bt))
         return dataset.assign_coords(datetime=("time", time_values))
@@ -222,7 +277,6 @@ def _ensure_datetime_coord(ds: xr.Dataset) -> xr.Dataset:
             ds = _with_datetime_coord(ds, ds.time.values)
         return ds
 
-    # Handle encoded numeric times from some Zarr stores.
     decoded = xr.decode_cf(ds)
     if "datetime" not in decoded.coords:
         decoded = _with_datetime_coord(decoded, decoded.time.values)
@@ -240,14 +294,11 @@ def prepare_dataset_for_task(ds: xr.Dataset, task_cfg: gc.TaskConfig) -> xr.Data
         - set(task_cfg.forcing_variables)
     )
 
-    # Add derived forcings once at dataset level (not per-sample).
     if forcing_vars & {"year_progress_sin", "year_progress_cos", "day_progress_sin", "day_progress_cos"}:
         data_utils.add_derived_vars(ds)
     if "toa_incident_solar_radiation" in forcing_vars and "toa_incident_solar_radiation" not in ds.data_vars:
         data_utils.add_tisr_var(ds)
 
-    # Keep static inputs truly time-independent so model input channels match checkpoint structure.
-    # If static vars were broadcast along time by dataset loaders, collapse them back.
     for name in sorted(static_input_vars):
         if name in ds.data_vars and "time" in ds[name].dims:
             ds[name] = ds[name].isel(time=0, drop=True)
@@ -302,7 +353,6 @@ def build_single_sample(
             f"input_steps={input_steps}, target_steps={target_steps}, total={ds.sizes['time']}."
         )
 
-    # Inclusive right endpoint via +1 in slice stop.
     window = ds.isel(time=slice(window_start, window_stop + 1))
     inputs, targets, forcings = data_utils.extract_inputs_targets_forcings(
         window,
@@ -338,7 +388,6 @@ def build_batch_from_indices(
             task_cfg=task_cfg,
             dt=dt,
         )
-        # Each sample has batch=1. Drop it, then stack samples back into batch.
         inputs_list.append(inputs.isel(batch=0, drop=True))
         targets_list.append(targets.isel(batch=0, drop=True))
         forcings_list.append(forcings.isel(batch=0, drop=True))
@@ -366,19 +415,15 @@ def run_eval(
     target_steps: int,
     task_cfg: gc.TaskConfig,
     dt: pd.Timedelta,
-    use_rollout_loss: bool,
-    rollout_weight: float,
     progress_label: str = "eval",
 ) -> dict[str, float]:
-    total_losses: list[float] = []
-    one_losses: list[float] = []
-    rollout_losses: list[float] = []
+    losses: list[float] = []
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     t_eval0 = time.time()
 
     for batch_i, i in enumerate(range(0, len(eval_indices), eval_batch_size), start=1):
         idx = eval_indices[i : i + eval_batch_size]
-        inputs, rollout_targets, rollout_forcings = build_batch_from_indices(
+        inputs, targets, forcings = build_batch_from_indices(
             eval_ds,
             indices=idx,
             input_steps=input_steps,
@@ -386,40 +431,20 @@ def run_eval(
             task_cfg=task_cfg,
             dt=dt,
         )
-        one_targets = rollout_targets.isel(time=[0])
-        one_forcings = rollout_forcings.isel(time=[0])
 
-        rng, key_one, key_roll = jax.random.split(rng, 3)
-        (one_loss_and_diag, _state_after_one) = transformed.apply(
-            params, state, key_one, inputs, one_targets, one_forcings, False
-        )
-        one_loss = float(scalarize_loss(one_loss_and_diag[0]))
-        rollout_loss = 0.0
-        total = one_loss
-
-        if use_rollout_loss:
-            (roll_loss_and_diag, _state_after_rollout) = transformed.apply(
-                params, state, key_roll, inputs, rollout_targets, rollout_forcings, False
-            )
-            rollout_loss = float(scalarize_loss(roll_loss_and_diag[0]))
-            total = one_loss + rollout_weight * rollout_loss
-
-        one_losses.append(one_loss)
-        rollout_losses.append(rollout_loss)
-        total_losses.append(total)
+        rng, key = jax.random.split(rng)
+        (loss_and_diag, _state_after) = transformed.apply(params, state, key, inputs, targets, forcings, False)
+        loss = float(scalarize_loss(loss_and_diag[0]))
+        losses.append(loss)
 
         if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
             elapsed = time.time() - t_eval0
             print(
                 f"[{progress_label}] batch {batch_i}/{n_batches} "
-                f"elapsed {elapsed:.1f}s current_total {total:.6f}"
+                f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
             )
 
-    return {
-        "total": float(np.mean(total_losses)),
-        "one_step": float(np.mean(one_losses)),
-        "rollout": float(np.mean(rollout_losses)) if use_rollout_loss else 0.0,
-    }
+    return {"total": float(np.mean(losses))}
 
 
 def save_checkpoint(
@@ -452,7 +477,7 @@ def save_logs(
     eval_details: list[dict[str, Any]],
     step_times: list[tuple[int, float]],
     mem_usage: list[tuple[int, float]],
-    actual_usage: list[dict[str, float | int | None]],
+    actual_usage: list[dict[str, Any]],
     epoch_summaries: list[dict[str, Any]],
 ) -> None:
     with (out_dir / "train_loss.json").open("w", encoding="utf-8") as f:
@@ -467,6 +492,7 @@ def save_logs(
         json.dump(mem_usage, f)
     with (out_dir / "actual_usage.json").open("w", encoding="utf-8") as f:
         json.dump(actual_usage, f, indent=2)
+
     rss_vals = [float(x["proc_rss_gib"]) for x in actual_usage if x.get("proc_rss_gib") is not None]
     gpu_vals = [float(x["gpu_mem_gib"]) for x in actual_usage if x.get("gpu_mem_gib") is not None]
     with (out_dir / "actual_usage_summary.json").open("w", encoding="utf-8") as f:
@@ -504,45 +530,55 @@ def _read_proc_mem_gib() -> tuple[float | None, float | None]:
         return None, None
 
 
-def _read_gpu_mem_gib_for_pid(pid: int) -> float | None:
-    """Return GPU memory in GiB for this PID via nvidia-smi compute-apps."""
+def _read_gpu_mem_by_device() -> tuple[list[dict[str, float | int]], float | None]:
+    """Return per-device GPU memory stats and total used GiB from nvidia-smi."""
     try:
         proc = subprocess.run(
             [
                 "nvidia-smi",
-                "--query-compute-apps=pid,used_memory",
+                "--query-gpu=index,memory.used,memory.total",
                 "--format=csv,noheader,nounits",
             ],
             check=True,
             capture_output=True,
             text=True,
         )
+        devices: list[dict[str, float | int]] = []
         total_mib = 0.0
         for raw in proc.stdout.splitlines():
             row = raw.strip()
             if not row:
                 continue
-            parts = [x.strip() for x in row.split(",")]
-            if len(parts) != 2:
+            parts = [x.strip() for x in row.split(",") if x.strip() != ""]
+            if len(parts) < 3:
                 continue
-            if int(parts[0]) == pid:
-                total_mib += float(parts[1])
-        if total_mib > 0:
-            return total_mib / 1024.0
+            index = int(parts[0])
+            used_mib = float(parts[1])
+            total_dev_mib = float(parts[2])
+            total_mib += used_mib
+            devices.append(
+                {
+                    "index": index,
+                    "used_gib": used_mib / 1024.0,
+                    "total_gib": total_dev_mib / 1024.0,
+                }
+            )
+        return devices, (total_mib / 1024.0 if devices else None)
     except Exception:
-        pass
-    return None
+        return [], None
 
 
-def sample_actual_usage(step: int, pid: int) -> dict[str, float | int | None]:
+def sample_actual_usage(step: int) -> dict[str, Any]:
     proc_rss_gib, proc_hwm_gib = _read_proc_mem_gib()
-    gpu_mem_gib = _read_gpu_mem_gib_for_pid(pid)
+    gpu_devices, gpu_mem_gib = _read_gpu_mem_by_device()
     return {
         "step": step,
         "timestamp": time.time(),
         "proc_rss_gib": proc_rss_gib,
         "proc_hwm_gib": proc_hwm_gib,
         "gpu_mem_gib": gpu_mem_gib,
+        "gpu_mem_total_gib": gpu_mem_gib,
+        "gpu_devices": gpu_devices,
     }
 
 
@@ -561,29 +597,103 @@ def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
     plt.close()
 
 
+def _open_wb2_streamed_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
+    print(f"Opening WB2 Zarr: {cfg.wb2_uri}")
+    ds = xr.open_zarr(cfg.wb2_uri, consolidated=True, storage_options={"token": "anon"})
+
+    if "latitude" in ds.coords and "longitude" in ds.coords:
+        ds = ds.rename({"latitude": "lat", "longitude": "lon"})
+
+    if "time" not in ds.coords:
+        raise KeyError("Expected `time` coordinate in source dataset.")
+    if "lat" not in ds.coords or "lon" not in ds.coords:
+        raise KeyError("Expected `lat` and `lon` coordinates in source dataset.")
+
+    if not np.issubdtype(ds.time.dtype, np.datetime64):
+        ds = xr.decode_cf(ds)
+
+    available_vars = [name for name in GRAPHCAST_VARS if name in ds.data_vars]
+    if not available_vars:
+        raise ValueError("None of the required GraphCast variables were found in source dataset.")
+
+    # Restrict to overall requested date extent first.
+    ds = ds[available_vars].sel(time=slice(cfg.train_start, cfg.val_end))
+
+    # 0.25deg -> 2.0deg requires stride 8.
+    base_res = 0.25
+    ratio = cfg.resolution / base_res
+    stride = int(round(ratio))
+    if not np.isclose(ratio, stride, atol=1e-6):
+        raise ValueError(
+            f"resolution={cfg.resolution} is not an integer multiple of 0.25deg base grid."
+        )
+    if stride <= 0:
+        raise ValueError(f"Invalid resolution stride: {stride}")
+
+    ds = ds.isel(lat=slice(0, None, stride), lon=slice(0, None, stride))
+
+    for name in list(ds.data_vars):
+        if ds[name].dtype.kind == "f" and ds[name].dtype != np.float32:
+            ds[name] = ds[name].astype(np.float32)
+
+    train_raw = ds.sel(time=slice(cfg.train_start, cfg.train_end))
+    val_raw = ds.sel(time=slice(cfg.val_start, cfg.val_end))
+
+    if train_raw.sizes.get("time", 0) == 0:
+        raise ValueError("Empty train split after date selection.")
+    if val_raw.sizes.get("time", 0) == 0:
+        raise ValueError("Empty validation split after date selection.")
+
+    return _to_graphcast_layout(train_raw), _to_graphcast_layout(val_raw)
+
+
+def _write_run_config(out_dir: Path, cfg: RunConfig, model_cfg: gc.ModelConfig, task_cfg: gc.TaskConfig) -> None:
+    payload = {
+        "wb2_uri": cfg.wb2_uri,
+        "train_start": cfg.train_start,
+        "train_end": cfg.train_end,
+        "val_start": cfg.val_start,
+        "val_end": cfg.val_end,
+        "batch_size": cfg.batch_size,
+        "max_steps": cfg.max_steps,
+        "eval_every": cfg.eval_every,
+        "eval_batch_size": cfg.eval_batch_size,
+        "checkpoint_every": cfg.checkpoint_every,
+        "seed": cfg.seed,
+        "lr": cfg.lr,
+        "weight_decay": cfg.weight_decay,
+        "precision": cfg.precision,
+        "model_config": dataclasses.asdict(model_cfg),
+        "task_config": dataclasses.asdict(task_cfg),
+    }
+    with (out_dir / "run_config.json").open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
 def main() -> None:
     cfg = parse_args()
     out_dir = Path(cfg.out_dir) / cfg.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     ckpt_in = load_graphcast_checkpoint(Path(cfg.ckpt_in))
-    model_cfg = ckpt_in.model_config
+    base_model_cfg = ckpt_in.model_config
     task_cfg = ckpt_in.task_config
-    params_from_ckpt = ckpt_in.params
-    norm_stats = load_stats(Path(DEFAULT_STATS_DIR))
+
+    model_cfg = dataclasses.replace(
+        base_model_cfg,
+        resolution=cfg.resolution,
+        mesh_size=cfg.mesh_size,
+        latent_size=cfg.width,
+        gnn_msg_steps=cfg.processor_msg_steps,
+        hidden_layers=1,
+        mesh2grid_edge_normalization_factor=None,
+    )
+
+    norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
 
-    train_ds = open_graphcast_era5(cfg.train_path)
-    eval_ds = open_graphcast_era5(cfg.eval_path)
+    train_ds, eval_ds = _open_wb2_streamed_splits(cfg)
 
-    if cfg.tiny:
-        slice_steps = cfg.tiny_days * 4  # 6h steps/day
-        train_ds = train_ds.isel(time=slice(-slice_steps, None))
-        batch_size = 1
-    else:
-        batch_size = cfg.batch_size
-
-    # Ensure required forcing variables exist before sample extraction.
     train_ds = prepare_dataset_for_task(train_ds, task_cfg)
     eval_ds = prepare_dataset_for_task(eval_ds, task_cfg)
 
@@ -593,8 +703,7 @@ def main() -> None:
         raise ValueError(f"Train/eval time step mismatch: train={dt_train}, eval={dt_eval}")
 
     input_steps = input_steps_from_duration(task_cfg.input_duration, dt_train)
-    target_steps = max(1, cfg.rollout_steps if cfg.enable_rollout else 1)
-    use_rollout_loss = cfg.enable_rollout and target_steps > 1
+    target_steps = 1
 
     train_final_indices = valid_final_input_indices(train_ds.sizes["time"], input_steps, target_steps)
     eval_final_indices = valid_final_input_indices(eval_ds.sizes["time"], input_steps, target_steps)
@@ -619,14 +728,12 @@ def main() -> None:
             use_bf16=(cfg.precision == "bf16"),
             gradient_checkpointing=True,
         )
-        # For autoregressive.Predictor, training goes through .loss(), not .loss_and_predictions().
         return predictor.loss(inputs, targets, forcings)
 
     transformed = hk.transform_with_state(forward_fn)
     rng = jax.random.PRNGKey(cfg.seed)
 
-    # Initialize model/state structure with the first train sample.
-    sample_inputs, sample_roll_targets, sample_roll_forcings = build_batch_from_indices(
+    sample_inputs, sample_targets, sample_forcings = build_batch_from_indices(
         train_ds,
         indices=[int(train_final_indices[0])],
         input_steps=input_steps,
@@ -634,15 +741,13 @@ def main() -> None:
         task_cfg=task_cfg,
         dt=dt_train,
     )
-    sample_one_targets = sample_roll_targets.isel(time=[0])
-    sample_one_forcings = sample_roll_forcings.isel(time=[0])
-    init_params, state = transformed.init(rng, sample_inputs, sample_one_targets, sample_one_forcings, True)
 
-    # Keep model structure from init, then overlay pretrained checkpoint values.
-    params = hk.data_structures.merge(init_params, params_from_ckpt)
+    params, state = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, True)
 
     opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     opt_state = opt.init(params)
+
+    _write_run_config(out_dir, cfg, model_cfg, task_cfg)
 
     @jax.jit
     def train_step(
@@ -651,249 +756,155 @@ def main() -> None:
         opt_state: optax.OptState,
         rng_key: jax.Array,
         inputs: xr.Dataset,
-        one_targets: xr.Dataset,
-        one_forcings: xr.Dataset,
-        rollout_targets: xr.Dataset,
-        rollout_forcings: xr.Dataset,
+        targets: xr.Dataset,
+        forcings: xr.Dataset,
     ):
         def loss_fn(p, s, key):
-            key_one, key_roll = jax.random.split(key)
-            (one_loss_and_diag, state_after_one) = transformed.apply(
-                p, s, key_one, inputs, one_targets, one_forcings, True
-            )
-            one_loss = scalarize_loss(one_loss_and_diag[0])
-            total_loss = one_loss
-            rollout_loss = jnp.array(0.0, dtype=one_loss.dtype)
-            state_after = state_after_one
+            (loss_and_diag, new_state) = transformed.apply(p, s, key, inputs, targets, forcings, True)
+            loss = scalarize_loss(loss_and_diag[0])
+            return loss, new_state
 
-            if use_rollout_loss:
-                (roll_loss_and_diag, state_after_rollout) = transformed.apply(
-                    p, state_after_one, key_roll, inputs, rollout_targets, rollout_forcings, True
-                )
-                rollout_loss = scalarize_loss(roll_loss_and_diag[0])
-                total_loss = one_loss + jnp.asarray(cfg.rollout_weight, dtype=one_loss.dtype) * rollout_loss
-                state_after = state_after_rollout
-
-            return total_loss, (state_after, one_loss, rollout_loss)
-
-        (total_loss, (new_state, one_loss, rollout_loss)), grads = jax.value_and_grad(loss_fn, has_aux=True)(
-            params, state, rng_key
-        )
+        (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
         updates, new_opt_state = opt.update(grads, opt_state, params)
         new_params = optax.apply_updates(params, updates)
-        return new_params, new_state, new_opt_state, total_loss, one_loss, rollout_loss
+        return new_params, new_state, new_opt_state, loss
 
     train_losses: list[float] = []
     eval_losses: list[tuple[int, float]] = []
     eval_details: list[dict[str, Any]] = []
     step_times: list[tuple[int, float]] = []
     mem_usage: list[tuple[int, float]] = []
-    actual_usage: list[dict[str, float | int | None]] = []
+    actual_usage: list[dict[str, Any]] = []
     epoch_summaries: list[dict[str, Any]] = []
-    pid = os.getpid()
+
+    np_rng = np.random.default_rng(cfg.seed)
+    current_indices = train_final_indices.copy()
+    np_rng.shuffle(current_indices)
+    cursor = 0
+    pass_idx = 1
+    pass_start_step = 1
+    pass_loss_accum: list[float] = []
 
     step = 0
-    for epoch in range(cfg.epochs):
-        epoch_indices = train_final_indices.copy()
-        if not cfg.tiny:
-            np.random.default_rng(cfg.seed + epoch).shuffle(epoch_indices)
-
-        epoch_loss_accum: list[float] = []
-        epoch_one_accum: list[float] = []
-        epoch_roll_accum: list[float] = []
-        epoch_start_step = step + 1
-
-        for i in range(0, len(epoch_indices), batch_size):
-            batch_idx = epoch_indices[i : i + batch_size]
-            batch_inputs, batch_roll_targets, batch_roll_forcings = build_batch_from_indices(
-                train_ds,
-                indices=batch_idx,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt_train,
+    while step < cfg.max_steps:
+        if cursor >= len(current_indices):
+            epoch_summaries.append(
+                {
+                    "pass": pass_idx,
+                    "steps": step - pass_start_step + 1,
+                    "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
+                    "time_per_step_mean": float(
+                        np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
+                    ),
+                    "mem_gib_max": float(
+                        np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
+                    ),
+                }
             )
-            batch_one_targets = batch_roll_targets.isel(time=[0])
-            batch_one_forcings = batch_roll_forcings.isel(time=[0])
+            pass_idx += 1
+            pass_start_step = step + 1
+            pass_loss_accum = []
+            current_indices = train_final_indices.copy()
+            np_rng.shuffle(current_indices)
+            cursor = 0
 
-            rng, step_key = jax.random.split(rng)
-            t0 = time.time()
-            params, state, opt_state, total_loss, one_loss, rollout_loss = train_step(
-                params,
-                state,
-                opt_state,
-                step_key,
-                batch_inputs,
-                batch_one_targets,
-                batch_one_forcings,
-                batch_roll_targets,
-                batch_roll_forcings,
-            )
-            step_time = time.time() - t0
+        batch_idx = current_indices[cursor : cursor + cfg.batch_size]
+        cursor += cfg.batch_size
 
-            step += 1
-            total_loss_f = float(total_loss)
-            one_loss_f = float(one_loss)
-            rollout_loss_f = float(rollout_loss)
-            train_losses.append(total_loss_f)
-            epoch_loss_accum.append(total_loss_f)
-            epoch_one_accum.append(one_loss_f)
-            epoch_roll_accum.append(rollout_loss_f)
-            step_times.append((step, step_time))
-
-            try:
-                dev = jax.devices()[0]
-                dev_mem_stats = dev.memory_stats() if hasattr(dev, "memory_stats") else {}
-                bytes_in_use = dev_mem_stats.get("bytes_in_use") or dev_mem_stats.get("reserved_bytes")
-                if bytes_in_use is not None:
-                    mem_usage.append((step, float(bytes_in_use) / (1024**3)))
-            except Exception:
-                pass
-            actual_usage.append(sample_actual_usage(step=step, pid=pid))
-
-            if step % 10 == 0:
-                if use_rollout_loss:
-                    print(
-                        f"step {step} total {total_loss_f:.6f} "
-                        f"one_step {one_loss_f:.6f} rollout {rollout_loss_f:.6f}"
-                    )
-                else:
-                    print(f"step {step} loss {total_loss_f:.6f}")
-
-            if step % cfg.eval_every == 0:
-                eval_metrics = run_eval(
-                    transformed,
-                    params,
-                    state,
-                    rng,
-                    eval_ds,
-                    eval_final_indices,
-                    eval_batch_size=cfg.eval_batch_size,
-                    input_steps=input_steps,
-                    target_steps=target_steps,
-                    task_cfg=task_cfg,
-                    dt=dt_train,
-                    use_rollout_loss=use_rollout_loss,
-                    rollout_weight=cfg.rollout_weight,
-                    progress_label=f"eval@step{step}",
-                )
-                eval_losses.append((step, eval_metrics["total"]))
-                eval_details.append(
-                    {
-                        "step": step,
-                        "total": eval_metrics["total"],
-                        "one_step": eval_metrics["one_step"],
-                        "rollout": eval_metrics["rollout"],
-                    }
-                )
-                print(
-                    f"[eval] step {step} total {eval_metrics['total']:.6f} "
-                    f"one_step {eval_metrics['one_step']:.6f} rollout {eval_metrics['rollout']:.6f}"
-                )
-                # Persist metadata immediately after each evaluation.
-                save_logs(
-                    out_dir,
-                    train_losses,
-                    eval_losses,
-                    eval_details,
-                    step_times,
-                    mem_usage,
-                    actual_usage,
-                    epoch_summaries,
-                )
-
-            if step % cfg.checkpoint_every == 0:
-                save_checkpoint(
-                    out_dir,
-                    params=params,
-                    step=step,
-                    model_cfg=model_cfg,
-                    task_cfg=task_cfg,
-                    description=ckpt_in.description,
-                    license_text=ckpt_in.license,
-                )
-
-        epoch_mean = float(np.mean(epoch_loss_accum)) if epoch_loss_accum else float("nan")
-        epoch_one_mean = float(np.mean(epoch_one_accum)) if epoch_one_accum else float("nan")
-        epoch_roll_mean = float(np.mean(epoch_roll_accum)) if epoch_roll_accum else float("nan")
-
-        epoch_eval = run_eval(
-            transformed,
-            params,
-            state,
-            rng,
-            eval_ds,
-            eval_final_indices,
-            eval_batch_size=cfg.eval_batch_size,
+        batch_inputs, batch_targets, batch_forcings = build_batch_from_indices(
+            train_ds,
+            indices=batch_idx,
             input_steps=input_steps,
             target_steps=target_steps,
             task_cfg=task_cfg,
             dt=dt_train,
-            use_rollout_loss=use_rollout_loss,
-            rollout_weight=cfg.rollout_weight,
-            progress_label=f"eval@epoch{epoch+1}",
-        )
-        eval_losses.append((step, epoch_eval["total"]))
-        eval_details.append(
-            {
-                "step": step,
-                "epoch": epoch + 1,
-                "total": epoch_eval["total"],
-                "one_step": epoch_eval["one_step"],
-                "rollout": epoch_eval["rollout"],
-            }
         )
 
+        rng, step_key = jax.random.split(rng)
+        t0 = time.time()
+        params, state, opt_state, loss = train_step(
+            params,
+            state,
+            opt_state,
+            step_key,
+            batch_inputs,
+            batch_targets,
+            batch_forcings,
+        )
+        step_time = time.time() - t0
+
+        step += 1
+        loss_f = float(loss)
+        train_losses.append(loss_f)
+        pass_loss_accum.append(loss_f)
+        step_times.append((step, step_time))
+
+        usage = sample_actual_usage(step=step)
+        actual_usage.append(usage)
+        if usage.get("gpu_mem_gib") is not None:
+            mem_usage.append((step, float(usage["gpu_mem_gib"])))
+
+        if step % 10 == 0:
+            print(f"step {step}/{cfg.max_steps} loss {loss_f:.6f}")
+
+        if step % cfg.eval_every == 0:
+            eval_metrics = run_eval(
+                transformed,
+                params,
+                state,
+                rng,
+                eval_ds,
+                eval_final_indices,
+                eval_batch_size=cfg.eval_batch_size,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt_train,
+                progress_label=f"eval@step{step}",
+            )
+            eval_losses.append((step, eval_metrics["total"]))
+            eval_details.append(
+                {
+                    "step": step,
+                    "total": eval_metrics["total"],
+                }
+            )
+            print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+            save_logs(
+                out_dir,
+                train_losses,
+                eval_losses,
+                eval_details,
+                step_times,
+                mem_usage,
+                actual_usage,
+                epoch_summaries,
+            )
+
+        if step % cfg.checkpoint_every == 0:
+            save_checkpoint(
+                out_dir,
+                params=params,
+                step=step,
+                model_cfg=model_cfg,
+                task_cfg=task_cfg,
+                description=ckpt_in.description,
+                license_text=ckpt_in.license,
+            )
+
+    if pass_loss_accum:
         epoch_summaries.append(
             {
-                "epoch": epoch + 1,
-                "steps": step - epoch_start_step + 1,
-                "train_loss_mean": epoch_mean,
-                "train_one_step_mean": epoch_one_mean,
-                "train_rollout_mean": epoch_roll_mean,
-                "eval_total_end": epoch_eval["total"],
-                "eval_one_step_end": epoch_eval["one_step"],
-                "eval_rollout_end": epoch_eval["rollout"],
+                "pass": pass_idx,
+                "steps": step - pass_start_step + 1,
+                "train_loss_mean": float(np.mean(pass_loss_accum)),
                 "time_per_step_mean": float(
-                    np.mean([t for s, t in step_times if s >= epoch_start_step] or [float("nan")])
+                    np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
                 ),
-                "mem_gib_max": float(np.max([m for s, m in mem_usage if s >= epoch_start_step] or [float("nan")])),
-                "rss_gib_max": float(
-                    np.max(
-                        [
-                            float(x["proc_rss_gib"])
-                            for x in actual_usage
-                            if int(x["step"]) >= epoch_start_step and x.get("proc_rss_gib") is not None
-                        ]
-                        or [float("nan")]
-                    )
-                ),
-                "gpu_mem_gib_max": float(
-                    np.max(
-                        [
-                            float(x["gpu_mem_gib"])
-                            for x in actual_usage
-                            if int(x["step"]) >= epoch_start_step and x.get("gpu_mem_gib") is not None
-                        ]
-                        or [float("nan")]
-                    )
+                "mem_gib_max": float(
+                    np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
                 ),
             }
-        )
-        print(
-            f"[epoch {epoch + 1}] train_total {epoch_mean:.6f} "
-            f"train_one_step {epoch_one_mean:.6f} train_rollout {epoch_roll_mean:.6f} "
-            f"eval_total {epoch_eval['total']:.6f}"
-        )
-        save_logs(
-            out_dir,
-            train_losses,
-            eval_losses,
-            eval_details,
-            step_times,
-            mem_usage,
-            actual_usage,
-            epoch_summaries,
         )
 
     final_eval = run_eval(
@@ -908,8 +919,6 @@ def main() -> None:
         target_steps=target_steps,
         task_cfg=task_cfg,
         dt=dt_train,
-        use_rollout_loss=use_rollout_loss,
-        rollout_weight=cfg.rollout_weight,
         progress_label="eval@final",
     )
     eval_losses.append((step, final_eval["total"]))
@@ -918,10 +927,9 @@ def main() -> None:
             "step": step,
             "final": True,
             "total": final_eval["total"],
-            "one_step": final_eval["one_step"],
-            "rollout": final_eval["rollout"],
         }
     )
+
     save_checkpoint(
         out_dir,
         params=params,
@@ -942,6 +950,7 @@ def main() -> None:
         epoch_summaries,
     )
     plot_val_loss(out_dir, eval_losses)
+
     rss_vals = [float(x["proc_rss_gib"]) for x in actual_usage if x.get("proc_rss_gib") is not None]
     gpu_vals = [float(x["gpu_mem_gib"]) for x in actual_usage if x.get("gpu_mem_gib") is not None]
     print(
@@ -951,11 +960,7 @@ def main() -> None:
         f"gpu_peak={float(np.max(gpu_vals)) if gpu_vals else float('nan'):.3f} GiB, "
         f"gpu_avg={float(np.mean(gpu_vals)) if gpu_vals else float('nan'):.3f} GiB"
     )
-    print(
-        f"Done. Final eval total {final_eval['total']:.6f}, "
-        f"one_step {final_eval['one_step']:.6f}, rollout {final_eval['rollout']:.6f}. "
-        f"Outputs in {out_dir}"
-    )
+    print(f"Done. Final eval total {final_eval['total']:.6f}. Outputs in {out_dir}")
 
 
 if __name__ == "__main__":

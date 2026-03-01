@@ -10,6 +10,7 @@ See docs/data_formats.md for format comparison.
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Optional, Union
 
@@ -44,19 +45,32 @@ def open_graphcast_era5(
         Dataset with dims (batch, time, lat, lon) or (batch, time, level, lat, lon)
         for data vars, and coordinates batch, time, lat, lon, level.
     """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Dataset path not found: {path}")
+    raw_path = str(path)
+    parsed = urlparse(raw_path)
+    is_remote = bool(parsed.scheme and parsed.scheme not in {"", "file"})
 
-    if path.suffix == ".zarr" or path.is_dir() and (path / ".zmetadata").exists():
-        ds = xr.open_zarr(str(path), consolidated=True)
+    if is_remote:
+        # WeatherBench2-style cloud Zarr stores.
+        ds = xr.open_zarr(raw_path, consolidated=True, storage_options={"token": "anon"})
+        if "latitude" in ds.coords and "longitude" in ds.coords:
+            ds = ds.rename({"latitude": "lat", "longitude": "lon"})
         ds = _zarr_to_graphcast_layout(ds)
     else:
-        engine = engine or "netcdf4"
-        ds = xr.open_dataset(path, engine=engine)
-        # CDS NetCDF already has batch; ensure we don't double-expand
-        if "batch" not in ds.dims:
+        local_path = Path(path)
+        if not local_path.exists():
+            raise FileNotFoundError(f"Dataset path not found: {local_path}")
+
+        if local_path.suffix == ".zarr" or local_path.is_dir() and (local_path / ".zmetadata").exists():
+            ds = xr.open_zarr(str(local_path), consolidated=True)
+            if "latitude" in ds.coords and "longitude" in ds.coords:
+                ds = ds.rename({"latitude": "lat", "longitude": "lon"})
             ds = _zarr_to_graphcast_layout(ds)
+        else:
+            engine = engine or "netcdf4"
+            ds = xr.open_dataset(local_path, engine=engine)
+            # CDS NetCDF already has batch; ensure we don't double-expand
+            if "batch" not in ds.dims:
+                ds = _zarr_to_graphcast_layout(ds)
 
     if time_slice is not None:
         ds = ds.isel(time=time_slice)
