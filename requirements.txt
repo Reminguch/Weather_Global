@@ -5,9 +5,9 @@
 
 jax[cuda12]
 git+https://github.com/google-deepmind/graphcast.git
+optax
 ipykernel
 notebook
 # Data exploration (NetCDF + xarray)
 netCDF4
 xarray
-

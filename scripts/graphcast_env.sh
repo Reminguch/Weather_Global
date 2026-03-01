@@ -13,8 +13,23 @@ cd "${PROJECT_ROOT}"
 export PS1="${PS1:-}"
 
 if command -v module >/dev/null 2>&1; then
-  module purge
-  module load anaconda3/2025.6
+  module purge >/dev/null 2>&1 || true
+  if ! module load anaconda3/2025.6 >/dev/null 2>&1; then
+    echo "Warning: module load anaconda3/2025.6 failed; trying direct conda init." >&2
+  fi
+fi
+
+if [ -f "/usr/licensed/anaconda3/2025.6/etc/profile.d/conda.sh" ]; then
+  NOUNSET_WAS_ON=0
+  if [[ $- == *u* ]]; then
+    NOUNSET_WAS_ON=1
+    set +u
+  fi
+  # shellcheck source=/dev/null
+  source "/usr/licensed/anaconda3/2025.6/etc/profile.d/conda.sh"
+  if [ "${NOUNSET_WAS_ON}" -eq 1 ]; then
+    set -u
+  fi
 fi
 
 if command -v conda >/dev/null 2>&1; then
@@ -23,7 +38,6 @@ if command -v conda >/dev/null 2>&1; then
     NOUNSET_WAS_ON=1
     set +u
   fi
-  source "$(conda info --base)/etc/profile.d/conda.sh"
 
   if [ "${SETUP_MODE}" = "--setup" ]; then
     echo "Setup mode: ensure you are on the LOGIN NODE (compute nodes have no internet)."

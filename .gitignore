@@ -33,3 +33,9 @@ dist/
 *.h5
 *.hdf5
 *.zarr
+
+# Project-specific: data, artifacts, logs (do not commit to GitHub)
+data/
+artifacts/
+logs/
+.venv_data/

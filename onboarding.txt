@@ -32,17 +32,25 @@ cd /scratch/gpfs/DABANIN/iv9432/Weather_global
 sbatch scripts/verify_gpu_jax.slurm
 
 4) GPU compute node allocation:
-use 
 
+4.0 Check available GPU nodes:
 example: `sinfo -o "%P %G %f"`
 
-then use salloc to get a GPU node.
+4.1 then use salloc to get a GPU node.
 example: salloc --nodes=1 --ntasks=1 --mem=32G --time=02:00:00 --gres=gpu:a100:1
 
-to get a GPU node.
+4.2 On the compute node: env + start Jupyter
 
-To use notebook:
+cd /scratch/gpfs/DABANIN/iv9432/Weather_globalsource scripts/graphcast_env.sh
+jupyter notebook --no-browser --port=8888 --ip=0.0.0.0
+
+Copy the URL it prints, e.g.
 http://della-l04g4:8888/?token=e2951779957f4999e647ff17d04044225d01096678f1b500
+(you need the token).
+4.3 From your local machine: SSH port forward
+The compute hostname (e.g. della-l04g4) is only reachable from the cluster. So on your local machine (where Cursor runs) open a tunnel:
+ssh -L 8889:della-i14g19:8888 iv9432@della.princeton.edu
+Use the actual compute node name from step 1 in place of della-l04g4. Leave this SSH session open.
 
 5) Check logs
 
