@@ -2,7 +2,7 @@
 """Fine-tune GraphCast_small on ERA5.
 
 This script:
- - streams train/eval datasets (e.g., cloud Zarr) in GraphCast-compatible layout
+ - loads local train/eval datasets in GraphCast-compatible layout
  - restores GraphCast_small params + configs from a GraphCast checkpoint
  - runs one-step (+6h) training with optional short rollout loss
  - logs train/eval loss, step time, memory usage
@@ -21,7 +21,6 @@ import time
 import warnings
 from pathlib import Path
 from typing import Any, Iterable, Sequence
-from urllib.parse import urlparse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -72,9 +71,9 @@ warnings.filterwarnings(
 )
 
 
-DEFAULT_WB2_STREAM = "gs://weatherbench2/datasets/era5/1959-2023_01_10-wb13-6h-1440x721_with_derived_variables.zarr"
-DEFAULT_TRAIN = DEFAULT_WB2_STREAM
-DEFAULT_EVAL = DEFAULT_WB2_STREAM
+DEFAULT_LOCAL_DATASET = "data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr"
+DEFAULT_TRAIN = DEFAULT_LOCAL_DATASET
+DEFAULT_EVAL = ""
 DEFAULT_CKPT = (
     "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - "
     "pressure levels 13 - mesh 2to5 - precipitation input and output.npz"
@@ -86,7 +85,10 @@ DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_finetune_1y"
 @dataclasses.dataclass
 class RunConfig:
     train_path: str
-    eval_path: str
+    eval_path: str | None
+    train_start_year: int | None
+    train_end_year: int | None
+    val_days: int
     ckpt_in: str
     out_dir: str
     run_name: str
@@ -111,13 +113,16 @@ def parse_args() -> RunConfig:
     parser.add_argument(
         "--train-path",
         default=DEFAULT_TRAIN,
-        help="Remote dataset URI (gs://...) used for training. Local paths are not supported.",
+        help="Local dataset path (.zarr or .nc) used for training.",
     )
     parser.add_argument(
         "--eval-path",
         default=DEFAULT_EVAL,
-        help="Remote dataset URI (gs://...) used for evaluation. Local paths are not supported.",
+        help="Optional local evaluation dataset path. If omitted, eval is trailing --val-days from train years.",
     )
+    parser.add_argument("--train-start-year", type=int, default=None)
+    parser.add_argument("--train-end-year", type=int, default=None)
+    parser.add_argument("--val-days", type=int, default=30)
     parser.add_argument("--ckpt-in", default=DEFAULT_CKPT)
     parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
     parser.add_argument("--run-name", default="h100_full")
@@ -136,9 +141,18 @@ def parse_args() -> RunConfig:
     parser.add_argument("--no-rollout", action="store_true", help="Disable rollout loss term.")
     parser.add_argument("--precision", choices=["bf16", "fp16", "fp32"], default="bf16")
     args = parser.parse_args()
+    if args.val_days <= 0:
+        raise ValueError("--val-days must be > 0")
+    if (args.train_start_year is None) ^ (args.train_end_year is None):
+        raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
+    if args.train_start_year is not None and args.train_start_year > args.train_end_year:
+        raise ValueError("--train-start-year must be <= --train-end-year")
     return RunConfig(
         train_path=args.train_path,
-        eval_path=args.eval_path,
+        eval_path=args.eval_path if args.eval_path else None,
+        train_start_year=args.train_start_year,
+        train_end_year=args.train_end_year,
+        val_days=args.val_days,
         ckpt_in=args.ckpt_in,
         out_dir=args.out_dir,
         run_name=args.run_name,
@@ -159,9 +173,9 @@ def parse_args() -> RunConfig:
     )
 
 
-def _is_remote_uri(path: str) -> bool:
-    parsed = urlparse(path)
-    return bool(parsed.scheme and parsed.scheme not in {"", "file"})
+def _assert_local_path(path: str, arg_name: str) -> None:
+    if "://" in path:
+        raise ValueError(f"{arg_name} must be a local path; remote URIs are disabled: {path}")
 
 
 def load_stats(stats_dir: Path) -> dict[str, xr.Dataset]:
@@ -462,7 +476,7 @@ def save_checkpoint(
 
 def save_logs(
     out_dir: Path,
-    train_losses: list[float],
+    train_losses: list[tuple[int, float]],
     eval_losses: list[tuple[int, float]],
     eval_details: list[dict[str, Any]],
     step_times: list[tuple[int, float]],
@@ -579,6 +593,9 @@ def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
     steps, vals = zip(*eval_losses)
     plt.figure()
     plt.plot(steps, vals, marker="o")
+    y_max = max(vals) * 2.0
+    if y_max > 0:
+        plt.ylim(0.0, y_max)
     plt.xlabel("step")
     plt.ylabel("eval loss")
     plt.title("Validation loss")
@@ -588,16 +605,34 @@ def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
     plt.close()
 
 
+def _slice_dataset_years(ds: xr.Dataset, start_year: int, end_year: int) -> xr.Dataset:
+    start = pd.Timestamp(year=start_year, month=1, day=1, hour=0)
+    end = pd.Timestamp(year=end_year, month=12, day=31, hour=23, minute=59, second=59)
+    return ds.sel(time=slice(start, end))
+
+
+def _split_train_eval_trailing_days(ds: xr.Dataset, val_days: int) -> tuple[xr.Dataset, xr.Dataset]:
+    val_steps = val_days * 4  # 6-hour cadence
+    if ds.sizes.get("time", 0) <= val_steps:
+        raise ValueError(
+            f"Not enough timesteps ({ds.sizes.get('time', 0)}) for trailing validation of "
+            f"{val_days} days ({val_steps} steps)."
+        )
+    train_ds = ds.isel(time=slice(None, -val_steps))
+    eval_ds = ds.isel(time=slice(-val_steps, None))
+
+    train_times = pd.DatetimeIndex(pd.to_datetime(train_ds.time.values))
+    eval_times = pd.DatetimeIndex(pd.to_datetime(eval_ds.time.values))
+    if train_times.intersection(eval_times).size > 0:
+        raise ValueError("Train/eval overlap detected in trailing validation split.")
+    return train_ds, eval_ds
+
+
 def main() -> None:
     cfg = parse_args()
-    if not _is_remote_uri(cfg.train_path):
-        raise ValueError(
-            f"--train-path must be a remote URI (e.g., gs://...). Local paths are disabled: {cfg.train_path}"
-        )
-    if not _is_remote_uri(cfg.eval_path):
-        raise ValueError(
-            f"--eval-path must be a remote URI (e.g., gs://...). Local paths are disabled: {cfg.eval_path}"
-        )
+    _assert_local_path(cfg.train_path, "--train-path")
+    if cfg.eval_path:
+        _assert_local_path(cfg.eval_path, "--eval-path")
     out_dir = Path(cfg.out_dir) / cfg.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -608,8 +643,40 @@ def main() -> None:
     norm_stats = load_stats(Path(DEFAULT_STATS_DIR))
     validate_stats_coverage(task_cfg, norm_stats)
 
-    train_ds = open_graphcast_era5(cfg.train_path)
-    eval_ds = open_graphcast_era5(cfg.eval_path)
+    train_full = open_graphcast_era5(cfg.train_path)
+    train_full = _ensure_datetime_coord(train_full)
+    years_all = pd.DatetimeIndex(pd.to_datetime(train_full.time.values)).year.astype(int)
+    min_year = int(years_all.min())
+    max_year = int(years_all.max())
+    train_start_year = cfg.train_start_year if cfg.train_start_year is not None else min_year
+    train_end_year = cfg.train_end_year if cfg.train_end_year is not None else max_year
+    if train_start_year < min_year or train_end_year > max_year:
+        raise ValueError(
+            f"Requested train years [{train_start_year}, {train_end_year}] outside dataset years "
+            f"[{min_year}, {max_year}]"
+        )
+
+    train_range_ds = _slice_dataset_years(train_full, train_start_year, train_end_year)
+    if train_range_ds.sizes.get("time", 0) == 0:
+        raise ValueError("Selected training year range produced an empty dataset.")
+
+    if cfg.eval_path:
+        train_ds = train_range_ds
+        eval_ds = open_graphcast_era5(cfg.eval_path)
+    else:
+        train_ds, eval_ds = _split_train_eval_trailing_days(train_range_ds, cfg.val_days)
+
+    if train_ds.sizes.get("time", 0) == 0:
+        raise ValueError("Train dataset is empty after split.")
+    if eval_ds.sizes.get("time", 0) == 0:
+        raise ValueError("Eval dataset is empty after split.")
+
+    print(
+        "Data split: "
+        f"train_path={cfg.train_path}, eval_path={cfg.eval_path or '<derived-from-train>'}, "
+        f"train_years={train_start_year}-{train_end_year}, val_days={cfg.val_days}, "
+        f"train_time={train_ds.sizes['time']}, eval_time={eval_ds.sizes['time']}"
+    )
 
     if cfg.tiny:
         slice_steps = cfg.tiny_days * 4  # 6h steps/day
@@ -718,7 +785,7 @@ def main() -> None:
         new_params = optax.apply_updates(params, updates)
         return new_params, new_state, new_opt_state, total_loss, one_loss, rollout_loss
 
-    train_losses: list[float] = []
+    train_losses: list[tuple[int, float]] = []
     eval_losses: list[tuple[int, float]] = []
     eval_details: list[dict[str, Any]] = []
     step_times: list[tuple[int, float]] = []
@@ -770,7 +837,7 @@ def main() -> None:
             total_loss_f = float(total_loss)
             one_loss_f = float(one_loss)
             rollout_loss_f = float(rollout_loss)
-            train_losses.append(total_loss_f)
+            train_losses.append((step, total_loss_f))
             epoch_loss_accum.append(total_loss_f)
             epoch_one_accum.append(one_loss_f)
             epoch_roll_accum.append(rollout_loss_f)

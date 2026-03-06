@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Train GraphCast on streamed WeatherBench2 ERA5 at 2.0-degree resolution.
+"""Train GraphCast on local ERA5 data at 2.0-degree resolution.
 
 This script:
- - streams WeatherBench2 ERA5 Zarr from GCS (no full local materialization)
- - slices train/val by date ranges
- - downsamples grid from 0.25deg to target resolution (default 2.0deg)
+ - loads local ERA5 dataset
+ - splits train/val by year (train: available years except val_year, val: val_year)
+ - downsamples grid from base local resolution to target resolution (default 2.0deg)
  - trains one-step (+6h) objective with fixed max optimizer steps
  - logs losses, timings, GPU/CPU memory, checkpoints, and run metadata
 """
@@ -31,6 +31,8 @@ import xarray as xr
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from src.data.graphcast_dataset import open_graphcast_era5
 
 
 def _require_graphcast() -> None:
@@ -69,7 +71,7 @@ warnings.filterwarnings(
 )
 
 
-DEFAULT_WB2_URI = "gs://weatherbench2/datasets/era5/1959-2023_01_10-wb13-6h-1440x721_with_derived_variables.zarr"
+DEFAULT_DATA_PATH = "data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr"
 DEFAULT_CKPT = (
     "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - "
     "pressure levels 13 - mesh 2to5 - precipitation input and output.npz"
@@ -98,15 +100,14 @@ GRAPHCAST_VARS = [
 
 @dataclasses.dataclass
 class RunConfig:
-    wb2_uri: str
-    train_start: str
-    train_end: str
-    val_start: str
-    val_end: str
+    data_path: str
     resolution: float
     mesh_size: int
     width: int
     processor_msg_steps: int
+    val_year: int
+    train_start_year: int | None
+    train_end_year: int | None
     ckpt_in: str
     stats_dir: str
     out_dir: str
@@ -120,19 +121,19 @@ class RunConfig:
     weight_decay: float
     seed: int
     precision: str
+    resume_step: int | None
 
 
 def parse_args() -> RunConfig:
-    parser = argparse.ArgumentParser(description="Train GraphCast at 2.0deg from streamed WB2 Zarr.")
-    parser.add_argument("--wb2-uri", default=DEFAULT_WB2_URI)
-    parser.add_argument("--train-start", default="1979-01-01")
-    parser.add_argument("--train-end", default="2020-12-31")
-    parser.add_argument("--val-start", default="2021-01-01")
-    parser.add_argument("--val-end", default="2021-12-31")
+    parser = argparse.ArgumentParser(description="Train GraphCast at 2.0deg from local ERA5 data.")
+    parser.add_argument("--data-path", default=DEFAULT_DATA_PATH, help="Local dataset path (.zarr or .nc).")
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
-    parser.add_argument("--width", type=int, choices=[128, 256], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2], default=1)
+    parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
+    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4], default=1)
+    parser.add_argument("--val-year", type=int, default=2021, help="Validation year (excluded from train split).")
+    parser.add_argument("--train-start-year", type=int, default=None, help="Optional lower bound for train years.")
+    parser.add_argument("--train-end-year", type=int, default=None, help="Optional upper bound for train years.")
     parser.add_argument("--ckpt-in", default=DEFAULT_CKPT)
     parser.add_argument("--stats-dir", default=DEFAULT_STATS_DIR)
     parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
@@ -146,23 +147,31 @@ def parse_args() -> RunConfig:
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--precision", choices=["bf16", "fp16", "fp32"], default="bf16")
+    parser.add_argument("--resume-step", type=int, default=None, help="Resume from this step (load params from --ckpt-in).")
     args = parser.parse_args()
 
     if args.max_steps <= 0:
         raise ValueError("--max-steps must be > 0")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be > 0")
+    if args.train_start_year is not None and args.train_end_year is None:
+        raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
+    if args.train_end_year is not None and args.train_start_year is None:
+        raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
+    if args.train_start_year is not None and args.train_start_year > args.train_end_year:
+        raise ValueError("--train-start-year must be <= --train-end-year")
+    if args.resume_step is not None and args.resume_step < 0:
+        raise ValueError("--resume-step must be >= 0")
 
     return RunConfig(
-        wb2_uri=args.wb2_uri,
-        train_start=args.train_start,
-        train_end=args.train_end,
-        val_start=args.val_start,
-        val_end=args.val_end,
+        data_path=args.data_path,
         resolution=args.resolution,
         mesh_size=args.mesh_size,
         width=args.width,
         processor_msg_steps=args.processor_msg_steps,
+        val_year=args.val_year,
+        train_start_year=args.train_start_year,
+        train_end_year=args.train_end_year,
         ckpt_in=args.ckpt_in,
         stats_dir=args.stats_dir,
         out_dir=args.out_dir,
@@ -176,6 +185,7 @@ def parse_args() -> RunConfig:
         weight_decay=args.weight_decay,
         seed=args.seed,
         precision=args.precision,
+        resume_step=args.resume_step,
     )
 
 
@@ -472,7 +482,7 @@ def save_checkpoint(
 
 def save_logs(
     out_dir: Path,
-    train_losses: list[float],
+    train_losses: list[tuple[int, float]],
     eval_losses: list[tuple[int, float]],
     eval_details: list[dict[str, Any]],
     step_times: list[tuple[int, float]],
@@ -509,6 +519,58 @@ def save_logs(
         )
     with (out_dir / "epoch_summary.json").open("w", encoding="utf-8") as f:
         json.dump(epoch_summaries, f, indent=2)
+
+
+def _load_json_list(path: Path) -> list[Any]:
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _load_step_value_pairs(path: Path) -> list[tuple[int, float]]:
+    data = _load_json_list(path)
+    out: list[tuple[int, float]] = []
+    for item in data:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            out.append((int(item[0]), float(item[1])))
+    return out
+
+
+def _load_train_losses(path: Path) -> list[tuple[int, float]]:
+    data = _load_json_list(path)
+    if not data:
+        return []
+    first = data[0]
+    if isinstance(first, (list, tuple)):
+        out: list[tuple[int, float]] = []
+        for item in data:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                out.append((int(item[0]), float(item[1])))
+        return out
+    return [(i + 1, float(loss)) for i, loss in enumerate(data)]
+
+
+def _filter_pairs_upto_step(data: list[tuple[int, float]], max_step: int) -> list[tuple[int, float]]:
+    return [(int(step), float(value)) for step, value in data if int(step) <= max_step]
+
+
+def _load_dict_series_upto_step(path: Path, max_step: int) -> list[dict[str, Any]]:
+    data = _load_json_list(path)
+    out: list[dict[str, Any]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        step = item.get("step")
+        if step is None:
+            continue
+        if int(step) <= max_step:
+            out.append(item)
+    return out
 
 
 def _read_proc_mem_gib() -> tuple[float | None, float | None]:
@@ -588,6 +650,9 @@ def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
     steps, vals = zip(*eval_losses)
     plt.figure()
     plt.plot(steps, vals, marker="o")
+    y_max = max(vals) * 2.0
+    if y_max > 0:
+        plt.ylim(0.0, y_max)
     plt.xlabel("step")
     plt.ylabel("eval loss")
     plt.title("Validation loss")
@@ -597,35 +662,51 @@ def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
     plt.close()
 
 
-def _open_wb2_streamed_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
-    print(f"Opening WB2 Zarr: {cfg.wb2_uri}")
-    ds = xr.open_zarr(cfg.wb2_uri, consolidated=True, storage_options={"token": "anon"})
+def _assert_local_path(path: str, arg_name: str) -> None:
+    if "://" in path:
+        raise ValueError(f"{arg_name} must be a local path; remote URIs are disabled: {path}")
 
-    if "latitude" in ds.coords and "longitude" in ds.coords:
-        ds = ds.rename({"latitude": "lat", "longitude": "lon"})
+
+def _infer_base_resolution_deg(ds: xr.Dataset) -> float:
+    if "lat" not in ds.coords or "lon" not in ds.coords:
+        raise KeyError("Expected `lat` and `lon` coordinates in local dataset.")
+    lat = np.asarray(ds["lat"].values, dtype=float)
+    lon = np.asarray(ds["lon"].values, dtype=float)
+    if lat.size < 2 or lon.size < 2:
+        raise ValueError("Need at least two lat/lon coordinates to infer base resolution.")
+    lat_d = np.abs(np.diff(lat))
+    lon_d = np.abs(np.diff(lon))
+    lat_d = lat_d[lat_d > 0]
+    lon_d = lon_d[lon_d > 0]
+    if lat_d.size == 0 or lon_d.size == 0:
+        raise ValueError("Unable to infer base resolution from lat/lon coordinates.")
+    lat_res = float(np.median(lat_d))
+    lon_res = float(np.median(lon_d))
+    if not np.isclose(lat_res, lon_res, atol=1e-6):
+        raise ValueError(f"Lat/lon spacing mismatch: lat={lat_res}, lon={lon_res}")
+    return lat_res
+
+
+def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
+    _assert_local_path(cfg.data_path, "--data-path")
+    print(f"Opening local dataset: {cfg.data_path}")
+    ds = open_graphcast_era5(cfg.data_path)
+    ds = _ensure_datetime_coord(ds)
 
     if "time" not in ds.coords:
-        raise KeyError("Expected `time` coordinate in source dataset.")
-    if "lat" not in ds.coords or "lon" not in ds.coords:
-        raise KeyError("Expected `lat` and `lon` coordinates in source dataset.")
-
-    if not np.issubdtype(ds.time.dtype, np.datetime64):
-        ds = xr.decode_cf(ds)
+        raise KeyError("Expected `time` coordinate in local dataset.")
 
     available_vars = [name for name in GRAPHCAST_VARS if name in ds.data_vars]
     if not available_vars:
-        raise ValueError("None of the required GraphCast variables were found in source dataset.")
+        raise ValueError("None of the required GraphCast variables were found in local dataset.")
+    ds = ds[available_vars]
 
-    # Restrict to overall requested date extent first.
-    ds = ds[available_vars].sel(time=slice(cfg.train_start, cfg.val_end))
-
-    # 0.25deg -> 2.0deg requires stride 8.
-    base_res = 0.25
+    base_res = _infer_base_resolution_deg(ds)
     ratio = cfg.resolution / base_res
     stride = int(round(ratio))
     if not np.isclose(ratio, stride, atol=1e-6):
         raise ValueError(
-            f"resolution={cfg.resolution} is not an integer multiple of 0.25deg base grid."
+            f"resolution={cfg.resolution} is not an integer multiple of base grid {base_res}deg."
         )
     if stride <= 0:
         raise ValueError(f"Invalid resolution stride: {stride}")
@@ -636,24 +717,50 @@ def _open_wb2_streamed_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
         if ds[name].dtype.kind == "f" and ds[name].dtype != np.float32:
             ds[name] = ds[name].astype(np.float32)
 
-    train_raw = ds.sel(time=slice(cfg.train_start, cfg.train_end))
-    val_raw = ds.sel(time=slice(cfg.val_start, cfg.val_end))
+    time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
+    years = sorted(set(time_index.year.astype(int).tolist()))
+    if cfg.val_year not in years:
+        raise ValueError(
+            f"Requested val year {cfg.val_year} not present in local dataset years: {years}"
+        )
+
+    train_years = [y for y in years if y != cfg.val_year]
+    if cfg.train_start_year is not None:
+        train_years = [y for y in train_years if cfg.train_start_year <= y <= cfg.train_end_year]
+
+    if not train_years:
+        raise ValueError("No train years left after excluding val year and applying train-year bounds.")
+
+    train_mask = np.isin(time_index.year, np.asarray(train_years))
+    val_mask = time_index.year == cfg.val_year
+    train_raw = ds.isel(time=np.where(train_mask)[0])
+    val_raw = ds.isel(time=np.where(val_mask)[0])
 
     if train_raw.sizes.get("time", 0) == 0:
-        raise ValueError("Empty train split after date selection.")
+        raise ValueError("Empty train split after year selection.")
     if val_raw.sizes.get("time", 0) == 0:
-        raise ValueError("Empty validation split after date selection.")
+        raise ValueError("Empty validation split after year selection.")
 
-    return _to_graphcast_layout(train_raw), _to_graphcast_layout(val_raw)
+    train_times = pd.DatetimeIndex(pd.to_datetime(train_raw.time.values))
+    val_times = pd.DatetimeIndex(pd.to_datetime(val_raw.time.values))
+    if train_times.intersection(val_times).size > 0:
+        raise ValueError("Train/validation overlap detected in year split.")
+
+    print(
+        "Data split: "
+        f"train_years={train_years[0]}-{train_years[-1]} (excluding {cfg.val_year}), "
+        f"val_year={cfg.val_year}, train_time={train_raw.sizes['time']}, val_time={val_raw.sizes['time']}, "
+        f"base_res={base_res}, target_res={cfg.resolution}, stride={stride}"
+    )
+    return train_raw, val_raw
 
 
 def _write_run_config(out_dir: Path, cfg: RunConfig, model_cfg: gc.ModelConfig, task_cfg: gc.TaskConfig) -> None:
     payload = {
-        "wb2_uri": cfg.wb2_uri,
-        "train_start": cfg.train_start,
-        "train_end": cfg.train_end,
-        "val_start": cfg.val_start,
-        "val_end": cfg.val_end,
+        "data_path": cfg.data_path,
+        "val_year": cfg.val_year,
+        "train_start_year": cfg.train_start_year,
+        "train_end_year": cfg.train_end_year,
         "batch_size": cfg.batch_size,
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
@@ -692,7 +799,7 @@ def main() -> None:
     norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
 
-    train_ds, eval_ds = _open_wb2_streamed_splits(cfg)
+    train_ds, eval_ds = _open_local_splits(cfg)
 
     train_ds = prepare_dataset_for_task(train_ds, task_cfg)
     eval_ds = prepare_dataset_for_task(eval_ds, task_cfg)
@@ -743,6 +850,9 @@ def main() -> None:
     )
 
     params, state = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, True)
+    if cfg.resume_step is not None:
+        params = ckpt_in.params
+        print(f"Resuming from step {cfg.resume_step} (params loaded from {cfg.ckpt_in})")
 
     opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     opt_state = opt.init(params)
@@ -769,7 +879,9 @@ def main() -> None:
         new_params = optax.apply_updates(params, updates)
         return new_params, new_state, new_opt_state, loss
 
-    train_losses: list[float] = []
+    step = cfg.resume_step if cfg.resume_step is not None else 0
+
+    train_losses: list[tuple[int, float]] = []
     eval_losses: list[tuple[int, float]] = []
     eval_details: list[dict[str, Any]] = []
     step_times: list[tuple[int, float]] = []
@@ -777,15 +889,27 @@ def main() -> None:
     actual_usage: list[dict[str, Any]] = []
     epoch_summaries: list[dict[str, Any]] = []
 
+    if cfg.resume_step is not None:
+        train_losses = _filter_pairs_upto_step(_load_train_losses(out_dir / "train_loss.json"), cfg.resume_step)
+        eval_losses = _filter_pairs_upto_step(_load_step_value_pairs(out_dir / "eval_loss.json"), cfg.resume_step)
+        step_times = _filter_pairs_upto_step(_load_step_value_pairs(out_dir / "step_times.json"), cfg.resume_step)
+        mem_usage = _filter_pairs_upto_step(_load_step_value_pairs(out_dir / "memory_gib.json"), cfg.resume_step)
+        eval_details = _load_dict_series_upto_step(out_dir / "eval_details.json", cfg.resume_step)
+        actual_usage = _load_dict_series_upto_step(out_dir / "actual_usage.json", cfg.resume_step)
+        epoch_summaries = _load_json_list(out_dir / "epoch_summary.json")
+        print(
+            "Loaded existing logs for resume: "
+            f"train={len(train_losses)}, eval={len(eval_losses)}, "
+            f"step_times={len(step_times)}, mem={len(mem_usage)}, actual={len(actual_usage)}"
+        )
+
     np_rng = np.random.default_rng(cfg.seed)
     current_indices = train_final_indices.copy()
     np_rng.shuffle(current_indices)
     cursor = 0
     pass_idx = 1
-    pass_start_step = 1
+    pass_start_step = step + 1
     pass_loss_accum: list[float] = []
-
-    step = 0
     while step < cfg.max_steps:
         if cursor >= len(current_indices):
             epoch_summaries.append(
@@ -835,7 +959,7 @@ def main() -> None:
 
         step += 1
         loss_f = float(loss)
-        train_losses.append(loss_f)
+        train_losses.append((step, loss_f))
         pass_loss_accum.append(loss_f)
         step_times.append((step, step_time))
 

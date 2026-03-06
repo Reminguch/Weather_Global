@@ -435,12 +435,16 @@ def main() -> None:
 
         if write_mode in {"create", "append"}:
             mode = "a" if output.exists() else "w"
-            for year in missing_years:
-                print(f"processing year {year} ({'append' if mode == 'a' else 'create'})")
+            total = len(missing_years)
+            for i, year in enumerate(missing_years, start=1):
+                t0 = time.time()
+                print(f"processing year {year} ({i}/{total}) ({'append' if mode == 'a' else 'create'})")
                 year_ds = _prepare_year_chunk(source, year, vars_to_keep, args.chunk_time)
                 _write_year(year_ds, output, mode=mode)
                 appended_years.append(year)
                 mode = "a"
+                elapsed = time.time() - t0
+                print(f"  completed in {elapsed:.0f}s" + (f" (est. {elapsed * (total - i) / 60:.0f} min left)" if i < total else ""))
 
         elif write_mode == "rebuild":
             if existing_ds is None:
@@ -451,9 +455,11 @@ def main() -> None:
                 shutil.rmtree(tmp_output)
 
             years_to_write = sorted(set(existing_years) | set(missing_years))
+            total = len(years_to_write)
             mode = "w"
-            for year in years_to_write:
-                print(f"processing year {year} ({'missing->source' if year in missing_years else 'existing->local'})")
+            for i, year in enumerate(years_to_write, start=1):
+                t0 = time.time()
+                print(f"processing year {year} ({i}/{total}) ({'missing->source' if year in missing_years else 'existing->local'})")
                 if year in missing_years:
                     year_ds = _prepare_year_chunk(source, year, vars_to_keep, args.chunk_time)
                     appended_years.append(year)
@@ -464,6 +470,8 @@ def main() -> None:
 
                 _write_year(year_ds, tmp_output, mode=mode)
                 mode = "a"
+                elapsed = time.time() - t0
+                print(f"  completed in {elapsed:.0f}s" + (f" (est. {elapsed * (total - i) / 60:.0f} min left)" if i < total else ""))
 
             if output.exists():
                 shutil.rmtree(output)

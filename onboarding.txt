@@ -41,7 +41,8 @@ example: salloc --nodes=1 --ntasks=1 --mem=32G --time=02:00:00 --gres=gpu:a100:1
 
 4.2 On the compute node: env + start Jupyter
 
-cd /scratch/gpfs/DABANIN/iv9432/Weather_globalsource scripts/graphcast_env.sh
+cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+source scripts/graphcast_env.sh
 jupyter notebook --no-browser --port=8888 --ip=0.0.0.0
 
 Copy the URL it prints, e.g.
@@ -81,3 +82,48 @@ Use the same environment script at the start of your job script:
 cd /scratch/gpfs/DABANIN/iv9432/Weather_global
 source scripts/graphcast_env.sh
 python your_script.py
+
+7) Stage WB2 data locally (for compute nodes without direct GCS access)
+
+Run this on a login/proxy-enabled context, then train from local Zarr on compute nodes.
+
+Bootstrap local WB2 dataset (1.0deg, 13 levels):
+
+cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+source scripts/graphcast_env.sh
+python scripts/stage_wb2_era5_yearly_append.py
+
+Append one next missing year later:
+
+python scripts/stage_wb2_era5_yearly_append.py
+
+Dry-run (no writes):
+
+python scripts/stage_wb2_era5_yearly_append.py --dry-run
+
+8) Download local last-30-day dataset (optional)
+
+Useful for short recency-focused evaluation datasets.
+
+python scripts/download_wb2_last30d.py
+
+Default output:
+- data/graphcast/graphcast/dataset/wb2_res1_levels13_last30d.zarr
+
+9) Train/fine-tune from local datasets
+
+Fine-tune on selected years, validate on trailing 30 days:
+
+python -u scripts/training/finetune_graphcast.py \
+  --train-path data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr \
+  --train-start-year 1979 \
+  --train-end-year 2021 \
+  --val-days 30
+
+Res2 training split:
+- train: all years in local dataset except 2021
+- val: year 2021
+
+python -u scripts/training/train_graphcast_res2_stream.py \
+  --data-path data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr \
+  --val-year 2021
