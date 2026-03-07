@@ -43,7 +43,7 @@ def main() -> None:
     parser.add_argument("--lon-name", default="lon", help="Longitude coordinate name.")
     parser.add_argument(
         "--method",
-        default="linear",
+        default="nearest",
         choices=["linear", "nearest"],
         help="Interpolation method.",
     )
