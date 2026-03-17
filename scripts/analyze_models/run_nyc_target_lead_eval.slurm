@@ -2,8 +2,8 @@
 #SBATCH --job-name=gc-nyc-lead
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=24:00:00
+#SBATCH --mem=30G
+#SBATCH --time=2:00:00
 #SBATCH --output=logs/gc_nyc_targetlead_%j.out
 #SBATCH --error=logs/gc_nyc_targetlead_%j.err
 
@@ -34,6 +34,7 @@ N_EVAL_DAYS="${N_EVAL_DAYS:-40}"
 N_EXTRA_STEPS="${N_EXTRA_STEPS:-14}"
 OUTPUT_DIR="${OUTPUT_DIR:-plots/analyze_models}"
 OUTPUT_STEM="${OUTPUT_STEM:-nyc_targetlead_${RUN_PREFIX}_${TARGET_LEAD_DAYS}d}"
+SINGLE_CKPT="${SINGLE_CKPT:-}"
 
 CMD=(
   python -u scripts/analyze_models/nyc_target_lead_eval.py
@@ -47,6 +48,10 @@ CMD=(
   --output-dir "${OUTPUT_DIR}"
   --output-stem "${OUTPUT_STEM}"
 )
+
+if [[ -n "${SINGLE_CKPT}" ]]; then
+  CMD+=(--single-ckpt "${SINGLE_CKPT}")
+fi
 
 echo "Running: ${CMD[*]}"
 "${CMD[@]}"

@@ -4,7 +4,7 @@
 Replicates the notebook workflow:
 - discover latest checkpoint per run under artifacts/checkpoints/graphcast_res4_stream/res4_*
 - evaluate 2m temperature at NYC for a fixed lead (default 6 days)
-- save trajectory plot and MAE summary under plots/analyze_models
+- save trajectory plot, MAE summary, and per-timepoint predictions under plots/analyze_models
 """
 
 from __future__ import annotations
@@ -57,6 +57,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--output-dir", default=OUTPUT_DIR_DEFAULT, help="Output directory.")
     p.add_argument("--ckpt-root", default=CKPT_ROOT_DEFAULT, help="Checkpoint root directory.")
     p.add_argument("--run-prefix", default=RUN_PREFIX_DEFAULT, help="Run prefix (default: res4).")
+    p.add_argument(
+        "--single-ckpt",
+        default=None,
+        help=(
+            "Optional path to a single checkpoint .npz. "
+            "If set, bypasses ckpt-root/run-prefix discovery (useful for baseline GraphCast)."
+        ),
+    )
     p.add_argument("--target-lead-days", type=int, default=6, help="Forecast lead in days.")
     p.add_argument("--hours-per-step", type=int, default=6, help="Hours per forecast step.")
     p.add_argument("--n-input-steps", type=int, default=2, help="Input context steps.")
@@ -192,7 +200,9 @@ def main() -> None:
         )
     target_lead_steps = target_lead_hours // args.hours_per_step
     n_context_steps = args.n_input_steps + target_lead_steps
-    target_lead_times = f"{target_lead_hours}h"
+    # Use a contiguous lead-time slice so autoregressive rollout advances through
+    # all intermediate forecast steps up to the requested lead.
+    target_lead_times = slice(f"{args.hours_per_step}h", f"{target_lead_hours}h")
 
     ds_nyc, start_target_idx, n_steps = _prepare_dataset(
         args.dataset_dir,
@@ -205,9 +215,15 @@ def main() -> None:
     all_times_nyc = ds_nyc["time"].values[start_target_idx:n_steps]
     stats = _load_stats(ROOT / args.stats_dir)
 
-    ckpt_paths = _discover_latest_checkpoints(ROOT / args.ckpt_root, args.run_prefix)
-    if not ckpt_paths:
-        raise RuntimeError(f"No ckpt_step*.npz found under {ROOT / args.ckpt_root} for prefix={args.run_prefix}")
+    if args.single_ckpt:
+        p = Path(args.single_ckpt)
+        if not p.is_absolute():
+            p = ROOT / p
+        ckpt_paths = [p]
+    else:
+        ckpt_paths = _discover_latest_checkpoints(ROOT / args.ckpt_root, args.run_prefix)
+        if not ckpt_paths:
+            raise RuntimeError(f"No ckpt_step*.npz found under {ROOT / args.ckpt_root} for prefix={args.run_prefix}")
     for p in ckpt_paths:
         if not p.exists():
             raise FileNotFoundError(f"Checkpoint not found: {p}")
@@ -260,8 +276,11 @@ def main() -> None:
         pred_arr = _to_celsius_if_needed(np.asarray(pred_nyc, dtype=float))
         real_arr = _to_celsius_if_needed(np.asarray(real_nyc_res, dtype=float))
 
-        step_tag = ckpt_path.stem.replace("ckpt_step", "")
-        label = f"{ckpt_path.parent.name} (step {step_tag})"
+        if ckpt_path.stem.startswith("ckpt_step"):
+            step_tag = ckpt_path.stem.replace("ckpt_step", "")
+            label = f"{ckpt_path.parent.name} (step {step_tag})"
+        else:
+            label = ckpt_path.stem
         results.append({"label": label, "pred_nyc": pred_arr, "real_nyc_res": real_arr})
         print(f"[{m_i}/{len(ckpt_paths)}] {label}: N={len(pred_arr)} stride={stride} resolution={res}")
 
@@ -301,6 +320,7 @@ def main() -> None:
     plt.close(fig)
 
     metrics_rows: list[dict[str, float | int | str]] = []
+    timeseries_rows: list[dict[str, object]] = []
     for item in results:
         label = str(item["label"])
         pred_arr = np.asarray(item["pred_nyc"])
@@ -312,7 +332,20 @@ def main() -> None:
                 f"(pred={len(pred_arr)}, real={len(real_arr)}, time={len(all_times_nyc)})"
             )
             continue
-        err = np.abs(pred_arr[:n] - real_arr[:n])
+        times = pd.to_datetime(all_times_nyc[:n])
+        err_signed = pred_arr[:n] - real_arr[:n]
+        err = np.abs(err_signed)
+        for i in range(n):
+            timeseries_rows.append(
+                {
+                    "label": label,
+                    "valid_time": times[i],
+                    "era5_c": float(real_arr[i]),
+                    "pred_c": float(pred_arr[i]),
+                    "error_c": float(err_signed[i]),
+                    "abs_error_c": float(err[i]),
+                }
+            )
         metrics_rows.append(
             {
                 "label": label,
@@ -324,7 +357,9 @@ def main() -> None:
 
     metrics_rows.sort(key=lambda x: float(x["mae_c"]))
     csv_path = out_dir / f"{output_stem}_mae.csv"
+    timeseries_path = out_dir / f"{output_stem}_timeseries.csv"
     pd.DataFrame(metrics_rows).to_csv(csv_path, index=False)
+    pd.DataFrame(timeseries_rows).to_csv(timeseries_path, index=False)
 
     print(f"Saved plot: {plot_path}")
     print(f"Saved MAE summary: {csv_path}")

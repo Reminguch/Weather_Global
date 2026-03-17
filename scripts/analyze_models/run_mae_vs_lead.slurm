@@ -2,8 +2,8 @@
 #SBATCH --job-name=gc-mae
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=24:00:00
+#SBATCH --mem=10G
+#SBATCH --time=2:00:00
 #SBATCH --output=logs/gc_mae_%j.out
 #SBATCH --error=logs/gc_mae_%j.err
 

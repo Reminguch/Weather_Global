@@ -54,6 +54,7 @@ from graphcast import (
     checkpoint,
     data_utils,
     graphcast as gc,
+    losses as gc_losses,
     normalization,
     xarray_jax,
 )
@@ -69,6 +70,44 @@ warnings.filterwarnings(
     category=FutureWarning,
     message=r"The return type of `Dataset\.dims` will be changed.*",
 )
+
+
+_ORIG_NORMALIZED_LATITUDE_WEIGHTS = gc_losses.normalized_latitude_weights
+
+
+def _fallback_normalized_latitude_weights(data: xr.DataArray) -> xr.DataArray:
+    """Area weights for any uniformly spaced latitude vector (with or without poles)."""
+    latitude = data.coords["lat"]
+    lat_vals = np.asarray(latitude.values, dtype=np.float64)
+    if lat_vals.ndim != 1 or lat_vals.size < 2:
+        raise ValueError(f"Expected 1D latitude with at least 2 points; got shape={lat_vals.shape}")
+
+    diffs = np.diff(lat_vals)
+    if not np.all(np.isclose(diffs, diffs[0], atol=1e-6)):
+        raise ValueError(f"Latitude vector is not uniformly spaced: {latitude}")
+    delta = float(diffs[0])
+
+    edges = np.empty(lat_vals.size + 1, dtype=np.float64)
+    edges[1:-1] = 0.5 * (lat_vals[:-1] + lat_vals[1:])
+    edges[0] = lat_vals[0] - (delta / 2.0)
+    edges[-1] = lat_vals[-1] + (delta / 2.0)
+    edges = np.clip(edges, -90.0, 90.0)
+
+    weights_np = np.abs(np.sin(np.deg2rad(edges[:-1])) - np.sin(np.deg2rad(edges[1:])))
+    weights = xr.DataArray(weights_np, coords=latitude.coords, dims=latitude.dims).astype(np.float32)
+    return weights / weights.mean(skipna=False)
+
+
+def _normalized_latitude_weights_with_fallback(data: xr.DataArray) -> xr.DataArray:
+    try:
+        return _ORIG_NORMALIZED_LATITUDE_WEIGHTS(data)
+    except ValueError as exc:
+        if "does not start/end" not in str(exc):
+            raise
+        return _fallback_normalized_latitude_weights(data)
+
+
+gc_losses.normalized_latitude_weights = _normalized_latitude_weights_with_fallback
 
 
 DEFAULT_DATA_PATH = "data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr"
@@ -644,18 +683,34 @@ def sample_actual_usage(step: int) -> dict[str, Any]:
     }
 
 
-def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
-    if not eval_losses:
+def plot_loss_curves(
+    out_dir: Path,
+    train_losses: list[tuple[int, float]],
+    eval_losses: list[tuple[int, float]],
+) -> None:
+    if not train_losses and not eval_losses:
         return
-    steps, vals = zip(*eval_losses)
+
     plt.figure()
-    plt.plot(steps, vals, marker="o")
-    y_max = max(vals) * 2.0
+    y_vals: list[float] = []
+
+    if train_losses:
+        train_steps, train_vals = zip(*train_losses)
+        plt.plot(train_steps, train_vals, label="train loss", alpha=0.6)
+        y_vals.extend(train_vals)
+
+    if eval_losses:
+        eval_steps, eval_vals = zip(*eval_losses)
+        plt.plot(eval_steps, eval_vals, marker="o", label="val loss")
+        y_vals.extend(eval_vals)
+
+    y_max = max(y_vals) * 2.0 if y_vals else 0.0
     if y_max > 0:
         plt.ylim(0.0, y_max)
     plt.xlabel("step")
-    plt.ylabel("eval loss")
-    plt.title("Validation loss")
+    plt.ylabel("loss")
+    plt.title("Train and validation loss")
+    plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(out_dir / "val_loss.png")
@@ -687,6 +742,14 @@ def _infer_base_resolution_deg(ds: xr.Dataset) -> float:
     return lat_res
 
 
+def _build_no_pole_latitudes(resolution: float) -> np.ndarray:
+    """Build colatitude grid x, x+res, ..., 180-x and map to latitude 90-colat."""
+    n_steps = int(180.0 // resolution)
+    x = (180.0 - n_steps * resolution) / 2.0
+    colat = x + np.arange(n_steps + 1, dtype=np.float64) * resolution
+    return (90.0 - colat).astype(np.float32)
+
+
 def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
     _assert_local_path(cfg.data_path, "--data-path")
     print(f"Opening local dataset: {cfg.data_path}")
@@ -711,7 +774,21 @@ def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
     if stride <= 0:
         raise ValueError(f"Invalid resolution stride: {stride}")
 
-    ds = ds.isel(lat=slice(0, None, stride), lon=slice(0, None, stride))
+    lat_divides_180 = np.isclose(np.mod(180.0, cfg.resolution), 0.0, atol=1e-6)
+    if lat_divides_180:
+        ds = ds.isel(lat=slice(0, None, stride))
+    else:
+        n_steps = int(180.0 // cfg.resolution)
+        x = (180.0 - n_steps * cfg.resolution) / 2.0
+        lat_targets = _build_no_pole_latitudes(cfg.resolution)
+        print(
+            "Using no-pole latitude grid because 180 is not divisible by resolution: "
+            f"resolution={cfg.resolution}, x={x}, lat_count={lat_targets.size}"
+        )
+        # Match requested no-pole latitude layout while keeping monotonic descending order.
+        ds = ds.sel(lat=lat_targets, method="nearest").sortby("lat", ascending=False)
+
+    ds = ds.isel(lon=slice(0, None, stride))
 
     for name in list(ds.data_vars):
         if ds[name].dtype.kind == "f" and ds[name].dtype != np.float32:
@@ -1073,7 +1150,7 @@ def main() -> None:
         actual_usage,
         epoch_summaries,
     )
-    plot_val_loss(out_dir, eval_losses)
+    plot_loss_curves(out_dir, train_losses, eval_losses)
 
     rss_vals = [float(x["proc_rss_gib"]) for x in actual_usage if x.get("proc_rss_gib") is not None]
     gpu_vals = [float(x["gpu_mem_gib"]) for x in actual_usage if x.get("gpu_mem_gib") is not None]

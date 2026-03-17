@@ -10,7 +10,6 @@ import numpy as np
 from src.data.contracts import CanonicalBatch, validate_canonical_batch
 from src.models.base import ForecastModel, LossAndPredictions, TrainState
 
-
 def _as_dict(value: Any, *, field_name: str) -> dict[str, Any]:
     if value is None:
         return {}

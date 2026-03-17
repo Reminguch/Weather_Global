@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Compute NYC MAE-vs-lead curves for GraphCast checkpoints.
 
-Supports three model groups:
+Supports model groups:
+- res1: latest checkpoints from artifacts/checkpoints/graphcast_res1_stream/res1_*
 - res2: latest checkpoints from artifacts/checkpoints/graphcast_res2_stream/res2_*
 - res4: latest checkpoints from artifacts/checkpoints/graphcast_res4_stream/res4_*
+- res8: latest checkpoints from artifacts/checkpoints/graphcast_res8_stream/res8_*
 - baseline: single baseline GraphCast_small checkpoint (res=1)
 
 Outputs:
@@ -59,14 +61,19 @@ OUTPUT_DIR_DEFAULT = "plots/analyze_models"
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Compute MAE vs lead step for GraphCast model groups.")
-    p.add_argument("--model-group", choices=["res2", "res4", "baseline"], required=True)
+    p.add_argument("--model-group", choices=["res1", "res2", "res4", "res8", "baseline"], required=True)
     p.add_argument("--dataset-dir", default=DATASET_DEFAULT, help="Path/URI for ERA5 dataset.")
     p.add_argument("--stats-dir", default=STATS_DIR_DEFAULT, help="Normalization stats directory.")
     p.add_argument("--baseline-ckpt", default=BASELINE_CKPT_DEFAULT, help="Baseline checkpoint file path.")
     p.add_argument("--n-eval-days", type=int, default=40, help="Number of days used for scoring window.")
     p.add_argument("--hours-per-step", type=int, default=6, help="Hours per forecast step.")
     p.add_argument("--n-input-steps", type=int, default=2, help="Input context steps.")
-    p.add_argument("--max-lead-steps", type=int, default=None, help="Max lead steps (default: 24 for res2/res4, 48 baseline).")
+    p.add_argument(
+        "--max-lead-steps",
+        type=int,
+        default=None,
+        help="Max lead steps (default: 24 for res1/res2/res4/res8, 48 baseline).",
+    )
     p.add_argument("--n-extra-steps", type=int, default=14, help="Extra buffer steps before scoring window.")
     p.add_argument("--discard-start-steps", type=int, default=None, help="Discard earliest origins from scoring.")
     p.add_argument("--discard-end-steps", type=int, default=0, help="Discard latest origins from scoring.")
@@ -349,8 +356,12 @@ def main() -> None:
 
     if model_group == "baseline":
         ckpt_paths = [ROOT / args.baseline_ckpt]
+    elif model_group == "res1":
+        ckpt_paths = _discover_latest_checkpoints(ROOT / "artifacts/checkpoints/graphcast_res1_stream", "res1")
     elif model_group == "res2":
         ckpt_paths = _discover_latest_checkpoints(ROOT / "artifacts/checkpoints/graphcast_res2_stream", "res2")
+    elif model_group == "res8":
+        ckpt_paths = _discover_latest_checkpoints(ROOT / "artifacts/checkpoints/graphcast_res8_stream", "res8")
     else:
         ckpt_paths = _discover_latest_checkpoints(ROOT / "artifacts/checkpoints/graphcast_res4_stream", "res4")
     if not ckpt_paths:
