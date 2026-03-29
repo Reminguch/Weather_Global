@@ -5,12 +5,20 @@
 
 set -eo pipefail
 
-PROJECT_ROOT=/scratch/gpfs/DABANIN/iv9432/Weather_global
+PROJECT_ROOT=/scratch/gpfs/MENGDIW/sh4809/Weather_Global
 ENV_NAME=graphcast311
 SETUP_MODE="${1:-}"
+CONDA_ROOT="${PROJECT_ROOT}/.conda"
+CONDA_ENVS_PATH="${CONDA_ROOT}/envs"
+CONDA_PKGS_DIRS="${CONDA_ROOT}/pkgs"
+PIP_CACHE_DIR="${PROJECT_ROOT}/.cache/pip"
+TMPDIR="${PROJECT_ROOT}/.tmp"
+ENV_PREFIX="${CONDA_ENVS_PATH}/${ENV_NAME}"
 
 cd "${PROJECT_ROOT}"
 export PS1="${PS1:-}"
+mkdir -p "${CONDA_ENVS_PATH}" "${CONDA_PKGS_DIRS}" "${PIP_CACHE_DIR}" "${TMPDIR}"
+export CONDA_ENVS_PATH CONDA_PKGS_DIRS PIP_CACHE_DIR TMPDIR XDG_CACHE_HOME="${PROJECT_ROOT}/.cache"
 
 if command -v module >/dev/null 2>&1; then
   module purge >/dev/null 2>&1 || true
@@ -41,17 +49,21 @@ if command -v conda >/dev/null 2>&1; then
 
   if [ "${SETUP_MODE}" = "--setup" ]; then
     echo "Setup mode: ensure you are on the LOGIN NODE (compute nodes have no internet)."
-    conda create -y -n "${ENV_NAME}" python=3.11
-    conda activate "${ENV_NAME}"
+    conda create -y -p "${ENV_PREFIX}" python=3.11
+    conda activate "${ENV_PREFIX}"
     pip install -U pip setuptools wheel
     pip install -r requirements.txt
   else
-    conda activate "${ENV_NAME}"
+    if [ -d "${ENV_PREFIX}" ]; then
+      conda activate "${ENV_PREFIX}"
+    else
+      conda activate "${ENV_NAME}"
+    fi
   fi
   if [ "${NOUNSET_WAS_ON}" -eq 1 ]; then
     set -u
   fi
-  echo "Using conda env: ${ENV_NAME}"
+  echo "Using conda env: ${CONDA_PREFIX}"
 elif [ -f ".venv/bin/activate" ]; then
   source .venv/bin/activate
   echo "Using venv: .venv"

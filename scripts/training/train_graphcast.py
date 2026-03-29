@@ -31,6 +31,9 @@ import xarray as xr
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+GRAPHCAST_LOCAL = ROOT / "third_party" / "graphcast"
+if GRAPHCAST_LOCAL.exists() and str(GRAPHCAST_LOCAL) not in sys.path:
+    sys.path.insert(0, str(GRAPHCAST_LOCAL))
 
 from src.data.graphcast_dataset import open_graphcast_era5
 
@@ -161,6 +164,12 @@ class RunConfig:
     seed: int
     precision: str
     resume_step: int | None
+    input_duration: str | None
+    temporal_backbone: str
+    temporal_location: str
+    temporal_hidden_size: int
+    temporal_layers: int
+    temporal_dropout: float
 
 
 def parse_args() -> RunConfig:
@@ -187,6 +196,26 @@ def parse_args() -> RunConfig:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--precision", choices=["bf16", "fp16", "fp32"], default="bf16")
     parser.add_argument("--resume-step", type=int, default=None, help="Resume from this step (load params from --ckpt-in).")
+    parser.add_argument(
+        "--input-duration",
+        default=None,
+        help="Override task input duration (e.g. 12h/24h/36h/48h). Default: use checkpoint task config.",
+    )
+    parser.add_argument(
+        "--temporal-backbone",
+        choices=["none", "mamba"],
+        default="none",
+        help="Temporal module type. 'none' preserves existing GraphCast behavior.",
+    )
+    parser.add_argument(
+        "--temporal-location",
+        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
+        default="mesh_post_encoder",
+        help="Where to insert temporal module when enabled.",
+    )
+    parser.add_argument("--temporal-hidden-size", type=int, default=128)
+    parser.add_argument("--temporal-layers", type=int, default=1)
+    parser.add_argument("--temporal-dropout", type=float, default=0.0)
     args = parser.parse_args()
 
     if args.max_steps <= 0:
@@ -201,6 +230,12 @@ def parse_args() -> RunConfig:
         raise ValueError("--train-start-year must be <= --train-end-year")
     if args.resume_step is not None and args.resume_step < 0:
         raise ValueError("--resume-step must be >= 0")
+    if args.temporal_hidden_size <= 0:
+        raise ValueError("--temporal-hidden-size must be > 0")
+    if args.temporal_layers <= 0:
+        raise ValueError("--temporal-layers must be > 0")
+    if not (0.0 <= args.temporal_dropout < 1.0):
+        raise ValueError("--temporal-dropout must be in [0, 1)")
 
     return RunConfig(
         data_path=args.data_path,
@@ -225,6 +260,12 @@ def parse_args() -> RunConfig:
         seed=args.seed,
         precision=args.precision,
         resume_step=args.resume_step,
+        input_duration=args.input_duration,
+        temporal_backbone=args.temporal_backbone,
+        temporal_location=args.temporal_location,
+        temporal_hidden_size=args.temporal_hidden_size,
+        temporal_layers=args.temporal_layers,
+        temporal_dropout=args.temporal_dropout,
     )
 
 
@@ -251,8 +292,19 @@ def build_predictor(
     *,
     use_bf16: bool,
     gradient_checkpointing: bool,
+    temporal_backbone: str,
+    temporal_location: str,
+    temporal_hidden_size: int,
+    temporal_layers: int,
+    temporal_dropout: float,
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
+    if hasattr(predictor, "_temporal_backbone"):
+        predictor._temporal_backbone = temporal_backbone
+        predictor._temporal_location = temporal_location
+        predictor._temporal_hidden_size = temporal_hidden_size
+        predictor._temporal_layers = temporal_layers
+        predictor._temporal_dropout = temporal_dropout
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
     predictor = normalization.InputsAndResiduals(
@@ -847,6 +899,13 @@ def _write_run_config(out_dir: Path, cfg: RunConfig, model_cfg: gc.ModelConfig, 
         "lr": cfg.lr,
         "weight_decay": cfg.weight_decay,
         "precision": cfg.precision,
+        "temporal_config": {
+            "backbone": cfg.temporal_backbone,
+            "location": cfg.temporal_location,
+            "hidden_size": cfg.temporal_hidden_size,
+            "layers": cfg.temporal_layers,
+            "dropout": cfg.temporal_dropout,
+        },
         "model_config": dataclasses.asdict(model_cfg),
         "task_config": dataclasses.asdict(task_cfg),
     }
@@ -862,6 +921,8 @@ def main() -> None:
     ckpt_in = load_graphcast_checkpoint(Path(cfg.ckpt_in))
     base_model_cfg = ckpt_in.model_config
     task_cfg = ckpt_in.task_config
+    if cfg.input_duration is not None:
+        task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
 
     model_cfg = dataclasses.replace(
         base_model_cfg,
@@ -887,6 +948,14 @@ def main() -> None:
         raise ValueError(f"Train/eval time step mismatch: train={dt_train}, eval={dt_eval}")
 
     input_steps = input_steps_from_duration(task_cfg.input_duration, dt_train)
+    if cfg.temporal_backbone != "none" and input_steps < 2:
+        raise ValueError("Temporal module requires at least 2 input steps.")
+    if cfg.temporal_backbone != "none":
+        print(
+            "Temporal module configured "
+            f"(backbone={cfg.temporal_backbone}, location={cfg.temporal_location}, "
+            f"hidden={cfg.temporal_hidden_size}, layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
+        )
     target_steps = 1
 
     train_final_indices = valid_final_input_indices(train_ds.sizes["time"], input_steps, target_steps)
@@ -911,6 +980,11 @@ def main() -> None:
             norm_stats,
             use_bf16=(cfg.precision == "bf16"),
             gradient_checkpointing=True,
+            temporal_backbone=cfg.temporal_backbone,
+            temporal_location=cfg.temporal_location,
+            temporal_hidden_size=cfg.temporal_hidden_size,
+            temporal_layers=cfg.temporal_layers,
+            temporal_dropout=cfg.temporal_dropout,
         )
         return predictor.loss(inputs, targets, forcings)
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import functools
+import json
 import re
 import sys
 from pathlib import Path
@@ -32,6 +33,9 @@ import xarray
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+GRAPHCAST_LOCAL = ROOT / "third_party" / "graphcast"
+if GRAPHCAST_LOCAL.exists() and str(GRAPHCAST_LOCAL) not in sys.path:
+    sys.path.insert(0, str(GRAPHCAST_LOCAL))
 
 from src.data.graphcast_dataset import open_graphcast_era5
 
@@ -155,7 +159,11 @@ def _discover_latest_checkpoints(root_dir: Path, prefix: str) -> list[Path]:
     return sorted(ckpts, key=lambda p: _sort_key_from_run_name(p.parent.name))
 
 
-def _build_run_jitted(ckpt_obj: graphcast.CheckPoint, stats: dict[str, xarray.Dataset]):
+def _build_run_jitted(
+    ckpt_obj: graphcast.CheckPoint,
+    stats: dict[str, xarray.Dataset],
+    ckpt_path: Path,
+):
     model_cfg = ckpt_obj.model_config
     task_cfg = ckpt_obj.task_config
     params = ckpt_obj.params
@@ -163,6 +171,19 @@ def _build_run_jitted(ckpt_obj: graphcast.CheckPoint, stats: dict[str, xarray.Da
 
     def construct_wrapped_graphcast(model_config, task_config):
         predictor = graphcast.GraphCast(model_config, task_config)
+        run_cfg_path = ckpt_path.parent / "run_config.json"
+        if run_cfg_path.exists():
+            with run_cfg_path.open("r", encoding="utf-8") as f:
+                run_cfg = json.load(f)
+            temporal_cfg = run_cfg.get("temporal_config", {})
+            if hasattr(predictor, "_temporal_backbone"):
+                predictor._temporal_backbone = temporal_cfg.get("backbone", "none")
+                predictor._temporal_location = temporal_cfg.get("location", "mesh_post_encoder")
+                predictor._temporal_hidden_size = temporal_cfg.get(
+                    "hidden_size", model_config.latent_size
+                )
+                predictor._temporal_layers = temporal_cfg.get("layers", 1)
+                predictor._temporal_dropout = temporal_cfg.get("dropout", 0.0)
         predictor = casting.Bfloat16Cast(predictor)
         predictor = normalization.InputsAndResiduals(
             predictor,
@@ -276,7 +297,7 @@ def _eval_group(
         with ckpt_path.open("rb") as f:
             ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
 
-        run_jitted, task_cfg, model_cfg = _build_run_jitted(ckpt_obj, stats)
+        run_jitted, task_cfg, model_cfg = _build_run_jitted(ckpt_obj, stats, ckpt_path)
         run_name = ckpt_path.parent.name if ckpt_path.parent != ckpt_path else ckpt_path.stem
         step_tag = ckpt_path.stem.replace("ckpt_step", "")
         label = f"{run_name} (step {step_tag})" if "ckpt_step" in ckpt_path.stem else run_name
