@@ -760,6 +760,9 @@ class GraphCast(predictor_base.Predictor):
         node_sequence = jnp.stack(
             [graph_t.nodes["mesh_nodes"].features for graph_t in latent_graphs],
             axis=0)
+        # stack gives (time, batch, n_mesh, channels);
+        # TemporalMeshBlock expects (time, n_mesh, batch, channels)
+        node_sequence = jnp.transpose(node_sequence, (0, 2, 1, 3))
         node_sequence = TemporalMeshBlock(
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
@@ -770,6 +773,8 @@ class GraphCast(predictor_base.Predictor):
             ),
             name=f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}",
         )(node_sequence, is_training=False)
+        # transpose back: (time, n_mesh, batch, channels) -> (time, batch, n_mesh, channels)
+        node_sequence = jnp.transpose(node_sequence, (0, 2, 1, 3))
         latent_graphs = [
             graph_t._replace(
                 nodes={"mesh_nodes": graph_t.nodes["mesh_nodes"]._replace(
