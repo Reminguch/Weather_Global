@@ -212,17 +212,49 @@ This meant all prior stateless Mamba experiments had **corrupted output** — th
 
 ---
 
-## Encoding Path Difference
+## Encoding Path Difference and the Residual Memory Fix
 
-When `temporal_backbone != "none"`, the model uses a **different encoding path** than baseline:
+When `temporal_backbone != "none"` with the original design, the model used a **different encoding path** than baseline:
 
-| | Baseline | Mamba |
+| | Baseline | Old Mamba (`mesh_post_encoder`) |
 |---|---|---|
-| Feature extraction | `_inputs_to_grid_node_features()` | `_inputs_to_grid_node_features_by_time()` |
-| Encoding | Concatenate all timesteps → single Grid2Mesh pass | Encode each timestep separately → Grid2Mesh per step |
+| Feature extraction | Concatenate all timesteps → `[grid, batch, C*T]` | Encode each timestep separately |
+| Grid2Mesh | Single pass | One pass per timestep |
 | Mesh features | `[mesh, batch, D]` | `[time, mesh, batch, D]` |
 
-This means Mamba experiments differ from baseline in two ways: (1) the temporal module itself, and (2) the encoding path. For the current experiments, both baseline and stateful Mamba use the same `target_steps` setting to ensure a fair comparison of the rollout training itself.
+This confounded every comparison: the performance difference could come from either the Mamba module or the weaker encoding path. Moreover, per-timestep encoding is inherently weaker than channel concatenation because the GNN cannot jointly process multiple frames in a single MLP pass.
+
+### Residual Memory Architecture (`mesh_post_encoder_residual`)
+
+To isolate Mamba's contribution, we introduced a new location: **`mesh_post_encoder_residual`**. This preserves the baseline encoding path entirely and injects Mamba only as a residual on the mesh latent:
+
+```
+Channel concat [t-1, t] → Grid2Mesh GNN → mesh_latent   ← identical to baseline
+                                                ↓
+                               ★ Mamba: load h_prev, process 1 frame,
+                                 output = mesh_latent + proj(mamba_out)
+                                 save h_new                              ← only change
+                                                ↓
+                               Mesh GNN → Mesh2Grid → prediction        ← identical to baseline
+```
+
+Key properties:
+- **Fair comparison**: the only difference from baseline is the Mamba residual block
+- **Cannot degrade**: residual connection means worst case = identity (baseline behavior)
+- **Focused purpose**: Mamba no longer redundantly processes the input frames; it only injects cross-rollout memory via hidden state
+
+Code changes:
+- `graphcast.py`: new branch for `mesh_post_encoder_residual` uses `_inputs_to_grid_node_features()` (baseline encoding) then applies Mamba on the 3D `[mesh, batch, D]` latent
+- `temporal_mesh_mamba_stateful.py`: handles 3D input by unsqueezing a time=1 dimension, running the SSM step + state update, then squeezing back
+- `train_graphcast.py`: added `mesh_post_encoder_residual` to `--temporal-location` choices
+
+### Residual Memory Results (in progress, mesh_size=4, batch=1, target_steps=2)
+
+| Step | Baseline RMSE | Residual Memory RMSE | Gap |
+|------|--------------|---------------------|-----|
+| 12k | 66.46 | 68.85 | +3.6% |
+
+**Assessment**: Residual memory no longer crashes and burns like the old stateful approach (which was 15–20% behind baseline). The 3.6% gap is much smaller and still closing. However, it is **not yet better than baseline**. The residual design is correct in principle — Mamba cannot hurt the model — but temporal memory from 2-step rollouts provides insufficient signal to outweigh the small optimization overhead of the additional parameters.
 
 ---
 
@@ -287,9 +319,16 @@ third_party/graphcast/graphcast/
   autoregressive.py                # Unmodified: hk.scan threads state automatically
 
 scripts/training/
-  train_graphcast.py               # Training loop: _reset_ssm_state, --temporal-stateful
-  stateful_longrollout_20k.slurm   # target_steps=10, 20k steps
+  train_graphcast.py               # Training loop: _reset_ssm_state, --temporal-stateful,
+                                   #   --temporal-location mesh_post_encoder_residual
+  stateful_longrollout_20k.slurm   # target_steps=10, 20k steps (old encoding)
   stateful_longrollout_smoke.slurm # Smoke test for target_steps=10
+  resmem_t2.slurm                  # Residual memory, target_steps=2, 2k steps
+  resmem_t4.slurm                  # Residual memory, target_steps=4, 2k steps
+  resmem_t6.slurm                  # Residual memory, target_steps=6, 2k steps
+  resmem_t2_20k.slurm              # Residual memory, target_steps=2, 20k steps
+  resmem_t4_20k.slurm              # Residual memory, target_steps=4, 20k steps
+  baseline_t6.slurm                # Baseline, target_steps=6, 2k steps
 
 results/
   eval_summary.md                  # Experiment results summary
@@ -310,13 +349,21 @@ python scripts/training/train_graphcast.py \
   --input-duration 12h \
   --target-steps 1
 
-# Stateful Mamba with 10-step autoregressive rollout
+# Stateful Mamba with 10-step autoregressive rollout (old encoding path)
 python scripts/training/train_graphcast.py \
   --temporal-backbone mamba \
   --temporal-stateful \
   --temporal-location mesh_post_encoder \
   --input-duration 12h \
   --target-steps 10
+
+# Residual Memory (recommended): same encoding as baseline + Mamba cross-rollout state
+python scripts/training/train_graphcast.py \
+  --temporal-backbone mamba \
+  --temporal-stateful \
+  --temporal-location mesh_post_encoder_residual \
+  --input-duration 12h \
+  --target-steps 4
 ```
 
 ## References

@@ -170,6 +170,8 @@ class RunConfig:
     temporal_hidden_size: int
     temporal_layers: int
     temporal_dropout: float
+    temporal_stateful: bool
+    target_steps: int
 
 
 def parse_args() -> RunConfig:
@@ -209,13 +211,17 @@ def parse_args() -> RunConfig:
     )
     parser.add_argument(
         "--temporal-location",
-        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
+        choices=["mesh_post_encoder", "mesh_processor_interleaved", "mesh_post_encoder_residual"],
         default="mesh_post_encoder",
         help="Where to insert temporal module when enabled.",
     )
     parser.add_argument("--temporal-hidden-size", type=int, default=128)
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
+    parser.add_argument("--temporal-stateful", action="store_true", default=False,
+                        help="Use stateful Mamba (preserves SSM state across autoregressive steps).")
+    parser.add_argument("--target-steps", type=int, default=1,
+                        help="Number of autoregressive target steps (default 1 = 6h single step).")
     args = parser.parse_args()
 
     if args.max_steps <= 0:
@@ -266,6 +272,8 @@ def parse_args() -> RunConfig:
         temporal_hidden_size=args.temporal_hidden_size,
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
+        temporal_stateful=args.temporal_stateful,
+        target_steps=args.target_steps,
     )
 
 
@@ -297,11 +305,13 @@ def build_predictor(
     temporal_hidden_size: int,
     temporal_layers: int,
     temporal_dropout: float,
+    temporal_stateful: bool = False,
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
     if hasattr(predictor, "_temporal_backbone"):
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location
+        predictor._temporal_stateful = temporal_stateful
         predictor._temporal_hidden_size = temporal_hidden_size
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
@@ -517,8 +527,21 @@ def run_eval(
     task_cfg: gc.TaskConfig,
     dt: pd.Timedelta,
     progress_label: str = "eval",
+    transformed_predict=None,
 ) -> dict[str, float]:
+    # Reset SSM hidden states so eval starts from clean zeros
+    state = jax.tree_util.tree_map(
+        lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
+        state,
+    )
+
     losses: list[float] = []
+    # Per-variable accumulators for RMSE and MAE
+    var_se_sums: dict[str, float] = {}   # sum of squared errors
+    var_ae_sums: dict[str, float] = {}   # sum of absolute errors
+    var_counts: dict[str, int] = {}      # number of elements
+    compute_metrics = transformed_predict is not None
+
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     t_eval0 = time.time()
 
@@ -534,8 +557,36 @@ def run_eval(
         )
 
         rng, key = jax.random.split(rng)
-        (loss_and_diag, _state_after) = transformed.apply(params, state, key, inputs, targets, forcings, False)
-        loss = float(scalarize_loss(loss_and_diag[0]))
+
+        if compute_metrics:
+            # Get loss from original transformed
+            (loss_and_diag, _state_after) = transformed.apply(
+                params, state, key, inputs, targets, forcings, False)
+            loss = float(scalarize_loss(loss_and_diag[0]))
+            # Get predictions from predict fn
+            (preds, _pred_state) = transformed_predict.apply(
+                params, state, key, inputs, targets, forcings, False)
+            # Accumulate per-variable SE and AE in original (denormalized) space
+            for var_name in preds.data_vars:
+                if var_name not in targets.data_vars:
+                    continue
+                # Align dimensions: preds and targets may have different dim order
+                # when target_steps > 1 (e.g. batch,time,lat,lon vs time,batch,lat,lon)
+                common_dims = [d for d in targets[var_name].dims if d in preds[var_name].dims]
+                pred_aligned = preds[var_name].transpose(*common_dims)
+                tgt_aligned = targets[var_name].transpose(*common_dims)
+                pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
+                tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
+                diff = pred_vals - tgt_vals
+                n = diff.size
+                var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
+                var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
+                var_counts[var_name] = var_counts.get(var_name, 0) + n
+        else:
+            (loss_and_diag, _state_after) = transformed.apply(
+                params, state, key, inputs, targets, forcings, False)
+            loss = float(scalarize_loss(loss_and_diag[0]))
+
         losses.append(loss)
 
         if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
@@ -545,7 +596,29 @@ def run_eval(
                 f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
             )
 
-    return {"total": float(np.mean(losses))}
+    results: dict[str, float] = {"total": float(np.mean(losses))}
+
+    if compute_metrics and var_counts:
+        # Compute and print per-variable RMSE and MAE
+        total_se, total_ae, total_n = 0.0, 0.0, 0
+        print(f"[{progress_label}] === Per-variable metrics ===")
+        for var_name in sorted(var_counts.keys()):
+            n = var_counts[var_name]
+            rmse = float(np.sqrt(var_se_sums[var_name] / n))
+            mae = float(var_ae_sums[var_name] / n)
+            results[f"{var_name}_RMSE"] = rmse
+            results[f"{var_name}_MAE"] = mae
+            print(f"[{progress_label}]   {var_name}: RMSE={rmse:.4f}  MAE={mae:.4f}")
+            total_se += var_se_sums[var_name]
+            total_ae += var_ae_sums[var_name]
+            total_n += n
+        overall_rmse = float(np.sqrt(total_se / total_n))
+        overall_mae = float(total_ae / total_n)
+        results["overall_RMSE"] = overall_rmse
+        results["overall_MAE"] = overall_mae
+        print(f"[{progress_label}]   OVERALL: RMSE={overall_rmse:.4f}  MAE={overall_mae:.4f}")
+
+    return results
 
 
 def save_checkpoint(
@@ -956,7 +1029,7 @@ def main() -> None:
             f"(backbone={cfg.temporal_backbone}, location={cfg.temporal_location}, "
             f"hidden={cfg.temporal_hidden_size}, layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
         )
-    target_steps = 1
+    target_steps = cfg.target_steps
 
     train_final_indices = valid_final_input_indices(train_ds.sizes["time"], input_steps, target_steps)
     eval_final_indices = valid_final_input_indices(eval_ds.sizes["time"], input_steps, target_steps)
@@ -985,10 +1058,29 @@ def main() -> None:
             temporal_hidden_size=cfg.temporal_hidden_size,
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
+            temporal_stateful=cfg.temporal_stateful,
         )
         return predictor.loss(inputs, targets, forcings)
 
+    def predict_fn(inputs, targets, forcings, is_training):
+        del is_training
+        predictor = build_predictor(
+            model_cfg,
+            task_cfg,
+            norm_stats,
+            use_bf16=(cfg.precision == "bf16"),
+            gradient_checkpointing=False,
+            temporal_backbone=cfg.temporal_backbone,
+            temporal_location=cfg.temporal_location,
+            temporal_hidden_size=cfg.temporal_hidden_size,
+            temporal_layers=cfg.temporal_layers,
+            temporal_dropout=cfg.temporal_dropout,
+            temporal_stateful=cfg.temporal_stateful,
+        )
+        return predictor(inputs, targets_template=targets, forcings=forcings)
+
     transformed = hk.transform_with_state(forward_fn)
+    transformed_predict = hk.transform_with_state(predict_fn)
     rng = jax.random.PRNGKey(cfg.seed)
 
     sample_inputs, sample_targets, sample_forcings = build_batch_from_indices(
@@ -1010,6 +1102,17 @@ def main() -> None:
 
     _write_run_config(out_dir, cfg, model_cfg, task_cfg)
 
+    def _reset_ssm_state(state: hk.State) -> hk.State:
+        """Zero out SSM hidden states so each sample starts fresh.
+
+        The hk.scan inside the autoregressive rollout will still thread
+        state across target steps within a single sample.
+        """
+        return jax.tree_util.tree_map(
+            lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
+            state,
+        )
+
     @jax.jit
     def train_step(
         params: hk.Params,
@@ -1020,6 +1123,8 @@ def main() -> None:
         targets: xr.Dataset,
         forcings: xr.Dataset,
     ):
+        state = _reset_ssm_state(state)
+
         def loss_fn(p, s, key):
             (loss_and_diag, new_state) = transformed.apply(p, s, key, inputs, targets, forcings, True)
             loss = scalarize_loss(loss_and_diag[0])
@@ -1136,6 +1241,7 @@ def main() -> None:
                 task_cfg=task_cfg,
                 dt=dt_train,
                 progress_label=f"eval@step{step}",
+                transformed_predict=transformed_predict,
             )
             eval_losses.append((step, eval_metrics["total"]))
             eval_details.append(
@@ -1195,6 +1301,7 @@ def main() -> None:
         task_cfg=task_cfg,
         dt=dt_train,
         progress_label="eval@final",
+        transformed_predict=transformed_predict,
     )
     eval_losses.append((step, final_eval["total"]))
     eval_details.append(

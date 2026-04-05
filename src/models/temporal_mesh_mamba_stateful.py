@@ -122,7 +122,12 @@ class TemporalMeshBlock(hk.Module):
 
     def __call__(self, mesh_latent_tnbd: jax.Array, *, is_training: bool) -> jax.Array:
         if mesh_latent_tnbd.ndim == 3:
-            return mesh_latent_tnbd
+            # [n_mesh, batch, D] → unsqueeze time=1, run Mamba (1 step + state), squeeze back.
+            # Used by mesh_post_encoder_residual: same encoding as baseline,
+            # Mamba only injects cross-rollout memory via hidden state.
+            mesh_4d = mesh_latent_tnbd[None]  # [1, n_mesh, batch, D]
+            out_4d = self._run_sequence(mesh_4d, is_training=is_training)
+            return out_4d[0]  # [n_mesh, batch, D]
         if mesh_latent_tnbd.ndim != 4:
             raise ValueError(
                 "Expected [time, n_mesh_nodes, batch, channels], got "

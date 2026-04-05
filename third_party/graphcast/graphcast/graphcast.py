@@ -40,7 +40,13 @@ import jax.numpy as jnp
 import jraph
 import numpy as np
 import xarray
-from src.models.temporal_mesh_mamba import TemporalMeshBlock, TemporalMeshConfig
+from src.models.temporal_mesh_mamba import TemporalMeshBlock as _StatelessTemporalBlock
+from src.models.temporal_mesh_mamba import TemporalMeshConfig
+from src.models.temporal_mesh_mamba_stateful import TemporalMeshBlock as _StatefulTemporalBlock
+
+
+def _get_temporal_block_cls(stateful: bool):
+    return _StatefulTemporalBlock if stateful else _StatelessTemporalBlock
 
 Kwargs = Mapping[str, Any]
 
@@ -248,6 +254,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_hidden_size = model_config.latent_size
     self._temporal_layers = 1
     self._temporal_dropout = 0.0
+    self._temporal_stateful = False
 
     self._spatial_features_kwargs = dict(
         add_node_positions=False,
@@ -373,8 +380,8 @@ class GraphCast(predictor_base.Predictor):
                ) -> xarray.Dataset:
     self._maybe_init(inputs)
 
-    if self._temporal_backbone == "none":
-      # Convert all input data into flat vectors for each of the grid nodes.
+    if self._temporal_backbone == "none" or self._temporal_location == "mesh_post_encoder_residual":
+      # Baseline encoding: concatenate all timesteps along channel dim.
       # xarray (batch, time, lat, lon, level, multiple vars, forcings)
       # -> [num_grid_nodes, batch, num_channels]
       grid_node_features = self._inputs_to_grid_node_features(inputs, forcings)
@@ -383,6 +390,12 @@ class GraphCast(predictor_base.Predictor):
       # [num_mesh_nodes, batch, latent_size], [num_grid_nodes, batch, latent_size]
       (latent_mesh_nodes, latent_grid_nodes
        ) = self._run_grid2mesh_gnn(grid_node_features)
+
+      # Residual memory: same encoding as baseline, then inject cross-rollout
+      # temporal state via stateful Mamba on the 3D mesh latent.
+      if self._temporal_location == "mesh_post_encoder_residual":
+        latent_mesh_nodes = self._run_temporal_mesh_block(
+            latent_mesh_nodes, is_training=is_training)
     else:
       grid_node_features = self._inputs_to_grid_node_features_by_time(
           inputs, forcings)
@@ -763,7 +776,7 @@ class GraphCast(predictor_base.Predictor):
         # stack gives (time, batch, n_mesh, channels);
         # TemporalMeshBlock expects (time, n_mesh, batch, channels)
         node_sequence = jnp.transpose(node_sequence, (0, 2, 1, 3))
-        node_sequence = TemporalMeshBlock(
+        node_sequence = _get_temporal_block_cls(self._temporal_stateful)(
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
                 location=self._temporal_location,
@@ -801,17 +814,18 @@ class GraphCast(predictor_base.Predictor):
       raise ValueError(
           "Expected mesh latent rank 3 or 4, got "
           f"{latent_mesh_nodes.ndim} with shape={latent_mesh_nodes.shape}")
-    block = TemporalMeshBlock(
-        TemporalMeshConfig(
-            backbone=self._temporal_backbone,
-            location=self._temporal_location,
-            hidden_size=self._temporal_hidden_size,
-            layers=self._temporal_layers,
-            dropout=self._temporal_dropout,
-        ),
-        name="temporal_mesh_block",
-    )
-    return block(latent_mesh_nodes, is_training=is_training)
+    if not hasattr(self, '_temporal_block'):
+      self._temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
+          TemporalMeshConfig(
+              backbone=self._temporal_backbone,
+              location=self._temporal_location,
+              hidden_size=self._temporal_hidden_size,
+              layers=self._temporal_layers,
+              dropout=self._temporal_dropout,
+          ),
+          name="temporal_mesh_block",
+      )
+    return self._temporal_block(latent_mesh_nodes, is_training=is_training)
 
   def _run_mesh2grid_gnn(self,
                          updated_latent_mesh_nodes: chex.Array,
