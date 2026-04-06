@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import gc
 import json
 import os
 import subprocess
@@ -158,6 +159,7 @@ class RunConfig:
     max_steps: int
     eval_every: int
     eval_batch_size: int
+    eval_metric_batch_size: int | None
     checkpoint_every: int
     lr: float
     weight_decay: float
@@ -192,6 +194,15 @@ def parse_args() -> RunConfig:
     parser.add_argument("--max-steps", type=int, default=10000)
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--eval-metric-batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Batch size for prediction-heavy detailed eval metrics. "
+            "Defaults to a safer value for autoregressive runs."
+        ),
+    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -228,6 +239,10 @@ def parse_args() -> RunConfig:
         raise ValueError("--max-steps must be > 0")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be > 0")
+    if args.eval_batch_size <= 0:
+        raise ValueError("--eval-batch-size must be > 0")
+    if args.eval_metric_batch_size is not None and args.eval_metric_batch_size <= 0:
+        raise ValueError("--eval-metric-batch-size must be > 0 when provided")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -260,6 +275,7 @@ def parse_args() -> RunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_metric_batch_size=args.eval_metric_batch_size,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -513,6 +529,20 @@ def scalarize_loss(loss_da: xr.DataArray) -> jax.Array:
     return jnp.mean(xarray_jax.unwrap_data(loss_da))
 
 
+def resolve_eval_metric_batch_size(
+    eval_batch_size: int,
+    target_steps: int,
+    requested: int | None,
+) -> int:
+    if requested is not None:
+        return max(1, min(requested, eval_batch_size))
+    if target_steps > 1:
+        # Prediction-heavy autoregressive eval is what pushed residual runs over
+        # the host-memory limit near the end of training.
+        return min(eval_batch_size, 2)
+    return eval_batch_size
+
+
 def run_eval(
     transformed,
     params: hk.Params,
@@ -522,6 +552,7 @@ def run_eval(
     eval_indices: np.ndarray,
     *,
     eval_batch_size: int,
+    eval_metric_batch_size: int | None,
     input_steps: int,
     target_steps: int,
     task_cfg: gc.TaskConfig,
@@ -541,6 +572,9 @@ def run_eval(
     var_ae_sums: dict[str, float] = {}   # sum of absolute errors
     var_counts: dict[str, int] = {}      # number of elements
     compute_metrics = transformed_predict is not None
+    metric_batch_size = eval_batch_size
+    if compute_metrics:
+        metric_batch_size = max(1, min(eval_metric_batch_size or eval_batch_size, eval_batch_size))
 
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     t_eval0 = time.time()
@@ -558,34 +592,53 @@ def run_eval(
 
         rng, key = jax.random.split(rng)
 
+        (loss_and_diag, _state_after) = transformed.apply(
+            params, state, key, inputs, targets, forcings, False)
+        loss = float(scalarize_loss(loss_and_diag[0]))
+        del loss_and_diag
+
         if compute_metrics:
-            # Get loss from original transformed
-            (loss_and_diag, _state_after) = transformed.apply(
-                params, state, key, inputs, targets, forcings, False)
-            loss = float(scalarize_loss(loss_and_diag[0]))
-            # Get predictions from predict fn
-            (preds, _pred_state) = transformed_predict.apply(
-                params, state, key, inputs, targets, forcings, False)
-            # Accumulate per-variable SE and AE in original (denormalized) space
-            for var_name in preds.data_vars:
-                if var_name not in targets.data_vars:
-                    continue
-                # Align dimensions: preds and targets may have different dim order
-                # when target_steps > 1 (e.g. batch,time,lat,lon vs time,batch,lat,lon)
-                common_dims = [d for d in targets[var_name].dims if d in preds[var_name].dims]
-                pred_aligned = preds[var_name].transpose(*common_dims)
-                tgt_aligned = targets[var_name].transpose(*common_dims)
-                pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
-                tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
-                diff = pred_vals - tgt_vals
-                n = diff.size
-                var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
-                var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
-                var_counts[var_name] = var_counts.get(var_name, 0) + n
+            # Drop the large loss batch before prediction-heavy detailed metrics.
+            del inputs, targets, forcings
+            gc.collect()
+
+            for metric_i in range(0, len(idx), metric_batch_size):
+                metric_idx = idx[metric_i : metric_i + metric_batch_size]
+                metric_inputs, metric_targets, metric_forcings = build_batch_from_indices(
+                    eval_ds,
+                    indices=metric_idx,
+                    input_steps=input_steps,
+                    target_steps=target_steps,
+                    task_cfg=task_cfg,
+                    dt=dt,
+                )
+
+                rng, metric_key = jax.random.split(rng)
+                preds, _pred_state = transformed_predict.apply(
+                    params, state, metric_key, metric_inputs, metric_targets, metric_forcings, False)
+
+                # Accumulate per-variable SE and AE in original (denormalized) space
+                for var_name in preds.data_vars:
+                    if var_name not in metric_targets.data_vars:
+                        continue
+                    # Align dimensions: preds and targets may have different dim order
+                    # when target_steps > 1 (e.g. batch,time,lat,lon vs time,batch,lat,lon)
+                    common_dims = [d for d in metric_targets[var_name].dims if d in preds[var_name].dims]
+                    pred_aligned = preds[var_name].transpose(*common_dims)
+                    tgt_aligned = metric_targets[var_name].transpose(*common_dims)
+                    pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
+                    tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
+                    diff = pred_vals - tgt_vals
+                    n = diff.size
+                    var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
+                    var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
+                    var_counts[var_name] = var_counts.get(var_name, 0) + n
+                    del pred_aligned, tgt_aligned, pred_vals, tgt_vals, diff
+
+                del preds, metric_inputs, metric_targets, metric_forcings
+                gc.collect()
         else:
-            (loss_and_diag, _state_after) = transformed.apply(
-                params, state, key, inputs, targets, forcings, False)
-            loss = float(scalarize_loss(loss_and_diag[0]))
+            del inputs, targets, forcings
 
         losses.append(loss)
 
@@ -595,6 +648,9 @@ def run_eval(
                 f"[{progress_label}] batch {batch_i}/{n_batches} "
                 f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
             )
+
+        if batch_i % 10 == 0 or batch_i == n_batches:
+            gc.collect()
 
     results: dict[str, float] = {"total": float(np.mean(losses))}
 
@@ -967,6 +1023,7 @@ def _write_run_config(out_dir: Path, cfg: RunConfig, model_cfg: gc.ModelConfig, 
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
         "eval_batch_size": cfg.eval_batch_size,
+        "eval_metric_batch_size": cfg.eval_metric_batch_size,
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,
@@ -1030,6 +1087,16 @@ def main() -> None:
             f"hidden={cfg.temporal_hidden_size}, layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
         )
     target_steps = cfg.target_steps
+    eval_metric_batch_size = resolve_eval_metric_batch_size(
+        cfg.eval_batch_size,
+        target_steps,
+        cfg.eval_metric_batch_size,
+    )
+    if eval_metric_batch_size != cfg.eval_batch_size:
+        print(
+            "Detailed eval metrics will use micro-batching "
+            f"(loss_batch={cfg.eval_batch_size}, metric_batch={eval_metric_batch_size})"
+        )
 
     train_final_indices = valid_final_input_indices(train_ds.sizes["time"], input_steps, target_steps)
     eval_final_indices = valid_final_input_indices(eval_ds.sizes["time"], input_steps, target_steps)
@@ -1227,7 +1294,7 @@ def main() -> None:
         if step % 10 == 0:
             print(f"step {step}/{cfg.max_steps} loss {loss_f:.6f}")
 
-        if step % cfg.eval_every == 0:
+        if step % cfg.eval_every == 0 and step < cfg.max_steps:
             eval_metrics = run_eval(
                 transformed,
                 params,
@@ -1236,20 +1303,16 @@ def main() -> None:
                 eval_ds,
                 eval_final_indices,
                 eval_batch_size=cfg.eval_batch_size,
+                eval_metric_batch_size=eval_metric_batch_size,
                 input_steps=input_steps,
                 target_steps=target_steps,
                 task_cfg=task_cfg,
                 dt=dt_train,
                 progress_label=f"eval@step{step}",
-                transformed_predict=transformed_predict,
+                transformed_predict=None,
             )
             eval_losses.append((step, eval_metrics["total"]))
-            eval_details.append(
-                {
-                    "step": step,
-                    "total": eval_metrics["total"],
-                }
-            )
+            eval_details.append({"step": step, **eval_metrics})
             print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
             save_logs(
                 out_dir,
@@ -1296,6 +1359,7 @@ def main() -> None:
         eval_ds,
         eval_final_indices,
         eval_batch_size=cfg.eval_batch_size,
+        eval_metric_batch_size=eval_metric_batch_size,
         input_steps=input_steps,
         target_steps=target_steps,
         task_cfg=task_cfg,
@@ -1304,13 +1368,7 @@ def main() -> None:
         transformed_predict=transformed_predict,
     )
     eval_losses.append((step, final_eval["total"]))
-    eval_details.append(
-        {
-            "step": step,
-            "final": True,
-            "total": final_eval["total"],
-        }
-    )
+    eval_details.append({"step": step, "final": True, **final_eval})
 
     save_checkpoint(
         out_dir,

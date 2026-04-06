@@ -248,13 +248,35 @@ Code changes:
 - `temporal_mesh_mamba_stateful.py`: handles 3D input by unsqueezing a time=1 dimension, running the SSM step + state update, then squeezing back
 - `train_graphcast.py`: added `mesh_post_encoder_residual` to `--temporal-location` choices
 
-### Residual Memory Results (in progress, mesh_size=4, batch=1, target_steps=2)
+### Residual Memory Results
 
-| Step | Baseline RMSE | Residual Memory RMSE | Gap |
-|------|--------------|---------------------|-----|
-| 12k | 66.46 | 68.85 | +3.6% |
+**20k steps (mesh_size=4, batch=1):**
 
-**Assessment**: Residual memory no longer crashes and burns like the old stateful approach (which was 15–20% behind baseline). The 3.6% gap is much smaller and still closing. However, it is **not yet better than baseline**. The residual design is correct in principle — Mamba cannot hurt the model — but temporal memory from 2-step rollouts provides insufficient signal to outweigh the small optimization overhead of the additional parameters.
+| target_steps | Step | Baseline RMSE | Residual Memory RMSE | Gap |
+|-------------|------|--------------|---------------------|-----|
+| 2 | 2k | 90.59 | 93.01 | +2.7% |
+| 2 | 10k | 69.25 | 70.18 | +1.3% |
+| 2 | 18k | ~63.5 | 64.77 | +2.0% |
+| 4 | 2k | 139.30 | 145.37 | +4.4% |
+| 4 | 18k | ~97 | 105.21 | +8.5% |
+
+**2k steps comparison across target_steps:**
+
+| target_steps | Baseline RMSE @2k | Residual Memory RMSE @2k | Gap |
+|-------------|-------------------|-------------------------|-----|
+| 2 | 90.59 | 93.20 | +2.9% |
+| 4 | 139.30 | 145.51 | +4.5% |
+| 6 | 195.46 | 195.38 | **-0.04%** |
+
+**Assessment**: Residual memory performs nearly identically to baseline at target_steps=6, and is only 2-4% behind at shorter rollouts. This is a large improvement over the old stateful approach (which was 15-20% behind baseline due to encoding path confounds). However, it does **not outperform baseline**.
+
+### Known Limitation: State Reset Between Samples
+
+The Mamba hidden state is **reset to zeros at the start of each training sample**. Because training samples are randomly drawn from 2020-2021 (non-consecutive time windows), carrying state across samples would be meaningless. This means Mamba only has `target_steps` worth of sequential context (2-6 steps = 12-36 hours) before its memory is wiped.
+
+This fundamentally limits Mamba's ability to learn long-range temporal patterns. To fully exploit Mamba's memory, one would need to either:
+1. **Sequential sampling with truncated BPTT**: iterate through the data chronologically, carry state forward with `stop_gradient` at sample boundaries
+2. **Much larger target_steps** (20-40): gives Mamba longer sequences within each sample, but requires more GPU memory
 
 ---
 
@@ -266,7 +288,7 @@ Code changes:
   - Train: 2020–2021, Eval: 2022
 - **Optimizer**: AdamW (lr=1e-4, weight_decay=1e-4), bf16 precision
 - **GPU**: NVIDIA A100 80GB (Princeton Della cluster)
-- **Mamba**: hidden_size=128, layers=1, dropout=0.0, location=mesh_post_encoder
+- **Mamba**: hidden_size=128, layers=1, dropout=0.0
 
 ### Phase 1: Stateless Mamba (mesh_size=3, batch_size=4, target_steps=1)
 
@@ -276,33 +298,35 @@ Code changes:
 | Mamba h2 (stateless, input=2) | 139.39 | 35.47 |
 | Mamba h4 (stateless, input=4) | 138.83 | 35.39 |
 
-**Result**: No meaningful improvement. Stateless Mamba is redundant with the GNN's built-in temporal handling. (Also affected by the transpose bug.)
+**Result**: No meaningful improvement. Stateless Mamba is redundant with the GNN's built-in temporal handling. (Also affected by a transpose bug that corrupted output dimensions.)
 
-### Phase 2: Stateful vs Baseline Fair Comparison (mesh_size=4, batch_size=1, 20k steps)
+### Phase 2: Baseline Reference (mesh_size=4, batch_size=1, 20k steps)
 
-**Baseline (completed):**
+| input_steps | target_steps | RMSE @20k | MAE @20k |
+|-------------|-------------|-----------|----------|
+| 2 | 2 | 62.41 | 18.21 |
+| **4** | **2** | **59.59** | **17.48** |
+| 2 | 4 | 96.08 | 26.89 |
+| 4 | 4 | 95.13 | 26.71 |
 
-| Config | RMSE @20k | MAE @20k |
-|--------|-----------|----------|
-| input=2, target=2 | 62.41 | 18.21 |
-| input=4, target=2 | **59.59** | **17.48** |
-| input=2, target=4 | 96.08 | 26.89 |
-| input=4, target=4 | 95.13 | 26.71 |
+### Phase 2: Stateful Mamba — Old Encoding Path (cancelled)
 
-**Stateful Mamba (in progress):**
+Used per-timestep encoding (different from baseline), confounding the comparison. All configs trailed baseline by 13-20%. Cancelled at ~70% completion.
 
-| Config | RMSE @10k | MAE @10k |
-|--------|-----------|----------|
-| input=2, target=2 | 75.10 | 21.69 |
-| input=4, target=2 | 77.07* | 22.15* |
-| input=2, target=4 | 112.58 | 31.54 |
-| input=4, target=4 | 116.32* | 32.27* |
+| Config | Best RMSE | Baseline @20k | Gap |
+|--------|-----------|---------------|-----|
+| sf-h2, target=2 | 72.70 @14k | 62.41 | +16.5% |
+| sf-h4, target=2 | 71.37 @12k | 59.59 | +19.8% |
+| sf-h2, target=4 | 108.41 @12k | 96.08 | +12.8% |
+| sf-h4, target=4 | 111.09 @10k | 95.13 | +16.8% |
 
-*eval at step 8k
+### Phase 3: Residual Memory (mesh_size=4, batch_size=1)
 
-### Phase 3: Long Rollout (target_steps=10, submitted)
+Uses baseline encoding path + stateful Mamba residual. See results above.
 
-**Hypothesis**: With only 2–4 rollout steps, the Mamba hidden state doesn't have enough sequential depth to accumulate useful temporal information beyond what the 2-frame input already provides. A 10-step rollout (60h forecast) should give the SSM state a real opportunity to demonstrate long-term memory benefit.
+### Phase 3: Long Rollout — Old Encoding Path (target_steps=10, completed)
+
+RMSE=214.70 @10k steps. Very poor performance due to both the encoding path confound and the difficulty of optimizing through 10 autoregressive steps.
 
 ---
 
