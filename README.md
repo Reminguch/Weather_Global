@@ -324,9 +324,6 @@ Used per-timestep encoding (different from baseline), confounding the comparison
 
 Uses baseline encoding path + stateful Mamba residual. See results above.
 
-### Phase 3: Long Rollout — Old Encoding Path (target_steps=10, completed)
-
-RMSE=214.70 @10k steps. Very poor performance due to both the encoding path confound and the difficulty of optimizing through 10 autoregressive steps.
 
 ---
 
