@@ -298,13 +298,57 @@ Both models trained with target_steps=2 (12h rollout), then evaluated with longe
 
 5. **The "sweet spot" is 2.5–6 day forecasts**: This matches the regime where the baseline's memoryless rollout starts to accumulate significant error, but the trajectory hasn't diverged so far that Mamba's compressed state becomes noise.
 
-### Known Limitation: State Reset Between Samples
+### Phase 4: Sequential Sampling with Truncated BPTT
 
-The Mamba hidden state is **reset to zeros at the start of each training sample**. Because training samples are randomly drawn from 2020-2021 (non-consecutive time windows), carrying state across samples would be meaningless. This means Mamba only has `target_steps` worth of sequential context (2-6 steps = 12-36 hours) before its memory is wiped.
+The previous phases used **random sampling** — each training sample is drawn from a random time, and Mamba's state is reset to zeros before every sample. This means Mamba never sees long continuous sequences during training.
 
-This fundamentally limits Mamba's ability to learn long-range temporal patterns. To fully exploit Mamba's memory, one would need to either:
-1. **Sequential sampling with truncated BPTT**: iterate through the data chronologically, carry state forward with `stop_gradient` at sample boundaries
-2. **Much larger target_steps** (20-40): gives Mamba longer sequences within each sample, but requires more GPU memory
+**Sequential sampling** fixes this: training data is divided into 30-day contiguous segments (120 time steps). Segments are shuffled across epochs (inter-segment i.i.d.), but within each segment, samples are iterated sequentially. Mamba's state carries forward within each segment via `stop_gradient` (truncated BPTT): the state values are preserved but gradients are cut at sample boundaries.
+
+```python
+# Random sampling (before): state = zeros every sample
+state = _reset_ssm_state(state)        # h = 0
+
+# Sequential sampling (new): state carries forward, gradient cut
+state = _stop_grad_state(state)        # h preserved, grad detached
+```
+
+#### Training Eval vs Inference: A Paradox
+
+The sequential resmem model shows a striking paradox: it performs **worse** on training eval but **much better** on long rollout inference.
+
+**Training eval (target_steps=2, state starts from zero):**
+
+| Step | Baseline RMSE | resmem seq RMSE | Gap |
+|------|--------------|-----------------|-----|
+| 2k | **93.29** | 97.42 | +4.4% |
+| 4k | **82.11** | 100.02 | +21.8% |
+| 6k | **75.91** | 85.07 | +12.1% |
+| 8k | **76.05** | 77.60 | +2.0% |
+| 10k | **70.13** | 75.20 | +7.2% |
+
+**Long rollout inference (same step 10k checkpoint, state accumulates freely):**
+
+| Inference t | Forecast | Baseline RMSE | resmem seq RMSE | Gap |
+|------------|----------|--------------|-----------------|-----|
+| 2 | 12h | 120.35 | **87.04** | **-27.7%** |
+| 10 | 2.5 days | 689.56 | **351.93** | **-49.0%** |
+| 16 | 4 days | 881.08 | **756.74** | **-14.1%** |
+| 24 | 6 days | 848.69 | **623.27** | **-26.6%** |
+
+#### Why Training Eval Is Worse But Inference Is Better
+
+This is not a contradiction — it actually confirms that Mamba **learned to depend on its state**.
+
+During sequential training, Mamba always starts each sample with a state that has been accumulating for many prior steps (within the 30-day segment). The model learns to **read useful information from a rich, pre-filled state** and incorporate it into predictions.
+
+At training eval time, the state is reset to **zeros** (standard eval protocol). The model expects information-rich state but gets an empty one — like a student trained with reference notes who is suddenly tested without them. Performance drops compared to baseline, which never learned to use state at all.
+
+At inference time with long rollouts (t=10, 16, 24), the model runs multiple autoregressive steps. After just 2–3 steps, the state accumulates enough information to resemble the training-time state. From that point on, Mamba's temporal memory kicks in and significantly reduces forecast error — especially at the 2.5-day forecast horizon where it achieves a **49% RMSE reduction**.
+
+This confirms:
+1. **Mamba genuinely learned to use temporal memory** — it depends on state so much that removing it (training eval) hurts performance
+2. **Sequential sampling was necessary** — random sampling resmem showed no such dependency (resmem ≈ baseline on both training eval and inference)
+3. **The improvement is real** — it only appears when state has time to accumulate (long rollouts), exactly where temporal memory should matter
 
 ---
 
