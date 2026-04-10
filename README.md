@@ -328,19 +328,63 @@ Sequential resmem is 2–22% worse than baseline on training eval, because durin
 
 #### Long Rollout Inference Results (Corrected, eval-only mode)
 
-**Note**: Earlier inference results used a flawed `--max-steps 1` workaround that ran one extra training step before evaluation, introducing noise. Results below use the corrected `--eval-only` mode.
+**Important correction**: Earlier inference results showing Mamba improvements of $-$27\% to $-$49\% were **incorrect**. They used a flawed `--max-steps 1` workaround that ran one extra training step before evaluation, introducing noise. The results below use the corrected `--eval-only` mode (no extra training).
 
-**Step 10k checkpoint, train target_steps=2:**
+All checkpoints at step 10k, mesh_size=4. Gap shows resmem relative to baseline (positive = resmem worse).
 
-| Inference t | Forecast | Baseline RMSE | resmem seq RMSE | Gap |
-|------------|----------|--------------|-----------------|-----|
+**Train target_steps=2:**
+
+| Inf t | Forecast | Baseline RMSE | resmem seq RMSE | Gap |
+|-------|----------|--------------|-----------------|-----|
 | 2 | 12h | **70.16** | 75.19 | +7.2% |
-| 4 | 24h | _pending_ | _pending_ | — |
-| 10 | 2.5 days | _pending_ | _pending_ | — |
-| 16 | 4 days | _pending_ | _pending_ | — |
-| 24 | 6 days | _pending_ | _pending_ | — |
+| 10 | 2.5d | **240.56** | 272.75 | +13.4% |
+| 16 | 4d | **341.67** | 381.57 | +11.7% |
+| 24 | 6d | **442.58** | 481.08 | +8.7% |
 
-Inference t=2 matches training eval exactly (70.16 vs 70.13, 75.19 vs 75.20), confirming the corrected eval-only mode is working. Long rollout results (t=10, 16, 24) and experiments with varying training target_steps (4, 6, 8) are pending.
+**Train target_steps=4:**
+
+| Inf t | Forecast | Baseline RMSE | resmem seq RMSE | Gap |
+|-------|----------|--------------|-----------------|-----|
+| 2 | 12h | **74.02** | 89.85 | +21.4% |
+| 10 | 2.5d | **211.87** | 294.32 | +38.9% |
+| 16 | 4d | **286.18** | 387.62 | +35.4% |
+| 24 | 6d | **358.73** | 473.81 | +32.1% |
+
+**Train target_steps=6:**
+
+| Inf t | Forecast | Baseline RMSE | resmem seq RMSE | Gap |
+|-------|----------|--------------|-----------------|-----|
+| 2 | 12h | **80.62** | 99.01 | +22.8% |
+| 10 | 2.5d | **207.45** | 278.05 | +34.0% |
+| 16 | 4d | **271.49** | 352.67 | +29.9% |
+| 24 | 6d | **332.39** | 416.54 | +25.3% |
+
+**Train target_steps=8:**
+
+| Inf t | Forecast | Baseline RMSE | resmem seq RMSE | Gap |
+|-------|----------|--------------|-----------------|-----|
+| 2 | 12h | **86.08** | 100.01 | +16.2% |
+| 10 | 2.5d | **210.67** | 250.79 | +19.0% |
+| 16 | 4d | **271.58** | 315.87 | +16.3% |
+| 24 | 6d | **330.33** | 374.07 | +13.2% |
+
+#### Conclusions (Corrected)
+
+After fixing the evaluation bug, the results change dramatically:
+
+1. **Sequential resmem does NOT outperform baseline.** Across all training target_steps (2, 4, 6, 8) and all inference rollout lengths (2, 10, 16, 24), baseline is consistently better by 7–39%.
+
+2. **Longer BPTT windows do not help.** Increasing training target_steps from 2 to 4, 6, 8 does not improve resmem relative to baseline. In fact, train target_steps=4 is the worst configuration, and train target_steps=2 is the least bad.
+
+3. **The earlier "49% improvement" was an evaluation artifact.** The `--max-steps 1` workaround ran one extra training step before eval, which introduced random parameter perturbations that happened to favor resmem in some configurations. With proper `--eval-only` mode, no such improvement exists.
+
+4. **Training eval and inference eval now agree exactly** (e.g., baseline t=2 RMSE 70.13 vs 70.16; resmem t=2 75.20 vs 75.19), confirming the fix.
+
+The most plausible explanations for why Mamba does not help:
+- **No spatial communication in Mamba**: each of the 2,562 mesh nodes runs its own independent SSM. Temporal patterns that involve spatial motion (e.g., propagating fronts) cannot be captured.
+- **State reset between eval samples**: during inference, the model processes each initial condition independently with state starting from zero. State only accumulates within one rollout (2–24 steps), never reaching the rich accumulated state seen during sequential training (up to 120 steps).
+- **Training objective mismatch**: the training loss optimizes predictions at `target_steps` horizon, not long rollouts.
+- **Mamba position**: placed after the encoder but before the Mesh GNN, so Mamba sees raw encoded features without spatial processing. An alternative would be placing Mamba inside or after the Mesh GNN (`mesh_processor_interleaved`), which has not been tested with sequential sampling.
 
 ---
 

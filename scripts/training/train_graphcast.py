@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import gc
+import functools
 import json
 import os
 import subprocess
@@ -159,7 +159,6 @@ class RunConfig:
     max_steps: int
     eval_every: int
     eval_batch_size: int
-    eval_metric_batch_size: int | None
     checkpoint_every: int
     lr: float
     weight_decay: float
@@ -174,6 +173,8 @@ class RunConfig:
     temporal_dropout: float
     temporal_stateful: bool
     target_steps: int
+    sequential_segment_steps: int | None
+    eval_only: bool
 
 
 def parse_args() -> RunConfig:
@@ -194,15 +195,6 @@ def parse_args() -> RunConfig:
     parser.add_argument("--max-steps", type=int, default=10000)
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
-    parser.add_argument(
-        "--eval-metric-batch-size",
-        type=int,
-        default=None,
-        help=(
-            "Batch size for prediction-heavy detailed eval metrics. "
-            "Defaults to a safer value for autoregressive runs."
-        ),
-    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -233,16 +225,18 @@ def parse_args() -> RunConfig:
                         help="Use stateful Mamba (preserves SSM state across autoregressive steps).")
     parser.add_argument("--target-steps", type=int, default=1,
                         help="Number of autoregressive target steps (default 1 = 6h single step).")
+    parser.add_argument("--sequential-segment-steps", type=int, default=None,
+                        help="Enable chunked sequential sampling: segment length in time steps. "
+                             "E.g. 120 = 30 days. Segments are shuffled across epochs, sequential within. "
+                             "Mamba state carries across samples within a segment (truncated BPTT).")
+    parser.add_argument("--eval-only", action="store_true", default=False,
+                        help="Skip training, only run eval on the loaded checkpoint.")
     args = parser.parse_args()
 
-    if args.max_steps <= 0:
+    if not args.eval_only and args.max_steps <= 0:
         raise ValueError("--max-steps must be > 0")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be > 0")
-    if args.eval_batch_size <= 0:
-        raise ValueError("--eval-batch-size must be > 0")
-    if args.eval_metric_batch_size is not None and args.eval_metric_batch_size <= 0:
-        raise ValueError("--eval-metric-batch-size must be > 0 when provided")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -275,7 +269,6 @@ def parse_args() -> RunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
-        eval_metric_batch_size=args.eval_metric_batch_size,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -290,6 +283,8 @@ def parse_args() -> RunConfig:
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
         target_steps=args.target_steps,
+        sequential_segment_steps=args.sequential_segment_steps,
+        eval_only=args.eval_only,
     )
 
 
@@ -455,6 +450,32 @@ def lead_times(target_steps: int, dt: pd.Timedelta) -> Sequence[pd.Timedelta]:
     return [dt * (i + 1) for i in range(target_steps)]
 
 
+def build_sequential_segments(
+    indices: np.ndarray,
+    segment_steps: int,
+) -> list[np.ndarray]:
+    """Split sorted indices into contiguous segments of approximately segment_steps.
+
+    Each segment contains consecutive indices (sequential time windows).
+    Indices that don't form contiguous runs are split at gaps.
+    """
+    if len(indices) == 0:
+        return []
+    sorted_idx = np.sort(indices)
+    # Find gaps: where consecutive indices differ by more than 1
+    gaps = np.where(np.diff(sorted_idx) > 1)[0] + 1
+    # Split into contiguous runs
+    runs = np.split(sorted_idx, gaps)
+    # Further split long runs into chunks of segment_steps
+    segments = []
+    for run in runs:
+        for i in range(0, len(run), segment_steps):
+            chunk = run[i : i + segment_steps]
+            if len(chunk) > 0:
+                segments.append(chunk)
+    return segments
+
+
 def valid_final_input_indices(total_time_steps: int, input_steps: int, target_steps: int) -> np.ndarray:
     start = input_steps - 1
     stop = total_time_steps - target_steps
@@ -529,20 +550,6 @@ def scalarize_loss(loss_da: xr.DataArray) -> jax.Array:
     return jnp.mean(xarray_jax.unwrap_data(loss_da))
 
 
-def resolve_eval_metric_batch_size(
-    eval_batch_size: int,
-    target_steps: int,
-    requested: int | None,
-) -> int:
-    if requested is not None:
-        return max(1, min(requested, eval_batch_size))
-    if target_steps > 1:
-        # Prediction-heavy autoregressive eval is what pushed residual runs over
-        # the host-memory limit near the end of training.
-        return min(eval_batch_size, 2)
-    return eval_batch_size
-
-
 def run_eval(
     transformed,
     params: hk.Params,
@@ -552,7 +559,6 @@ def run_eval(
     eval_indices: np.ndarray,
     *,
     eval_batch_size: int,
-    eval_metric_batch_size: int | None,
     input_steps: int,
     target_steps: int,
     task_cfg: gc.TaskConfig,
@@ -572,9 +578,6 @@ def run_eval(
     var_ae_sums: dict[str, float] = {}   # sum of absolute errors
     var_counts: dict[str, int] = {}      # number of elements
     compute_metrics = transformed_predict is not None
-    metric_batch_size = eval_batch_size
-    if compute_metrics:
-        metric_batch_size = max(1, min(eval_metric_batch_size or eval_batch_size, eval_batch_size))
 
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     t_eval0 = time.time()
@@ -592,53 +595,34 @@ def run_eval(
 
         rng, key = jax.random.split(rng)
 
-        (loss_and_diag, _state_after) = transformed.apply(
-            params, state, key, inputs, targets, forcings, False)
-        loss = float(scalarize_loss(loss_and_diag[0]))
-        del loss_and_diag
-
         if compute_metrics:
-            # Drop the large loss batch before prediction-heavy detailed metrics.
-            del inputs, targets, forcings
-            gc.collect()
-
-            for metric_i in range(0, len(idx), metric_batch_size):
-                metric_idx = idx[metric_i : metric_i + metric_batch_size]
-                metric_inputs, metric_targets, metric_forcings = build_batch_from_indices(
-                    eval_ds,
-                    indices=metric_idx,
-                    input_steps=input_steps,
-                    target_steps=target_steps,
-                    task_cfg=task_cfg,
-                    dt=dt,
-                )
-
-                rng, metric_key = jax.random.split(rng)
-                preds, _pred_state = transformed_predict.apply(
-                    params, state, metric_key, metric_inputs, metric_targets, metric_forcings, False)
-
-                # Accumulate per-variable SE and AE in original (denormalized) space
-                for var_name in preds.data_vars:
-                    if var_name not in metric_targets.data_vars:
-                        continue
-                    # Align dimensions: preds and targets may have different dim order
-                    # when target_steps > 1 (e.g. batch,time,lat,lon vs time,batch,lat,lon)
-                    common_dims = [d for d in metric_targets[var_name].dims if d in preds[var_name].dims]
-                    pred_aligned = preds[var_name].transpose(*common_dims)
-                    tgt_aligned = metric_targets[var_name].transpose(*common_dims)
-                    pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
-                    tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
-                    diff = pred_vals - tgt_vals
-                    n = diff.size
-                    var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
-                    var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
-                    var_counts[var_name] = var_counts.get(var_name, 0) + n
-                    del pred_aligned, tgt_aligned, pred_vals, tgt_vals, diff
-
-                del preds, metric_inputs, metric_targets, metric_forcings
-                gc.collect()
+            # Get loss from original transformed
+            (loss_and_diag, _state_after) = transformed.apply(
+                params, state, key, inputs, targets, forcings, False)
+            loss = float(scalarize_loss(loss_and_diag[0]))
+            # Get predictions from predict fn
+            (preds, _pred_state) = transformed_predict.apply(
+                params, state, key, inputs, targets, forcings, False)
+            # Accumulate per-variable SE and AE in original (denormalized) space
+            for var_name in preds.data_vars:
+                if var_name not in targets.data_vars:
+                    continue
+                # Align dimensions: preds and targets may have different dim order
+                # when target_steps > 1 (e.g. batch,time,lat,lon vs time,batch,lat,lon)
+                common_dims = [d for d in targets[var_name].dims if d in preds[var_name].dims]
+                pred_aligned = preds[var_name].transpose(*common_dims)
+                tgt_aligned = targets[var_name].transpose(*common_dims)
+                pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
+                tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
+                diff = pred_vals - tgt_vals
+                n = diff.size
+                var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
+                var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
+                var_counts[var_name] = var_counts.get(var_name, 0) + n
         else:
-            del inputs, targets, forcings
+            (loss_and_diag, _state_after) = transformed.apply(
+                params, state, key, inputs, targets, forcings, False)
+            loss = float(scalarize_loss(loss_and_diag[0]))
 
         losses.append(loss)
 
@@ -648,9 +632,6 @@ def run_eval(
                 f"[{progress_label}] batch {batch_i}/{n_batches} "
                 f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
             )
-
-        if batch_i % 10 == 0 or batch_i == n_batches:
-            gc.collect()
 
     results: dict[str, float] = {"total": float(np.mean(losses))}
 
@@ -1023,7 +1004,6 @@ def _write_run_config(out_dir: Path, cfg: RunConfig, model_cfg: gc.ModelConfig, 
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
         "eval_batch_size": cfg.eval_batch_size,
-        "eval_metric_batch_size": cfg.eval_metric_batch_size,
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,
@@ -1087,16 +1067,6 @@ def main() -> None:
             f"hidden={cfg.temporal_hidden_size}, layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
         )
     target_steps = cfg.target_steps
-    eval_metric_batch_size = resolve_eval_metric_batch_size(
-        cfg.eval_batch_size,
-        target_steps,
-        cfg.eval_metric_batch_size,
-    )
-    if eval_metric_batch_size != cfg.eval_batch_size:
-        print(
-            "Detailed eval metrics will use micro-batching "
-            f"(loss_batch={cfg.eval_batch_size}, metric_batch={eval_metric_batch_size})"
-        )
 
     train_final_indices = valid_final_input_indices(train_ds.sizes["time"], input_steps, target_steps)
     eval_final_indices = valid_final_input_indices(eval_ds.sizes["time"], input_steps, target_steps)
@@ -1163,6 +1133,29 @@ def main() -> None:
     if cfg.resume_step is not None:
         params = ckpt_in.params
         print(f"Resuming from step {cfg.resume_step} (params loaded from {cfg.ckpt_in})")
+    elif cfg.eval_only:
+        params = ckpt_in.params
+        print(f"Eval-only: loaded params from {cfg.ckpt_in}")
+
+    if cfg.eval_only:
+        print("Eval-only mode: running eval on loaded checkpoint, no training.")
+        eval_metrics = run_eval(
+            transformed,
+            params,
+            state,
+            rng,
+            eval_ds,
+            eval_final_indices,
+            eval_batch_size=cfg.eval_batch_size,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            dt=dt_train,
+            progress_label="eval-only",
+            transformed_predict=transformed_predict,
+        )
+        print(f"[eval-only] total {eval_metrics['total']:.6f}")
+        return
 
     opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     opt_state = opt.init(params)
@@ -1170,17 +1163,27 @@ def main() -> None:
     _write_run_config(out_dir, cfg, model_cfg, task_cfg)
 
     def _reset_ssm_state(state: hk.State) -> hk.State:
-        """Zero out SSM hidden states so each sample starts fresh.
-
-        The hk.scan inside the autoregressive rollout will still thread
-        state across target steps within a single sample.
-        """
+        """Zero out SSM hidden states so each sample starts fresh."""
         return jax.tree_util.tree_map(
             lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
             state,
         )
 
-    @jax.jit
+    def _stop_grad_state(state: hk.State) -> hk.State:
+        """Detach SSM state from computation graph (truncated BPTT).
+
+        The state values are preserved for the next sample, but gradients
+        are cut so backprop only flows through the current sample's
+        target_steps.
+        """
+        return jax.tree_util.tree_map(
+            lambda leaf: jax.lax.stop_gradient(leaf) if isinstance(leaf, jax.Array) else leaf,
+            state,
+        )
+
+    use_sequential = cfg.sequential_segment_steps is not None
+
+    @functools.partial(jax.jit, static_argnames=("reset_state",))
     def train_step(
         params: hk.Params,
         state: hk.State,
@@ -1189,8 +1192,14 @@ def main() -> None:
         inputs: xr.Dataset,
         targets: xr.Dataset,
         forcings: xr.Dataset,
+        reset_state: bool = True,
     ):
-        state = _reset_ssm_state(state)
+        # reset_state=True: zero out SSM state (random sampling or segment boundary)
+        # reset_state=False: carry state with stop_gradient (truncated BPTT within segment)
+        if reset_state:
+            state = _reset_ssm_state(state)
+        else:
+            state = _stop_grad_state(state)
 
         def loss_fn(p, s, key):
             (loss_and_diag, new_state) = transformed.apply(p, s, key, inputs, targets, forcings, True)
@@ -1227,36 +1236,89 @@ def main() -> None:
         )
 
     np_rng = np.random.default_rng(cfg.seed)
-    current_indices = train_final_indices.copy()
-    np_rng.shuffle(current_indices)
+
+    # Build sampling structure
+    if use_sequential:
+        segments = build_sequential_segments(train_final_indices, cfg.sequential_segment_steps)
+        np_rng.shuffle(segments)
+        seg_idx = 0  # current segment
+        seg_cursor = 0  # position within current segment
+        print(
+            f"Sequential sampling: {len(segments)} segments of ~{cfg.sequential_segment_steps} steps "
+            f"({cfg.sequential_segment_steps * 6 / 24:.0f} days each)"
+        )
+    else:
+        current_indices = train_final_indices.copy()
+        np_rng.shuffle(current_indices)
     cursor = 0
     pass_idx = 1
     pass_start_step = step + 1
     pass_loss_accum: list[float] = []
-    while step < cfg.max_steps:
-        if cursor >= len(current_indices):
-            epoch_summaries.append(
-                {
-                    "pass": pass_idx,
-                    "steps": step - pass_start_step + 1,
-                    "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
-                    "time_per_step_mean": float(
-                        np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
-                    ),
-                    "mem_gib_max": float(
-                        np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
-                    ),
-                }
-            )
-            pass_idx += 1
-            pass_start_step = step + 1
-            pass_loss_accum = []
-            current_indices = train_final_indices.copy()
-            np_rng.shuffle(current_indices)
-            cursor = 0
 
-        batch_idx = current_indices[cursor : cursor + cfg.batch_size]
-        cursor += cfg.batch_size
+    while step < cfg.max_steps:
+        if use_sequential:
+            # Sequential segment sampling
+            need_new_segment = seg_idx >= len(segments) or seg_cursor >= len(segments[seg_idx])
+            if seg_idx >= len(segments):
+                # All segments exhausted -> new epoch
+                epoch_summaries.append(
+                    {
+                        "pass": pass_idx,
+                        "steps": step - pass_start_step + 1,
+                        "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
+                        "time_per_step_mean": float(
+                            np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
+                        ),
+                        "mem_gib_max": float(
+                            np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
+                        ),
+                    }
+                )
+                pass_idx += 1
+                pass_start_step = step + 1
+                pass_loss_accum = []
+                segments = build_sequential_segments(train_final_indices, cfg.sequential_segment_steps)
+                np_rng.shuffle(segments)
+                seg_idx = 0
+                seg_cursor = 0
+            elif seg_cursor >= len(segments[seg_idx]):
+                # Current segment exhausted -> move to next segment (reset state)
+                seg_idx += 1
+                seg_cursor = 0
+                if seg_idx >= len(segments):
+                    continue  # will trigger new epoch on next iteration
+
+            # At start of segment, reset state; otherwise carry with stop_gradient
+            reset_state = (seg_cursor == 0)
+            seg = segments[seg_idx]
+            batch_idx = seg[seg_cursor : seg_cursor + cfg.batch_size]
+            seg_cursor += cfg.batch_size
+        else:
+            # Original random sampling
+            if cursor >= len(current_indices):
+                epoch_summaries.append(
+                    {
+                        "pass": pass_idx,
+                        "steps": step - pass_start_step + 1,
+                        "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
+                        "time_per_step_mean": float(
+                            np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
+                        ),
+                        "mem_gib_max": float(
+                            np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
+                        ),
+                    }
+                )
+                pass_idx += 1
+                pass_start_step = step + 1
+                pass_loss_accum = []
+                current_indices = train_final_indices.copy()
+                np_rng.shuffle(current_indices)
+                cursor = 0
+
+            batch_idx = current_indices[cursor : cursor + cfg.batch_size]
+            cursor += cfg.batch_size
+            reset_state = True  # always reset in random mode
 
         batch_inputs, batch_targets, batch_forcings = build_batch_from_indices(
             train_ds,
@@ -1277,6 +1339,7 @@ def main() -> None:
             batch_inputs,
             batch_targets,
             batch_forcings,
+            reset_state=reset_state,
         )
         step_time = time.time() - t0
 
@@ -1294,7 +1357,7 @@ def main() -> None:
         if step % 10 == 0:
             print(f"step {step}/{cfg.max_steps} loss {loss_f:.6f}")
 
-        if step % cfg.eval_every == 0 and step < cfg.max_steps:
+        if step % cfg.eval_every == 0:
             eval_metrics = run_eval(
                 transformed,
                 params,
@@ -1303,16 +1366,20 @@ def main() -> None:
                 eval_ds,
                 eval_final_indices,
                 eval_batch_size=cfg.eval_batch_size,
-                eval_metric_batch_size=eval_metric_batch_size,
                 input_steps=input_steps,
                 target_steps=target_steps,
                 task_cfg=task_cfg,
                 dt=dt_train,
                 progress_label=f"eval@step{step}",
-                transformed_predict=None,
+                transformed_predict=transformed_predict,
             )
             eval_losses.append((step, eval_metrics["total"]))
-            eval_details.append({"step": step, **eval_metrics})
+            eval_details.append(
+                {
+                    "step": step,
+                    "total": eval_metrics["total"],
+                }
+            )
             print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
             save_logs(
                 out_dir,
@@ -1359,7 +1426,6 @@ def main() -> None:
         eval_ds,
         eval_final_indices,
         eval_batch_size=cfg.eval_batch_size,
-        eval_metric_batch_size=eval_metric_batch_size,
         input_steps=input_steps,
         target_steps=target_steps,
         task_cfg=task_cfg,
@@ -1368,7 +1434,13 @@ def main() -> None:
         transformed_predict=transformed_predict,
     )
     eval_losses.append((step, final_eval["total"]))
-    eval_details.append({"step": step, "final": True, **final_eval})
+    eval_details.append(
+        {
+            "step": step,
+            "final": True,
+            "total": final_eval["total"],
+        }
+    )
 
     save_checkpoint(
         out_dir,

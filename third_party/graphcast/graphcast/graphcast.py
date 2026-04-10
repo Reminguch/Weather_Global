@@ -804,13 +804,11 @@ class GraphCast(predictor_base.Predictor):
                                is_training: bool = False) -> chex.Array:
     """Optional temporal module over mesh latent states.
 
-    For the legacy path the tensor is already rank-3 and passes through
-    unchanged. For the time-preserving path we apply the configured temporal
-    block over the explicit time axis.
+    Supports both 3D [n_mesh, batch, D] (residual memory with baseline encoding)
+    and 4D [time, n_mesh, batch, D] (legacy per-timestep encoding) inputs.
+    The TemporalMeshBlock handles both shapes internally.
     """
-    if latent_mesh_nodes.ndim == 3:
-      return latent_mesh_nodes
-    if latent_mesh_nodes.ndim != 4:
+    if latent_mesh_nodes.ndim not in (3, 4):
       raise ValueError(
           "Expected mesh latent rank 3 or 4, got "
           f"{latent_mesh_nodes.ndim} with shape={latent_mesh_nodes.shape}")
