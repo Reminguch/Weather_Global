@@ -6,7 +6,7 @@ This script:
  - restores GraphCast_small params + configs from a GraphCast checkpoint
  - runs one-step (+6h) training with optional short rollout loss
  - logs train/eval loss, step time, memory usage
- - saves checkpoints and plots validation loss
+ - saves checkpoints and plots train/validation loss
 """
 
 from __future__ import annotations
@@ -460,8 +460,9 @@ def save_checkpoint(
     task_cfg: gc.TaskConfig,
     description: str,
     license_text: str,
+    filename: str | None = None,
 ) -> None:
-    path = out_dir / f"ckpt_step{step}.npz"
+    path = out_dir / (filename if filename is not None else f"ckpt_step{step}.npz")
     ckpt_out = gc.CheckPoint(
         params=params,
         model_config=model_cfg,
@@ -587,18 +588,43 @@ def sample_actual_usage(step: int, pid: int) -> dict[str, Any]:
     }
 
 
-def plot_val_loss(out_dir: Path, eval_losses: list[tuple[int, float]]) -> None:
-    if not eval_losses:
+def plot_loss_curves(
+    out_dir: Path,
+    train_losses: list[tuple[int, float]],
+    eval_losses: list[tuple[int, float]],
+) -> None:
+    if not train_losses and not eval_losses:
         return
-    steps, vals = zip(*eval_losses)
+
     plt.figure()
-    plt.plot(steps, vals, marker="o")
-    y_max = max(vals) * 2.0
-    if y_max > 0:
-        plt.ylim(0.0, y_max)
+    y_vals: list[float] = []
+
+    if train_losses:
+        train_steps, train_vals = zip(*train_losses)
+        plt.plot(train_steps, train_vals, label="train loss", alpha=0.6)
+        y_vals.extend(train_vals)
+
+    if eval_losses:
+        eval_steps, eval_vals = zip(*eval_losses)
+        plt.plot(eval_steps, eval_vals, marker="o", label="val loss")
+        y_vals.extend(eval_vals)
+
+    # Scale y-axis from validation-loss dynamics when available.
+    # Train curve may be clipped by this range.
+    y_ref = list(eval_vals) if eval_losses else y_vals
+    if y_ref:
+        y_min = min(y_ref)
+        y_max = max(y_ref)
+        y_span = y_max - y_min
+        pad = 0.1 * y_span if y_span > 0 else max(1e-8, 0.1 * abs(y_max))
+        lo = max(0.0, y_min - pad)
+        hi = y_max + pad
+        if hi > lo:
+            plt.ylim(lo, hi)
     plt.xlabel("step")
-    plt.ylabel("eval loss")
-    plt.title("Validation loss")
+    plt.ylabel("loss")
+    plt.title("Train and validation loss")
+    plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(out_dir / "val_loss.png")
@@ -794,6 +820,38 @@ def main() -> None:
     epoch_summaries: list[dict[str, Any]] = []
     pid = os.getpid()
 
+    best_eval_step: int | None = None
+    best_eval_loss = float("inf")
+
+    def maybe_save_best_checkpoint(eval_step: int, eval_total: float) -> None:
+        nonlocal best_eval_step, best_eval_loss
+        if eval_total >= best_eval_loss:
+            return
+        best_eval_step = int(eval_step)
+        best_eval_loss = float(eval_total)
+        save_checkpoint(
+            out_dir,
+            params=params,
+            step=eval_step,
+            model_cfg=model_cfg,
+            task_cfg=task_cfg,
+            description=ckpt_in.description,
+            license_text=ckpt_in.license,
+            filename="ckpt_best.npz",
+        )
+        with (out_dir / "best_checkpoint.json").open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "best_eval_step": best_eval_step,
+                    "best_eval_loss": best_eval_loss,
+                    "best_checkpoint": "ckpt_best.npz",
+                    "match_type": "exact",
+                },
+                f,
+                indent=2,
+            )
+        print(f"[best] updated step {best_eval_step} val {best_eval_loss:.6f}")
+
     step = 0
     for epoch in range(cfg.epochs):
         epoch_indices = train_final_indices.copy()
@@ -875,6 +933,7 @@ def main() -> None:
                     progress_label=f"eval@step{step}",
                 )
                 eval_losses.append((step, eval_metrics["total"]))
+                maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
                 eval_details.append(
                     {
                         "step": step,
@@ -887,6 +946,7 @@ def main() -> None:
                     f"[eval] step {step} total {eval_metrics['total']:.6f} "
                     f"one_step {eval_metrics['one_step']:.6f} rollout {eval_metrics['rollout']:.6f}"
                 )
+                plot_loss_curves(out_dir, train_losses, eval_losses)
                 # Persist metadata immediately after each evaluation.
                 save_logs(
                     out_dir,
@@ -931,6 +991,7 @@ def main() -> None:
             progress_label=f"eval@epoch{epoch+1}",
         )
         eval_losses.append((step, epoch_eval["total"]))
+        maybe_save_best_checkpoint(step, float(epoch_eval["total"]))
         eval_details.append(
             {
                 "step": step,
@@ -982,6 +1043,7 @@ def main() -> None:
             f"train_one_step {epoch_one_mean:.6f} train_rollout {epoch_roll_mean:.6f} "
             f"eval_total {epoch_eval['total']:.6f}"
         )
+        plot_loss_curves(out_dir, train_losses, eval_losses)
         save_logs(
             out_dir,
             train_losses,
@@ -1010,6 +1072,7 @@ def main() -> None:
         progress_label="eval@final",
     )
     eval_losses.append((step, final_eval["total"]))
+    maybe_save_best_checkpoint(step, float(final_eval["total"]))
     eval_details.append(
         {
             "step": step,
@@ -1038,7 +1101,7 @@ def main() -> None:
         actual_usage,
         epoch_summaries,
     )
-    plot_val_loss(out_dir, eval_losses)
+    plot_loss_curves(out_dir, train_losses, eval_losses)
     rss_vals = [float(x["proc_rss_gib"]) for x in actual_usage if x.get("proc_rss_gib") is not None]
     gpu_vals = [float(x["gpu_mem_gib"]) for x in actual_usage if x.get("gpu_mem_gib") is not None]
     print(

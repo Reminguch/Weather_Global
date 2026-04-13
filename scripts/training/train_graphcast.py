@@ -667,8 +667,9 @@ def save_checkpoint(
     task_cfg: gc.TaskConfig,
     description: str,
     license_text: str,
+    filename: str | None = None,
 ) -> None:
-    path = out_dir / f"ckpt_step{step}.npz"
+    path = out_dir / (filename if filename is not None else f"ckpt_step{step}.npz")
     ckpt_out = gc.CheckPoint(
         params=params,
         model_config=model_cfg,
@@ -866,9 +867,18 @@ def plot_loss_curves(
         plt.plot(eval_steps, eval_vals, marker="o", label="val loss")
         y_vals.extend(eval_vals)
 
-    y_max = max(y_vals) * 2.0 if y_vals else 0.0
-    if y_max > 0:
-        plt.ylim(0.0, y_max)
+    # Scale y-axis from validation-loss dynamics when available.
+    # Train curve may be clipped by this range.
+    y_ref = list(eval_vals) if eval_losses else y_vals
+    if y_ref:
+        y_min = min(y_ref)
+        y_max = max(y_ref)
+        y_span = y_max - y_min
+        pad = 0.1 * y_span if y_span > 0 else max(1e-8, 0.1 * abs(y_max))
+        lo = max(0.0, y_min - pad)
+        hi = y_max + pad
+        if hi > lo:
+            plt.ylim(lo, hi)
     plt.xlabel("step")
     plt.ylabel("loss")
     plt.title("Train and validation loss")
@@ -1235,6 +1245,41 @@ def main() -> None:
             f"step_times={len(step_times)}, mem={len(mem_usage)}, actual={len(actual_usage)}"
         )
 
+    best_eval_step: int | None = None
+    best_eval_loss = float("inf")
+    if eval_losses:
+        best_eval_step, best_eval_loss = min(eval_losses, key=lambda x: (x[1], x[0]))
+        print(f"[best:init] step {best_eval_step} val {best_eval_loss:.6f}")
+
+    def maybe_save_best_checkpoint(eval_step: int, eval_total: float) -> None:
+        nonlocal best_eval_step, best_eval_loss
+        if eval_total >= best_eval_loss:
+            return
+        best_eval_step = int(eval_step)
+        best_eval_loss = float(eval_total)
+        save_checkpoint(
+            out_dir,
+            params=params,
+            step=eval_step,
+            model_cfg=model_cfg,
+            task_cfg=task_cfg,
+            description=ckpt_in.description,
+            license_text=ckpt_in.license,
+            filename="ckpt_best.npz",
+        )
+        with (out_dir / "best_checkpoint.json").open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "best_eval_step": best_eval_step,
+                    "best_eval_loss": best_eval_loss,
+                    "best_checkpoint": "ckpt_best.npz",
+                    "match_type": "exact",
+                },
+                f,
+                indent=2,
+            )
+        print(f"[best] updated step {best_eval_step} val {best_eval_loss:.6f}")
+
     np_rng = np.random.default_rng(cfg.seed)
 
     # Build sampling structure
@@ -1374,6 +1419,7 @@ def main() -> None:
                 transformed_predict=transformed_predict,
             )
             eval_losses.append((step, eval_metrics["total"]))
+            maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
             eval_details.append(
                 {
                     "step": step,
@@ -1381,6 +1427,7 @@ def main() -> None:
                 }
             )
             print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+            plot_loss_curves(out_dir, train_losses, eval_losses)
             save_logs(
                 out_dir,
                 train_losses,
@@ -1434,6 +1481,7 @@ def main() -> None:
         transformed_predict=transformed_predict,
     )
     eval_losses.append((step, final_eval["total"]))
+    maybe_save_best_checkpoint(step, float(final_eval["total"]))
     eval_details.append(
         {
             "step": step,

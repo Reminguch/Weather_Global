@@ -76,9 +76,16 @@ def plot_train_and_val_loss(out_dir: Path) -> bool:
     if train_steps and train_vals:
         ax.plot(train_steps, train_vals, alpha=0.7, label="Train loss", color="C0")
     ax.plot(eval_steps, eval_vals, marker="o", linestyle="-", label="Val loss", color="C1")
-    y_max = max(eval_vals) * 2.0
-    if y_max > 0:
-        ax.set_ylim(0.0, y_max)
+    # Scale y-axis from validation-loss dynamics only.
+    # Train loss may be clipped by this range, per intended behavior.
+    y_min = min(eval_vals)
+    y_max = max(eval_vals)
+    y_span = y_max - y_min
+    pad = 0.1 * y_span if y_span > 0 else max(1e-8, 0.1 * abs(y_max))
+    lo = max(0.0, y_min - pad)
+    hi = y_max + pad
+    if hi > lo:
+        ax.set_ylim(lo, hi)
     ax.set_xlabel("step")
     ax.set_ylabel("loss")
     ax.set_title("Train & validation loss")
@@ -105,9 +112,11 @@ def main() -> None:
         if not root.is_dir():
             print(f"Not a directory: {root}", file=sys.stderr)
             continue
-        for run_dir in sorted(root.iterdir()):
-            if not run_dir.is_dir():
-                continue
+        # Include nested run directories that contain eval_loss.json.
+        run_dirs = sorted({p.parent for p in root.rglob("eval_loss.json")})
+        if (root / "eval_loss.json").exists():
+            run_dirs = sorted(set(run_dirs + [root]))
+        for run_dir in run_dirs:
             if plot_train_and_val_loss(run_dir):
                 print(f"Updated: {run_dir}")
                 updated += 1
