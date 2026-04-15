@@ -5,7 +5,19 @@
 
 set -eo pipefail
 
-PROJECT_ROOT=/scratch/gpfs/MENGDIW/sh4809/Weather_Global
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+LEGACY_PROJECT_ROOT="/scratch/gpfs/MENGDIW/sh4809/Weather_Global"
+PROJECT_ROOT="${PROJECT_ROOT:-${DEFAULT_PROJECT_ROOT}}"
+if [[ ! -d "${PROJECT_ROOT}" && -d "${LEGACY_PROJECT_ROOT}" ]]; then
+  PROJECT_ROOT="${LEGACY_PROJECT_ROOT}"
+fi
+
+if [[ ! -d "${PROJECT_ROOT}" ]]; then
+  echo "PROJECT_ROOT does not exist: ${PROJECT_ROOT}" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 ENV_NAME=graphcast311
 SETUP_MODE="${1:-}"
 CONDA_ROOT="${PROJECT_ROOT}/.conda"
