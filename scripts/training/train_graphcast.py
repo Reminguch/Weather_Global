@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import concurrent.futures
 import time
 import warnings
 from pathlib import Path
@@ -169,6 +170,12 @@ class RunConfig:
     temporal_backbone: str
     temporal_location: str
     temporal_hidden_size: int
+    temporal_d_inner: int | None
+    temporal_d_state: int
+    temporal_d_conv: int
+    temporal_dt_rank: str
+    temporal_bias: bool
+    temporal_conv_bias: bool
     temporal_layers: int
     temporal_dropout: float
     temporal_stateful: bool
@@ -219,6 +226,19 @@ def parse_args() -> RunConfig:
         help="Where to insert temporal module when enabled.",
     )
     parser.add_argument("--temporal-hidden-size", type=int, default=128)
+    parser.add_argument("--temporal-d-inner", type=int, default=None,
+                        help="Mamba internal channel width. Default: use --temporal-hidden-size.")
+    parser.add_argument("--temporal-d-state", type=int, default=16,
+                        help="Mamba SSM state size per internal channel.")
+    parser.add_argument("--temporal-d-conv", type=int, default=4,
+                        help="Mamba causal convolution width. Use 1 to disable local temporal mixing.")
+    parser.add_argument("--temporal-dt-rank", default="auto",
+                        help="Mamba dt rank: 'auto' or a positive integer.")
+    parser.add_argument("--temporal-bias", action="store_true", default=False,
+                        help="Enable bias in Mamba linear projections.")
+    parser.add_argument("--no-temporal-conv-bias", dest="temporal_conv_bias",
+                        action="store_false", default=True,
+                        help="Disable bias in the Mamba causal convolution.")
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False,
@@ -247,6 +267,19 @@ def parse_args() -> RunConfig:
         raise ValueError("--resume-step must be >= 0")
     if args.temporal_hidden_size <= 0:
         raise ValueError("--temporal-hidden-size must be > 0")
+    if args.temporal_d_inner is not None and args.temporal_d_inner <= 0:
+        raise ValueError("--temporal-d-inner must be > 0")
+    if args.temporal_d_state <= 0:
+        raise ValueError("--temporal-d-state must be > 0")
+    if args.temporal_d_conv <= 0:
+        raise ValueError("--temporal-d-conv must be > 0")
+    if args.temporal_dt_rank != "auto":
+        try:
+            dt_rank = int(args.temporal_dt_rank)
+        except ValueError as exc:
+            raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer") from exc
+        if dt_rank <= 0:
+            raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer")
     if args.temporal_layers <= 0:
         raise ValueError("--temporal-layers must be > 0")
     if not (0.0 <= args.temporal_dropout < 1.0):
@@ -279,6 +312,12 @@ def parse_args() -> RunConfig:
         temporal_backbone=args.temporal_backbone,
         temporal_location=args.temporal_location,
         temporal_hidden_size=args.temporal_hidden_size,
+        temporal_d_inner=args.temporal_d_inner,
+        temporal_d_state=args.temporal_d_state,
+        temporal_d_conv=args.temporal_d_conv,
+        temporal_dt_rank=args.temporal_dt_rank,
+        temporal_bias=args.temporal_bias,
+        temporal_conv_bias=args.temporal_conv_bias,
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
@@ -314,6 +353,12 @@ def build_predictor(
     temporal_backbone: str,
     temporal_location: str,
     temporal_hidden_size: int,
+    temporal_d_inner: int | None,
+    temporal_d_state: int,
+    temporal_d_conv: int,
+    temporal_dt_rank: str,
+    temporal_bias: bool,
+    temporal_conv_bias: bool,
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
@@ -324,6 +369,12 @@ def build_predictor(
         predictor._temporal_location = temporal_location
         predictor._temporal_stateful = temporal_stateful
         predictor._temporal_hidden_size = temporal_hidden_size
+        predictor._temporal_d_inner = temporal_d_inner
+        predictor._temporal_d_state = temporal_d_state
+        predictor._temporal_d_conv = temporal_d_conv
+        predictor._temporal_dt_rank = temporal_dt_rank
+        predictor._temporal_bias = temporal_bias
+        predictor._temporal_conv_bias = temporal_conv_bias
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
     if use_bf16:
@@ -1022,7 +1073,14 @@ def _write_run_config(out_dir: Path, cfg: RunConfig, model_cfg: gc.ModelConfig, 
         "temporal_config": {
             "backbone": cfg.temporal_backbone,
             "location": cfg.temporal_location,
+            "stateful": cfg.temporal_stateful,
             "hidden_size": cfg.temporal_hidden_size,
+            "d_inner": cfg.temporal_d_inner,
+            "d_state": cfg.temporal_d_state,
+            "d_conv": cfg.temporal_d_conv,
+            "dt_rank": cfg.temporal_dt_rank,
+            "bias": cfg.temporal_bias,
+            "conv_bias": cfg.temporal_conv_bias,
             "layers": cfg.temporal_layers,
             "dropout": cfg.temporal_dropout,
         },
@@ -1074,7 +1132,10 @@ def main() -> None:
         print(
             "Temporal module configured "
             f"(backbone={cfg.temporal_backbone}, location={cfg.temporal_location}, "
-            f"hidden={cfg.temporal_hidden_size}, layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
+            f"stateful={cfg.temporal_stateful}, hidden={cfg.temporal_hidden_size}, "
+            f"d_inner={cfg.temporal_d_inner}, d_state={cfg.temporal_d_state}, "
+            f"d_conv={cfg.temporal_d_conv}, dt_rank={cfg.temporal_dt_rank}, "
+            f"layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
         )
     target_steps = cfg.target_steps
 
@@ -1103,6 +1164,12 @@ def main() -> None:
             temporal_backbone=cfg.temporal_backbone,
             temporal_location=cfg.temporal_location,
             temporal_hidden_size=cfg.temporal_hidden_size,
+            temporal_d_inner=cfg.temporal_d_inner,
+            temporal_d_state=cfg.temporal_d_state,
+            temporal_d_conv=cfg.temporal_d_conv,
+            temporal_dt_rank=cfg.temporal_dt_rank,
+            temporal_bias=cfg.temporal_bias,
+            temporal_conv_bias=cfg.temporal_conv_bias,
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
@@ -1120,6 +1187,12 @@ def main() -> None:
             temporal_backbone=cfg.temporal_backbone,
             temporal_location=cfg.temporal_location,
             temporal_hidden_size=cfg.temporal_hidden_size,
+            temporal_d_inner=cfg.temporal_d_inner,
+            temporal_d_state=cfg.temporal_d_state,
+            temporal_d_conv=cfg.temporal_d_conv,
+            temporal_dt_rank=cfg.temporal_dt_rank,
+            temporal_bias=cfg.temporal_bias,
+            temporal_conv_bias=cfg.temporal_conv_bias,
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
@@ -1172,24 +1245,29 @@ def main() -> None:
 
     _write_run_config(out_dir, cfg, model_cfg, task_cfg)
 
+    def _map_temporal_state_leaves(state: hk.State, fn) -> hk.State:
+        mutable_state = hk.data_structures.to_mutable_dict(state)
+        for module_name, module_state in mutable_state.items():
+            del module_name
+            for state_name, leaf in module_state.items():
+                if not isinstance(leaf, jax.Array):
+                    continue
+                if state_name.endswith("_ssm_state") or state_name.endswith("_conv_cache"):
+                    module_state[state_name] = fn(leaf)
+        return hk.data_structures.to_immutable_dict(mutable_state)
+
     def _reset_ssm_state(state: hk.State) -> hk.State:
-        """Zero out SSM hidden states so each sample starts fresh."""
-        return jax.tree_util.tree_map(
-            lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
-            state,
-        )
+        """Zero out temporal Mamba state so each sample starts fresh."""
+        return _map_temporal_state_leaves(state, jnp.zeros_like)
 
     def _stop_grad_state(state: hk.State) -> hk.State:
-        """Detach SSM state from computation graph (truncated BPTT).
+        """Detach temporal Mamba state from the computation graph.
 
         The state values are preserved for the next sample, but gradients
         are cut so backprop only flows through the current sample's
         target_steps.
         """
-        return jax.tree_util.tree_map(
-            lambda leaf: jax.lax.stop_gradient(leaf) if isinstance(leaf, jax.Array) else leaf,
-            state,
-        )
+        return _map_temporal_state_leaves(state, jax.lax.stop_gradient)
 
     use_sequential = cfg.sequential_segment_steps is not None
 
@@ -1300,9 +1378,31 @@ def main() -> None:
     pass_start_step = step + 1
     pass_loss_accum: list[float] = []
 
+    # Prefetch setup for random sampling: submit first batch before the loop so
+    # subsequent iterations can retrieve it while the GPU runs the previous one.
+    if not use_sequential:
+        _prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        _first_idx = current_indices[cursor : cursor + cfg.batch_size]
+        cursor += cfg.batch_size
+        _pending_future: concurrent.futures.Future | None = _prefetch_executor.submit(
+            build_batch_from_indices,
+            train_ds,
+            indices=_first_idx,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            dt=dt_train,
+        )
+        _pending_reset = True
+    else:
+        _prefetch_executor = None
+        _pending_future = None
+        _pending_reset = None
+
     while step < cfg.max_steps:
         if use_sequential:
-            # Sequential segment sampling
+            # Sequential segment sampling (blocking load; no prefetch due to continue logic).
+            _new_epoch = False
             need_new_segment = seg_idx >= len(segments) or seg_cursor >= len(segments[seg_idx])
             if seg_idx >= len(segments):
                 # All segments exhausted -> new epoch
@@ -1338,41 +1438,45 @@ def main() -> None:
             seg = segments[seg_idx]
             batch_idx = seg[seg_cursor : seg_cursor + cfg.batch_size]
             seg_cursor += cfg.batch_size
+            t_data = time.time()
+            batch_inputs, batch_targets, batch_forcings = build_batch_from_indices(
+                train_ds,
+                indices=batch_idx,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt_train,
+            )
+            data_time = time.time() - t_data
         else:
-            # Original random sampling
-            if cursor >= len(current_indices):
-                epoch_summaries.append(
-                    {
-                        "pass": pass_idx,
-                        "steps": step - pass_start_step + 1,
-                        "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
-                        "time_per_step_mean": float(
-                            np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
-                        ),
-                        "mem_gib_max": float(
-                            np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
-                        ),
-                    }
-                )
-                pass_idx += 1
-                pass_start_step = step + 1
-                pass_loss_accum = []
+            # Random sampling with prefetch: GPU and data loading run concurrently.
+            # Epoch boundary is detected one step ahead of training; summary logged after step.
+            _new_epoch = cursor >= len(current_indices)
+            if _new_epoch:
                 current_indices = train_final_indices.copy()
                 np_rng.shuffle(current_indices)
                 cursor = 0
 
+            # Submit NEXT batch to background thread (loads while GPU runs current step).
             batch_idx = current_indices[cursor : cursor + cfg.batch_size]
             cursor += cfg.batch_size
-            reset_state = True  # always reset in random mode
+            _next_future = _prefetch_executor.submit(
+                build_batch_from_indices,
+                train_ds,
+                indices=batch_idx,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt_train,
+            )
 
-        batch_inputs, batch_targets, batch_forcings = build_batch_from_indices(
-            train_ds,
-            indices=batch_idx,
-            input_steps=input_steps,
-            target_steps=target_steps,
-            task_cfg=task_cfg,
-            dt=dt_train,
-        )
+            # Retrieve current batch (submitted last iteration, loaded while GPU ran).
+            t_data = time.time()
+            batch_inputs, batch_targets, batch_forcings = _pending_future.result()
+            data_time = time.time() - t_data
+            reset_state = _pending_reset
+            _pending_future = _next_future
+            _pending_reset = True
 
         rng, step_key = jax.random.split(rng)
         t0 = time.time()
@@ -1394,13 +1498,32 @@ def main() -> None:
         pass_loss_accum.append(loss_f)
         step_times.append((step, step_time))
 
+        # Random mode: log epoch summary after the last step of each epoch completes.
+        if _new_epoch:
+            epoch_summaries.append(
+                {
+                    "pass": pass_idx,
+                    "steps": step - pass_start_step + 1,
+                    "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
+                    "time_per_step_mean": float(
+                        np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
+                    ),
+                    "mem_gib_max": float(
+                        np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
+                    ),
+                }
+            )
+            pass_idx += 1
+            pass_start_step = step + 1
+            pass_loss_accum = []
+
         usage = sample_actual_usage(step=step)
         actual_usage.append(usage)
         if usage.get("gpu_mem_gib") is not None:
             mem_usage.append((step, float(usage["gpu_mem_gib"])))
 
         if step % 10 == 0:
-            print(f"step {step}/{cfg.max_steps} loss {loss_f:.6f}")
+            print(f"step {step}/{cfg.max_steps} loss {loss_f:.6f} data={data_time:.3f}s gpu={step_time:.4f}s")
 
         if step % cfg.eval_every == 0:
             eval_metrics = run_eval(
@@ -1449,6 +1572,9 @@ def main() -> None:
                 description=ckpt_in.description,
                 license_text=ckpt_in.license,
             )
+
+    if _prefetch_executor is not None:
+        _prefetch_executor.shutdown(wait=False)
 
     if pass_loss_accum:
         epoch_summaries.append(

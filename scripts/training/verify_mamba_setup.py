@@ -174,6 +174,12 @@ def main():
             temporal_backbone="mamba",
             temporal_location="mesh_post_encoder_residual",
             temporal_hidden_size=mamba_hidden,
+            temporal_d_inner=None,
+            temporal_d_state=16,
+            temporal_d_conv=4,
+            temporal_dt_rank="auto",
+            temporal_bias=False,
+            temporal_conv_bias=True,
             temporal_layers=1, temporal_dropout=0.0,
             temporal_stateful=True,
         )
@@ -236,7 +242,14 @@ def main():
             model_cfg, task_cfg, stats,
             use_bf16=True, gradient_checkpointing=True,
             temporal_backbone="mamba", temporal_location="mesh_post_encoder_residual",
-            temporal_hidden_size=mamba_hidden, temporal_layers=1, temporal_dropout=0.0,
+            temporal_hidden_size=mamba_hidden,
+            temporal_d_inner=None,
+            temporal_d_state=16,
+            temporal_d_conv=4,
+            temporal_dt_rank="auto",
+            temporal_bias=False,
+            temporal_conv_bias=True,
+            temporal_layers=1, temporal_dropout=0.0,
             temporal_stateful=True,
         )
         return predictor.loss(inputs, targets, forcings)

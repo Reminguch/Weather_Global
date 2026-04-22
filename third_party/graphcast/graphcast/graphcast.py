@@ -42,7 +42,11 @@ import numpy as np
 import xarray
 from src.models.temporal_mesh_mamba import TemporalMeshBlock as _StatelessTemporalBlock
 from src.models.temporal_mesh_mamba import TemporalMeshConfig
-from src.models.temporal_mesh_mamba_stateful import TemporalMeshBlock as _StatefulTemporalBlock
+from src.models.temporal_mesh_mamba_Ilya import (
+    TemporalMeshBlock as _StatefulTemporalBlock,
+)
+from src.models.temporal_mesh_mamba_Ilya import load_temporal_state_from_haiku
+from src.models.temporal_mesh_mamba_Ilya import store_temporal_state_to_haiku
 
 
 def _get_temporal_block_cls(stateful: bool):
@@ -252,6 +256,12 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_backbone = "none"
     self._temporal_location = "mesh_post_encoder"
     self._temporal_hidden_size = model_config.latent_size
+    self._temporal_d_inner = None
+    self._temporal_d_state = 16
+    self._temporal_d_conv = 4
+    self._temporal_dt_rank = "auto"
+    self._temporal_bias = False
+    self._temporal_conv_bias = True
     self._temporal_layers = 1
     self._temporal_dropout = 0.0
     self._temporal_stateful = False
@@ -306,6 +316,12 @@ class GraphCast(predictor_base.Predictor):
         temporal_backbone=self._temporal_backbone,
         temporal_location=self._temporal_location,
         temporal_hidden_size=self._temporal_hidden_size,
+        temporal_d_inner=self._temporal_d_inner,
+        temporal_d_state=self._temporal_d_state,
+        temporal_d_conv=self._temporal_d_conv,
+        temporal_dt_rank=self._temporal_dt_rank,
+        temporal_bias=self._temporal_bias,
+        temporal_conv_bias=self._temporal_conv_bias,
         temporal_layers=self._temporal_layers,
         temporal_dropout=self._temporal_dropout,
         name="mesh_gnn",
@@ -740,7 +756,11 @@ class GraphCast(predictor_base.Predictor):
 
   def _run_mesh_gnn_interleaved(self, latent_mesh_nodes: chex.Array) -> chex.Array:
     """Runs the mesh processor with interleaved spatial and temporal steps."""
-    time_size, _, batch_size, _ = latent_mesh_nodes.shape
+    if latent_mesh_nodes.ndim != 4:
+      raise ValueError(
+          "Expected [time, num_mesh_nodes, batch, channels], got "
+          f"shape={latent_mesh_nodes.shape}")
+    time_size, n_mesh, batch_size, _ = latent_mesh_nodes.shape
 
     mesh_graph = self._mesh_graph_structure
     assert mesh_graph is not None
@@ -773,21 +793,54 @@ class GraphCast(predictor_base.Predictor):
         node_sequence = jnp.stack(
             [graph_t.nodes["mesh_nodes"].features for graph_t in latent_graphs],
             axis=0)
-        # stack gives (time, batch, n_mesh, channels);
-        # TemporalMeshBlock expects (time, n_mesh, batch, channels)
-        node_sequence = jnp.transpose(node_sequence, (0, 2, 1, 3))
-        node_sequence = _get_temporal_block_cls(self._temporal_stateful)(
+        # Graph node features are [num_mesh_nodes, batch, channels], so stacking
+        # over input time already gives the TemporalMeshBlock contract:
+        # [time, num_mesh_nodes, batch, channels].
+        expected_prefix = (time_size, n_mesh, batch_size)
+        if node_sequence.shape[:3] != expected_prefix:
+          raise ValueError(
+              "Unexpected interleaved mesh node sequence shape before temporal "
+              f"block: expected prefix {expected_prefix}, got "
+              f"{node_sequence.shape}.")
+        temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}"
+        temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
                 location=self._temporal_location,
                 hidden_size=self._temporal_hidden_size,
+                d_inner=self._temporal_d_inner,
+                d_state=self._temporal_d_state,
+                dt_rank=self._temporal_dt_rank,
+                d_conv=self._temporal_d_conv,
                 layers=self._temporal_layers,
+                bias=self._temporal_bias,
+                conv_bias=self._temporal_conv_bias,
                 dropout=self._temporal_dropout,
             ),
-            name=f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}",
-        )(node_sequence, is_training=False)
-        # transpose back: (time, n_mesh, batch, channels) -> (time, batch, n_mesh, channels)
-        node_sequence = jnp.transpose(node_sequence, (0, 2, 1, 3))
+            name=temporal_block_name,
+        )
+        if self._temporal_stateful:
+          temporal_state = load_temporal_state_from_haiku(
+              f"{temporal_block_name}_state",
+              temporal_block.cfg,
+              batch_size=batch_size,
+              n_mesh=node_sequence.shape[1],
+              dtype=node_sequence.dtype,
+          )
+          node_sequence, next_temporal_state = temporal_block(
+              node_sequence,
+              prev_state=temporal_state,
+              is_training=False,
+          )
+          store_temporal_state_to_haiku(
+              f"{temporal_block_name}_state", next_temporal_state)
+        else:
+          node_sequence = temporal_block(node_sequence, is_training=False)
+        if node_sequence.shape[:3] != expected_prefix:
+          raise ValueError(
+              "Unexpected interleaved mesh node sequence shape after temporal "
+              f"block: expected prefix {expected_prefix}, got "
+              f"{node_sequence.shape}.")
         latent_graphs = [
             graph_t._replace(
                 nodes={"mesh_nodes": graph_t.nodes["mesh_nodes"]._replace(
@@ -818,12 +871,36 @@ class GraphCast(predictor_base.Predictor):
               backbone=self._temporal_backbone,
               location=self._temporal_location,
               hidden_size=self._temporal_hidden_size,
+              d_inner=self._temporal_d_inner,
+              d_state=self._temporal_d_state,
+              dt_rank=self._temporal_dt_rank,
+              d_conv=self._temporal_d_conv,
               layers=self._temporal_layers,
+              bias=self._temporal_bias,
+              conv_bias=self._temporal_conv_bias,
               dropout=self._temporal_dropout,
           ),
           name="temporal_mesh_block",
       )
-    return self._temporal_block(latent_mesh_nodes, is_training=is_training)
+    if not self._temporal_stateful:
+      return self._temporal_block(latent_mesh_nodes, is_training=is_training)
+
+    batch_size = latent_mesh_nodes.shape[2] if latent_mesh_nodes.ndim == 4 else latent_mesh_nodes.shape[1]
+    n_mesh = latent_mesh_nodes.shape[1] if latent_mesh_nodes.ndim == 4 else latent_mesh_nodes.shape[0]
+    temporal_state = load_temporal_state_from_haiku(
+        "temporal_mesh_block_state",
+        self._temporal_block.cfg,
+        batch_size=batch_size,
+        n_mesh=n_mesh,
+        dtype=latent_mesh_nodes.dtype,
+    )
+    output, next_temporal_state = self._temporal_block(
+        latent_mesh_nodes,
+        prev_state=temporal_state,
+        is_training=is_training,
+    )
+    store_temporal_state_to_haiku("temporal_mesh_block_state", next_temporal_state)
+    return output
 
   def _run_mesh2grid_gnn(self,
                          updated_latent_mesh_nodes: chex.Array,

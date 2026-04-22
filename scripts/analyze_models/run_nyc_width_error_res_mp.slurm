@@ -7,8 +7,11 @@
 #   MP_LIST=(1 2)
 #   => 14 jobs total.
 #
-# This produces per-(res,mp) metric CSVs.
-# For each run/width, the analysis script uses ckpt_best.npz.
+# Each job evaluates all widths for its (res, mp) pair sequentially.
+# Batch size is scaled automatically inside the Python script per width
+# (smaller models get larger batches to saturate the A100).
+#
+# This produces per-(res,mp) metric CSVs:
 #   plots/analyze_models/data/nyc_width_error_res{res}_mp{mp}.csv
 #
 # After all jobs finish, build MAE-vs-res plots from CSVs with:

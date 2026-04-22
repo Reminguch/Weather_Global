@@ -74,6 +74,33 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--res", type=int, required=True, help="Resolution group (e.g., 1,2,4,9,12,15,18,30).")
     p.add_argument("--mp", type=int, required=True, help="mp value to filter runs (e.g., 1 or 2).")
+    p.add_argument(
+        "--width",
+        type=int,
+        default=None,
+        help="If set, evaluate only this width. Useful for per-width SLURM array jobs to avoid "
+             "repeated JIT recompilation across widths on the same GPU.",
+    )
+    p.add_argument(
+        "--batch-size",
+        type=int,
+        default=WINDOW_BATCH_SIZE,
+        help=f"Inference batch size (default: {WINDOW_BATCH_SIZE}). "
+             "Increase for small/narrow models on large-memory GPUs.",
+    )
+    p.add_argument(
+        "--checkpoint-root",
+        type=Path,
+        default=None,
+        help="Optional checkpoint root containing res{res}_* run directories. "
+             "Defaults to artifacts/checkpoints/graphcast_res{res}_stream.",
+    )
+    p.add_argument(
+        "--output-data-dir",
+        type=Path,
+        default=None,
+        help="Optional output directory for CSVs. Defaults to plots/analyze_models/data.",
+    )
     return p.parse_args()
 
 
@@ -127,8 +154,10 @@ def _extract_ckpt_step(p: Path) -> int:
     return int(m.group(1)) if m else -1
 
 
-def _discover_best_by_width(res: int, mp: int) -> list[tuple[int, Path]]:
-    root = ROOT / f"artifacts/checkpoints/graphcast_res{res}_stream"
+def _discover_best_by_width(res: int, mp: int, checkpoint_root: Path | None = None) -> list[tuple[int, Path]]:
+    root = checkpoint_root if checkpoint_root is not None else ROOT / f"artifacts/checkpoints/graphcast_res{res}_stream"
+    if not root.is_absolute():
+        root = ROOT / root
     if not root.exists():
         raise FileNotFoundError(f"Checkpoint root not found: {root}")
 
@@ -188,6 +217,7 @@ def _normalized_weighted_mse_allvars(
     *,
     per_variable_weights: dict[str, float],
     use_latitude_weights: bool,
+    diffs_stddev_by_level: xarray.Dataset | None = None,
 ) -> xarray.DataArray:
     """Normalized weighted MSE over variables.
 
@@ -196,6 +226,10 @@ def _normalized_weighted_mse_allvars(
     - per-area-point: spatial dimensions are averaged (lat/lon, with optional lat weighting),
     - per-atmospheric-level: `level` is averaged,
     - per-variable: weighted mean over variables (dividing by total variable weight).
+
+    When `diffs_stddev_by_level` is provided the squared error is divided by the
+    per-variable (and per-level) variance before averaging, matching the scale of
+    the training loss which is computed on normalized residuals.
     """
     per_var_losses: list[xarray.DataArray] = []
     per_var_weights: list[float] = []
@@ -204,6 +238,10 @@ def _normalized_weighted_mse_allvars(
             continue
         prediction = predictions[name]
         loss = (prediction - target) ** 2
+        # Divide by diffs_stddev² to match the training-loss normalization scale.
+        if diffs_stddev_by_level is not None and name in diffs_stddev_by_level:
+            scale = diffs_stddev_by_level[name].astype(loss.dtype)
+            loss = loss / (scale ** 2)
         if use_latitude_weights and "lat" in loss.dims:
             # Latitude-weighted mean over latitude, then ordinary means elsewhere.
             lat_w = _latitude_weights_with_fallback(target).astype(loss.dtype)
@@ -331,6 +369,7 @@ def _evaluate_checkpoint(
     lead_days: list[int],
     lead_steps: list[int],
     seed_base: int,
+    window_batch_size: int = WINDOW_BATCH_SIZE,
 ) -> tuple[dict[int, float], dict[int, float], dict[int, float], dict[int, int]]:
     max_lead_steps = max(lead_steps)
     with ckpt_path.open("rb") as f:
@@ -346,7 +385,7 @@ def _evaluate_checkpoint(
 
     min_target_idx = N_INPUT_STEPS + max_lead_steps - 1
     target_indices = np.arange(max(start_target_idx, min_target_idx), n_steps, dtype=int).tolist()
-    n_batches = (len(target_indices) + WINDOW_BATCH_SIZE - 1) // WINDOW_BATCH_SIZE
+    n_batches = (len(target_indices) + window_batch_size - 1) // window_batch_size
 
     abs_err_sum = np.zeros(max_lead_steps, dtype=float)
     counts = np.zeros(max_lead_steps, dtype=int)
@@ -354,8 +393,8 @@ def _evaluate_checkpoint(
     grid_weighted_mse_sum = np.zeros(max_lead_steps, dtype=float)
     weighted_mse_counts = np.zeros(max_lead_steps, dtype=int)
     for b_i in range(n_batches):
-        i0 = b_i * WINDOW_BATCH_SIZE
-        i1 = min((b_i + 1) * WINDOW_BATCH_SIZE, len(target_indices))
+        i0 = b_i * window_batch_size
+        i1 = min((b_i + 1) * window_batch_size, len(target_indices))
         batch = _build_batch(ds_res, target_indices[i0:i1], task_cfg, max_lead_steps, lat_idx, lon_idx)
         if batch is None:
             continue
@@ -386,6 +425,7 @@ def _evaluate_checkpoint(
                 point_target,
                 per_variable_weights=GRAPHCAST_PER_VARIABLE_WEIGHTS,
                 use_latitude_weights=False,
+                diffs_stddev_by_level=stats["diffs_stddev_by_level"],
             )
 
             grid_pred = pred_step.sel(lat=res_grid_lats, lon=res_grid_lons, method="nearest")
@@ -395,6 +435,7 @@ def _evaluate_checkpoint(
                 grid_target,
                 per_variable_weights=GRAPHCAST_PER_VARIABLE_WEIGHTS,
                 use_latitude_weights=True,
+                diffs_stddev_by_level=stats["diffs_stddev_by_level"],
             )
 
             batch_count = int(point_loss_batch.sizes.get("batch", 1))
@@ -434,14 +475,22 @@ def main() -> None:
 
     ds_nyc, start_target_idx, n_steps = _prepare_dataset(max(lead_steps))
     stats = _load_stats(ROOT / STATS_DIR)
-    by_width = _discover_best_by_width(args.res, args.mp)
+    by_width = _discover_best_by_width(args.res, args.mp, args.checkpoint_root)
+
+    if args.width is not None:
+        by_width = [(w, p) for w, p in by_width if w == args.width]
+        if not by_width:
+            raise RuntimeError(f"No checkpoint found for res={args.res}, mp={args.mp}, width={args.width}")
+
+    window_batch_size = args.batch_size
 
     rows: list[dict[str, object]] = []
     for i, (width, ckpt_path) in enumerate(by_width, start=1):
         run_name = ckpt_path.parent.name
         ckpt_step = int(_extract_ckpt_step(ckpt_path))
         mae_by_day, point_wmse_by_day, grid_wmse_by_day, n_by_day = _evaluate_checkpoint(
-            ckpt_path, stats, ds_nyc, start_target_idx, n_steps, lead_days, lead_steps, seed_base=100000 * i
+            ckpt_path, stats, ds_nyc, start_target_idx, n_steps, lead_days, lead_steps,
+            seed_base=100000 * i, window_batch_size=window_batch_size,
         )
         print(
             f"[{i}/{len(by_width)}] {run_name} w={width} ckpt=ckpt_best.npz "
@@ -475,10 +524,14 @@ def main() -> None:
             )
 
     df = pd.DataFrame(rows).sort_values(["res", "mp", "width", "lead_days"]).reset_index(drop=True)
-    base_dir = ROOT / OUTPUT_BASE_DIR
-    data_dir = base_dir / OUTPUT_DATA_SUBDIR
+    data_dir = args.output_data_dir if args.output_data_dir is not None else ROOT / OUTPUT_BASE_DIR / OUTPUT_DATA_SUBDIR
+    if not data_dir.is_absolute():
+        data_dir = ROOT / data_dir
     data_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = data_dir / f"nyc_width_error_res{args.res}_mp{args.mp}.csv"
+    if args.width is not None:
+        csv_path = data_dir / f"nyc_width_error_res{args.res}_mp{args.mp}_w{args.width}.csv"
+    else:
+        csv_path = data_dir / f"nyc_width_error_res{args.res}_mp{args.mp}.csv"
     df.to_csv(csv_path, index=False)
 
     print(f"Saved CSV: {csv_path}")

@@ -2,17 +2,22 @@
 #SBATCH --job-name=gc-res-sweep
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --mem=80G
 #SBATCH --time=24:00:00
-#SBATCH --array=0-47
+#SBATCH --array=0-35
 #SBATCH --output=logs/gc_stream_%A_%a.out
 #SBATCH --error=logs/gc_stream_%A_%a.err
 
 set -euo pipefail
 
-# Adaptive sweep script:
-# - Sweeps resolutions: 6, 9, 12, 15, 18, 30
-# - Uses resolution-dependent mesh mapping for fair comparison
+# Resolution/mesh sweep script:
+# - Sweeps message passing steps 1, 2, 3, 4
+# - Sweeps widths 128, 256, 512
+# - Uses mesh/resolution pairs:
+#     mesh=2 -> res=15
+#     mesh=3 -> res=4
+#     mesh=4 -> res=1
+# - Omits mesh=1
 # For a single manual run, use: scripts/training/train_graphcast_standard.slurm
 
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
@@ -32,84 +37,74 @@ which python
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 # Sweep mapping:
-#   6 resolutions x 8 (WIDTH, MSG) combos = 48 jobs total.
-#   resolution-major ordering:
-#     task_id = resolution_index * 8 + combo_index
-RESOLUTIONS=(6 9 12 15 18 30)
-COMBOS_PER_RES=8
-MAX_TASK_ID=$(( ${#RESOLUTIONS[@]} * COMBOS_PER_RES - 1 ))
+#   3 (mesh,res) pairs x 4 mp values x 3 widths = 36 jobs total.
+#   pair-major ordering:
+#     task_id = pair_index * 12 + mp_index * 3 + width_index
+NUM_WIDTHS=3
+NUM_MPS=4
+NUM_PAIRS=3
+COMBOS_PER_PAIR=$(( NUM_MPS * NUM_WIDTHS ))
+MAX_TASK_ID=$(( NUM_PAIRS * COMBOS_PER_PAIR - 1 ))
 
 if (( SLURM_ARRAY_TASK_ID < 0 || SLURM_ARRAY_TASK_ID > MAX_TASK_ID )); then
   echo "Invalid SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID}; expected [0, ${MAX_TASK_ID}]"
   exit 1
 fi
 
-RESOLUTION_INDEX=$(( SLURM_ARRAY_TASK_ID / COMBOS_PER_RES ))
-COMBO_INDEX=$(( SLURM_ARRAY_TASK_ID % COMBOS_PER_RES ))
-RESOLUTION=${RESOLUTIONS[RESOLUTION_INDEX]}
+WIDTH_INDEX=$(( SLURM_ARRAY_TASK_ID % NUM_WIDTHS ))
+MP_INDEX=$(( (SLURM_ARRAY_TASK_ID % COMBOS_PER_PAIR) / NUM_WIDTHS ))
+PAIR_INDEX=$(( SLURM_ARRAY_TASK_ID / COMBOS_PER_PAIR ))
 
-# Resolution-dependent mesh for fair comparison across coarse grids.
-# Mapping:
-#   6->3, 9->2, 12->2, 15->1, 18->1, 30->0
-if [[ -n "${MESH_SIZE:-}" ]]; then
-  MESH_SIZE="${MESH_SIZE}"
-  echo "Using user-provided MESH_SIZE=${MESH_SIZE} override"
-else
-  case "${RESOLUTION}" in
-    6)
-      MESH_SIZE=3
-      ;;
-    9|12)
-      MESH_SIZE=2
-      ;;
-    15|18)
-      MESH_SIZE=1
-      ;;
-    30)
-      MESH_SIZE=0
-      ;;
-    *)
-      echo "Unsupported RESOLUTION=${RESOLUTION}"
-      exit 1
-      ;;
-  esac
-fi
-
-case "${COMBO_INDEX}" in
+case "${WIDTH_INDEX}" in
   0)
     WIDTH=128
-    MSG=1
     ;;
   1)
     WIDTH=256
-    MSG=1
     ;;
   2)
     WIDTH=512
-    MSG=1
-    ;;
-  3)
-    WIDTH=1024
-    MSG=1
-    ;;
-  4)
-    WIDTH=128
-    MSG=2
-    ;;
-  5)
-    WIDTH=256
-    MSG=2
-    ;;
-  6)
-    WIDTH=512
-    MSG=2
-    ;;
-  7)
-    WIDTH=1024
-    MSG=2
     ;;
   *)
     echo "Invalid SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID}"
+    exit 1
+    ;;
+esac
+
+case "${MP_INDEX}" in
+  0)
+    MSG=1
+    ;;
+  1)
+    MSG=2
+    ;;
+  2)
+    MSG=3
+    ;;
+  3)
+    MSG=4
+    ;;
+  *)
+    echo "Invalid MP_INDEX=${MP_INDEX}"
+    exit 1
+    ;;
+esac
+
+case "${PAIR_INDEX}" in
+  0)
+    MESH_SIZE=2
+    RESOLUTION=15
+    ;;
+  1)
+    MESH_SIZE=3
+    RESOLUTION=4
+    ;;
+  2)
+    MESH_SIZE=4
+    RESOLUTION=1
+    ;;
+  *)
+    echo "Invalid PAIR_INDEX=${PAIR_INDEX}"
     exit 1
     ;;
 esac
@@ -127,7 +122,7 @@ LR=${LR:-1e-4}
 WEIGHT_DECAY=${WEIGHT_DECAY:-1e-4}
 SEED=${SEED:-0}
 PRECISION=${PRECISION:-bf16}
-OUT_DIR=${OUT_DIR:-artifacts/checkpoints/graphcast_res${RESOLUTION%.*}_stream}
+OUT_DIR=${OUT_DIR:-artifacts/checkpoints/res_mesh234_mp_sweep}
 # Run name includes resolution + mesh tag.
 RES_TAG="res${RESOLUTION%.0}"
 RUN_NAME=${RUN_NAME:-${RES_TAG}_m${MESH_SIZE}_w${WIDTH}_mp${MSG}_h6_bs${BATCH_SIZE}}
@@ -151,7 +146,7 @@ else
 fi
 
 echo "resolved combo: WIDTH=${WIDTH} MSG=${MSG} RUN_NAME=${RUN_NAME}"
-echo "resolution setup: RESOLUTION=${RESOLUTION} MESH_SIZE=${MESH_SIZE} (task_id=${SLURM_ARRAY_TASK_ID})"
+echo "resolution setup: RESOLUTION=${RESOLUTION} MESH_SIZE=${MESH_SIZE} PAIR_INDEX=${PAIR_INDEX} MP_INDEX=${MP_INDEX} (task_id=${SLURM_ARRAY_TASK_ID})"
 
 echo "command: python -u scripts/training/train_graphcast.py ..."
 CMD=(
@@ -188,9 +183,13 @@ fi
 "${CMD[@]}"
 
 # Examples:
-#   sbatch scripts/training/train_graphcast.slurm
-#   sbatch --array=0-7 scripts/training/train_graphcast.slurm         # only resolution=6
-#   sbatch --array=8-15 scripts/training/train_graphcast.slurm        # only resolution=9
-#   sbatch --export=MAX_STEPS=2000 scripts/training/train_graphcast.slurm
-#   sbatch --export=BATCH_SIZE=2,PRECISION=fp32 scripts/training/train_graphcast.slurm
-#   sbatch --export=DATA_PATH=data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr scripts/training/train_graphcast.slurm
+#   sbatch scripts/training/train_graphcast_different_res.slurm
+#   sbatch --array=0-11 scripts/training/train_graphcast_different_res.slurm   # mesh=2, res=15, mp=1..4, widths 128/256/512
+#   sbatch --array=12-23 scripts/training/train_graphcast_different_res.slurm  # mesh=3, res=4, mp=1..4, widths 128/256/512
+#   sbatch --array=24-35 scripts/training/train_graphcast_different_res.slurm  # mesh=4, res=1, mp=1..4, widths 128/256/512
+#   sbatch --array=0-2 scripts/training/train_graphcast_different_res.slurm    # mesh=2, res=15, mp=1, widths 128/256/512
+#   sbatch --array=3-5 scripts/training/train_graphcast_different_res.slurm    # mesh=2, res=15, mp=2, widths 128/256/512
+#   sbatch --array=6-8 scripts/training/train_graphcast_different_res.slurm    # mesh=2, res=15, mp=3, widths 128/256/512
+#   sbatch --array=9-11 scripts/training/train_graphcast_different_res.slurm   # mesh=2, res=15, mp=4, widths 128/256/512
+#   sbatch --export=MAX_STEPS=2000 scripts/training/train_graphcast_different_res.slurm
+#   sbatch --export=BATCH_SIZE=2,PRECISION=fp32 scripts/training/train_graphcast_different_res.slurm

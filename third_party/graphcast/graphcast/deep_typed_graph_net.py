@@ -102,6 +102,12 @@ class DeepTypedGraphNet(hk.Module):
                temporal_backbone: str = "none",
                temporal_location: str = "mesh_post_encoder",
                temporal_hidden_size: int = 128,
+               temporal_d_inner: int | None = None,
+               temporal_d_state: int = 16,
+               temporal_d_conv: int = 4,
+               temporal_dt_rank: int | str = "auto",
+               temporal_bias: bool = False,
+               temporal_conv_bias: bool = True,
                temporal_layers: int = 1,
                temporal_dropout: float = 0.0,
                name: str = "DeepTypedGraphNet"):
@@ -153,6 +159,12 @@ class DeepTypedGraphNet(hk.Module):
         passing on graphs with an explicit time axis.
       temporal_location: Temporal insertion point.
       temporal_hidden_size: Hidden size for the temporal processor.
+      temporal_d_inner: Mamba internal channel width.
+      temporal_d_state: Mamba SSM state size per internal channel.
+      temporal_d_conv: Mamba causal convolution width.
+      temporal_dt_rank: Mamba dt-rank setting, or "auto".
+      temporal_bias: Whether Mamba linear projections use bias.
+      temporal_conv_bias: Whether Mamba causal convolution uses bias.
       temporal_layers: Number of temporal layers per interleaved step.
       temporal_dropout: Dropout rate inside the temporal processor.
       name: Name of the model.
@@ -187,6 +199,12 @@ class DeepTypedGraphNet(hk.Module):
     self._temporal_backbone = temporal_backbone
     self._temporal_location = temporal_location
     self._temporal_hidden_size = temporal_hidden_size
+    self._temporal_d_inner = temporal_d_inner
+    self._temporal_d_state = temporal_d_state
+    self._temporal_d_conv = temporal_d_conv
+    self._temporal_dt_rank = temporal_dt_rank
+    self._temporal_bias = temporal_bias
+    self._temporal_conv_bias = temporal_conv_bias
     self._temporal_layers = temporal_layers
     self._temporal_dropout = temporal_dropout
 
@@ -438,7 +456,13 @@ class DeepTypedGraphNet(hk.Module):
               backbone=self._temporal_backbone,
               location=self._temporal_location,
               hidden_size=self._temporal_hidden_size,
+              d_inner=self._temporal_d_inner,
+              d_state=self._temporal_d_state,
+              dt_rank=self._temporal_dt_rank,
+              d_conv=self._temporal_d_conv,
               layers=self._temporal_layers,
+              bias=self._temporal_bias,
+              conv_bias=self._temporal_conv_bias,
               dropout=self._temporal_dropout,
           ),
           name=f"processor_temporal_r{repetition_i}_s{step_i}_{node_set_name}",

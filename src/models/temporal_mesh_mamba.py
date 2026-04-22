@@ -18,7 +18,13 @@ class TemporalMeshConfig:
     backbone: str = "none"
     location: str = "mesh_post_encoder"
     hidden_size: int = 128
+    d_inner: int | None = None
+    d_state: int = 16
+    dt_rank: int | str = "auto"
+    d_conv: int = 4
     layers: int = 1
+    bias: bool = False
+    conv_bias: bool = True
     dropout: float = 0.0
 
 
