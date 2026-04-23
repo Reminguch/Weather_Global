@@ -39,3 +39,22 @@ data/
 artifacts/
 logs/
 .venv_data/
+
+# Model checkpoints and saved tensors (too large for git)
+*.pkl
+*.npz
+
+# LaTeX build intermediates
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Tool caches
+.cache/
+.codex
+.conda/
+analysis/

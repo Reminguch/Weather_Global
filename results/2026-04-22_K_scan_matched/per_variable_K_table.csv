@@ -1,0 +1,16 @@
+K,variable,base_MAE,MZ_MAE,improvement_%
+1,mean_sea_level_pressure,90.5414,88.1929,2.5938
+1,geopotential,83.6875,80.8903,3.3424
+1,u_component_of_wind,2.1757,2.1602,0.7136
+1,v_component_of_wind,2.2501,2.2275,1.0058
+1,overall,30.9004,29.9202,3.1721
+2,mean_sea_level_pressure,105.7781,105.4100,0.3480
+2,geopotential,98.9315,97.5763,1.3699
+2,u_component_of_wind,2.4168,2.4080,0.3644
+2,v_component_of_wind,2.4500,2.4362,0.5665
+2,overall,36.3789,35.9219,1.2563
+4,mean_sea_level_pressure,167.0584,162.4274,2.7721
+4,geopotential,152.5897,150.3308,1.4804
+4,u_component_of_wind,2.9359,2.9285,0.2491
+4,v_component_of_wind,2.9643,2.9482,0.5433
+4,overall,55.6857,54.8281,1.5400

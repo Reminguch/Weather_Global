@@ -1,0 +1,389 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,shapes}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{gray!10},
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  urlcolor=blue!60!black,
+}
+
+\title{Current State: Mamba-Based Residual Memory on Frozen GraphCast}
+\author{Lianghong Mo}
+\date{April 22, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note summarises the architecture that is running in the \texttt{Weather\_Global\_lagrangian\_lab} repository as of 2026-04-22: a frozen GraphCast provides a one-step Markov prediction; a small Mamba-style selective state-space network, applied independently at every grid point, learns a residual memory correction. The note covers (i) how Mamba is inserted, (ii) how training samples are constructed from contiguous time segments, and (iii) the full parameter inventory of the currently running pilot.
+\end{abstract}
+
+\tableofcontents
+
+%==============================================================================
+\section{Overview}
+%==============================================================================
+
+We treat GraphCast as the Markov part of the dynamics. A separate, much smaller Mamba module is trained \emph{on top of} a frozen GraphCast checkpoint and learns only the time-history-dependent residual. This splits the problem into two clean pieces:
+\begin{itemize}[nosep]
+  \item GraphCast (frozen): captures the instantaneous one-step physics.
+  \item Mamba residual memory (trained): captures everything that persists across steps --- the Mori--Zwanzig memory kernel, in effect.
+\end{itemize}
+
+The Mori--Zwanzig formalism writes the exact dynamics of a projected set of variables $\mathbf{q}$ as
+\[
+\dot{\mathbf{q}}(t) \;=\; \underbrace{\mathcal{M}(\mathbf{q}(t))}_{\text{Markov}} + \underbrace{\int_0^t K(t{-}s)\,\mathbf{q}(s)\,ds}_{\text{memory}} + \underbrace{\eta(t)}_{\text{noise}}.
+\]
+Our identification:
+\begin{itemize}[nosep]
+  \item $\mathcal{M}$: GraphCast one-step forecast,
+  \item $K$: per-grid-point Mamba SSM,
+  \item $\eta$: absorbed by MSE loss (Gaussian noise).
+\end{itemize}
+
+%==============================================================================
+\section{How Mamba is integrated with GraphCast}
+%==============================================================================
+
+\subsection{GraphCast skeleton}
+
+GraphCast follows an encode--process--decode pattern on an icosahedral mesh:
+\begin{enumerate}[nosep]
+  \item \textbf{Grid-to-Mesh GNN} (encoder) lifts lat/lon grid features to mesh node features of width $D$ (\texttt{latent\_size}).
+  \item \textbf{Mesh Processor GNN} runs message passing on the mesh (one or more rounds).
+  \item \textbf{Mesh-to-Grid GNN} projects mesh features back to grid predictions.
+\end{enumerate}
+
+We do not modify this pipeline. GraphCast is loaded from a pre-trained checkpoint and its parameters are \emph{frozen} for the entire training of the memory module.
+
+\subsection{Insertion point: \texttt{mesh\_post\_encoder\_residual}}
+
+Within the main GraphCast/Mamba codebase (Weather\_Global\_experiments), Mamba can be inserted at one of several locations. For the residual-memory setup we use \texttt{mesh\_post\_encoder\_residual}: after the Grid-to-Mesh encoder and before the Mesh Processor. The critical property of this location is that
+\begin{itemize}[nosep]
+  \item the encoding path is identical to the baseline (channel-concat of all input frames, one Grid-to-Mesh pass),
+  \item Mamba's contribution is a \emph{residual} with a zero-initialised output projection, so at step~0 the full model exactly equals the baseline.
+\end{itemize}
+Any measured improvement is therefore attributable to the learned memory and not to a different encoding.
+
+\subsection{MZ-lite variant used in the current pilot}
+
+In the pilot currently in production (\texttt{mz\_r4\_m3\_i32\_seg32\_h16\_fullnorm}), we go one step further and decouple the memory module entirely from GraphCast's forward pass:
+
+\begin{enumerate}[nosep]
+  \item We run frozen GraphCast to get a per-grid-point Markov forecast $\widehat{\mathbf{q}}^{\,\text{base}}_{t+1}$ for a batch of 32 consecutive one-step problems.
+  \item A small \texttt{MZResidualMamba} then reads $(\mathbf{q}_t,\,\mathbf{r}^{\text{prev}}_t)$ at every grid point and produces a correction $\widehat{\mathbf{r}}_{t+1}$.
+  \item The corrected forecast is $\widehat{\mathbf{q}}^{\,\text{corrected}}_{t+1} = \widehat{\mathbf{q}}^{\,\text{base}}_{t+1} + \widehat{\mathbf{r}}_{t+1}$.
+\end{enumerate}
+
+\paragraph{Per-grid-point SSM.}
+\texttt{MZResidualMamba} reshapes the incoming $[T, B, \mathrm{lat}, \mathrm{lon}, 2F]$ tensor to $[B{\cdot}\mathrm{lat}{\cdot}\mathrm{lon}, T, 2F]$, passes it through a single Mamba-style selective SSM block shared across all grid points, and projects back to a $F$-channel residual with a zero-initialised head. There is no explicit spatial coupling inside this module --- the memory kernel is spatially diagonal, which is a deliberate simplification.
+
+\paragraph{Resolved feature vector.}
+The memory currently operates on four synoptic-scale variables:
+\[
+F \;=\; 1\,(\text{msl\_pressure}) + 13\,(\text{geopotential}) + 13\,(u\text{-wind}) + 13\,(v\text{-wind}) \;=\; 40.
+\]
+\emph{Input dimension} to the Mamba block is $2F = 80$ (concatenation of the current state and the shifted previous residual); \emph{output dimension} is $F = 40$ (the residual correction).
+
+\subsection{Anatomy of one Mamba block}
+
+Within the block, with hidden size $H$, the computation is (using $\odot$ for elementwise):
+\begin{enumerate}[nosep]
+  \item $\tilde{\mathbf{x}} = \text{LayerNorm}(\mathbf{x})$
+  \item $[\mathbf{u};\mathbf{g}] = \text{Linear}_{2H}(\tilde{\mathbf{x}})$, split into value and gate.
+  \item $\boldsymbol\Delta = \text{softplus}(\text{Linear}_H(\mathbf{u}))$, the data-dependent time step.
+  \item Learnable parameters $\mathbf{a}_{\log}\in\mathbb{R}^H$, $\mathbf{s}\in\mathbb{R}^H$ (init $-0.1$ and $1.0$), with effective decay $a = -e^{\mathbf{a}_{\log}}$.
+  \item Recurrence over time via \texttt{jax.lax.scan}: for $t = 1,\dots,T$,
+  \[
+  \text{decay}_t = \exp(a \odot \boldsymbol\Delta_t), \qquad h_t = \text{decay}_t \odot h_{t-1} + (1-\text{decay}_t)\odot \mathbf{u}_t,
+  \]
+  \[
+  y_t = h_t \odot \sigma(\mathbf{g}_t) + \mathbf{s} \odot \mathbf{u}_t, \qquad h_0 = 0.
+  \]
+  \item Output projection $\text{Linear}_D(\mathbf{y})$, then $\mathbf{x}' = \mathbf{x} + \mathbf{y}$ (residual).
+\end{enumerate}
+The final residual head (\texttt{Linear}: $H{\to}F$) is initialised to \emph{zero}, so at step~0 the predicted residual is identically zero.
+
+%==============================================================================
+\section{Sampling: how a training example is built}
+%==============================================================================
+
+\subsection{Year layout and time continuity}
+
+The local dataset contains three years of ERA5 at 6-hour cadence. We train on 2020--2021 (adjacent) and hold out 2022 for both validation and final inference. This avoids the pitfall of concatenating non-adjacent years, which would inject a one-year discontinuity into forcings (year progress, solar radiation, accumulated precipitation) and cause the frozen baseline to produce NaN at the join.
+
+A defensive filter in the training script drops any sample whose full input+target window is not strictly $\Delta t = 6\,$h-consecutive, so misconfigured year selections fail loudly rather than silently poisoning the loss.
+
+\subsection{Sequential segments}
+
+Valid final-input indices in the training set are split into \emph{contiguous segments} of length $S = 32$ using
+\[
+\texttt{\_time\_continuous\_segments}(ds, \text{indices}, S, \Delta t),
+\]
+which is like \texttt{build\_sequential\_segments} in the main repo but splits on actual timestamp gaps, not just index gaps.
+
+\subsection{One training step}
+
+For each segment $\mathcal{S} = (i_1, \ldots, i_{32})$:
+\begin{enumerate}[nosep]
+  \item Call \texttt{build\_batch\_from\_indices} which returns an xarray batch with leading axis $32$; each element is an independent one-step sample with a 32-frame history window (192\,h).
+  \item Run frozen GraphCast once on the whole batch of 32 to obtain $\widehat{\mathbf{q}}^{\,\text{base}}_{i_k+1}$ for $k = 1, \ldots, 32$.
+  \item Extract the four resolved variables at the last input time ($\mathbf{q}_{i_k}$, ``current state''), at the target time ($\mathbf{q}^{\text{truth}}_{i_k+1}$), and from the baseline prediction.
+  \item Reshape from $[\text{batch}=32, \ldots, F]$ to $[T=32, B=1, \mathrm{lat}, \mathrm{lon}, F]$: the 32 batch elements are \emph{reinterpreted} as a $T=32$ time sequence for the SSM. This is valid because segments are strictly time-sorted and never shuffled internally.
+  \item Build the teacher-forcing signal
+  \[
+  \mathbf{r}^{\star}_t = \mathbf{q}^{\text{truth}}_t - \widehat{\mathbf{q}}^{\,\text{base}}_t, \qquad \mathbf{r}^{\text{prev}}_1 = 0, \; \mathbf{r}^{\text{prev}}_t = \mathbf{r}^{\star}_{t-1}\ (t>1).
+  \]
+  \item Concatenate $[\mathbf{q}_t;\,\mathbf{r}^{\text{prev}}_t]$ into a length-$2F$ feature vector and feed the 32-step sequence into the Mamba block.
+  \item Compute a weighted MSE loss (\S\ref{sec:loss}) and take one AdamW step.
+\end{enumerate}
+
+Training samples one segment per gradient step. Across segments they are shuffled; within a segment the 32-step order is preserved.
+
+\subsection{Teacher forcing and its caveat}
+
+During training and current evaluation, $\mathbf{r}^{\text{prev}}_t$ is the \emph{true} previous residual. At deployment, this needs to be replaced by the model's own $\widehat{\mathbf{r}}_{t-1}$. The gap between teacher-forced and autoregressive metrics is the true error-accumulation rate and should be measured before claiming deployment skill.
+
+%==============================================================================
+\section{Loss: GraphCast-style weighted MSE in normalised units}
+\label{sec:loss}
+%==============================================================================
+
+GraphCast internally computes its loss in normalised residual space (via the \texttt{InputsAndResiduals} wrapper). Since our MZ output bypasses that wrapper, we apply the same weighting scheme explicitly:
+\begin{itemize}[nosep]
+  \item \textbf{Per-channel scale}: divide each channel's error by the one-step diff stddev \texttt{diffs\_stddev\_by\_level}. This makes the loss dimensionless and balances variables of vastly different magnitudes (geopotential $\sim$10$^5$ vs.\ wind $\sim$10).
+  \item \textbf{Latitude weight}: $\cos(\mathrm{lat}) / \overline{\cos(\mathrm{lat})}$, accounting for sphere-slice area.
+  \item \textbf{Level weight}: $p / \bar{p}$ on the 13 task pressure levels, giving more weight to near-surface levels and less to the stratosphere.
+  \item \textbf{Per-variable weight}: $w_{\text{msl}} = 0.1$, others $= 1.0$ (matching GraphCast's default).
+\end{itemize}
+All weights are normalised to unit mean along their respective dimensions, so the final loss remains an $O(1)$ dimensionless quantity.
+
+\paragraph{Input standardisation.}
+Symmetrically, the inputs to the Mamba block are standardised:
+\begin{itemize}[nosep]
+  \item $\mathbf{q}_t$ is $z$-scored using \texttt{mean\_by\_level} and \texttt{stddev\_by\_level}.
+  \item $\mathbf{r}^{\text{prev}}_t$ is divided by \texttt{diffs\_stddev\_by\_level} (it has zero mean by construction).
+  \item The network outputs a \emph{normalised} residual, which is de-normalised by $\times$\texttt{diffs\_stddev} before being added to the baseline.
+\end{itemize}
+Without this, the linear layer $\text{Linear}(2F{\to}H)$ would be dominated by the pressure/geopotential directions and blow up within a handful of training steps.
+
+\paragraph{Numerical hygiene.}
+\begin{itemize}[nosep]
+  \item Frozen GraphCast runs in \texttt{fp32} here, not \texttt{bf16}. In bf16 the quantisation noise on pressure ($\sim$780\,Pa) is on the same scale as the one-step residual ($\sim$200\,Pa) and contaminates the target signal.
+  \item Global-norm gradient clipping at 1.0 is always on.
+  \item Optional linear LR warmup over 200 steps (current: on).
+\end{itemize}
+
+%==============================================================================
+\section{Current parameters}
+%==============================================================================
+
+\subsection{Run configuration for the 2026-04-21 pilot}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{5.5cm}p{9cm}}
+\toprule
+Group / parameter & Value \\
+\midrule
+\multicolumn{2}{l}{\textit{Spatial grid}} \\
+\texttt{resolution} & $4^\circ$ (46 latitudes $\times$ 90 longitudes; poles included) \\
+\texttt{mesh\_size} & $3$ (icosahedral refinement $\Rightarrow$ 642 mesh nodes) \\
+\addlinespace
+\multicolumn{2}{l}{\textit{Time}} \\
+\texttt{input\_duration} & \texttt{192h} $\Rightarrow$ \texttt{input\_steps} = 32 history frames \\
+\texttt{target\_steps} (baseline) & 1 \\
+\texttt{segment\_steps} (MZ) & 32 (8 days of contiguous samples) \\
+\texttt{train\_years} / \texttt{val\_year} & 2020--2021 / 2022 \\
+\addlinespace
+\multicolumn{2}{l}{\textit{Frozen baseline (GraphCast)}} \\
+\texttt{baseline\_ckpt} & \texttt{bfix\_r4\_m3\_in32\_t1/ckpt\_step23000.npz} (eval loss $\sim$3.40) \\
+\texttt{baseline\_precision} & \texttt{fp32} \\
+\addlinespace
+\multicolumn{2}{l}{\textit{MZ residual module (\texttt{MZResidualMamba})}} \\
+\texttt{hidden\_size} $H$ & 16 \\
+\texttt{layers} & 1 \\
+\texttt{dropout} & 0.0 \\
+\texttt{a\_log\_init} & $-0.1$ (decay $\approx 0.9$/step $\Rightarrow$ multi-day memory) \\
+\texttt{input\_size} & $2F = 80$ \\
+\texttt{output\_size} & $F = 40$ (\texttt{msl\_press} + 13-level \texttt{z}, \texttt{u}, \texttt{v}) \\
+Parameter count & $\sim$3\,100 trainable weights \\
+\addlinespace
+\multicolumn{2}{l}{\textit{Training}} \\
+\texttt{max\_steps} & 400 (one gradient step per segment) \\
+\texttt{eval\_every} / \texttt{eval\_max\_segments} & 100 / 8 \\
+\texttt{checkpoint\_every} & 200 \\
+\texttt{lr} & $10^{-4}$ (linearly warmed from 0 over 200 steps) \\
+\texttt{weight\_decay} & $10^{-4}$ \\
+\texttt{grad\_clip} & 1.0 (global norm) \\
+\texttt{seed} & 0 \\
+\texttt{precision} (compute) & bf16 hint; MZ network actually runs fp32 end-to-end \\
+\addlinespace
+\multicolumn{2}{l}{\textit{Normalisation (all on by default)}} \\
+\texttt{standardize\_input} & $z$-score \texttt{current\_state}; divide \texttt{prev\_residual} by diffs std \\
+\texttt{normalize\_loss} & weighted MSE in diffs-std space \\
+Latitude weight & $\cos(\mathrm{lat}) / \overline{\cos(\mathrm{lat})}$ \\
+Level weight & $p / \bar{p}$ on 13 task levels \\
+Per-variable weight & \texttt{msl\_press}$=0.1$, others $=1.0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Resolution sweep in progress}
+
+To separate the contribution of resolution from everything else, we are now running four apples-to-apples configurations at \texttt{res} $\in \{2, 4, 6, 8\}^\circ$ with all other settings held fixed: \texttt{mesh\_size=3}, \texttt{width=128}, \texttt{input\_duration=192h}, \texttt{segment\_steps=32}, \texttt{hidden\_size=16}, shared random seed. Each MZ run will be trained on top of its own baseline's \texttt{ckpt\_step5000.npz} so all four MZ runs see a baseline of comparable strength.
+
+%==============================================================================
+\section{Representative results (res=4, step 400)}
+%==============================================================================
+
+After 400 gradient steps the MZ module is clearly learning and reduces per-variable MAE over the frozen baseline on the 2022 validation set:
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lcccr}
+\toprule
+Variable & Baseline MAE (frozen) & MZ-corrected MAE (step 400) & Improvement \\
+\midrule
+\texttt{mean\_sea\_level\_pressure}  & $86.6$ Pa       & $80.8$ Pa       & $-6.78\%$ \\
+\texttt{geopotential}                & $81.6$ m$^2$/s$^2$ & $74.8$ m$^2$/s$^2$ & $-8.28\%$ \\
+\texttt{u\_component\_of\_wind}      & $2.10$ m/s      & $2.08$ m/s      & $-1.07\%$ \\
+\texttt{v\_component\_of\_wind}      & $2.14$ m/s      & $2.13$ m/s      & $-0.81\%$ \\
+\midrule
+OVERALL (weighted mix)               & $30.06$         & $27.70$         & $-7.84\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The gain is concentrated in large-scale, long-persistence fields (\texttt{geopotential}, \texttt{mean\_sea\_level\_pressure}), which is the regime where temporal memory is expected to help most. Chaotic small-scale variables (\texttt{u}, \texttt{v} wind) see only marginal benefit. The curves have not converged at step 400, so further training is expected to extend the gap.
+
+%==============================================================================
+\section{Known limitations}
+%==============================================================================
+
+\begin{enumerate}[nosep]
+  \item \textbf{Teacher-forced evaluation.} Eval uses true previous residuals; autoregressive eval (feed the model's own $\widehat{\mathbf{r}}$ back in) is not yet wired up. The gap between the two will bound the true deployment skill.
+  \item \textbf{Spatially diagonal memory.} The Mamba SSM runs per grid point with no direct spatial coupling. A true MZ kernel can be non-local; a small GNN layer inside the memory module could relax this.
+  \item \textbf{Four resolved variables only.} Temperature, specific humidity, vertical velocity, and precipitation are not corrected. Extend once the synoptic variables show clear wins.
+  \item \textbf{Segment-boundary state reset.} The SSM state $h_0 = 0$ at the start of every 32-step segment. Real deployment has a continuous history; cross-segment state threading (as already done in the GraphCast-inline stateful Mamba) is a plausible extension.
+  \item \textbf{Short training schedule.} The current pilot uses \texttt{max\_steps=400}; eval curves are still falling. A longer schedule is cheap (each step is $\sim$14\,s at 4$^\circ$).
+  \item \textbf{Single baseline snapshot.} The quality of the frozen baseline strongly affects how much residual memory there is left to capture. We plan to compare MZ on top of weak ($\texttt{step5000}$) vs.\ strong ($\texttt{step23000}$) baselines.
+\end{enumerate}
+
+%==============================================================================
+\section{Planned fix: from teacher forcing to autoregressive residual rollout}
+%==============================================================================
+
+The main train--test mismatch in the current pilot is that both training and the current evaluation use the \emph{true} previous residual as input,
+\begin{equation}
+r^{\mathrm{prev}}_1 = 0,
+\qquad
+r^{\mathrm{prev}}_t = r^*_{t-1},
+\qquad
+r^*_{t-1} = q^{\mathrm{truth}}_{t-1} - q^{\mathrm{base}}_{t-1},
+\end{equation}
+whereas at deployment this quantity is unavailable. In practice, the deployed model must use its \emph{own} previously predicted residual,
+\begin{equation}
+r^{\mathrm{prev}}_1 = 0,
+\qquad
+r^{\mathrm{prev}}_t = \hat r_{t-1}.
+\end{equation}
+The teacher-forced metrics reported above are therefore optimistic: they do not yet measure the true error-accumulation rate of the residual-memory module.
+
+\paragraph{Step 1: add autoregressive evaluation.}
+Before changing training, we add a genuine autoregressive evaluation mode. For a segment of length $T$, run
+\begin{align}
+\hat r_t &= f_\theta(q_t, r^{\mathrm{prev}}_t, h_t),\\
+q^{\mathrm{corr}}_{t+1} &= q^{\mathrm{base}}_{t+1} + \hat r_{t+1},\\
+r^{\mathrm{prev}}_{t+1} &= \hat r_t,
+\end{align}
+and compare against the current teacher-forced evaluation. This directly quantifies the gap between ideal-context performance and true deployed performance.
+
+\paragraph{Step 2: reduce exposure bias during training.}
+If the autoregressive gap is significant, training should switch from pure teacher forcing to a mixed strategy such as scheduled sampling:
+\begin{equation}
+r^{\mathrm{prev}}_t =
+\begin{cases}
+r^*_{t-1}, & \text{with probability } p,\\
+\hat r_{t-1}, & \text{with probability } 1-p.
+\end{cases}
+\end{equation}
+The teacher-forcing probability $p$ should start near $1$ early in training and be gradually reduced toward $0$. A practical implementation is a two-stage schedule: (i) warm start with pure teacher forcing, then (ii) continue training with mixed teacher/model residual feedback.
+
+\paragraph{Step 3: train on rollout loss rather than ideal-context correction.}
+The loss should be computed on the corrected autoregressive rollout,
+\begin{equation}
+\mathcal{L}_{\mathrm{rollout}}
+=
+\sum_{t=1}^{T} w_t\,
+\ell\!\left(q^{\mathrm{corr}}_t, q^{\mathrm{truth}}_t\right),
+\end{equation}
+so that the model is explicitly optimised for stability under self-generated residual feedback.
+
+\paragraph{Step 4: add simple stabilisers if needed.}
+If autoregressive rollout is unstable, two cheap stabilisers should be tested:
+\begin{enumerate}[nosep]
+  \item residual clipping,
+  $\hat r_t \leftarrow \mathrm{clip}(\hat r_t,-c,c)$,
+  to suppress rare exploding corrections;
+  \item residual shrinkage,
+  $q^{\mathrm{corr}}_{t+1} = q^{\mathrm{base}}_{t+1} + \beta\,\hat r_{t+1}$ with $0 < \beta \le 1$,
+  to damp over-aggressive corrections at inference time.
+\end{enumerate}
+
+\paragraph{Recommended order of implementation.}
+The modifications should be introduced in the following order:
+\begin{enumerate}[nosep]
+  \item add autoregressive evaluation without changing training;
+  \item measure the teacher-forced vs.\ autoregressive gap by variable and rollout step;
+  \item if the gap is large, introduce scheduled sampling;
+  \item if needed, add clipping or shrinkage as inference stabilisers.
+\end{enumerate}
+
+\paragraph{Interpretation.}
+This change does not alter the basic MZ-lite decomposition
+\[
+\text{forecast} \;=\; \text{frozen Markov baseline} \;+\; \text{learned residual memory},
+\]
+but makes the residual-memory module operate under the same information constraints at training, evaluation, and deployment. The goal is to turn the current residual corrector from an ideal-context predictor into a genuinely autoregressive memory model.
+
+%==============================================================================
+\section{File layout for this pilot}
+%==============================================================================
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{6.6cm}p{8.4cm}}
+\toprule
+Path & Role \\
+\midrule
+\texttt{src/models/mz\_residual\_mamba.py} & \texttt{MZResidualMamba}, \texttt{\_SelectiveSSMBlock}, \texttt{shift\_residual\_history}. \\
+\texttt{scripts/training/train\_mz\_residual\_memory.py} & Training loop: load frozen baseline, build segments, compute residual targets, optimise MZ params only. \\
+\texttt{scripts/training/infer\_mz\_save\_tensors.py} & Inference-only driver; saves \texttt{baseline}, \texttt{corrected}, \texttt{truth} tensors for plotting. \\
+\texttt{slurm\_pilots/mz\_r\{2,4,6,8\}\_m3\_i32\_seg32\_h16\_fullnorm.slurm} & Submission scripts for the four-resolution sweep. \\
+\texttt{slurm\_pilots/bfix\_r\{2,4,6,8\}\_m3\_in32\_t1.slurm} & Baselines for the same sweep. \\
+\texttt{Weather\_Global\_experiments/results/mz\_r4\_m3\_i32\_seg32\_h16\_fullnorm/} & Current pilot output: logs, checkpoints, plots. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

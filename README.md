@@ -432,6 +432,91 @@ Used per-timestep encoding (different from baseline), confounding the comparison
 
 Uses baseline encoding path + stateful Mamba residual. See results above.
 
+### Phase 4: MZ-Residual (Mori–Zwanzig) Sweeps (April 2026)
+
+A separate, self-contained residual-memory module (`src/models/mz_residual_mamba.py`)
+trained on top of **frozen** GraphCast baselines. The MZ-Mamba predicts the baseline
+correction `r_t = truth_t − baseline_t` and scans along a segment window.
+
+Training pipeline: `scripts/training/train_mz_residual_memory.py` (all runs use
+teacher forcing for K=1 and target_rollout for K>1; AR closed-loop metrics are
+reported at every eval step).
+
+All numbers are **step 400**, overall MAE on val year 2022 (train 2020–2021),
+with default settings `h=16, layers=1, segment_steps=32, K=1` unless noted.
+
+**1) Resolution scan (r=2/4/6/8) at K=1 with matching baselines (step 10000):**
+
+| resolution | baseline MAE | MZ MAE (TF) | Δ TF | AR–TF gap (loss) |
+|---|---|---|---|---|
+| r=2 | 32.12 | 29.91 | **+6.88%** | +0.0041 |
+| r=4 | 30.90 | 29.92 | +3.17% | +0.0043 |
+| r=6 | 33.19 | 30.74 | **+7.37%** 🔥 | +0.0038 |
+| r=8 (step 300) | 33.81 | 32.31 | +4.43% | +0.0048 |
+
+See `results/2026-04-22_resolution_scan/` for plots.
+
+**2) K-rollout scan at r=4 with matched FT baselines:**
+
+For K>1, baselines were fine-tuned at the same K (ckpt_step28000) for an
+apples-to-apples comparison.
+
+| K | matched-base MAE | MZ MAE | Δ TF |
+|---|---|---|---|
+| 1 | 30.90 | 29.92 | +3.17% |
+| 2 | 36.38 | 35.92 | +1.26% |
+| 4 | 55.69 | 54.83 | +1.54% |
+
+Key finding: when the baseline itself has been fine-tuned at matching K, MZ's
+relative improvement shrinks (FT absorbs the coherent drift that MZ was
+capturing). Weak-baseline comparisons (K=1-trained baseline + K=2/4 MZ) give
+misleading +4–5% numbers; the honest apples-to-apples is +1–2%. See
+`results/2026-04-22_K_scan_matched/`.
+
+**3) Hidden-size sweep at r=4 K=1 (h=16/32/64):**
+
+| hidden | Δ TF | AR–TF gap | approx #MZ params |
+|---|---|---|---|
+| 16 | +3.17% | 0.0043 | ~1.5k |
+| 32 | +4.38% | 0.0094 | ~6k |
+| 64 | +5.57% | 0.0161 | ~25k |
+
+Trend is log-linear — not saturating yet. Bigger MZ helps, but the AR–TF gap
+grows too (exposure bias is amplified because the corrections are more
+aggressive). See `results/2026-04-22_mamba_hsize_scan/`.
+
+**4) Segment-length sweep at r=2, input=2, matched b20k baseline (seg=16/32/48):**
+
+| segment_steps | Δ TF | AR–TF gap (loss) |
+|---|---|---|
+| 16 (4 days) | +1.34% | 0.0013 |
+| 32 (8 days) | +1.53% | 0.0014 |
+| 48 (12 days) | +1.62% | 0.0015 |
+
+Nearly saturated: r=2 baseline is already strong (base_MAE=28), so MZ has
+little headroom to exploit by extending the memory window.
+
+**5) Public DeepMind GraphCast_small at 1° (paper baseline), h=16:**
+
+| step | baseline MAE | MZ MAE | Δ TF |
+|---|---|---|---|
+| 100 | 8.92 | 8.90 | +0.12% |
+| 400 | 8.92 | 8.90 | +0.14% |
+
+The paper-grade baseline is 3.5× stronger than our r=4 in raw MAE; h=16 MZ
+gets essentially no traction. Follow-up h=64/h=128 runs on this baseline are
+in progress to test whether a larger MZ capacity (on a harder residual
+surface) unlocks meaningful improvement.
+
+**Takeaways:**
+- MZ residual improvement scales with **baseline weakness** (gives 3–7% on
+  our in-house baselines, <0.2% on DeepMind paper-grade baseline).
+- Hidden size is the strongest knob at our scale (h=64 nearly doubles h=16
+  relative gain); segment length saturates around 8–12 days.
+- AR (closed-loop) evaluation degrades gracefully: at r=6 MZ still captures
+  +4.7% with 32 steps (8 days) of pure self-feedback, showing the learned
+  A-matrix has stable eigenstructure.
+
 
 ---
 
