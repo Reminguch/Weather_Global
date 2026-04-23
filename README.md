@@ -194,6 +194,74 @@ The SSM state has shape `(n_mesh, hidden_size)`, **independent of batch size**:
 - **Batch handling**: Before the scan, state is tiled to `(batch*n_mesh, H)`. After the scan, the per-batch states are averaged back to `(n_mesh, H)` before saving.
 - **Implication**: During training with batch_size > 1, different batch elements (different time windows) contribute to a "consensus" state. During inference (batch=1), the state is exact.
 
+### Alternative Architecture: MZ-Residual (Mori–Zwanzig Post-Processor)
+
+A separate track of experiments (`src/models/mz_residual_mamba.py`) treats GraphCast as a **frozen** one-step dynamics model and adds a small Mamba **outside** it, following the Mori–Zwanzig decomposition
+
+$$
+u_{t+1} \;=\; \underbrace{G(u_t)}_{\text{Markov (frozen GraphCast)}} \;+\; \underbrace{r_t(u_{\le t})}_{\text{Memory (MZ–Mamba)}} \;+\; \text{noise}.
+$$
+
+The MZ module learns only the residual `r_t = truth_t − G(u_t)` — a pure correction term — while GraphCast's weights are never touched.
+
+```
+For each segment (length T) within a continuous time window:
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  FROZEN GraphCast baseline (no grad)                    │
+  │  For every anchor k ∈ [0, T-1]:                         │
+  │    real history [t_k - in + 1, …, t_k]                  │
+  │        → G(·) → baseline_next[k]                        │
+  └──────────────────┬──────────────────────────────────────┘
+                     │  baseline_next [T, lat, lon, F]
+                     │  truth_next    [T, lat, lon, F]   (ERA5)
+                     ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │  Per-step input assembly at step t ∈ [0, T-1]:          │
+  │    current_state_t  = u_t  (truth in TF, self-fed in AR)│
+  │    prev_residual_t  = r_{t-1}  (truth or self-fed)      │
+  │                                                         │
+  │  z-score:                                               │
+  │    cs_n   = (current_state - mean_f) / std_f            │
+  │    r_prev_n = prev_residual / diffs_stddev_f            │
+  │                                                         │
+  │  Input vector x_t = [cs_n, r_prev_n]   shape (…, 2F)    │
+  └──────────────────┬──────────────────────────────────────┘
+                     ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │  MZ-Mamba (hidden_size H, layers L)                     │
+  │                                                         │
+  │    x_t → input_proj (2F → H)                            │
+  │    for ℓ in layers:                                     │
+  │        h_t^(ℓ) = A·h_{t-1}^(ℓ) + B·x_t^(ℓ)   (SSM step) │
+  │        x_t^(ℓ+1) = C·h_t^(ℓ) ⊙ σ(gate) + skip ⊙ x_t^(ℓ) │
+  │    residual_head (H → F)                                │
+  │                                                         │
+  │  → pred_residual_n_t  (normalized tendency)             │
+  └──────────────────┬──────────────────────────────────────┘
+                     │  pred_residual = pred_residual_n · diffs_stddev_f
+                     ▼
+  corrected_t = baseline_next_t + pred_residual_t
+  Loss_t = weighted_MSE( (truth_next_t − corrected_t) / diffs_stddev_f )
+```
+
+**What makes this "Mori–Zwanzig" in practice:**
+
+- **Markov split is exact**: `G` is trained+frozen; MZ sees only the frozen `G`'s outputs, cannot shift them, only adds `r_t` on top.
+- **Memory is a learned low-rank SSM**: `h_t` is a compressed summary of the *error history* — not the weather state itself. This is why a very small Mamba (h=16–64) can give meaningful corrections on top of a much larger GNN.
+- **Per-channel normalization**:
+  - Input channel `current_state` uses GraphCast's own `mean_by_level / stddev_by_level` (same stats the baseline was trained with).
+  - Input channel `prev_residual` and the loss are both scaled by `diffs_stddev_by_level` — the *tendency* scale — so that residuals for slow (geopotential) and fast (wind) variables live on comparable magnitudes.
+- **Two eval modes** (same weights, different plumbing):
+  - **TF eval**: `current_state_t` and `prev_residual_t` come from real ERA5 at every step. Measures the "conditional" quality of the residual estimator.
+  - **AR eval**: From t=1 onward, both are replaced by the model's own outputs (`baseline_{t−1} + r̂_{t−1}` and `r̂_{t−1}`). The Mamba hidden state must carry enough information to remain useful without ground-truth injection. This is the deployment-relevant regime.
+- **Training modes**:
+  - `teacher`: pure TF during training, used for K=1. AR gap at eval time is diagnostic of exposure bias.
+  - `target_rollout`: at K>1, each anchor's K intra-sample steps self-feed except at the anchor (`tf_mask = [1,0,0,…,0]`-repeating), giving honest K-step rollout supervision.
+  - `mixed` / `ar`: scheduled-sampling Bernoulli mixing of teacher and self-feed during training, annealing the teacher-forcing probability.
+
+**Cross-Rollout state in the MZ variant:** the Mamba hidden state flows along the segment's time axis inside one training step (via the internal `jax.lax.scan`). Across training steps the state is re-initialized to zero — there is no global cross-sample state — because each segment is treated as an i.i.d. trajectory. This is simpler than the stateful cross-rollout design above and matches the "segment as one Mori–Zwanzig trajectory" interpretation.
+
 ---
 
 ## Key Bug Fix: Transpose in Stateless Version
