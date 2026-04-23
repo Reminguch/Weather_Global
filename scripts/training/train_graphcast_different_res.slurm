@@ -2,7 +2,7 @@
 #SBATCH --job-name=gc-res-sweep
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=80G
+#SBATCH --mem=128G
 #SBATCH --time=24:00:00
 #SBATCH --array=0-35
 #SBATCH --output=logs/gc_stream_%A_%a.out
@@ -17,6 +17,8 @@ set -euo pipefail
 #     mesh=2 -> res=15
 #     mesh=3 -> res=4
 #     mesh=4 -> res=1
+# - Memory is set to 128G for the whole array because res=1 runs need
+#   substantially more host RAM to enable the cached numpy batch path.
 # - Omits mesh=1
 # For a single manual run, use: scripts/training/train_graphcast_standard.slurm
 
@@ -113,7 +115,7 @@ DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.
 VAL_YEAR=${VAL_YEAR:-2022}
 TRAIN_START_YEAR=${TRAIN_START_YEAR:-}
 TRAIN_END_YEAR=${TRAIN_END_YEAR:-}
-BATCH_SIZE=${BATCH_SIZE:-4}
+BATCH_SIZE=${BATCH_SIZE:-8}
 MAX_STEPS=${MAX_STEPS:-50000}
 EVAL_EVERY=${EVAL_EVERY:-2000}
 EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE:-4}
@@ -129,6 +131,13 @@ RUN_NAME=${RUN_NAME:-${RES_TAG}_m${MESH_SIZE}_w${WIDTH}_mp${MSG}_h6_bs${BATCH_SI
 CKPT_IN=${CKPT_IN:-"data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"}
 STATS_DIR=${STATS_DIR:-data/graphcast/graphcast/stats}
 AUTO_RESUME=${AUTO_RESUME:-0}
+DATA_CACHE_MODE=${DATA_CACHE_MODE:-auto}
+DATA_CACHE_MAX_GIB=${DATA_CACHE_MAX_GIB:-48}
+BATCH_BUILDER=${BATCH_BUILDER:-numpy}
+PREFETCH_WORKERS=${PREFETCH_WORKERS:-7}
+PREFETCH_DEPTH=${PREFETCH_DEPTH:-8}
+PREFETCH_DEVICE_DEPTH=${PREFETCH_DEVICE_DEPTH:-1}
+USAGE_EVERY=${USAGE_EVERY:-50}
 
 # For every job: resume from latest checkpoint in this run's dir if present (any resolution)
 RESUME_RUN_DIR="${OUT_DIR}/${RUN_NAME}"
@@ -170,6 +179,13 @@ CMD=(
   --run-name "${RUN_NAME}"
   --ckpt-in "${CKPT_IN}"
   --stats-dir "${STATS_DIR}"
+  --data-cache-mode "${DATA_CACHE_MODE}"
+  --data-cache-max-gib "${DATA_CACHE_MAX_GIB}"
+  --batch-builder "${BATCH_BUILDER}"
+  --prefetch-workers "${PREFETCH_WORKERS}"
+  --prefetch-depth "${PREFETCH_DEPTH}"
+  --prefetch-device-depth "${PREFETCH_DEVICE_DEPTH}"
+  --usage-every "${USAGE_EVERY}"
 )
 
 if [[ -n "${RESUME_STEP:-}" ]]; then

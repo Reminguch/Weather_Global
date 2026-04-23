@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=gc-mamba-seg
+#SBATCH --job-name=gc-mamba-seg-continue
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
-#SBATCH --array=0-11
-#SBATCH --output=logs/gc_mamba_seg_%A_%a.out
-#SBATCH --error=logs/gc_mamba_seg_%A_%a.err
+#SBATCH --array=0-7
+#SBATCH --output=logs/gc_mamba_seg_continue_%A_%a.out
+#SBATCH --error=logs/gc_mamba_seg_continue_%A_%a.err
 
 set -euo pipefail
 
@@ -21,10 +21,6 @@ mkdir -p logs
 source scripts/graphcast_env.sh
 
 COMBOS=(
-  "base|128|1|"
-  "base|128|2|"
-  "base|256|1|"
-  "base|256|2|"
   "mamba|128|1|16"
   "mamba|128|1|32"
   "mamba|128|2|16"
@@ -45,7 +41,6 @@ IFS="|" read -r KIND WIDTH MSG D_INNER <<< "${COMBOS[${TASK_ID}]}"
 
 DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}
 STATS_DIR=${STATS_DIR:-data/graphcast/graphcast/stats}
-CKPT_IN=${CKPT_IN:-"data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"}
 OUT_DIR=${OUT_DIR:-artifacts/checkpoints/graphcast_mamba_interleaved_segments}
 
 VAL_YEAR=${VAL_YEAR:-2021}
@@ -61,7 +56,7 @@ BPTT_STEPS=${BPTT_STEPS:-6}
 
 BATCH_SIZE=${BATCH_SIZE:-8}
 EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE:-4}
-MAX_STEPS=${MAX_STEPS:-20000}
+CONTINUE_STEPS=${CONTINUE_STEPS:-20000}
 EVAL_EVERY=${EVAL_EVERY:-2000}
 CHECKPOINT_EVERY=${CHECKPOINT_EVERY:-2000}
 CHUNK_LOAD_WORKERS=${CHUNK_LOAD_WORKERS:-6}
@@ -73,25 +68,44 @@ WEIGHT_DECAY=${WEIGHT_DECAY:-1e-4}
 PRECISION=${PRECISION:-bf16}
 SEED=${SEED:-0}
 
-if [[ "${KIND}" == "base" ]]; then
-  RUN_NAME="base_seg_res2_m4_w${WIDTH}_mp${MSG}_ls${LEN_SEGMENT}_bptt${BPTT_STEPS}_t1"
-else
-  RUN_NAME="mamba_int_seg_res2_m4_w${WIDTH}_mp${MSG}_di${D_INNER}_ds1_dc1_ls${LEN_SEGMENT}_bptt${BPTT_STEPS}_t1"
+RUN_NAME="mamba_int_seg_res2_m4_w${WIDTH}_mp${MSG}_di${D_INNER}_ds1_dc1_ls${LEN_SEGMENT}_bptt${BPTT_STEPS}_t1"
+RUN_DIR="${OUT_DIR}/${RUN_NAME}"
+
+if [[ ! -d "${RUN_DIR}" ]]; then
+  echo "Run directory does not exist: ${RUN_DIR}"
+  exit 1
 fi
+
+LATEST_CKPT=$(find "${RUN_DIR}" -maxdepth 1 -name 'ckpt_step*.npz' | sort -V | tail -n 1)
+if [[ -z "${LATEST_CKPT}" ]]; then
+  echo "No checkpoints found in ${RUN_DIR}"
+  exit 1
+fi
+
+RESUME_STEP=$(basename "${LATEST_CKPT}" .npz)
+RESUME_STEP=${RESUME_STEP#ckpt_step}
+if ! [[ "${RESUME_STEP}" =~ ^[0-9]+$ ]]; then
+  echo "Could not parse step from checkpoint: ${LATEST_CKPT}"
+  exit 1
+fi
+
+MAX_STEPS=$(( RESUME_STEP + CONTINUE_STEPS ))
 
 echo "host: $(hostname)"
 python --version
 which python
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
-echo "combo: kind=${KIND} width=${WIDTH} processor_msg_steps=${MSG} d_inner=${D_INNER:-none}"
+echo "combo: kind=${KIND} width=${WIDTH} processor_msg_steps=${MSG} d_inner=${D_INNER}"
 echo "segments: len_segment=${LEN_SEGMENT} bptt_steps=${BPTT_STEPS}"
-echo "run: ${OUT_DIR}/${RUN_NAME}"
+echo "run: ${RUN_DIR}"
+echo "resume: ckpt=${LATEST_CKPT} resume_step=${RESUME_STEP} continue_steps=${CONTINUE_STEPS} max_steps=${MAX_STEPS}"
 
 CMD=(
   python -u scripts/training/train_graphcast_segments.py
   --data-path "${DATA_PATH}"
   --stats-dir "${STATS_DIR}"
-  --ckpt-in "${CKPT_IN}"
+  --ckpt-in "${LATEST_CKPT}"
+  --resume-step "${RESUME_STEP}"
   --out-dir "${OUT_DIR}"
   --run-name "${RUN_NAME}"
   --val-year "${VAL_YEAR}"
@@ -116,24 +130,19 @@ CMD=(
   --weight-decay "${WEIGHT_DECAY}"
   --precision "${PRECISION}"
   --seed "${SEED}"
+  --temporal-backbone mamba
+  --temporal-location mesh_processor_interleaved
+  --temporal-stateful
+  --temporal-layers 1
+  --temporal-d-inner "${D_INNER}"
+  --temporal-d-state 1
+  --temporal-d-conv 1
+  --temporal-dt-rank auto
+  --temporal-dropout 0.0
 )
 
 if [[ -n "${TRAIN_START_YEAR}" && -n "${TRAIN_END_YEAR}" ]]; then
   CMD+=(--train-start-year "${TRAIN_START_YEAR}" --train-end-year "${TRAIN_END_YEAR}")
-fi
-
-if [[ "${KIND}" == "mamba" ]]; then
-  CMD+=(
-    --temporal-backbone mamba
-    --temporal-location mesh_processor_interleaved
-    --temporal-stateful
-    --temporal-layers 1
-    --temporal-d-inner "${D_INNER}"
-    --temporal-d-state 1
-    --temporal-d-conv 1
-    --temporal-dt-rank auto
-    --temporal-dropout 0.0
-  )
 fi
 
 "${CMD[@]}"

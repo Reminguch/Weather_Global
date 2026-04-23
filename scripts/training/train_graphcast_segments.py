@@ -3,14 +3,14 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import argparse
 import dataclasses
 import functools
 import json
-import sys
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import haiku as hk
 import jax
@@ -20,83 +20,64 @@ import optax
 import pandas as pd
 import xarray as xr
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
-import train_graphcast as base  # noqa: E402
-
-
-@dataclasses.dataclass(frozen=True)
-class SegmentRunConfig:
-    base_cfg: base.RunConfig
-    len_segment: int
-    bptt_steps: int
-
-
-class SegmentBatchScheduler:
-    """Assign shuffled chronological segments to independent batch lanes."""
-
-    def __init__(
-        self,
-        segments: list[np.ndarray],
-        *,
-        batch_size: int,
-        bptt_steps: int,
-        seed: int,
-    ) -> None:
-        if not segments:
-            raise ValueError("No training segments available.")
-        self._segments = segments
-        self._batch_size = batch_size
-        self._bptt_steps = bptt_steps
-        self._rng = np.random.default_rng(seed)
-        self._active: list[np.ndarray | None] = [None] * batch_size
-        self._offsets = np.zeros(batch_size, dtype=np.int64)
-        self.epoch = 0
-        self._order = np.arange(len(segments), dtype=np.int64)
-        self._cursor = len(segments)
-
-    def _reshuffle(self) -> None:
-        self._order = np.arange(len(self._segments), dtype=np.int64)
-        self._rng.shuffle(self._order)
-        self._cursor = 0
-        self.epoch += 1
-
-    def _next_segment(self) -> np.ndarray:
-        if self._cursor >= len(self._order):
-            self._reshuffle()
-        segment = self._segments[int(self._order[self._cursor])]
-        self._cursor += 1
-        return segment
-
-    def next_chunk(self) -> tuple[tuple[np.ndarray, ...], np.ndarray]:
-        """Return bptt_steps arrays of final-input indices plus lane reset mask."""
-        reset_mask = np.zeros(self._batch_size, dtype=np.bool_)
-        per_step: list[list[int]] = [[] for _ in range(self._bptt_steps)]
-
-        for lane in range(self._batch_size):
-            segment = self._active[lane]
-            offset = int(self._offsets[lane])
-            if segment is None or offset + self._bptt_steps > len(segment):
-                segment = self._next_segment()
-                self._active[lane] = segment
-                offset = 0
-                self._offsets[lane] = 0
-                reset_mask[lane] = True
-
-            for bptt_i in range(self._bptt_steps):
-                per_step[bptt_i].append(int(segment[offset + bptt_i]))
-            self._offsets[lane] = offset + self._bptt_steps
-
-        return tuple(np.asarray(step_indices, dtype=np.int64) for step_indices in per_step), reset_mask
+from graphcast_train.batching import (
+    BatchBuilder,
+    NumpyBatchCache,
+    build_batch_from_indices,
+    build_batch_from_indices_vectorized,
+    infer_time_step,
+    input_steps_from_duration,
+)
+from graphcast_train.config import (
+    DEFAULT_CKPT,
+    DEFAULT_DATA_PATH,
+    DEFAULT_STATS_DIR,
+    RunConfig,
+)
+from graphcast_train.dataset import (
+    _open_local_splits,
+    _training_cache_decision,
+    maybe_cache_training_data,
+    prepare_dataset_for_task,
+)
+from graphcast_train.logging import (
+    _filter_pairs_upto_step,
+    _load_dict_series_upto_step,
+    _load_json_list,
+    _load_step_value_pairs,
+    _load_train_losses,
+    plot_loss_curves,
+    sample_actual_usage,
+    save_checkpoint,
+    save_logs,
+)
+from graphcast_train.model import (
+    build_predictor,
+    gc,
+    load_graphcast_checkpoint,
+    load_stats,
+    scalarize_loss,
+    validate_stats_coverage,
+)
+from graphcast_train.segments import (
+    SegmentBatchScheduler,
+    SegmentRunConfig,
+    _build_chunk_batches,
+    _reset_temporal_state_lanes,
+    _save_chunk_timing_logs,
+    _stop_gradient_temporal_state,
+    _write_segment_run_config,
+    build_full_segments,
+    run_eval_fresh_state,
+    valid_contiguous_final_input_indices,
+)
 
 
 def parse_args() -> SegmentRunConfig:
     parser = argparse.ArgumentParser(
         description="Train GraphCast on shuffled chronological segments with chunked BPTT."
     )
-    parser.add_argument("--data-path", default=base.DEFAULT_DATA_PATH)
+    parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
@@ -104,8 +85,8 @@ def parse_args() -> SegmentRunConfig:
     parser.add_argument("--val-year", type=int, default=2021)
     parser.add_argument("--train-start-year", type=int, default=None)
     parser.add_argument("--train-end-year", type=int, default=None)
-    parser.add_argument("--ckpt-in", default=base.DEFAULT_CKPT)
-    parser.add_argument("--stats-dir", default=base.DEFAULT_STATS_DIR)
+    parser.add_argument("--ckpt-in", default=DEFAULT_CKPT)
+    parser.add_argument("--stats-dir", default=DEFAULT_STATS_DIR)
     parser.add_argument("--out-dir", default="artifacts/checkpoints/graphcast_mamba_interleaved_segments")
     parser.add_argument("--run-name", default="segments_res2_m4_w128_mp1")
     parser.add_argument("--batch-size", type=int, default=1)
@@ -122,6 +103,12 @@ def parse_args() -> SegmentRunConfig:
     parser.add_argument("--target-steps", type=int, default=1)
     parser.add_argument("--len-segment", type=int, default=30)
     parser.add_argument("--bptt-steps", type=int, default=6)
+    parser.add_argument(
+        "--chunk-load-workers",
+        type=int,
+        default=6,
+        help="Parallel workers for loading the independent BPTT batches in each chunk.",
+    )
     parser.add_argument("--temporal-backbone", choices=["none", "mamba"], default="none")
     parser.add_argument(
         "--temporal-location",
@@ -138,6 +125,9 @@ def parse_args() -> SegmentRunConfig:
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
+    parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
+    parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "numpy"], default="numpy")
     args = parser.parse_args()
 
     if args.max_steps <= 0:
@@ -148,6 +138,8 @@ def parse_args() -> SegmentRunConfig:
         raise ValueError("--len-segment must be > 0")
     if args.bptt_steps <= 0:
         raise ValueError("--bptt-steps must be > 0")
+    if args.chunk_load_workers <= 0:
+        raise ValueError("--chunk-load-workers must be > 0")
     if args.len_segment % args.bptt_steps != 0:
         raise ValueError("--bptt-steps must divide --len-segment")
     if args.target_steps != 1:
@@ -174,8 +166,10 @@ def parse_args() -> SegmentRunConfig:
         raise ValueError("--temporal-layers must be > 0")
     if not (0.0 <= args.temporal_dropout < 1.0):
         raise ValueError("--temporal-dropout must be in [0, 1)")
+    if args.data_cache_max_gib <= 0:
+        raise ValueError("--data-cache-max-gib must be > 0")
 
-    base_cfg = base.RunConfig(
+    base_cfg = RunConfig(
         data_path=args.data_path,
         resolution=args.resolution,
         mesh_size=args.mesh_size,
@@ -213,169 +207,22 @@ def parse_args() -> SegmentRunConfig:
         temporal_stateful=args.temporal_stateful,
         target_steps=args.target_steps,
         sequential_segment_steps=None,
+        data_cache_mode=args.data_cache_mode,
+        data_cache_max_gib=args.data_cache_max_gib,
+        batch_builder=args.batch_builder,
+        prefetch_workers=0,
+        prefetch_depth=0,
+        prefetch_device_depth=0,
+        usage_every=1,
         eval_only=False,
     )
-    return SegmentRunConfig(base_cfg=base_cfg, len_segment=args.len_segment, bptt_steps=args.bptt_steps)
+    return SegmentRunConfig(
+        base_cfg=base_cfg,
+        len_segment=args.len_segment,
+        bptt_steps=args.bptt_steps,
+        chunk_load_workers=args.chunk_load_workers,
+    )
 
-
-def valid_contiguous_final_input_indices(
-    ds: xr.Dataset,
-    *,
-    input_steps: int,
-    target_steps: int,
-    dt: pd.Timedelta,
-) -> np.ndarray:
-    """Final input indices whose full input+target window has no time gaps."""
-    time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
-    candidates = base.valid_final_input_indices(len(time_index), input_steps, target_steps)
-    valid: list[int] = []
-    expected_count = input_steps + target_steps
-    for idx in candidates:
-        start = int(idx) - input_steps + 1
-        stop = int(idx) + target_steps
-        window = time_index[start : stop + 1]
-        if len(window) != expected_count:
-            continue
-        if all((window[i + 1] - window[i]) == dt for i in range(len(window) - 1)):
-            valid.append(int(idx))
-    return np.asarray(valid, dtype=np.int64)
-
-
-def build_full_segments(indices: np.ndarray, len_segment: int) -> list[np.ndarray]:
-    """Split consecutive valid indices into full, chronological segments."""
-    if len(indices) == 0:
-        return []
-    sorted_idx = np.sort(indices)
-    gaps = np.where(np.diff(sorted_idx) > 1)[0] + 1
-    runs = np.split(sorted_idx, gaps)
-    segments: list[np.ndarray] = []
-    for run in runs:
-        for start in range(0, len(run) - len_segment + 1, len_segment):
-            segment = run[start : start + len_segment]
-            if len(segment) == len_segment:
-                segments.append(segment)
-    return segments
-
-
-def _map_temporal_state_leaves(state: hk.State, fn) -> hk.State:
-    mutable_state = hk.data_structures.to_mutable_dict(state)
-    for module_state in mutable_state.values():
-        for state_name, leaf in module_state.items():
-            if not isinstance(leaf, jax.Array):
-                continue
-            if state_name.endswith("_ssm_state") or state_name.endswith("_conv_cache"):
-                module_state[state_name] = fn(leaf)
-    return hk.data_structures.to_immutable_dict(mutable_state)
-
-
-def _reset_temporal_state_lanes(state: hk.State, reset_mask: jax.Array) -> hk.State:
-    reset_mask = jnp.asarray(reset_mask, dtype=bool)
-
-    def reset_leaf(leaf: jax.Array) -> jax.Array:
-        if leaf.ndim > 0 and leaf.shape[0] == reset_mask.shape[0]:
-            mask_shape = (reset_mask.shape[0],) + (1,) * (leaf.ndim - 1)
-            return jnp.where(reset_mask.reshape(mask_shape), jnp.zeros_like(leaf), leaf)
-        return jnp.where(jnp.any(reset_mask), jnp.zeros_like(leaf), leaf)
-
-    return _map_temporal_state_leaves(state, reset_leaf)
-
-
-def _stop_gradient_temporal_state(state: hk.State) -> hk.State:
-    return _map_temporal_state_leaves(state, jax.lax.stop_gradient)
-
-
-def _write_segment_run_config(
-    out_dir: Path,
-    *,
-    segment_cfg: SegmentRunConfig,
-    model_cfg: base.gc.ModelConfig,
-    task_cfg: base.gc.TaskConfig,
-) -> None:
-    base._write_run_config(out_dir, segment_cfg.base_cfg, model_cfg, task_cfg)
-    path = out_dir / "run_config.json"
-    with path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
-    payload["segment_training"] = {
-        "len_segment": segment_cfg.len_segment,
-        "bptt_steps": segment_cfg.bptt_steps,
-        "shuffle_segments": True,
-        "drop_short_tail_segments": True,
-        "max_steps_unit": "optimizer_updates",
-    }
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-
-
-def _build_chunk_batches(
-    train_ds: xr.Dataset,
-    chunk_indices: Iterable[np.ndarray],
-    *,
-    input_steps: int,
-    target_steps: int,
-    task_cfg: base.gc.TaskConfig,
-    dt: pd.Timedelta,
-) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...]]:
-    inputs = []
-    targets = []
-    forcings = []
-    for step_indices in chunk_indices:
-        batch_inputs, batch_targets, batch_forcings = base.build_batch_from_indices(
-            train_ds,
-            indices=step_indices,
-            input_steps=input_steps,
-            target_steps=target_steps,
-            task_cfg=task_cfg,
-            dt=dt,
-        )
-        inputs.append(batch_inputs)
-        targets.append(batch_targets)
-        forcings.append(batch_forcings)
-    return tuple(inputs), tuple(targets), tuple(forcings)
-
-
-def run_eval_fresh_state(
-    transformed,
-    params: hk.Params,
-    rng: jax.Array,
-    eval_ds: xr.Dataset,
-    eval_indices: np.ndarray,
-    *,
-    eval_batch_size: int,
-    input_steps: int,
-    target_steps: int,
-    task_cfg: base.gc.TaskConfig,
-    dt: pd.Timedelta,
-    progress_label: str,
-) -> dict[str, float]:
-    losses: list[float] = []
-    state_by_batch_size: dict[int, hk.State] = {}
-    n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
-    t_eval0 = time.time()
-    for batch_i, i in enumerate(range(0, len(eval_indices), eval_batch_size), start=1):
-        idx = eval_indices[i : i + eval_batch_size]
-        inputs, targets, forcings = base.build_batch_from_indices(
-            eval_ds,
-            indices=idx,
-            input_steps=input_steps,
-            target_steps=target_steps,
-            task_cfg=task_cfg,
-            dt=dt,
-        )
-        rng, init_key, apply_key = jax.random.split(rng, 3)
-        batch_size = len(idx)
-        if batch_size not in state_by_batch_size:
-            _, state_by_batch_size[batch_size] = transformed.init(init_key, inputs, targets, forcings, False)
-        eval_state = state_by_batch_size[batch_size]
-        (loss_and_diag, _) = transformed.apply(params, eval_state, apply_key, inputs, targets, forcings, False)
-        loss = float(base.scalarize_loss(loss_and_diag[0]))
-        losses.append(loss)
-        if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
-            elapsed = time.time() - t_eval0
-            print(
-                f"[{progress_label}] batch {batch_i}/{n_batches} "
-                f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
-            )
-    return {"total": float(np.mean(losses))}
 
 
 def main() -> None:
@@ -384,7 +231,7 @@ def main() -> None:
     out_dir = Path(cfg.out_dir) / cfg.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    ckpt_in = base.load_graphcast_checkpoint(Path(cfg.ckpt_in))
+    ckpt_in = load_graphcast_checkpoint(Path(cfg.ckpt_in))
     base_model_cfg = ckpt_in.model_config
     task_cfg = ckpt_in.task_config
     if cfg.input_duration is not None:
@@ -400,18 +247,18 @@ def main() -> None:
         mesh2grid_edge_normalization_factor=None,
     )
 
-    norm_stats = base.load_stats(Path(cfg.stats_dir))
-    base.validate_stats_coverage(task_cfg, norm_stats)
-    train_ds, eval_ds = base._open_local_splits(cfg)
-    train_ds = base.prepare_dataset_for_task(train_ds, task_cfg)
-    eval_ds = base.prepare_dataset_for_task(eval_ds, task_cfg)
+    norm_stats = load_stats(Path(cfg.stats_dir))
+    validate_stats_coverage(task_cfg, norm_stats)
+    train_ds, eval_ds = _open_local_splits(cfg)
+    train_ds = prepare_dataset_for_task(train_ds, task_cfg)
+    eval_ds = prepare_dataset_for_task(eval_ds, task_cfg)
 
-    dt_train = base.infer_time_step(train_ds)
-    dt_eval = base.infer_time_step(eval_ds)
+    dt_train = infer_time_step(train_ds)
+    dt_eval = infer_time_step(eval_ds)
     if dt_train != dt_eval:
         raise ValueError(f"Train/eval time step mismatch: train={dt_train}, eval={dt_eval}")
 
-    input_steps = base.input_steps_from_duration(task_cfg.input_duration, dt_train)
+    input_steps = input_steps_from_duration(task_cfg.input_duration, dt_train)
     if input_steps < 2:
         raise ValueError("Segment training expects at least two input frames.")
     target_steps = cfg.target_steps
@@ -441,8 +288,69 @@ def main() -> None:
         f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, target_steps={target_steps}"
     )
 
+    should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
+    train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
+
+    numpy_cache_active = False
+    train_numpy_cache: NumpyBatchCache | None = None
+    eval_numpy_cache: NumpyBatchCache | None = None
+    if cfg.batch_builder == "numpy":
+        if should_cache_train:
+            train_numpy_cache = NumpyBatchCache(train_ds, task_cfg, label="segment-train")
+            eval_numpy_cache = NumpyBatchCache(eval_ds, task_cfg, label="segment-eval")
+            numpy_cache_active = True
+        else:
+            print(
+                "[numpy-cache] requested for segments but train split is not cached; "
+                "falling back to vectorized builder. Use --data-cache-mode=always to force it."
+            )
+
+    if numpy_cache_active:
+        assert train_numpy_cache is not None
+        assert eval_numpy_cache is not None
+
+        def train_batch_builder(
+            _ds: xr.Dataset,
+            *,
+            indices: Iterable[int],
+            input_steps: int,
+            target_steps: int,
+            task_cfg: gc.TaskConfig,
+            dt: pd.Timedelta,
+        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+            return train_numpy_cache.build_batch_from_indices(
+                indices=indices,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt,
+            )
+
+        def eval_batch_builder(
+            _ds: xr.Dataset,
+            *,
+            indices: Iterable[int],
+            input_steps: int,
+            target_steps: int,
+            task_cfg: gc.TaskConfig,
+            dt: pd.Timedelta,
+        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+            return eval_numpy_cache.build_batch_from_indices(
+                indices=indices,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt,
+            )
+    elif cfg.batch_builder == "legacy":
+        train_batch_builder = build_batch_from_indices
+        eval_batch_builder = build_batch_from_indices
+    else:
+        train_batch_builder = build_batch_from_indices_vectorized
+        eval_batch_builder = build_batch_from_indices_vectorized
+
     def forward_fn(inputs, targets, forcings, is_training):
-        predictor = base.build_predictor(
+        predictor = build_predictor(
             model_cfg,
             task_cfg,
             norm_stats,
@@ -467,7 +375,7 @@ def main() -> None:
     rng = jax.random.PRNGKey(cfg.seed)
 
     init_indices = [int(segments[lane % len(segments)][0]) for lane in range(cfg.batch_size)]
-    sample_inputs, sample_targets, sample_forcings = base.build_batch_from_indices(
+    sample_inputs, sample_targets, sample_forcings = train_batch_builder(
         train_ds,
         indices=init_indices,
         input_steps=input_steps,
@@ -482,7 +390,14 @@ def main() -> None:
 
     opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     opt_state = opt.init(params)
-    _write_segment_run_config(out_dir, segment_cfg=segment_cfg, model_cfg=model_cfg, task_cfg=task_cfg)
+    _write_segment_run_config(
+        out_dir,
+        segment_cfg=segment_cfg,
+        model_cfg=model_cfg,
+        task_cfg=task_cfg,
+        numpy_cache_active=numpy_cache_active,
+        train_cache_estimate_gib=train_cache_estimate_gib,
+    )
 
     @functools.partial(jax.jit)
     def train_chunk(
@@ -511,7 +426,7 @@ def main() -> None:
                     chunk_forcings[bptt_i],
                     True,
                 )
-                losses.append(base.scalarize_loss(loss_and_diag[0]))
+                losses.append(scalarize_loss(loss_and_diag[0]))
             return jnp.mean(jnp.stack(losses)), current_state
 
         (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
@@ -527,15 +442,17 @@ def main() -> None:
     mem_usage: list[tuple[int, float]] = []
     actual_usage: list[dict[str, Any]] = []
     epoch_summaries: list[dict[str, Any]] = []
+    chunk_timing: list[dict[str, Any]] = []
 
     if cfg.resume_step is not None:
-        train_losses = base._filter_pairs_upto_step(base._load_train_losses(out_dir / "train_loss.json"), cfg.resume_step)
-        eval_losses = base._filter_pairs_upto_step(base._load_step_value_pairs(out_dir / "eval_loss.json"), cfg.resume_step)
-        step_times = base._filter_pairs_upto_step(base._load_step_value_pairs(out_dir / "step_times.json"), cfg.resume_step)
-        mem_usage = base._filter_pairs_upto_step(base._load_step_value_pairs(out_dir / "memory_gib.json"), cfg.resume_step)
-        eval_details = base._load_dict_series_upto_step(out_dir / "eval_details.json", cfg.resume_step)
-        actual_usage = base._load_dict_series_upto_step(out_dir / "actual_usage.json", cfg.resume_step)
-        epoch_summaries = base._load_json_list(out_dir / "epoch_summary.json")
+        train_losses = _filter_pairs_upto_step(_load_train_losses(out_dir / "train_loss.json"), cfg.resume_step)
+        eval_losses = _filter_pairs_upto_step(_load_step_value_pairs(out_dir / "eval_loss.json"), cfg.resume_step)
+        step_times = _filter_pairs_upto_step(_load_step_value_pairs(out_dir / "step_times.json"), cfg.resume_step)
+        mem_usage = _filter_pairs_upto_step(_load_step_value_pairs(out_dir / "memory_gib.json"), cfg.resume_step)
+        eval_details = _load_dict_series_upto_step(out_dir / "eval_details.json", cfg.resume_step)
+        actual_usage = _load_dict_series_upto_step(out_dir / "actual_usage.json", cfg.resume_step)
+        epoch_summaries = _load_json_list(out_dir / "epoch_summary.json")
+        chunk_timing = _load_dict_series_upto_step(out_dir / "chunk_timing.json", cfg.resume_step)
 
     best_eval_step: int | None = None
     best_eval_loss = float("inf")
@@ -549,7 +466,7 @@ def main() -> None:
             return
         best_eval_step = int(eval_step)
         best_eval_loss = float(eval_total)
-        base.save_checkpoint(
+        save_checkpoint(
             out_dir,
             params=params,
             step=eval_step,
@@ -580,26 +497,30 @@ def main() -> None:
     )
     pass_start_step = step + 1
     pass_loss_accum: list[float] = []
-    observed_epoch = scheduler.epoch
+    observed_epoch: int | None = None
 
-    while step < cfg.max_steps:
-        chunk_indices, reset_mask_np = scheduler.next_chunk()
-        if scheduler.epoch != observed_epoch and pass_loss_accum:
-            epoch_summaries.append(
-                {
-                    "pass": observed_epoch,
-                    "steps": step - pass_start_step + 1,
-                    "train_loss_mean": float(np.mean(pass_loss_accum)),
-                    "time_per_step_mean": float(
-                        np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
-                    ),
-                    "mem_gib_max": float(np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])),
-                }
-            )
-            observed_epoch = scheduler.epoch
-            pass_start_step = step + 1
-            pass_loss_accum = []
+    def save_all_logs() -> None:
+        save_logs(
+            out_dir,
+            train_losses,
+            eval_losses,
+            eval_details,
+            step_times,
+            [],
+            mem_usage,
+            actual_usage,
+            epoch_summaries,
+        )
+        _save_chunk_timing_logs(out_dir, chunk_timing)
 
+    load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=segment_cfg.chunk_load_workers)
+    prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+    def load_chunk_payload(
+        chunk_indices: tuple[np.ndarray, ...],
+        reset_mask_np: np.ndarray,
+        chunk_epoch: int,
+    ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], np.ndarray, int]:
         chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
             train_ds,
             chunk_indices,
@@ -607,78 +528,134 @@ def main() -> None:
             target_steps=target_steps,
             task_cfg=task_cfg,
             dt=dt_train,
+            batch_builder=train_batch_builder,
+            chunk_load_workers=segment_cfg.chunk_load_workers,
+            load_executor=load_executor,
+        )
+        return chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch
+
+    def submit_next_chunk() -> concurrent.futures.Future:
+        chunk_indices, reset_mask_np = scheduler.next_chunk()
+        return prefetch_executor.submit(
+            load_chunk_payload,
+            chunk_indices,
+            reset_mask_np,
+            scheduler.epoch,
         )
 
-        rng, step_key = jax.random.split(rng)
-        t0 = time.time()
-        params, state, opt_state, loss = train_chunk(
-            params,
-            state,
-            opt_state,
-            step_key,
-            chunk_inputs,
-            chunk_targets,
-            chunk_forcings,
-            jnp.asarray(reset_mask_np),
-        )
-        step_time = time.time() - t0
-        step += 1
-        loss_f = float(loss)
-        train_losses.append((step, loss_f))
-        pass_loss_accum.append(loss_f)
-        step_times.append((step, step_time))
+    pending_chunk = submit_next_chunk()
 
-        usage = base.sample_actual_usage(step=step)
-        actual_usage.append(usage)
-        if usage.get("gpu_mem_gib") is not None:
-            mem_usage.append((step, float(usage["gpu_mem_gib"])))
+    try:
+        while step < cfg.max_steps:
+            iteration_t0 = time.time()
+            t_data = time.time()
+            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch = pending_chunk.result()
+            data_wait_s = time.time() - t_data
 
-        if step % 10 == 0:
-            print(
-                f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
-                f"segment_epoch {scheduler.epoch} reset_lanes {int(reset_mask_np.sum())}"
-            )
+            if observed_epoch is None:
+                observed_epoch = chunk_epoch
+            elif chunk_epoch != observed_epoch and pass_loss_accum:
+                epoch_summaries.append(
+                    {
+                        "pass": observed_epoch,
+                        "steps": step - pass_start_step + 1,
+                        "train_loss_mean": float(np.mean(pass_loss_accum)),
+                        "time_per_step_mean": float(
+                            np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
+                        ),
+                        "mem_gib_max": float(
+                            np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
+                        ),
+                    }
+                )
+                observed_epoch = chunk_epoch
+                pass_start_step = step + 1
+                pass_loss_accum = []
 
-        if step % cfg.eval_every == 0:
-            eval_metrics = run_eval_fresh_state(
-                transformed,
+            rng, step_key = jax.random.split(rng)
+            t0 = time.time()
+            params, state, opt_state, loss = train_chunk(
                 params,
-                rng,
-                eval_ds,
-                eval_final_indices,
-                eval_batch_size=cfg.eval_batch_size,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt_train,
-                progress_label=f"eval@step{step}",
-            )
-            eval_losses.append((step, eval_metrics["total"]))
-            maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
-            eval_details.append({"step": step, "total": eval_metrics["total"]})
-            print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
-            base.plot_loss_curves(out_dir, train_losses, eval_losses)
-            base.save_logs(
-                out_dir,
-                train_losses,
-                eval_losses,
-                eval_details,
-                step_times,
-                mem_usage,
-                actual_usage,
-                epoch_summaries,
+                state,
+                opt_state,
+                step_key,
+                chunk_inputs,
+                chunk_targets,
+                chunk_forcings,
+                jnp.asarray(reset_mask_np),
             )
 
-        if step % cfg.checkpoint_every == 0:
-            base.save_checkpoint(
-                out_dir,
-                params=params,
-                step=step,
-                model_cfg=model_cfg,
-                task_cfg=task_cfg,
-                description=ckpt_in.description,
-                license_text=ckpt_in.license,
+            next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
+            loss_f = float(loss)
+            gpu_train_s = time.time() - t0
+            iteration_wall_s = time.time() - iteration_t0
+
+            step += 1
+            train_losses.append((step, loss_f))
+            pass_loss_accum.append(loss_f)
+            step_times.append((step, gpu_train_s))
+            chunk_timing.append(
+                {
+                    "step": step,
+                    "data_wait_s": data_wait_s,
+                    "gpu_train_s": gpu_train_s,
+                    "iteration_wall_s": iteration_wall_s,
+                    "batch_size": cfg.batch_size,
+                    "bptt_steps": segment_cfg.bptt_steps,
+                    "chunk_load_workers": segment_cfg.chunk_load_workers,
+                }
             )
+
+            usage = sample_actual_usage(step=step)
+            actual_usage.append(usage)
+            if usage.get("gpu_mem_gib") is not None:
+                mem_usage.append((step, float(usage["gpu_mem_gib"])))
+
+            if step % 10 == 0:
+                print(
+                    f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
+                    f"segment_epoch {chunk_epoch} reset_lanes {int(reset_mask_np.sum())} "
+                    f"data_wait={data_wait_s:.3f}s gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s"
+                )
+
+            if step % cfg.eval_every == 0:
+                eval_metrics = run_eval_fresh_state(
+                    transformed,
+                    params,
+                    rng,
+                    eval_ds,
+                    eval_final_indices,
+                    eval_batch_size=cfg.eval_batch_size,
+                    input_steps=input_steps,
+                    target_steps=target_steps,
+                    task_cfg=task_cfg,
+                    dt=dt_train,
+                    progress_label=f"eval@step{step}",
+                    batch_builder=eval_batch_builder,
+                )
+                eval_losses.append((step, eval_metrics["total"]))
+                maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
+                eval_details.append({"step": step, "total": eval_metrics["total"]})
+                print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+                plot_loss_curves(out_dir, train_losses, eval_losses)
+                save_all_logs()
+
+            if step % cfg.checkpoint_every == 0:
+                save_checkpoint(
+                    out_dir,
+                    params=params,
+                    step=step,
+                    model_cfg=model_cfg,
+                    task_cfg=task_cfg,
+                    description=ckpt_in.description,
+                    license_text=ckpt_in.license,
+                )
+
+            if next_chunk is not None:
+                pending_chunk = next_chunk
+    finally:
+        prefetch_executor.shutdown(wait=False, cancel_futures=True)
+        load_executor.shutdown(wait=False, cancel_futures=True)
 
     if pass_loss_accum:
         epoch_summaries.append(
@@ -705,12 +682,13 @@ def main() -> None:
         task_cfg=task_cfg,
         dt=dt_train,
         progress_label="eval@final",
+        batch_builder=eval_batch_builder,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
     eval_details.append({"step": step, "final": True, "total": final_eval["total"]})
 
-    base.save_checkpoint(
+    save_checkpoint(
         out_dir,
         params=params,
         step=step,
@@ -719,17 +697,8 @@ def main() -> None:
         description=ckpt_in.description,
         license_text=ckpt_in.license,
     )
-    base.save_logs(
-        out_dir,
-        train_losses,
-        eval_losses,
-        eval_details,
-        step_times,
-        mem_usage,
-        actual_usage,
-        epoch_summaries,
-    )
-    base.plot_loss_curves(out_dir, train_losses, eval_losses)
+    save_all_logs()
+    plot_loss_curves(out_dir, train_losses, eval_losses)
     print(f"Done. Final eval total {final_eval['total']:.6f}. Outputs in {out_dir}")
 
 

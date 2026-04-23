@@ -36,14 +36,18 @@ import pandas as pd
 from graphcast import checkpoint
 from graphcast import graphcast as gc
 from src.data.graphcast_dataset import open_graphcast_era5
-from train_graphcast import (
-    build_predictor,
+from graphcast_train.batching import (
     build_batch_from_indices,
     build_sequential_segments,
-    _ensure_datetime_coord,
-    prepare_dataset_for_task,
     infer_time_step,
     valid_final_input_indices,
+)
+from graphcast_train.dataset import (
+    _ensure_datetime_coord,
+    prepare_dataset_for_task,
+)
+from graphcast_train.model import (
+    build_predictor,
 )
 
 RESULTS = {"pass": [], "fail": [], "warn": []}

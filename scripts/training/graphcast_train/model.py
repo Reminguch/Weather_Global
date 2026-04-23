@@ -1,0 +1,171 @@
+from __future__ import annotations
+
+import warnings
+from pathlib import Path
+
+import haiku as hk
+import jax
+import jax.numpy as jnp
+import numpy as np
+import xarray as xr
+
+from . import bootstrap as _bootstrap  # noqa: F401
+
+
+def _require_graphcast() -> None:
+    try:
+        import graphcast  # noqa: F401
+    except Exception as exc:  # pragma: no cover
+        raise ImportError(
+            "graphcast is required. Activate env via scripts/graphcast_env.sh or install graphcast+jax+haiku."
+        ) from exc
+
+
+
+_require_graphcast()
+from graphcast import (
+    autoregressive,
+    casting,
+    checkpoint,
+    data_utils,
+    graphcast as gc,
+    losses as gc_losses,
+    normalization,
+    xarray_jax,
+)
+
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    module=r"graphcast\.autoregressive",
+)
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message=r"The return type of `Dataset\.dims` will be changed.*",
+)
+
+_ORIG_NORMALIZED_LATITUDE_WEIGHTS = gc_losses.normalized_latitude_weights
+
+
+def _fallback_normalized_latitude_weights(data: xr.DataArray) -> xr.DataArray:
+    """Area weights for any uniformly spaced latitude vector (with or without poles)."""
+    latitude = data.coords["lat"]
+    lat_vals = np.asarray(latitude.values, dtype=np.float64)
+    if lat_vals.ndim != 1 or lat_vals.size < 2:
+        raise ValueError(f"Expected 1D latitude with at least 2 points; got shape={lat_vals.shape}")
+
+    diffs = np.diff(lat_vals)
+    if not np.all(np.isclose(diffs, diffs[0], atol=1e-6)):
+        raise ValueError(f"Latitude vector is not uniformly spaced: {latitude}")
+    delta = float(diffs[0])
+
+    edges = np.empty(lat_vals.size + 1, dtype=np.float64)
+    edges[1:-1] = 0.5 * (lat_vals[:-1] + lat_vals[1:])
+    edges[0] = lat_vals[0] - (delta / 2.0)
+    edges[-1] = lat_vals[-1] + (delta / 2.0)
+    edges = np.clip(edges, -90.0, 90.0)
+
+    weights_np = np.abs(np.sin(np.deg2rad(edges[:-1])) - np.sin(np.deg2rad(edges[1:])))
+    weights = xr.DataArray(weights_np, coords=latitude.coords, dims=latitude.dims).astype(np.float32)
+    return weights / weights.mean(skipna=False)
+
+
+def _normalized_latitude_weights_with_fallback(data: xr.DataArray) -> xr.DataArray:
+    try:
+        return _ORIG_NORMALIZED_LATITUDE_WEIGHTS(data)
+    except ValueError as exc:
+        if "does not start/end" not in str(exc):
+            raise
+        return _fallback_normalized_latitude_weights(data)
+
+
+def load_stats(stats_dir: Path) -> dict[str, xr.Dataset]:
+    def open_nc(name: str) -> xr.Dataset:
+        return xr.open_dataset(stats_dir / f"{name}.nc")
+
+    return {
+        "stddev_by_level": open_nc("stddev_by_level"),
+        "mean_by_level": open_nc("mean_by_level"),
+        "diffs_stddev_by_level": open_nc("diffs_stddev_by_level"),
+    }
+
+
+def load_graphcast_checkpoint(path: Path) -> gc.CheckPoint:
+    with path.open("rb") as f:
+        return checkpoint.load(f, gc.CheckPoint)
+
+
+def build_predictor(
+    model_cfg: gc.ModelConfig,
+    task_cfg: gc.TaskConfig,
+    stats: dict[str, xr.Dataset],
+    *,
+    use_bf16: bool,
+    gradient_checkpointing: bool,
+    temporal_backbone: str,
+    temporal_location: str,
+    temporal_hidden_size: int,
+    temporal_d_inner: int | None,
+    temporal_d_state: int,
+    temporal_d_conv: int,
+    temporal_dt_rank: str,
+    temporal_bias: bool,
+    temporal_conv_bias: bool,
+    temporal_layers: int,
+    temporal_dropout: float,
+    temporal_stateful: bool = False,
+):
+    predictor = gc.GraphCast(model_cfg, task_cfg)
+    if hasattr(predictor, "_temporal_backbone"):
+        predictor._temporal_backbone = temporal_backbone
+        predictor._temporal_location = temporal_location
+        predictor._temporal_stateful = temporal_stateful
+        predictor._temporal_hidden_size = temporal_hidden_size
+        predictor._temporal_d_inner = temporal_d_inner
+        predictor._temporal_d_state = temporal_d_state
+        predictor._temporal_d_conv = temporal_d_conv
+        predictor._temporal_dt_rank = temporal_dt_rank
+        predictor._temporal_bias = temporal_bias
+        predictor._temporal_conv_bias = temporal_conv_bias
+        predictor._temporal_layers = temporal_layers
+        predictor._temporal_dropout = temporal_dropout
+    if use_bf16:
+        predictor = casting.Bfloat16Cast(predictor)
+    predictor = normalization.InputsAndResiduals(
+        predictor,
+        stddev_by_level=stats["stddev_by_level"],
+        mean_by_level=stats["mean_by_level"],
+        diffs_stddev_by_level=stats["diffs_stddev_by_level"],
+    )
+    predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
+    return predictor
+
+
+def validate_stats_coverage(task_cfg: gc.TaskConfig, stats: dict[str, xr.Dataset]) -> None:
+    required_inputs = set(task_cfg.input_variables) | set(task_cfg.forcing_variables)
+    required_targets = set(task_cfg.target_variables)
+
+    stddev_vars = set(stats["stddev_by_level"].data_vars)
+    mean_vars = set(stats["mean_by_level"].data_vars)
+    diffs_vars = set(stats["diffs_stddev_by_level"].data_vars)
+
+    missing_stddev = sorted(required_inputs - stddev_vars)
+    missing_mean = sorted(required_inputs - mean_vars)
+    missing_diffs = sorted(required_targets - diffs_vars)
+
+    if missing_stddev or missing_mean or missing_diffs:
+        raise ValueError(
+            "Normalization stats missing required variables: "
+            f"stddev_missing={missing_stddev}, "
+            f"mean_missing={missing_mean}, "
+            f"diffs_stddev_missing={missing_diffs}"
+        )
+
+
+def scalarize_loss(loss_da: xr.DataArray) -> jax.Array:
+    return jnp.mean(xarray_jax.unwrap_data(loss_da))
+
+
+
+gc_losses.normalized_latitude_weights = _normalized_latitude_weights_with_fallback
