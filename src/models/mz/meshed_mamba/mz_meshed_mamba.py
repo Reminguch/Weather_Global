@@ -36,7 +36,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ..mz_residual_mamba import _SelectiveSSMBlock  # reuse the Mamba block
+from ..grid_mamba.mz_grid_mamba import _SelectiveSSMBlock  # reuse the Mamba block
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,130 @@
+{
+  "config": {
+    "data_path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr",
+    "baseline_ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "stats_dir": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/stats",
+    "out_dir": "/home/lm8598/Weather_Global_experiments/results/mz_residual_memory",
+    "run_name": "mz_paperckpt_r1_in2_seg16_meshed_m5_h128_alog_neg3_2k",
+    "resolution": 1.0,
+    "mesh_size": 5,
+    "val_year": 2022,
+    "train_start_year": 2020,
+    "train_end_year": 2021,
+    "input_duration": "12h",
+    "segment_steps": 16,
+    "max_steps": 2000,
+    "eval_every": 200,
+    "eval_max_segments": 8,
+    "checkpoint_every": 500,
+    "hidden_size": 128,
+    "layers": 1,
+    "dropout": 0.0,
+    "a_log_init": -3.0,
+    "residual_loss_weight": 1.0,
+    "lr": 0.0001,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "warmup_steps": 200,
+    "normalize_loss": true,
+    "standardize_input": true,
+    "baseline_precision": "fp32",
+    "train_mode": "teacher",
+    "tf_prob_start": 1.0,
+    "tf_prob_end": 0.0,
+    "tf_prob_schedule_end": 2000,
+    "eval_autoregressive": true,
+    "residual_clip": 0.0,
+    "residual_shrinkage": 1.0,
+    "target_steps": 1,
+    "seed": 0,
+    "precision": "bf16",
+    "meshed": true,
+    "mz_mesh_size": 5,
+    "n_grid_neighbors": 6,
+    "n_mesh_neighbors": 3,
+    "resume_from": null,
+    "resume_step": 0
+  },
+  "resolved_variables": [
+    "mean_sea_level_pressure",
+    "geopotential",
+    "u_component_of_wind",
+    "v_component_of_wind"
+  ],
+  "feature_slices": {
+    "mean_sea_level_pressure": [
+      0,
+      1
+    ],
+    "geopotential": [
+      1,
+      14
+    ],
+    "u_component_of_wind": [
+      14,
+      27
+    ],
+    "v_component_of_wind": [
+      27,
+      40
+    ]
+  },
+  "task_config": {
+    "input_variables": [
+      "2m_temperature",
+      "mean_sea_level_pressure",
+      "10m_v_component_of_wind",
+      "10m_u_component_of_wind",
+      "total_precipitation_6hr",
+      "temperature",
+      "geopotential",
+      "u_component_of_wind",
+      "v_component_of_wind",
+      "vertical_velocity",
+      "specific_humidity",
+      "toa_incident_solar_radiation",
+      "year_progress_sin",
+      "year_progress_cos",
+      "day_progress_sin",
+      "day_progress_cos",
+      "geopotential_at_surface",
+      "land_sea_mask"
+    ],
+    "target_variables": [
+      "2m_temperature",
+      "mean_sea_level_pressure",
+      "10m_v_component_of_wind",
+      "10m_u_component_of_wind",
+      "total_precipitation_6hr",
+      "temperature",
+      "geopotential",
+      "u_component_of_wind",
+      "v_component_of_wind",
+      "vertical_velocity",
+      "specific_humidity"
+    ],
+    "forcing_variables": [
+      "toa_incident_solar_radiation",
+      "year_progress_sin",
+      "year_progress_cos",
+      "day_progress_sin",
+      "day_progress_cos"
+    ],
+    "pressure_levels": [
+      50,
+      100,
+      150,
+      200,
+      250,
+      300,
+      400,
+      500,
+      600,
+      700,
+      850,
+      925,
+      1000
+    ],
+    "input_duration": "12h"
+  }
+}

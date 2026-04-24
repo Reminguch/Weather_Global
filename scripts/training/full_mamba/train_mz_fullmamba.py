@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
-"""Train an MZ-lite residual memory model on top of a frozen GraphCast baseline.
+"""Resumable variant of train_mz_residual_memory.py.
 
-The setup is intentionally narrow:
- - the frozen baseline provides the Markov/instantaneous one-step prediction
- - a small Mamba-style temporal block learns the residual correction
- - each contiguous segment is treated as one sample
- - only selected resolved variables are corrected:
-   geopotential, mean sea level pressure, u wind, v wind
+Adds two CLI flags to support continuing an earlier run:
+  --resume-from <path>   : path to an mz_residual_stepN.pkl checkpoint.
+  --resume-step <int>    : the step number that checkpoint corresponds to;
+                           training continues at resume_step + 1.
+
+Caveats:
+  * Adam optimizer moments are NOT persisted in the old checkpoint format,
+    so they restart from zero on resume. Expect a small grad-norm transient
+    (<~50 steps) while the momenta warm up.
+  * train_log.json and eval_log.json are APPENDED (not overwritten) when
+    --resume-from is given, so the full curve is preserved.
+  * Everything else matches train_mz_residual_memory.py. This file is kept
+    separate so it cannot break currently-running non-resumable jobs.
+
+The underlying task is the same as train_mz_residual_memory.py:
+frozen GraphCast provides the Markov one-step prediction; a small Mamba-style
+temporal block learns the residual correction; each contiguous time segment
+is treated as one sample; only selected resolved variables are corrected
+(geopotential, mean sea level pressure, u wind, v wind).
 """
 
 from __future__ import annotations
@@ -23,9 +36,14 @@ from typing import Any
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[2]
+# Script lives at scripts/training/full_mamba/, so repo root is 3 parents up.
+ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+TRAIN_DIR = ROOT / "scripts" / "training"
+if str(TRAIN_DIR) not in sys.path:
+    sys.path.insert(0, str(TRAIN_DIR))
 
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
@@ -40,6 +58,10 @@ import optax
 import xarray as xr
 from src.models.mz_residual_mamba import MZResidualConfig
 from src.models.mz_residual_mamba import MZResidualMamba
+from src.models.full_mamba import (
+    MZResidualFullMambaConfig,
+    MZResidualFullMambaMeshed,
+)
 from src.models.mz_meshed import (
     MZResidualMeshedConfig,
     MZResidualMeshedMamba,
@@ -53,12 +75,39 @@ DEFAULT_BASELINE_CKPT = (
     "artifacts/checkpoints/long_iid_mamba/bfix_r4_m3_in32_t1/ckpt_step4000.npz"
 )
 DEFAULT_OUT_DIR = "artifacts/checkpoints/mz_residual_memory"
-RESOLVED_VARIABLES = (
+# Variable sets. The active set is chosen at runtime via --full-variables.
+# Keep the minimal 4-variable set first (MSLP + upper-air Z/U/V) so the
+# default behaviour matches the historical MZ runs (grid-mamba, meshed-mamba).
+RESOLVED_VARIABLES_MIN = (
     "mean_sea_level_pressure",
     "geopotential",
     "u_component_of_wind",
     "v_component_of_wind",
 )
+# Full 11-variable set (all GraphCast targets). Only used when --full-variables.
+RESOLVED_VARIABLES_FULL = (
+    # Surface (each 1 channel)
+    "2m_temperature",
+    "mean_sea_level_pressure",
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "total_precipitation_6hr",
+    # Upper-air (each 13 channels at 13 pressure levels)
+    "temperature",
+    "geopotential",
+    "u_component_of_wind",
+    "v_component_of_wind",
+    "vertical_velocity",
+    "specific_humidity",
+)
+PRESSURE_LEVEL_VARS = {
+    "geopotential", "u_component_of_wind", "v_component_of_wind",
+    "temperature", "vertical_velocity", "specific_humidity",
+}
+# `RESOLVED_VARIABLES` is assigned in main() after CLI parse. Default to the
+# minimal set at import time so helpers that reference it at module scope
+# (e.g. the factory's attribute access) keep working.
+RESOLVED_VARIABLES = RESOLVED_VARIABLES_MIN
 
 
 @dataclasses.dataclass
@@ -110,6 +159,20 @@ class RunConfig:
                                # (independent of baseline's mesh_size)
     n_grid_neighbors: int      # grid->mesh KNN width
     n_mesh_neighbors: int      # mesh->grid KNN width
+    # --- FullMamba (d_state>1, input-dep B/C) -------------------------------
+    full_mamba: bool           # if True, use FullMamba block (ignores a_log_init)
+    d_state: int               # SSM state dim per inner channel (FullMamba only)
+    expand: int                # D_inner / hidden_size ratio (FullMamba only)
+    a_log_init_min: float      # uniform init range lower bound for A_log
+    a_log_init_max: float      # uniform init range upper bound for A_log
+    # --- variable set (orthogonal knob to --full-mamba) ---------------------
+    full_variables: bool       # if True, use the 11-variable RESOLVED_VARIABLES_FULL
+                               #         (adds 2m_T, T, humidity, precip, vertical
+                               #          velocity, 10m winds on top of MSLP/Z/U/V).
+                               # False = default 4-variable set (historical MZ).
+    # --- resume from existing checkpoint ------------------------------------
+    resume_from: str | None    # path to an mz_residual_stepN.pkl to resume from
+    resume_step: int           # step that checkpoint corresponds to
 
 
 def parse_args() -> RunConfig:
@@ -201,6 +264,34 @@ def parse_args() -> RunConfig:
                         help="K for the grid->mesh KNN aggregation (meshed only).")
     parser.add_argument("--n-mesh-neighbors", type=int, default=3,
                         help="K for the mesh->grid KNN aggregation (meshed only).")
+    parser.add_argument("--full-mamba", action="store_true", default=False,
+                        help="Use the FullMamba block (d_state>1, input-dep B/C, "
+                             "SiLU gating) instead of the simplified SelectiveSSMBlock. "
+                             "Requires --meshed as well (only the meshed wrapper "
+                             "is implemented in full_mamba).")
+    parser.add_argument("--d-state", type=int, default=16,
+                        help="SSM state dim per inner channel (FullMamba only). "
+                             "Original Mamba uses 16.")
+    parser.add_argument("--expand", type=int, default=2,
+                        help="D_inner = hidden_size * expand (FullMamba only). "
+                             "Original Mamba uses 2.")
+    parser.add_argument("--a-log-init-min", type=float, default=-3.0,
+                        help="Lower bound of uniform init for A_log (FullMamba only). "
+                             "-3 -> longest memory half-life ~14 steps.")
+    parser.add_argument("--a-log-init-max", type=float, default=-0.1,
+                        help="Upper bound of uniform init for A_log (FullMamba only). "
+                             "-0.1 -> shortest memory half-life ~1 step. Uniform "
+                             "between these gives natural multi-scale init.")
+    parser.add_argument("--full-variables", action="store_true", default=False,
+                        help="Use the full 11-variable GraphCast target set (F=83) "
+                             "instead of the 4-variable MSLP/Z/U/V minimal set "
+                             "(F=40). Orthogonal to --full-mamba; either or both "
+                             "can be enabled.")
+    parser.add_argument("--resume-from", default=None,
+                        help="Path to an mz_residual_stepN.pkl to resume training from.")
+    parser.add_argument("--resume-step", type=int, default=0,
+                        help="Step number the --resume-from checkpoint corresponds to. "
+                             "Training will continue at resume_step + 1 and run until --max-steps.")
     parser.add_argument("--precision", choices=["bf16", "fp32"], default="bf16",
                         help="Precision hint (kept for compatibility; MZ network currently runs in fp32 either way).")
     args = parser.parse_args()
@@ -235,6 +326,23 @@ def parse_args() -> RunConfig:
     if args.train_mode == "target_rollout" and args.target_steps < 2:
         raise ValueError(
             "--train-mode target_rollout only makes sense with --target-steps >= 2."
+        )
+    if args.full_mamba and not args.meshed:
+        raise ValueError(
+            "--full-mamba requires --meshed. Only the meshed wrapper "
+            "(MZResidualFullMambaMeshed) is implemented in src/models/full_mamba. "
+            "Without --meshed, the factory would silently fall back to the "
+            "per-grid simplified SelectiveSSMBlock and the --full-mamba flag "
+            "would have no effect."
+        )
+    if args.full_mamba and args.d_state < 1:
+        raise ValueError("--d-state must be >= 1")
+    if args.full_mamba and args.expand < 1:
+        raise ValueError("--expand must be >= 1")
+    if args.full_mamba and args.a_log_init_min >= args.a_log_init_max:
+        raise ValueError(
+            f"--a-log-init-min ({args.a_log_init_min}) must be < "
+            f"--a-log-init-max ({args.a_log_init_max})."
         )
 
     return RunConfig(
@@ -280,6 +388,14 @@ def parse_args() -> RunConfig:
         mz_mesh_size=args.mz_mesh_size,
         n_grid_neighbors=args.n_grid_neighbors,
         n_mesh_neighbors=args.n_mesh_neighbors,
+        full_mamba=args.full_mamba,
+        d_state=args.d_state,
+        expand=args.expand,
+        a_log_init_min=args.a_log_init_min,
+        a_log_init_max=args.a_log_init_max,
+        full_variables=args.full_variables,
+        resume_from=args.resume_from,
+        resume_step=args.resume_step,
     )
 
 
@@ -358,11 +474,7 @@ def _resolved_feature_layout(task_cfg) -> tuple[tuple[str, ...], dict[str, slice
     slices: dict[str, slice] = {}
     cursor = 0
     for name in RESOLVED_VARIABLES:
-        width = len(task_cfg.pressure_levels) if name in {
-            "geopotential",
-            "u_component_of_wind",
-            "v_component_of_wind",
-        } else 1
+        width = len(task_cfg.pressure_levels) if name in PRESSURE_LEVEL_VARS else 1
         slices[name] = slice(cursor, cursor + width)
         layout.append(name)
         cursor += width
@@ -412,8 +524,15 @@ def _build_mean_stddev_vectors(
 # (third_party/graphcast/graphcast/graphcast.py:477-490). Variables not listed
 # default to 1.0. Among our resolved set only mean_sea_level_pressure is
 # downweighted.
+# Matches GraphCast's per-variable loss weights. Surface fields (MSLP, 10m
+# winds, precipitation) are downweighted to 0.1 as in the paper; 2m_T and
+# upper-air variables stay at 1.0. Only touched when --full-variables enables
+# the corresponding variables.
 _PER_VARIABLE_LOSS_WEIGHTS: dict[str, float] = {
     "mean_sea_level_pressure": 0.1,
+    "10m_u_component_of_wind": 0.1,
+    "10m_v_component_of_wind": 0.1,
+    "total_precipitation_6hr": 0.1,
 }
 
 
@@ -493,12 +612,22 @@ def _compute_group_metrics(
     truth_tblnf: np.ndarray,
     slices: dict[str, slice],
     prefix: str,
+    diffs_std_f: np.ndarray | None = None,
 ) -> dict[str, float]:
+    """Per-variable RMSE/MAE plus a raw-averaged ``overall_MAE``.
+
+    If ``diffs_std_f`` is provided (1-D array of length feature_dim matching
+    the slice layout), also record a paper-style weighted overall metric
+    that normalises each variable's MAE by its diffs_stddev and applies the
+    GraphCast per-variable weights (MSLP / 10m wind / precip = 0.1, else 1.0).
+    """
     results: dict[str, float] = {}
     total_sq = 0.0
     total_abs = 0.0
     total_n = 0
     diff = pred_tblnf - truth_tblnf
+    weighted_num = 0.0          # Σ w_var · MAE_var / mean(diffs_std over var levels)
+    weighted_den = 0.0          # Σ w_var
     for name, sl in slices.items():
         var_diff = diff[..., sl]
         n = int(var_diff.size)
@@ -509,8 +638,18 @@ def _compute_group_metrics(
         total_sq += float(np.sum(np.square(var_diff)))
         total_abs += float(np.sum(np.abs(var_diff)))
         total_n += n
+        if diffs_std_f is not None:
+            w_var = _PER_VARIABLE_LOSS_WEIGHTS.get(name, 1.0)
+            # Level-averaged diffs_stddev for this variable.
+            var_std_slice = diffs_std_f[sl]
+            var_std_mean = float(np.mean(var_std_slice)) if var_std_slice.size else 1.0
+            if var_std_mean > 0:
+                weighted_num += w_var * (mae / var_std_mean)
+                weighted_den += w_var
     results[f"{prefix}_overall_RMSE"] = float(np.sqrt(total_sq / total_n))
     results[f"{prefix}_overall_MAE"] = float(total_abs / total_n)
+    if diffs_std_f is not None and weighted_den > 0:
+        results[f"{prefix}_weighted_overall_MAE_norm"] = weighted_num / weighted_den
     return results
 
 
@@ -718,6 +857,18 @@ def main() -> None:
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
 
+    # Select the active variable set. Reassign the module-level
+    # ``RESOLVED_VARIABLES`` so helpers (_resolved_feature_layout, the run_config
+    # dump) that reference the module attribute pick up the new set.
+    global RESOLVED_VARIABLES
+    RESOLVED_VARIABLES = (
+        RESOLVED_VARIABLES_FULL if cfg.full_variables else RESOLVED_VARIABLES_MIN
+    )
+    print(
+        f"[vars] full_variables={cfg.full_variables}  "
+        f"n_vars={len(RESOLVED_VARIABLES)}  list={RESOLVED_VARIABLES}"
+    )
+
     ckpt = base_train.load_graphcast_checkpoint(Path(cfg.baseline_ckpt))
     task_cfg = ckpt.task_config
     if cfg.input_duration is not None:
@@ -898,23 +1049,51 @@ def main() -> None:
             f"n_grid_pts={len(lat_deg) * len(lon_deg)}  "
             f"KNN g2m={cfg.n_grid_neighbors} m2g={cfg.n_mesh_neighbors}"
         )
-        mz_cfg_meshed = MZResidualMeshedConfig(
-            input_size=feature_dim * 2,
-            output_size=feature_dim,
-            hidden_size=cfg.hidden_size,
-            layers=cfg.layers,
-            dropout=cfg.dropout,
-            a_log_init=cfg.a_log_init,
-        )
-
-        def _build_mz_model():
-            return MZResidualMeshedMamba(
-                mz_cfg_meshed,
-                n_mesh_nodes=n_mesh_nodes,
-                **proj_arrays,
+        if cfg.full_mamba:
+            mz_cfg_full = MZResidualFullMambaConfig(
+                input_size=feature_dim * 2,
+                output_size=feature_dim,
+                hidden_size=cfg.hidden_size,
+                d_state=cfg.d_state,
+                expand=cfg.expand,
+                layers=cfg.layers,
+                dropout=cfg.dropout,
+                a_log_init_min=cfg.a_log_init_min,
+                a_log_init_max=cfg.a_log_init_max,
+            )
+            print(
+                f"[full_mamba] d_state={cfg.d_state} expand={cfg.expand} "
+                f"D_inner={cfg.hidden_size * cfg.expand} "
+                f"a_log_init=U[{cfg.a_log_init_min}, {cfg.a_log_init_max}] "
+                f"layers={cfg.layers}"
             )
 
-        mz_cfg = mz_cfg_meshed  # used for attribute access below (input_size/output_size)
+            def _build_mz_model():
+                return MZResidualFullMambaMeshed(
+                    mz_cfg_full,
+                    n_mesh_nodes=n_mesh_nodes,
+                    **proj_arrays,
+                )
+
+            mz_cfg = mz_cfg_full
+        else:
+            mz_cfg_meshed = MZResidualMeshedConfig(
+                input_size=feature_dim * 2,
+                output_size=feature_dim,
+                hidden_size=cfg.hidden_size,
+                layers=cfg.layers,
+                dropout=cfg.dropout,
+                a_log_init=cfg.a_log_init,
+            )
+
+            def _build_mz_model():
+                return MZResidualMeshedMamba(
+                    mz_cfg_meshed,
+                    n_mesh_nodes=n_mesh_nodes,
+                    **proj_arrays,
+                )
+
+            mz_cfg = mz_cfg_meshed
     else:
         mz_cfg = MZResidualConfig(
             input_size=feature_dim * 2,
@@ -1067,6 +1246,33 @@ def main() -> None:
         rng, seq_inputs0, baseline_next0, truth_next0, tf_mask0, True, 1.0
     )
 
+    # ---- Resume from existing checkpoint, if requested -----------------------
+    if cfg.resume_from is not None:
+        ckpt_path = Path(cfg.resume_from)
+        if not ckpt_path.exists():
+            raise FileNotFoundError(f"--resume-from path not found: {ckpt_path}")
+        with ckpt_path.open("rb") as f:
+            loaded_params = pickle.load(f)
+        # Shape-check by recursing leaf pairs; haiku trees are dicts of dicts.
+        loaded_leaves = jax.tree_util.tree_leaves(loaded_params)
+        init_leaves = jax.tree_util.tree_leaves(mem_params)
+        if len(loaded_leaves) != len(init_leaves):
+            raise ValueError(
+                f"resume mismatch: checkpoint has {len(loaded_leaves)} param leaves, "
+                f"current model has {len(init_leaves)}. Are configs aligned?"
+            )
+        for i, (lp, ip) in enumerate(zip(loaded_leaves, init_leaves)):
+            if lp.shape != ip.shape:
+                raise ValueError(
+                    f"resume mismatch at leaf {i}: ckpt shape {lp.shape} != "
+                    f"init shape {ip.shape}"
+                )
+        mem_params = loaded_params
+        print(
+            f"[resume] loaded {len(loaded_leaves)} param leaves from {ckpt_path}; "
+            f"training continues at step {cfg.resume_step + 1} -> {cfg.max_steps}"
+        )
+
     if cfg.warmup_steps > 0:
         lr_schedule = optax.linear_schedule(
             init_value=0.0, end_value=cfg.lr, transition_steps=cfg.warmup_steps
@@ -1143,6 +1349,21 @@ def main() -> None:
 
     train_log: list[dict[str, Any]] = []
     eval_log: list[dict[str, Any]] = []
+    # If resuming, load prior logs so new entries get appended to the full curve.
+    if cfg.resume_from is not None:
+        train_log_path = out_dir / "train_log.json"
+        eval_log_path = out_dir / "eval_log.json"
+        if train_log_path.exists():
+            with train_log_path.open("r", encoding="utf-8") as f:
+                train_log = json.load(f)
+            # Trim any entries beyond the resume step (shouldn't happen, but defensive)
+            train_log = [e for e in train_log if e.get("step", 0) <= cfg.resume_step]
+            print(f"[resume] loaded {len(train_log)} existing train_log entries")
+        if eval_log_path.exists():
+            with eval_log_path.open("r", encoding="utf-8") as f:
+                eval_log = json.load(f)
+            eval_log = [e for e in eval_log if e.get("step", 0) <= cfg.resume_step]
+            print(f"[resume] loaded {len(eval_log)} existing eval_log entries")
     segments_shuffled = list(train_segments)
     random.shuffle(segments_shuffled)
     seg_ptr = 0
@@ -1253,7 +1474,8 @@ def main() -> None:
             tf_res.append(float(tf_outputs["residual_loss"]))
             corr_tf_metrics_accum.append(
                 _compute_group_metrics(tf_corrected, np.asarray(truth_next, dtype=np.float32),
-                                       feature_slices, "corrected")
+                                       feature_slices, "corrected",
+                                       diffs_std_f=diffs_std_f_np)
             )
 
             # Closed-loop autoregressive eval (honest; prev_residual = model's own r_hat).
@@ -1265,13 +1487,15 @@ def main() -> None:
                 ar_res.append(float(ar_outputs["residual_loss"]))
                 corr_ar_metrics_accum.append(
                     _compute_group_metrics(ar_corrected, np.asarray(truth_next, dtype=np.float32),
-                                           feature_slices, "corrected_ar")
+                                           feature_slices, "corrected_ar",
+                                           diffs_std_f=diffs_std_f_np)
                 )
 
             baseline_metrics_accum.append(
                 _compute_group_metrics(np.asarray(baseline_next, dtype=np.float32),
                                        np.asarray(truth_next, dtype=np.float32),
-                                       feature_slices, "baseline")
+                                       feature_slices, "baseline",
+                                       diffs_std_f=diffs_std_f_np)
             )
             if seg_i == 1 or seg_i % 4 == 0 or seg_i == len(chosen_segments):
                 msg = (f"[mz-eval@step{step}] segment {seg_i}/{len(chosen_segments)} "
@@ -1309,7 +1533,14 @@ def main() -> None:
         print(line)
         return results
 
-    for step in range(1, cfg.max_steps + 1):
+    start_step = cfg.resume_step + 1 if cfg.resume_from is not None else 1
+    if cfg.resume_from is not None and start_step > cfg.max_steps:
+        print(
+            f"[resume] resume_step={cfg.resume_step} >= max_steps={cfg.max_steps}; "
+            "nothing to do"
+        )
+        return
+    for step in range(start_step, cfg.max_steps + 1):
         if seg_ptr >= len(segments_shuffled):
             random.shuffle(segments_shuffled)
             seg_ptr = 0
