@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import time
 
 import haiku as hk
@@ -14,7 +15,7 @@ from .model import gc, scalarize_loss
 
 
 def run_eval(
-    transformed,
+    transformed_eval,
     params: hk.Params,
     state: hk.State,
     rng: jax.Array,
@@ -27,28 +28,26 @@ def run_eval(
     task_cfg: gc.TaskConfig,
     dt: pd.Timedelta,
     progress_label: str = "eval",
-    transformed_predict=None,
     batch_builder: BatchBuilder = build_batch_from_indices_vectorized,
+    prefetch_workers: int = 4,
+    prefetch_depth: int = 4,
 ) -> dict[str, float]:
-    # Reset SSM hidden states so eval starts from clean zeros
-    state = jax.tree_util.tree_map(
-        lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
-        state,
-    )
+    del state
 
     losses: list[float] = []
-    # Per-variable accumulators for RMSE and MAE
-    var_se_sums: dict[str, float] = {}   # sum of squared errors
-    var_ae_sums: dict[str, float] = {}   # sum of absolute errors
-    var_counts: dict[str, int] = {}      # number of elements
-    compute_metrics = transformed_predict is not None
+    # Per-variable accumulators for RMSE and MAE.
+    var_se_sums: dict[str, float] = {}
+    var_ae_sums: dict[str, float] = {}
+    var_counts: dict[str, int] = {}
 
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
-    t_eval0 = time.time()
+    index_batches = [
+        eval_indices[i : i + eval_batch_size]
+        for i in range(0, len(eval_indices), eval_batch_size)
+    ]
 
-    for batch_i, i in enumerate(range(0, len(eval_indices), eval_batch_size), start=1):
-        idx = eval_indices[i : i + eval_batch_size]
-        inputs, targets, forcings = batch_builder(
+    def _build(idx):
+        return batch_builder(
             eval_ds,
             indices=idx,
             input_steps=input_steps,
@@ -57,39 +56,73 @@ def run_eval(
             dt=dt,
         )
 
-        rng, key = jax.random.split(rng)
+    t_eval0 = time.time()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=prefetch_workers)
+    pending: list[concurrent.futures.Future] = []
+    next_submit = 0
 
-        if compute_metrics:
-            # Get loss from original transformed
-            (loss_and_diag, _state_after) = transformed.apply(
-                params, state, key, inputs, targets, forcings, False)
-            loss = float(scalarize_loss(loss_and_diag[0]))
-            # Get predictions from predict fn
-            (preds, _pred_state) = transformed_predict.apply(
-                params, state, key, inputs, targets, forcings, False)
-            # Accumulate per-variable SE and AE in original (denormalized) space
-            for var_name in preds.data_vars:
-                if var_name not in targets.data_vars:
-                    continue
-                # Align dimensions: preds and targets may have different dim order
-                # when target_steps > 1 (e.g. batch,time,lat,lon vs time,batch,lat,lon)
-                common_dims = [d for d in targets[var_name].dims if d in preds[var_name].dims]
-                pred_aligned = preds[var_name].transpose(*common_dims)
-                tgt_aligned = targets[var_name].transpose(*common_dims)
-                pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
-                tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
-                diff = pred_vals - tgt_vals
-                n = diff.size
-                var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
-                var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
-                var_counts[var_name] = var_counts.get(var_name, 0) + n
-        else:
-            (loss_and_diag, _state_after) = transformed.apply(
-                params, state, key, inputs, targets, forcings, False)
-            loss = float(scalarize_loss(loss_and_diag[0]))
+    def _fill():
+        nonlocal next_submit
+        while len(pending) < prefetch_depth and next_submit < n_batches:
+            pending.append(executor.submit(_build, index_batches[next_submit]))
+            next_submit += 1
 
+    _fill()
+
+    state_by_batch_size: dict[int, hk.State] = {}
+    eval_fn_cache: dict[int, callable] = {}
+
+    def _eval_batch_fn(batch_size: int, batch_state: hk.State):
+        fn = eval_fn_cache.get(batch_size)
+        if fn is None:
+            @jax.jit
+            def fn(params, key, inputs, targets, forcings):
+                (loss_and_diag, preds), _ = transformed_eval.apply(
+                    params,
+                    batch_state,
+                    key,
+                    inputs,
+                    targets,
+                    forcings,
+                    False,
+                )
+                return scalarize_loss(loss_and_diag[0]), preds
+
+            eval_fn_cache[batch_size] = fn
+        return eval_fn_cache[batch_size]
+
+    for batch_i in range(1, n_batches + 1):
+        inputs, targets, forcings = pending.pop(0).result()
+        _fill()
+
+        batch_size = int(inputs.sizes["batch"])
+        rng, init_key, apply_key = jax.random.split(rng, 3)
+        if batch_size not in state_by_batch_size:
+            _, batch_state = transformed_eval.init(init_key, inputs, targets, forcings, False)
+            batch_state = jax.tree_util.tree_map(
+                lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
+                batch_state,
+            )
+            state_by_batch_size[batch_size] = batch_state
+        loss_value, preds = _eval_batch_fn(batch_size, state_by_batch_size[batch_size])(
+            params, apply_key, inputs, targets, forcings
+        )
+        loss = float(loss_value)
         losses.append(loss)
 
+        for var_name in preds.data_vars:
+            if var_name not in targets.data_vars:
+                continue
+            common_dims = [d for d in targets[var_name].dims if d in preds[var_name].dims]
+            pred_aligned = preds[var_name].transpose(*common_dims)
+            tgt_aligned = targets[var_name].transpose(*common_dims)
+            pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
+            tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
+            diff = pred_vals - tgt_vals
+            n = diff.size
+            var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
+            var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
+            var_counts[var_name] = var_counts.get(var_name, 0) + n
         if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
             elapsed = time.time() - t_eval0
             print(
@@ -97,10 +130,11 @@ def run_eval(
                 f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
             )
 
+    executor.shutdown(wait=False)
+
     results: dict[str, float] = {"total": float(np.mean(losses))}
 
-    if compute_metrics and var_counts:
-        # Compute and print per-variable RMSE and MAE
+    if var_counts:
         total_se, total_ae, total_n = 0.0, 0.0, 0
         print(f"[{progress_label}] === Per-variable metrics ===")
         for var_name in sorted(var_counts.keys()):

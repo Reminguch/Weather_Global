@@ -46,6 +46,7 @@ from graphcast_train.logging import (
     _load_json_list,
     _load_step_value_pairs,
     _load_train_losses,
+    build_batch_builder_metadata,
     plot_loss_curves,
     sample_actual_usage,
     save_checkpoint,
@@ -294,12 +295,16 @@ def main() -> None:
     numpy_cache_active = False
     train_numpy_cache: NumpyBatchCache | None = None
     eval_numpy_cache: NumpyBatchCache | None = None
+    effective_train_batch_builder = cfg.batch_builder
+    effective_eval_batch_builder = cfg.batch_builder
     if cfg.batch_builder == "numpy":
         if should_cache_train:
             train_numpy_cache = NumpyBatchCache(train_ds, task_cfg, label="segment-train")
             eval_numpy_cache = NumpyBatchCache(eval_ds, task_cfg, label="segment-eval")
             numpy_cache_active = True
         else:
+            effective_train_batch_builder = "vectorized"
+            effective_eval_batch_builder = "vectorized"
             print(
                 "[numpy-cache] requested for segments but train split is not cached; "
                 "falling back to vectorized builder. Use --data-cache-mode=always to force it."
@@ -397,6 +402,14 @@ def main() -> None:
         task_cfg=task_cfg,
         numpy_cache_active=numpy_cache_active,
         train_cache_estimate_gib=train_cache_estimate_gib,
+        effective_train_batch_builder=effective_train_batch_builder,
+        effective_eval_batch_builder=effective_eval_batch_builder,
+    )
+    batch_builder_metadata = build_batch_builder_metadata(
+        requested_batch_builder=cfg.batch_builder,
+        effective_train_batch_builder=effective_train_batch_builder,
+        effective_eval_batch_builder=effective_eval_batch_builder,
+        numpy_cache_active=numpy_cache_active,
     )
 
     @functools.partial(jax.jit)
@@ -635,7 +648,7 @@ def main() -> None:
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
-                eval_details.append({"step": step, "total": eval_metrics["total"]})
+                eval_details.append({"step": step, "total": eval_metrics["total"], **batch_builder_metadata})
                 print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
                 plot_loss_curves(out_dir, train_losses, eval_losses)
                 save_all_logs()
@@ -686,7 +699,7 @@ def main() -> None:
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
-    eval_details.append({"step": step, "final": True, "total": final_eval["total"]})
+    eval_details.append({"step": step, "final": True, "total": final_eval["total"], **batch_builder_metadata})
 
     save_checkpoint(
         out_dir,

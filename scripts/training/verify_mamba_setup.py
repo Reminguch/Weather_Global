@@ -170,7 +170,7 @@ def main():
         radius_query_fraction_edge_length=0.6,
     )
 
-    def forward_fn(inputs, targets, forcings, is_training):
+    def forward_fn(inputs, targets, forcings, is_training, *, zero_init_temporal_out: bool):
         del is_training
         predictor = build_predictor(
             model_cfg, task_cfg, stats,
@@ -186,10 +186,22 @@ def main():
             temporal_conv_bias=True,
             temporal_layers=1, temporal_dropout=0.0,
             temporal_stateful=True,
+            zero_init_temporal_out=zero_init_temporal_out,
         )
         return predictor.loss(inputs, targets, forcings)
 
-    transformed = hk.transform_with_state(forward_fn)
+    def make_transformed(*, zero_init_temporal_out: bool):
+        return hk.transform_with_state(
+            lambda inputs, targets, forcings, is_training: forward_fn(
+                inputs,
+                targets,
+                forcings,
+                is_training,
+                zero_init_temporal_out=zero_init_temporal_out,
+            )
+        )
+
+    transformed = make_transformed(zero_init_temporal_out=True)
     rng = jax.random.PRNGKey(0)
     print("Initializing (compiles, may take a minute)...")
     params, state = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, True)
@@ -202,6 +214,29 @@ def main():
     for ename in ["a_log", "skip", "dt_proj", "in_proj", "out_proj", "layer_norm"]:
         found = any(ename in k for k in mamba_p.keys())
         check(found, f"param '{ename}' exists")
+
+    zero_out_proj = [
+        np.asarray(v)
+        for k, v in mamba_p.items()
+        if "out_proj" in k and k.endswith("/w")
+    ]
+    check(len(zero_out_proj) > 0, "out_proj weights found for zero-init check")
+    for arr in zero_out_proj:
+        check(np.allclose(arr, 0.0), "zero-init residual out_proj", f"max_abs={float(np.abs(arr).max()):.6f}")
+
+    std_transformed = make_transformed(zero_init_temporal_out=False)
+    std_params, _ = std_transformed.init(rng, sample_inputs, sample_targets, sample_forcings, True)
+    std_flat_p = flatten(std_params)
+    std_out_proj = [
+        np.asarray(v)
+        for k, v in std_flat_p.items()
+        if "temporal" in k.lower() and "out_proj" in k and k.endswith("/w")
+    ]
+    check(len(std_out_proj) > 0, "standard out_proj weights found")
+    check(
+        any(not np.allclose(arr, 0.0) for arr in std_out_proj),
+        "standard Mamba out_proj remains nonzero-initialized",
+    )
 
     a_log = [v for k, v in mamba_p.items() if "a_log" in k][0]
     check(abs(float(np.asarray(a_log).mean()) + 0.1) < 0.01, "a_log init ≈ -0.1",

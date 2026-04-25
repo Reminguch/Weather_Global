@@ -82,6 +82,25 @@ def save_logs(
         json.dump(epoch_summaries, f, indent=2)
 
 
+def build_batch_builder_metadata(
+    *,
+    requested_batch_builder: str,
+    effective_train_batch_builder: str | None = None,
+    effective_eval_batch_builder: str | None = None,
+    numpy_cache_active: bool = False,
+) -> dict[str, Any]:
+    train_builder = effective_train_batch_builder or requested_batch_builder
+    eval_builder = effective_eval_batch_builder or requested_batch_builder
+    used_fallback = requested_batch_builder == "numpy" and eval_builder != "numpy"
+    return {
+        "requested_batch_builder": requested_batch_builder,
+        "effective_train_batch_builder": train_builder,
+        "effective_eval_batch_builder": eval_builder,
+        "numpy_cache_active": bool(numpy_cache_active),
+        "used_fallback": used_fallback,
+    }
+
+
 def _load_json_list(path: Path) -> list[Any]:
     if not path.exists():
         return []
@@ -256,7 +275,15 @@ def _write_run_config(
     *,
     numpy_cache_active: bool = False,
     train_cache_estimate_gib: float | None = None,
+    effective_train_batch_builder: str | None = None,
+    effective_eval_batch_builder: str | None = None,
 ) -> None:
+    builder_metadata = build_batch_builder_metadata(
+        requested_batch_builder=cfg.batch_builder,
+        effective_train_batch_builder=effective_train_batch_builder,
+        effective_eval_batch_builder=effective_eval_batch_builder,
+        numpy_cache_active=numpy_cache_active,
+    )
     payload = {
         "data_path": cfg.data_path,
         "val_year": cfg.val_year,
@@ -279,7 +306,7 @@ def _write_run_config(
             "prefetch_depth": cfg.prefetch_depth,
             "prefetch_device_depth": cfg.prefetch_device_depth,
             "usage_every": cfg.usage_every,
-            "numpy_cache_active": numpy_cache_active,
+            **builder_metadata,
             "train_cache_estimate_gib": train_cache_estimate_gib,
         },
         "temporal_config": {

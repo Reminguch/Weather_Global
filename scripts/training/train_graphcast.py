@@ -56,12 +56,14 @@ from graphcast_train.logging import (
     _load_step_value_pairs,
     _load_train_losses,
     _write_run_config,
+    build_batch_builder_metadata,
     plot_loss_curves,
     sample_actual_usage,
     save_checkpoint,
     save_logs,
 )
 from graphcast_train.model import (
+    build_loss_and_predictions_transform,
     build_predictor,
     gc,
     load_graphcast_checkpoint,
@@ -140,12 +142,16 @@ def main() -> None:
     numpy_cache_active = False
     train_numpy_cache: NumpyBatchCache | None = None
     eval_numpy_cache: NumpyBatchCache | None = None
+    effective_train_batch_builder = cfg.batch_builder
+    effective_eval_batch_builder = cfg.batch_builder
     if cfg.batch_builder == "numpy":
         if should_cache_train:
             train_numpy_cache = NumpyBatchCache(train_ds, task_cfg, label="train")
             eval_numpy_cache = NumpyBatchCache(eval_ds, task_cfg, label="eval")
             numpy_cache_active = True
         else:
+            effective_train_batch_builder = "vectorized"
+            effective_eval_batch_builder = "vectorized"
             print(
                 "[numpy-cache] requested but train split is not cached; "
                 "falling back to vectorized builder. Use --data-cache-mode=always to force it."
@@ -233,31 +239,26 @@ def main() -> None:
         )
         return predictor.loss(inputs, targets, forcings)
 
-    def predict_fn(inputs, targets, forcings, is_training):
-        del is_training
-        predictor = build_predictor(
-            model_cfg,
-            task_cfg,
-            norm_stats,
-            use_bf16=(cfg.precision == "bf16"),
-            gradient_checkpointing=False,
-            temporal_backbone=cfg.temporal_backbone,
-            temporal_location=cfg.temporal_location,
-            temporal_hidden_size=cfg.temporal_hidden_size,
-            temporal_d_inner=cfg.temporal_d_inner,
-            temporal_d_state=cfg.temporal_d_state,
-            temporal_d_conv=cfg.temporal_d_conv,
-            temporal_dt_rank=cfg.temporal_dt_rank,
-            temporal_bias=cfg.temporal_bias,
-            temporal_conv_bias=cfg.temporal_conv_bias,
-            temporal_layers=cfg.temporal_layers,
-            temporal_dropout=cfg.temporal_dropout,
-            temporal_stateful=cfg.temporal_stateful,
-        )
-        return predictor(inputs, targets_template=targets, forcings=forcings)
-
     transformed = hk.transform_with_state(forward_fn)
-    transformed_predict = hk.transform_with_state(predict_fn)
+    transformed_eval = build_loss_and_predictions_transform(
+        model_cfg,
+        task_cfg,
+        norm_stats,
+        use_bf16=(cfg.precision == "bf16"),
+        gradient_checkpointing=False,
+        temporal_backbone=cfg.temporal_backbone,
+        temporal_location=cfg.temporal_location,
+        temporal_hidden_size=cfg.temporal_hidden_size,
+        temporal_d_inner=cfg.temporal_d_inner,
+        temporal_d_state=cfg.temporal_d_state,
+        temporal_d_conv=cfg.temporal_d_conv,
+        temporal_dt_rank=cfg.temporal_dt_rank,
+        temporal_bias=cfg.temporal_bias,
+        temporal_conv_bias=cfg.temporal_conv_bias,
+        temporal_layers=cfg.temporal_layers,
+        temporal_dropout=cfg.temporal_dropout,
+        temporal_stateful=cfg.temporal_stateful,
+    )
     rng = jax.random.PRNGKey(cfg.seed)
 
     sample_inputs, sample_targets, sample_forcings = build_train_batch([int(train_final_indices[0])])
@@ -273,7 +274,7 @@ def main() -> None:
     if cfg.eval_only:
         print("Eval-only mode: running eval on loaded checkpoint, no training.")
         eval_metrics = run_eval(
-            transformed,
+            transformed_eval,
             params,
             state,
             rng,
@@ -286,7 +287,6 @@ def main() -> None:
             dt=dt_train,
             progress_label="eval-only",
             batch_builder=eval_batch_builder_fn,
-            transformed_predict=transformed_predict,
         )
         print(f"[eval-only] total {eval_metrics['total']:.6f}")
         return
@@ -301,6 +301,14 @@ def main() -> None:
         task_cfg,
         numpy_cache_active=numpy_cache_active,
         train_cache_estimate_gib=train_cache_estimate_gib,
+        effective_train_batch_builder=effective_train_batch_builder,
+        effective_eval_batch_builder=effective_eval_batch_builder,
+    )
+    batch_builder_metadata = build_batch_builder_metadata(
+        requested_batch_builder=cfg.batch_builder,
+        effective_train_batch_builder=effective_train_batch_builder,
+        effective_eval_batch_builder=effective_eval_batch_builder,
+        numpy_cache_active=numpy_cache_active,
     )
 
     def _map_temporal_state_leaves(state: hk.State, fn) -> hk.State:
@@ -606,7 +614,7 @@ def main() -> None:
 
         if step % cfg.eval_every == 0:
             eval_metrics = run_eval(
-                transformed,
+                transformed_eval,
                 params,
                 state,
                 rng,
@@ -619,7 +627,6 @@ def main() -> None:
                 dt=dt_train,
                 progress_label=f"eval@step{step}",
                 batch_builder=eval_batch_builder_fn,
-                transformed_predict=transformed_predict,
             )
             eval_losses.append((step, eval_metrics["total"]))
             maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
@@ -627,6 +634,7 @@ def main() -> None:
                 {
                     "step": step,
                     "total": eval_metrics["total"],
+                    **batch_builder_metadata,
                 }
             )
             print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
@@ -673,7 +681,7 @@ def main() -> None:
         )
 
     final_eval = run_eval(
-        transformed,
+        transformed_eval,
         params,
         state,
         rng,
@@ -686,7 +694,6 @@ def main() -> None:
         dt=dt_train,
         progress_label="eval@final",
         batch_builder=eval_batch_builder_fn,
-        transformed_predict=transformed_predict,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
@@ -695,6 +702,7 @@ def main() -> None:
             "step": step,
             "final": True,
             "total": final_eval["total"],
+            **batch_builder_metadata,
         }
     )
 

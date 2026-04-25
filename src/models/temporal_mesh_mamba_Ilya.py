@@ -33,6 +33,7 @@ class TemporalMeshConfig:
     bias: bool = False
     conv_bias: bool = True
     dropout: float = 0.0
+    zero_init_output: bool = False
 
 
 class TemporalLayerState(NamedTuple):
@@ -256,6 +257,16 @@ class _StatefulSSMBlock(hk.Module):
         output = hk.Linear(
             d_model,
             with_bias=bool(_cfg_value(self._cfg, "bias", False)),
+            w_init=(
+                hk.initializers.Constant(0.0)
+                if bool(_cfg_value(self._cfg, "zero_init_output", False))
+                else None
+            ),
+            b_init=(
+                hk.initializers.Constant(0.0)
+                if bool(_cfg_value(self._cfg, "zero_init_output", False))
+                else None
+            ),
             name="out_proj",
         )(y_btd)
         return output.astype(x_dtype), next_state.astype(x_dtype), next_conv_cache.astype(x_dtype)

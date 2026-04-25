@@ -160,6 +160,8 @@ def _write_segment_run_config(
     task_cfg: gc.TaskConfig,
     numpy_cache_active: bool = False,
     train_cache_estimate_gib: float | None = None,
+    effective_train_batch_builder: str | None = None,
+    effective_eval_batch_builder: str | None = None,
 ) -> None:
     _write_run_config(
         out_dir,
@@ -168,6 +170,8 @@ def _write_segment_run_config(
         task_cfg,
         numpy_cache_active=numpy_cache_active,
         train_cache_estimate_gib=train_cache_estimate_gib,
+        effective_train_batch_builder=effective_train_batch_builder,
+        effective_eval_batch_builder=effective_eval_batch_builder,
     )
     path = out_dir / "run_config.json"
     with path.open("r", encoding="utf-8") as f:
@@ -272,6 +276,7 @@ def run_eval_fresh_state(
 ) -> dict[str, float]:
     losses: list[float] = []
     state_by_batch_size: dict[int, hk.State] = {}
+    eval_fn_by_batch_size: dict[int, callable] = {}
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     t_eval0 = time.time()
     for batch_i, i in enumerate(range(0, len(eval_indices), eval_batch_size), start=1):
@@ -288,9 +293,16 @@ def run_eval_fresh_state(
         batch_size = len(idx)
         if batch_size not in state_by_batch_size:
             _, state_by_batch_size[batch_size] = transformed.init(init_key, inputs, targets, forcings, False)
-        eval_state = state_by_batch_size[batch_size]
-        (loss_and_diag, _) = transformed.apply(params, eval_state, apply_key, inputs, targets, forcings, False)
-        loss = float(scalarize_loss(loss_and_diag[0]))
+        if batch_size not in eval_fn_by_batch_size:
+            eval_state = state_by_batch_size[batch_size]
+
+            @jax.jit
+            def eval_batch(params, key, inputs, targets, forcings):
+                (loss_and_diag, _) = transformed.apply(params, eval_state, key, inputs, targets, forcings, False)
+                return scalarize_loss(loss_and_diag[0])
+
+            eval_fn_by_batch_size[batch_size] = eval_batch
+        loss = float(eval_fn_by_batch_size[batch_size](params, apply_key, inputs, targets, forcings))
         losses.append(loss)
         if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
             elapsed = time.time() - t_eval0

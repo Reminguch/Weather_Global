@@ -139,17 +139,6 @@ def _common_window_time(window_len: int, dt: pd.Timedelta) -> np.ndarray:
     return start + offsets
 
 
-def _ensure_batch_dim_for_static_vars(ds: xr.Dataset, batch_size: int) -> xr.Dataset:
-    if "batch" not in ds.coords:
-        ds = ds.assign_coords(batch=np.arange(batch_size))
-    batch_values = np.asarray(ds.coords["batch"].values)
-    for name in list(ds.data_vars):
-        if "batch" in ds[name].dims:
-            continue
-        ds[name] = ds[name].expand_dims(batch=batch_values, axis=0)
-    return ds
-
-
 def build_batch_from_indices_vectorized(
     ds: xr.Dataset,
     *,
@@ -181,37 +170,34 @@ def build_batch_from_indices_vectorized(
     else:
         source = ds
 
-    window_time = _common_window_time(len(window_offsets), dt)
-    time_indexer = xr.DataArray(
-        window_indices,
-        dims=("batch", "time"),
-        coords={"batch": np.arange(batch_indices.size)},
-    )
-    gathered = source.isel(time=time_indexer)
+    unique_time_indices = np.unique(window_indices.reshape(-1))
+    time_vars = [name for name, var in source.data_vars.items() if "time" in var.dims]
+    static_vars = [name for name in source.data_vars if name not in time_vars]
 
-    if "datetime" in gathered.coords:
-        datetime_values = np.asarray(gathered.coords["datetime"].values)
+    # Some xarray/zarr backends reject vectorized fancy indexing over time.
+    # Gather only the unique singleton time slices we need, then rebuild the
+    # requested batch windows from a small in-memory dataset.
+    if time_vars:
+        gathered_time = xr.concat(
+            [source[time_vars].isel(time=slice(int(idx), int(idx) + 1)) for idx in unique_time_indices],
+            dim="time",
+        )
     else:
-        datetime_values = np.asarray(gathered.coords["time"].values)
-    gathered = gathered.assign_coords(
-        batch=np.arange(batch_indices.size),
-        time=("time", window_time),
-        datetime=(("batch", "time"), datetime_values),
-    )
+        gathered_time = xr.Dataset(coords={name: coord for name, coord in source.coords.items() if name != "time"})
+        gathered_time = gathered_time.assign_coords(time=source.coords["time"].isel(time=unique_time_indices))
+    compact_ds = gathered_time
+    for name in static_vars:
+        compact_ds[name] = source[name]
 
-    inputs, targets, forcings = data_utils.extract_inputs_targets_forcings(
-        gathered,
-        input_variables=task_cfg.input_variables,
-        target_variables=task_cfg.target_variables,
-        forcing_variables=task_cfg.forcing_variables,
-        pressure_levels=task_cfg.pressure_levels,
-        input_duration=task_cfg.input_duration,
-        target_lead_times=lead_times(target_steps, dt),
+    compact_final_indices = np.searchsorted(unique_time_indices, batch_indices)
+    compact_cache = NumpyBatchCache(compact_ds, task_cfg, label="vectorized-compact", log_build=False)
+    return compact_cache.build_batch_from_indices(
+        indices=compact_final_indices,
+        input_steps=input_steps,
+        target_steps=target_steps,
+        task_cfg=task_cfg,
+        dt=dt,
     )
-    inputs = _ensure_batch_dim_for_static_vars(inputs, batch_indices.size)
-    targets = _ensure_batch_dim_for_static_vars(targets, batch_indices.size)
-    forcings = _ensure_batch_dim_for_static_vars(forcings, batch_indices.size)
-    return inputs.load(), targets.load(), forcings.load()
 
 
 def _timedelta_coords(count: int, start_steps: int, dt: pd.Timedelta) -> np.ndarray:
@@ -230,7 +216,7 @@ class _CachedVar:
 class NumpyBatchCache:
     """Fast batch builder that gathers prepared GraphCast variables with numpy."""
 
-    def __init__(self, ds: xr.Dataset, task_cfg: gc.TaskConfig, *, label: str) -> None:
+    def __init__(self, ds: xr.Dataset, task_cfg: gc.TaskConfig, *, label: str, log_build: bool = True) -> None:
         t0 = time.time()
         self._label = label
         self._vars: dict[str, _CachedVar] = {}
@@ -273,10 +259,11 @@ class NumpyBatchCache:
                 coords["level"] = self._pressure_levels
             self._vars[name] = _CachedVar(data=data, dims=dims, coords=coords)
         total_gib = sum(var.data.nbytes for var in self._vars.values()) / (1024**3)
-        print(
-            f"[numpy-cache] built {label} cache with {len(self._vars)} vars, "
-            f"{total_gib:.2f} GiB in {time.time() - t0:.1f}s."
-        )
+        if log_build:
+            print(
+                f"[numpy-cache] built {label} cache with {len(self._vars)} vars, "
+                f"{total_gib:.2f} GiB in {time.time() - t0:.1f}s."
+            )
 
     @property
     def active(self) -> bool:

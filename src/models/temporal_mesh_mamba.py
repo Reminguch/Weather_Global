@@ -26,15 +26,23 @@ class TemporalMeshConfig:
     bias: bool = False
     conv_bias: bool = True
     dropout: float = 0.0
+    zero_init_output: bool = False
 
 
 class _SelectiveSSMBlock(hk.Module):
     """Small Mamba-style selective state space block over a time axis."""
 
-    def __init__(self, hidden_size: int, dropout: float, name: str | None = None):
+    def __init__(
+        self,
+        hidden_size: int,
+        dropout: float,
+        zero_init_output: bool = False,
+        name: str | None = None,
+    ):
         super().__init__(name=name)
         self._hidden_size = hidden_size
         self._dropout = dropout
+        self._zero_init_output = zero_init_output
 
     def __call__(self, x_btd: jax.Array, *, is_training: bool) -> jax.Array:
         input_dim = x_btd.shape[-1]
@@ -78,7 +86,12 @@ class _SelectiveSSMBlock(hk.Module):
             ),
         )
         y_btd = jnp.swapaxes(y_tbh, 0, 1)
-        y_btd = hk.Linear(input_dim, name="out_proj")(y_btd)
+        y_btd = hk.Linear(
+            input_dim,
+            w_init=hk.initializers.Constant(0.0) if self._zero_init_output else None,
+            b_init=hk.initializers.Constant(0.0) if self._zero_init_output else None,
+            name="out_proj",
+        )(y_btd)
         if is_training and self._dropout > 0.0:
             y_btd = hk.dropout(hk.next_rng_key(), self._dropout, y_btd)
         return residual + y_btd
@@ -125,6 +138,7 @@ class TemporalMeshBlock(hk.Module):
             x_bntd = _SelectiveSSMBlock(
                 hidden_size=self.cfg.hidden_size,
                 dropout=self.cfg.dropout,
+                zero_init_output=self.cfg.zero_init_output,
                 name=f"mamba_block_{layer_idx}",
             )(x_bntd, is_training=is_training)
 

@@ -27,6 +27,7 @@ class TemporalMeshConfig:
     hidden_size: int = 128
     layers: int = 1
     dropout: float = 0.0
+    zero_init_output: bool = False
 
 
 class _StatefulSSMBlock(hk.Module):
@@ -38,11 +39,19 @@ class _StatefulSSMBlock(hk.Module):
     (using the mean across batch elements for the stored state).
     """
 
-    def __init__(self, hidden_size: int, n_mesh: int, dropout: float, name: str | None = None):
+    def __init__(
+        self,
+        hidden_size: int,
+        n_mesh: int,
+        dropout: float,
+        zero_init_output: bool = False,
+        name: str | None = None,
+    ):
         super().__init__(name=name)
         self._hidden_size = hidden_size
         self._n_mesh = n_mesh
         self._dropout = dropout
+        self._zero_init_output = zero_init_output
 
     def __call__(self, x_btd: jax.Array, *, is_training: bool, batch_size: int) -> jax.Array:
         """x_btd: (batch*n_mesh, time, channels)."""
@@ -103,7 +112,12 @@ class _StatefulSSMBlock(hk.Module):
         hk.set_state("ssm_state", new_stored)
 
         y_btd = jnp.swapaxes(y_tbh, 0, 1)
-        y_btd = hk.Linear(input_dim, name="out_proj")(y_btd)
+        y_btd = hk.Linear(
+            input_dim,
+            w_init=hk.initializers.Constant(0.0) if self._zero_init_output else None,
+            b_init=hk.initializers.Constant(0.0) if self._zero_init_output else None,
+            name="out_proj",
+        )(y_btd)
         if is_training and self._dropout > 0.0:
             y_btd = hk.dropout(hk.next_rng_key(), self._dropout, y_btd)
         return residual + y_btd
@@ -159,6 +173,7 @@ class TemporalMeshBlock(hk.Module):
                 hidden_size=self.cfg.hidden_size,
                 n_mesh=n_mesh,
                 dropout=self.cfg.dropout,
+                zero_init_output=self.cfg.zero_init_output,
                 name=f"mamba_block_{layer_idx}",
             )(x_bntd, is_training=is_training, batch_size=batch_size)
 

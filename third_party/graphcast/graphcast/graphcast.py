@@ -265,6 +265,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_layers = 1
     self._temporal_dropout = 0.0
     self._temporal_stateful = False
+    self._temporal_zero_init_out = False
 
     self._spatial_features_kwargs = dict(
         add_node_positions=False,
@@ -816,6 +817,7 @@ class GraphCast(predictor_base.Predictor):
                 bias=self._temporal_bias,
                 conv_bias=self._temporal_conv_bias,
                 dropout=self._temporal_dropout,
+                zero_init_output=self._temporal_zero_init_out,
             ),
             name=temporal_block_name,
         )
@@ -879,6 +881,7 @@ class GraphCast(predictor_base.Predictor):
               bias=self._temporal_bias,
               conv_bias=self._temporal_conv_bias,
               dropout=self._temporal_dropout,
+              zero_init_output=self._temporal_zero_init_out,
           ),
           name="temporal_mesh_block",
       )

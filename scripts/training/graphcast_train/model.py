@@ -115,6 +115,7 @@ def build_predictor(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
+    zero_init_temporal_out: bool = False,
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
     if hasattr(predictor, "_temporal_backbone"):
@@ -130,6 +131,7 @@ def build_predictor(
         predictor._temporal_conv_bias = temporal_conv_bias
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
+        predictor._temporal_zero_init_out = zero_init_temporal_out
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
     predictor = normalization.InputsAndResiduals(
@@ -140,6 +142,54 @@ def build_predictor(
     )
     predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
     return predictor
+
+
+def build_loss_and_predictions_transform(
+    model_cfg: gc.ModelConfig,
+    task_cfg: gc.TaskConfig,
+    stats: dict[str, xr.Dataset],
+    *,
+    use_bf16: bool,
+    gradient_checkpointing: bool,
+    temporal_backbone: str,
+    temporal_location: str,
+    temporal_hidden_size: int,
+    temporal_d_inner: int | None,
+    temporal_d_state: int,
+    temporal_d_conv: int,
+    temporal_dt_rank: str,
+    temporal_bias: bool,
+    temporal_conv_bias: bool,
+    temporal_layers: int,
+    temporal_dropout: float,
+    temporal_stateful: bool = False,
+    zero_init_temporal_out: bool = False,
+) -> hk.TransformedWithState:
+    def forward_fn(inputs, targets, forcings, is_training):
+        del is_training
+        predictor = build_predictor(
+            model_cfg,
+            task_cfg,
+            stats,
+            use_bf16=use_bf16,
+            gradient_checkpointing=gradient_checkpointing,
+            temporal_backbone=temporal_backbone,
+            temporal_location=temporal_location,
+            temporal_hidden_size=temporal_hidden_size,
+            temporal_d_inner=temporal_d_inner,
+            temporal_d_state=temporal_d_state,
+            temporal_d_conv=temporal_d_conv,
+            temporal_dt_rank=temporal_dt_rank,
+            temporal_bias=temporal_bias,
+            temporal_conv_bias=temporal_conv_bias,
+            temporal_layers=temporal_layers,
+            temporal_dropout=temporal_dropout,
+            temporal_stateful=temporal_stateful,
+            zero_init_temporal_out=zero_init_temporal_out,
+        )
+        return predictor.loss_and_predictions(inputs, targets, forcings)
+
+    return hk.transform_with_state(forward_fn)
 
 
 def validate_stats_coverage(task_cfg: gc.TaskConfig, stats: dict[str, xr.Dataset]) -> None:
