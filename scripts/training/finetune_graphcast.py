@@ -906,7 +906,7 @@ def main() -> None:
             if usage.get("gpu_mem_gib") is not None:
                 mem_usage.append((step, float(usage["gpu_mem_gib"])))
 
-            if step % 10 == 0:
+            if step % 200 == 0:
                 if use_rollout_loss:
                     print(
                         f"step {step} total {total_loss_f:.6f} "

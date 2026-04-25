@@ -624,7 +624,7 @@ def main() -> None:
             if usage.get("gpu_mem_gib") is not None:
                 mem_usage.append((step, float(usage["gpu_mem_gib"])))
 
-            if step % 10 == 0:
+            if step % 200 == 0:
                 print(
                     f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
                     f"segment_epoch {chunk_epoch} reset_lanes {int(reset_mask_np.sum())} "

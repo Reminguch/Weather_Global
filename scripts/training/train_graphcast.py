@@ -604,7 +604,7 @@ def main() -> None:
             if usage.get("gpu_mem_gib") is not None:
                 mem_usage.append((step, float(usage["gpu_mem_gib"])))
 
-        if step % 10 == 0:
+        if step % 200 == 0:
             print(
                 f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
                 f"data_wait={data_wait:.3f}s host_build={host_build_time:.3f}s "
