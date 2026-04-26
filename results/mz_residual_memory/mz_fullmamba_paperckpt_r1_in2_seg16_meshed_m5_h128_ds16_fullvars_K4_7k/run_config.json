@@ -1,0 +1,171 @@
+{
+  "config": {
+    "data_path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr",
+    "baseline_ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "stats_dir": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/stats",
+    "out_dir": "/home/lm8598/Weather_Global_experiments/results/mz_residual_memory",
+    "run_name": "mz_fullmamba_paperckpt_r1_in2_seg16_meshed_m5_h128_ds16_fullvars_K4_7k",
+    "resolution": 1.0,
+    "mesh_size": 5,
+    "val_year": 2022,
+    "train_start_year": 2020,
+    "train_end_year": 2021,
+    "input_duration": "12h",
+    "segment_steps": 8,
+    "max_steps": 7000,
+    "eval_every": 200,
+    "eval_max_segments": 8,
+    "checkpoint_every": 500,
+    "hidden_size": 128,
+    "layers": 1,
+    "dropout": 0.0,
+    "a_log_init": -0.1,
+    "residual_loss_weight": 1.0,
+    "lr": 0.0001,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "warmup_steps": 200,
+    "normalize_loss": true,
+    "standardize_input": true,
+    "baseline_precision": "fp32",
+    "train_mode": "target_rollout",
+    "tf_prob_start": 1.0,
+    "tf_prob_end": 0.0,
+    "tf_prob_schedule_end": 7000,
+    "eval_autoregressive": true,
+    "residual_clip": 0.0,
+    "residual_shrinkage": 1.0,
+    "target_steps": 4,
+    "seed": 0,
+    "precision": "bf16",
+    "meshed": true,
+    "mz_mesh_size": 5,
+    "n_grid_neighbors": 6,
+    "n_mesh_neighbors": 3,
+    "full_mamba": true,
+    "d_state": 16,
+    "expand": 2,
+    "a_log_init_min": -3.0,
+    "a_log_init_max": -0.1,
+    "full_variables": true,
+    "resume_from": "/home/lm8598/Weather_Global_experiments/results/mz_residual_memory/mz_fullmamba_paperckpt_r1_in2_seg16_meshed_m5_h128_ds16_fullvars_K2_5k/mz_residual_step5000.pkl",
+    "resume_step": 5000
+  },
+  "resolved_variables": [
+    "2m_temperature",
+    "mean_sea_level_pressure",
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "total_precipitation_6hr",
+    "temperature",
+    "geopotential",
+    "u_component_of_wind",
+    "v_component_of_wind",
+    "vertical_velocity",
+    "specific_humidity"
+  ],
+  "feature_slices": {
+    "2m_temperature": [
+      0,
+      1
+    ],
+    "mean_sea_level_pressure": [
+      1,
+      2
+    ],
+    "10m_u_component_of_wind": [
+      2,
+      3
+    ],
+    "10m_v_component_of_wind": [
+      3,
+      4
+    ],
+    "total_precipitation_6hr": [
+      4,
+      5
+    ],
+    "temperature": [
+      5,
+      18
+    ],
+    "geopotential": [
+      18,
+      31
+    ],
+    "u_component_of_wind": [
+      31,
+      44
+    ],
+    "v_component_of_wind": [
+      44,
+      57
+    ],
+    "vertical_velocity": [
+      57,
+      70
+    ],
+    "specific_humidity": [
+      70,
+      83
+    ]
+  },
+  "task_config": {
+    "input_variables": [
+      "2m_temperature",
+      "mean_sea_level_pressure",
+      "10m_v_component_of_wind",
+      "10m_u_component_of_wind",
+      "total_precipitation_6hr",
+      "temperature",
+      "geopotential",
+      "u_component_of_wind",
+      "v_component_of_wind",
+      "vertical_velocity",
+      "specific_humidity",
+      "toa_incident_solar_radiation",
+      "year_progress_sin",
+      "year_progress_cos",
+      "day_progress_sin",
+      "day_progress_cos",
+      "geopotential_at_surface",
+      "land_sea_mask"
+    ],
+    "target_variables": [
+      "2m_temperature",
+      "mean_sea_level_pressure",
+      "10m_v_component_of_wind",
+      "10m_u_component_of_wind",
+      "total_precipitation_6hr",
+      "temperature",
+      "geopotential",
+      "u_component_of_wind",
+      "v_component_of_wind",
+      "vertical_velocity",
+      "specific_humidity"
+    ],
+    "forcing_variables": [
+      "toa_incident_solar_radiation",
+      "year_progress_sin",
+      "year_progress_cos",
+      "day_progress_sin",
+      "day_progress_cos"
+    ],
+    "pressure_levels": [
+      50,
+      100,
+      150,
+      200,
+      250,
+      300,
+      400,
+      500,
+      600,
+      700,
+      850,
+      925,
+      1000
+    ],
+    "input_duration": "12h"
+  }
+}

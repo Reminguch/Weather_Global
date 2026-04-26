@@ -122,3 +122,27 @@ def build_grid_mesh_projections(
         m2g_weights=m2g_w.astype(np.float32),
     )
     return arrays, int(M)
+
+
+def build_mesh_edges(mesh_size: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Return bidirectional edge sender/receiver indices for the icosphere mesh.
+
+    Edges are derived from the triangular faces of the icosphere at the given
+    refinement level via ``faces_to_edges`` (each undirected edge appears twice,
+    once in each direction, so message passing is symmetric).
+
+    Parameters
+    ----------
+    mesh_size : int
+        Icosphere refinement level. mesh_size=5 -> 10242 vertices, ~61440 edges.
+
+    Returns
+    -------
+    senders, receivers : np.ndarray (int32, shape [E])
+        Edge sender / receiver node indices in [0, M).
+    """
+    from third_party.graphcast.graphcast import icosahedral_mesh as ico
+    meshes = ico.get_hierarchy_of_triangular_meshes_for_sphere(splits=mesh_size)
+    final_faces = meshes[-1].faces  # [num_faces, 3]
+    senders, receivers = ico.faces_to_edges(final_faces)
+    return senders.astype(np.int32), receivers.astype(np.int32)

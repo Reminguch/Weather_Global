@@ -16,6 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from .full_mamba_block import FullMambaBlock
+from ..processor import MeshProcessor, MeshProcessorConfig
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,13 @@ class MZResidualFullMambaConfig:
     a_log_init_max: float = -0.1
     use_mesh_pre_mlp: bool = True
     use_mesh_post_mlp: bool = True
+    # Optional spatial GNN processor between encoder and SSM. n_layers=0 -> off
+    # (default, identical to pre-processor model). n_layers>=1 inserts a stack
+    # of bidirectional MeshGraphNet blocks operating on icosphere edges, so
+    # mesh nodes can exchange information with their geometric neighbours
+    # before the temporal SSM kicks in.
+    processor_layers: int = 0
+    processor_hidden_size: int | None = None  # None -> hidden_size
 
 
 # ---- geometric aggregation (unchanged from mz_meshed) -----------------------
@@ -63,6 +71,8 @@ class MZResidualFullMambaMeshed(hk.Module):
         m2g_indices: np.ndarray | jax.Array,
         m2g_weights: np.ndarray | jax.Array,
         n_mesh_nodes: int,
+        mesh_senders: np.ndarray | None = None,
+        mesh_receivers: np.ndarray | None = None,
         name: str | None = None,
     ):
         super().__init__(name=name)
@@ -80,6 +90,33 @@ class MZResidualFullMambaMeshed(hk.Module):
         self._mesh_post = (
             hk.Linear(cfg.hidden_size, name="mesh_post") if cfg.use_mesh_post_mlp else None
         )
+
+        # Optional spatial GNN processor on the icosphere mesh.
+        if cfg.processor_layers > 0:
+            if mesh_senders is None or mesh_receivers is None:
+                raise ValueError(
+                    "processor_layers > 0 requires mesh_senders and mesh_receivers "
+                    "(call build_mesh_edges in mesh_ops to obtain them)."
+                )
+            proc_cfg = MeshProcessorConfig(
+                hidden_size=cfg.processor_hidden_size or cfg.hidden_size,
+                n_layers=cfg.processor_layers,
+            )
+            if proc_cfg.hidden_size != cfg.hidden_size:
+                raise ValueError(
+                    "processor_hidden_size must equal hidden_size for now "
+                    "(no projection layer between encoder and processor)."
+                )
+            self._processor = MeshProcessor(
+                proc_cfg,
+                senders=mesh_senders,
+                receivers=mesh_receivers,
+                n_mesh_nodes=self._n_mesh,
+                name="mesh_processor",
+            )
+        else:
+            self._processor = None
+
         self._ssm_blocks = [
             FullMambaBlock(
                 hidden_size=cfg.hidden_size,
@@ -127,6 +164,9 @@ class MZResidualFullMambaMeshed(hk.Module):
         H = self.cfg.hidden_size
         x = seq_tblnf.reshape(T * B, P_grid, Fin)
         x_mesh = self._encode_to_mesh(x)                      # [T*B, M, H]
+        if self._processor is not None:
+            # Spatial message passing per (T*B) snapshot, no time mixing.
+            x_mesh = self._processor(x_mesh)
         x_mesh = x_mesh.reshape(T, B, self._n_mesh, H)
         x_mesh = jnp.transpose(x_mesh, (1, 2, 0, 3))          # [B, M, T, H]
         x_mesh = x_mesh.reshape(B * self._n_mesh, T, H)
@@ -218,6 +258,8 @@ class MZResidualFullMambaMeshed(hk.Module):
 
             x_t = jnp.concatenate([cs_t, r_prev], axis=-1)         # [B, P, 2F]
             h_mesh = self._encode_to_mesh(x_t)                      # [B, M, H]
+            if self._processor is not None:
+                h_mesh = self._processor(h_mesh)
             h_mesh = h_mesh.reshape(B * M, H)
 
             new_h_states: list[jax.Array] = []

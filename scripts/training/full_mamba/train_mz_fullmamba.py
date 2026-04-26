@@ -170,9 +170,15 @@ class RunConfig:
                                #         (adds 2m_T, T, humidity, precip, vertical
                                #          velocity, 10m winds on top of MSLP/Z/U/V).
                                # False = default 4-variable set (historical MZ).
+    # --- spatial GNN processor (optional) -----------------------------------
+    processor_layers: int      # 0 = off; >=1 inserts MeshGraphNet block(s)
+                               # between mesh encoder and SSM. Adds ~199K params
+                               # at hidden_size=128 with mesh_size=5.
     # --- resume from existing checkpoint ------------------------------------
     resume_from: str | None    # path to an mz_residual_stepN.pkl to resume from
     resume_step: int           # step that checkpoint corresponds to
+    allow_partial_resume: bool # tolerate ckpt being a subset of current model
+                               # (e.g. when adding a fresh processor sub-tree).
 
 
 def parse_args() -> RunConfig:
@@ -282,6 +288,19 @@ def parse_args() -> RunConfig:
                         help="Upper bound of uniform init for A_log (FullMamba only). "
                              "-0.1 -> shortest memory half-life ~1 step. Uniform "
                              "between these gives natural multi-scale init.")
+    parser.add_argument("--processor-layers", type=int, default=0,
+                        help="Spatial GNN processor layers between mesh encoder and SSM "
+                             "(meshed + full_mamba only). 0 disables the processor "
+                             "(default, identical to pre-processor model). "
+                             "1-2 layers add a ~250-500 km receptive field on the "
+                             "icosphere mesh so synoptic-scale variables (MSLP, Z) "
+                             "can use spatial context before the temporal SSM.")
+    parser.add_argument("--allow-partial-resume", action="store_true", default=False,
+                        help="On --resume-from, allow the loaded ckpt to be a strict "
+                             "subset of the current model's parameter tree (extra "
+                             "leaves like a freshly-added processor get fresh init). "
+                             "Use when porting a no-processor ckpt into a "
+                             "processor-augmented model.")
     parser.add_argument("--full-variables", action="store_true", default=False,
                         help="Use the full 11-variable GraphCast target set (F=83) "
                              "instead of the 4-variable MSLP/Z/U/V minimal set "
@@ -394,8 +413,10 @@ def parse_args() -> RunConfig:
         a_log_init_min=args.a_log_init_min,
         a_log_init_max=args.a_log_init_max,
         full_variables=args.full_variables,
+        processor_layers=args.processor_layers,
         resume_from=args.resume_from,
         resume_step=args.resume_step,
+        allow_partial_resume=args.allow_partial_resume,
     )
 
 
@@ -613,13 +634,20 @@ def _compute_group_metrics(
     slices: dict[str, slice],
     prefix: str,
     diffs_std_f: np.ndarray | None = None,
+    lat_weights_f: np.ndarray | None = None,
 ) -> dict[str, float]:
-    """Per-variable RMSE/MAE plus a raw-averaged ``overall_MAE``.
+    """Per-variable RMSE/MAE plus an overall scalar; both uniform and
+    cos(lat) area-weighted versions.
 
     If ``diffs_std_f`` is provided (1-D array of length feature_dim matching
     the slice layout), also record a paper-style weighted overall metric
     that normalises each variable's MAE by its diffs_stddev and applies the
     GraphCast per-variable weights (MSLP / 10m wind / precip = 0.1, else 1.0).
+
+    If ``lat_weights_f`` is provided (1-D array of length n_lat, normalised
+    to mean=1), additionally emit ``*_latw`` variants of every per-variable
+    and overall metric. These are the paper-comparable numbers (GraphCast,
+    Pangu, FuXi, WeatherBench2 all report cos(lat)-weighted RMSE/MAE).
     """
     results: dict[str, float] = {}
     total_sq = 0.0
@@ -628,28 +656,71 @@ def _compute_group_metrics(
     diff = pred_tblnf - truth_tblnf
     weighted_num = 0.0          # Σ w_var · MAE_var / mean(diffs_std over var levels)
     weighted_den = 0.0          # Σ w_var
+
+    # Lat-weighted accumulators. lat_weights are normalised to mean=1, so the
+    # lat-weighted sum has the same effective count as the uniform sum and we
+    # can divide by `n` (or `total_n`) to get the area-weighted mean.
+    has_latw = lat_weights_f is not None
+    if has_latw:
+        # diff has shape (..., lat, lon, F). Broadcast lat weights across the
+        # other dims.
+        if diff.ndim < 3:
+            raise ValueError(
+                f"_compute_group_metrics expects diff with ndim>=3 (..., lat, lon, F), "
+                f"got {diff.shape}"
+            )
+        lat_w_b = lat_weights_f.reshape((1,) * (diff.ndim - 3) + (-1, 1, 1))
+        weighted_num_latw = 0.0
+        weighted_den_latw = 0.0
+        total_sq_latw = 0.0
+        total_abs_latw = 0.0
+
     for name, sl in slices.items():
         var_diff = diff[..., sl]
         n = int(var_diff.size)
-        rmse = float(np.sqrt(np.mean(np.square(var_diff))))
-        mae = float(np.mean(np.abs(var_diff)))
+        sq = np.square(var_diff)
+        ab = np.abs(var_diff)
+        rmse = float(np.sqrt(np.mean(sq)))
+        mae = float(np.mean(ab))
         results[f"{prefix}_{name}_RMSE"] = rmse
         results[f"{prefix}_{name}_MAE"] = mae
-        total_sq += float(np.sum(np.square(var_diff)))
-        total_abs += float(np.sum(np.abs(var_diff)))
+        total_sq += float(np.sum(sq))
+        total_abs += float(np.sum(ab))
         total_n += n
+
+        if has_latw:
+            sq_w = sq * lat_w_b
+            ab_w = ab * lat_w_b
+            rmse_latw = float(np.sqrt(np.mean(sq_w)))
+            mae_latw = float(np.mean(ab_w))
+            results[f"{prefix}_{name}_RMSE_latw"] = rmse_latw
+            results[f"{prefix}_{name}_MAE_latw"] = mae_latw
+            total_sq_latw += float(np.sum(sq_w))
+            total_abs_latw += float(np.sum(ab_w))
+
         if diffs_std_f is not None:
             w_var = _PER_VARIABLE_LOSS_WEIGHTS.get(name, 1.0)
-            # Level-averaged diffs_stddev for this variable.
             var_std_slice = diffs_std_f[sl]
             var_std_mean = float(np.mean(var_std_slice)) if var_std_slice.size else 1.0
             if var_std_mean > 0:
                 weighted_num += w_var * (mae / var_std_mean)
                 weighted_den += w_var
+                if has_latw:
+                    weighted_num_latw += w_var * (mae_latw / var_std_mean)
+                    weighted_den_latw += w_var
+
     results[f"{prefix}_overall_RMSE"] = float(np.sqrt(total_sq / total_n))
     results[f"{prefix}_overall_MAE"] = float(total_abs / total_n)
     if diffs_std_f is not None and weighted_den > 0:
         results[f"{prefix}_weighted_overall_MAE_norm"] = weighted_num / weighted_den
+
+    if has_latw:
+        results[f"{prefix}_overall_RMSE_latw"] = float(np.sqrt(total_sq_latw / total_n))
+        results[f"{prefix}_overall_MAE_latw"] = float(total_abs_latw / total_n)
+        if diffs_std_f is not None and weighted_den_latw > 0:
+            results[f"{prefix}_weighted_overall_MAE_norm_latw"] = (
+                weighted_num_latw / weighted_den_latw
+            )
     return results
 
 
@@ -895,8 +966,11 @@ def main() -> None:
 
     dt = base_train.infer_time_step(train_ds)
     input_steps = base_train.input_steps_from_duration(task_cfg.input_duration, dt)
-    train_indices_raw = base_train.valid_final_input_indices(train_ds.sizes["time"], input_steps, 1)
-    eval_indices_raw = base_train.valid_final_input_indices(eval_ds.sizes["time"], input_steps, 1)
+    # Bound the valid pool by the actual K used at sample time, not 1 — otherwise
+    # K>=2 segments can land on an index whose i+input+K window runs off the array.
+    K_pool = max(1, int(cfg.target_steps))
+    train_indices_raw = base_train.valid_final_input_indices(train_ds.sizes["time"], input_steps, K_pool)
+    eval_indices_raw = base_train.valid_final_input_indices(eval_ds.sizes["time"], input_steps, K_pool)
     # The training set concatenates non-adjacent years (e.g. 2020 and 2022
     # with 2021 held out for validation). The resulting time axis has a
     # ~1-year jump at the boundary, but array indices remain consecutive.
@@ -905,10 +979,10 @@ def main() -> None:
     # precip) to the frozen baseline, which then produces Inf/NaN. Filter
     # those samples out based on actual time-stamp deltas.
     train_indices = _filter_time_continuous_indices(
-        train_ds, train_indices_raw, input_steps=input_steps, target_steps=1, dt=dt
+        train_ds, train_indices_raw, input_steps=input_steps, target_steps=K_pool, dt=dt
     )
     eval_indices = _filter_time_continuous_indices(
-        eval_ds, eval_indices_raw, input_steps=input_steps, target_steps=1, dt=dt
+        eval_ds, eval_indices_raw, input_steps=input_steps, target_steps=K_pool, dt=dt
     )
     train_dropped = len(train_indices_raw) - len(train_indices)
     eval_dropped = len(eval_indices_raw) - len(eval_indices)
@@ -1049,6 +1123,19 @@ def main() -> None:
             f"n_grid_pts={len(lat_deg) * len(lon_deg)}  "
             f"KNN g2m={cfg.n_grid_neighbors} m2g={cfg.n_mesh_neighbors}"
         )
+        # Optional spatial GNN processor edges (icosphere triangulation).
+        if cfg.processor_layers > 0:
+            from src.models.mz.meshed_mamba.mesh_ops import build_mesh_edges
+            mesh_senders, mesh_receivers = build_mesh_edges(mesh_size=cfg.mz_mesh_size)
+            print(
+                f"[processor] layers={cfg.processor_layers}  "
+                f"n_edges={len(mesh_senders)} (bidirectional, mean degree="
+                f"{len(mesh_senders)/n_mesh_nodes:.2f})"
+            )
+        else:
+            mesh_senders = None
+            mesh_receivers = None
+
         if cfg.full_mamba:
             mz_cfg_full = MZResidualFullMambaConfig(
                 input_size=feature_dim * 2,
@@ -1060,18 +1147,21 @@ def main() -> None:
                 dropout=cfg.dropout,
                 a_log_init_min=cfg.a_log_init_min,
                 a_log_init_max=cfg.a_log_init_max,
+                processor_layers=cfg.processor_layers,
             )
             print(
                 f"[full_mamba] d_state={cfg.d_state} expand={cfg.expand} "
                 f"D_inner={cfg.hidden_size * cfg.expand} "
                 f"a_log_init=U[{cfg.a_log_init_min}, {cfg.a_log_init_max}] "
-                f"layers={cfg.layers}"
+                f"layers={cfg.layers} processor_layers={cfg.processor_layers}"
             )
 
             def _build_mz_model():
                 return MZResidualFullMambaMeshed(
                     mz_cfg_full,
                     n_mesh_nodes=n_mesh_nodes,
+                    mesh_senders=mesh_senders,
+                    mesh_receivers=mesh_receivers,
                     **proj_arrays,
                 )
 
@@ -1253,25 +1343,77 @@ def main() -> None:
             raise FileNotFoundError(f"--resume-from path not found: {ckpt_path}")
         with ckpt_path.open("rb") as f:
             loaded_params = pickle.load(f)
-        # Shape-check by recursing leaf pairs; haiku trees are dicts of dicts.
-        loaded_leaves = jax.tree_util.tree_leaves(loaded_params)
-        init_leaves = jax.tree_util.tree_leaves(mem_params)
-        if len(loaded_leaves) != len(init_leaves):
-            raise ValueError(
-                f"resume mismatch: checkpoint has {len(loaded_leaves)} param leaves, "
-                f"current model has {len(init_leaves)}. Are configs aligned?"
+        if cfg.allow_partial_resume:
+            # Partial-resume mode: ckpt is a strict subset of the current model's
+            # param tree. Walk the init tree and copy any matching path; leave
+            # everything else (e.g. a freshly-added processor sub-tree) at its
+            # fresh init. Used when porting a no-processor ckpt into a
+            # processor-augmented model.
+            from typing import Any
+            init_flat = hk.data_structures.to_mutable_dict(mem_params)
+            loaded_flat = hk.data_structures.to_mutable_dict(loaded_params)
+            n_copied = 0
+            n_init_only = 0
+            n_ckpt_only = 0
+            init_keys = set(init_flat.keys())
+            ckpt_keys = set(loaded_flat.keys())
+            for module_key in init_keys & ckpt_keys:
+                ckpt_mod = loaded_flat[module_key]
+                init_mod = init_flat[module_key]
+                for param_key in init_mod.keys():
+                    if param_key in ckpt_mod:
+                        if ckpt_mod[param_key].shape != init_mod[param_key].shape:
+                            raise ValueError(
+                                f"shape mismatch at {module_key}/{param_key}: "
+                                f"ckpt {ckpt_mod[param_key].shape} != "
+                                f"init {init_mod[param_key].shape}"
+                            )
+                        init_flat[module_key][param_key] = ckpt_mod[param_key]
+                        n_copied += 1
+                    else:
+                        n_init_only += 1
+                for param_key in ckpt_mod.keys():
+                    if param_key not in init_mod:
+                        n_ckpt_only += 1
+            for k in init_keys - ckpt_keys:
+                n_init_only += len(init_flat[k])
+            for k in ckpt_keys - init_keys:
+                n_ckpt_only += len(loaded_flat[k])
+            mem_params = hk.data_structures.to_immutable_dict(init_flat)
+            print(
+                f"[resume:partial] copied {n_copied} param tensors from {ckpt_path}; "
+                f"{n_init_only} new tensors keep fresh init (e.g. processor); "
+                f"{n_ckpt_only} ckpt tensors had no destination (dropped). "
+                f"Training continues at step {cfg.resume_step + 1} -> {cfg.max_steps}"
             )
-        for i, (lp, ip) in enumerate(zip(loaded_leaves, init_leaves)):
-            if lp.shape != ip.shape:
-                raise ValueError(
-                    f"resume mismatch at leaf {i}: ckpt shape {lp.shape} != "
-                    f"init shape {ip.shape}"
+            if n_ckpt_only > 0:
+                print(
+                    f"[resume:partial] WARNING: {n_ckpt_only} ckpt tensors had no "
+                    f"destination — likely architecture mismatch beyond just adding "
+                    f"a processor. Investigate before trusting this run."
                 )
-        mem_params = loaded_params
-        print(
-            f"[resume] loaded {len(loaded_leaves)} param leaves from {ckpt_path}; "
-            f"training continues at step {cfg.resume_step + 1} -> {cfg.max_steps}"
-        )
+        else:
+            # Strict resume: the ckpt's param tree must match the current model's.
+            loaded_leaves = jax.tree_util.tree_leaves(loaded_params)
+            init_leaves = jax.tree_util.tree_leaves(mem_params)
+            if len(loaded_leaves) != len(init_leaves):
+                raise ValueError(
+                    f"resume mismatch: checkpoint has {len(loaded_leaves)} param leaves, "
+                    f"current model has {len(init_leaves)}. Are configs aligned? "
+                    f"(Use --allow-partial-resume if you intentionally added new "
+                    f"layers like a processor.)"
+                )
+            for i, (lp, ip) in enumerate(zip(loaded_leaves, init_leaves)):
+                if lp.shape != ip.shape:
+                    raise ValueError(
+                        f"resume mismatch at leaf {i}: ckpt shape {lp.shape} != "
+                        f"init shape {ip.shape}"
+                    )
+            mem_params = loaded_params
+            print(
+                f"[resume] loaded {len(loaded_leaves)} param leaves from {ckpt_path}; "
+                f"training continues at step {cfg.resume_step + 1} -> {cfg.max_steps}"
+            )
 
     if cfg.warmup_steps > 0:
         lr_schedule = optax.linear_schedule(
@@ -1475,7 +1617,8 @@ def main() -> None:
             corr_tf_metrics_accum.append(
                 _compute_group_metrics(tf_corrected, np.asarray(truth_next, dtype=np.float32),
                                        feature_slices, "corrected",
-                                       diffs_std_f=diffs_std_f_np)
+                                       diffs_std_f=diffs_std_f_np,
+                                       lat_weights_f=lat_weights_np)
             )
 
             # Closed-loop autoregressive eval (honest; prev_residual = model's own r_hat).
@@ -1488,14 +1631,16 @@ def main() -> None:
                 corr_ar_metrics_accum.append(
                     _compute_group_metrics(ar_corrected, np.asarray(truth_next, dtype=np.float32),
                                            feature_slices, "corrected_ar",
-                                           diffs_std_f=diffs_std_f_np)
+                                           diffs_std_f=diffs_std_f_np,
+                                           lat_weights_f=lat_weights_np)
                 )
 
             baseline_metrics_accum.append(
                 _compute_group_metrics(np.asarray(baseline_next, dtype=np.float32),
                                        np.asarray(truth_next, dtype=np.float32),
                                        feature_slices, "baseline",
-                                       diffs_std_f=diffs_std_f_np)
+                                       diffs_std_f=diffs_std_f_np,
+                                       lat_weights_f=lat_weights_np)
             )
             if seg_i == 1 or seg_i % 4 == 0 or seg_i == len(chosen_segments):
                 msg = (f"[mz-eval@step{step}] segment {seg_i}/{len(chosen_segments)} "

@@ -1,0 +1,840 @@
+{
+  "run_dir": "/home/lm8598/Weather_Global_experiments/results/mz_residual_memory/mz_fullmamba_paperckpt_r1_in2_seg16_meshed_m5_h128_ds16_fullvars_K2_5k",
+  "step": 5000,
+  "num_segments": 64,
+  "n_channels_total": 83,
+  "n_channels_better": 82,
+  "n_channels_worse": 1,
+  "per_channel": [
+    {
+      "variable": "2m_temperature",
+      "level": null,
+      "channel_idx": 0,
+      "baseline_MAE": 0.004873222322804035,
+      "corrected_MAE": 0.004865318910634769,
+      "baseline_RMSE": 0.07021586355922041,
+      "corrected_RMSE": 0.07013029326733673,
+      "delta_MAE_pct": 0.1621804146361665
+    },
+    {
+      "variable": "mean_sea_level_pressure",
+      "level": null,
+      "channel_idx": 1,
+      "baseline_MAE": 0.3792689162063771,
+      "corrected_MAE": 0.3787123813220192,
+      "baseline_RMSE": 5.055782357510151,
+      "corrected_RMSE": 5.038869962271587,
+      "delta_MAE_pct": 0.1467388601008057
+    },
+    {
+      "variable": "10m_u_component_of_wind",
+      "level": null,
+      "channel_idx": 2,
+      "baseline_MAE": 0.0055094085386168,
+      "corrected_MAE": 0.0054971134522352905,
+      "baseline_RMSE": 0.07082934374547192,
+      "corrected_RMSE": 0.07069401961862021,
+      "delta_MAE_pct": 0.2231652689273293
+    },
+    {
+      "variable": "10m_v_component_of_wind",
+      "level": null,
+      "channel_idx": 3,
+      "baseline_MAE": 0.005605407207898988,
+      "corrected_MAE": 0.00559860460054999,
+      "baseline_RMSE": 0.07188011321443435,
+      "corrected_RMSE": 0.07178520074913262,
+      "delta_MAE_pct": 0.12135795129052587
+    },
+    {
+      "variable": "total_precipitation_6hr",
+      "level": null,
+      "channel_idx": 4,
+      "baseline_MAE": 3.2031944849080485e-06,
+      "corrected_MAE": 2.880506545078881e-06,
+      "baseline_RMSE": 9.528938940746552e-05,
+      "corrected_RMSE": 9.488545311100049e-05,
+      "delta_MAE_pct": 10.073941540219366
+    },
+    {
+      "variable": "temperature",
+      "level": 50,
+      "channel_idx": 5,
+      "baseline_MAE": 0.006260172537327169,
+      "corrected_MAE": 0.006245561276528767,
+      "baseline_RMSE": 0.07855327810152056,
+      "corrected_RMSE": 0.0783796862931424,
+      "delta_MAE_pct": 0.23340028906999866
+    },
+    {
+      "variable": "temperature",
+      "level": 100,
+      "channel_idx": 6,
+      "baseline_MAE": 0.004649878965606325,
+      "corrected_MAE": 0.004646109799699633,
+      "baseline_RMSE": 0.05867732962478955,
+      "corrected_RMSE": 0.05863248141769396,
+      "delta_MAE_pct": 0.08105944121494715
+    },
+    {
+      "variable": "temperature",
+      "level": 150,
+      "channel_idx": 7,
+      "baseline_MAE": 0.003796268683681694,
+      "corrected_MAE": 0.0037865118873301245,
+      "baseline_RMSE": 0.04743606233981585,
+      "corrected_RMSE": 0.0473319726198212,
+      "delta_MAE_pct": 0.2570101635194873
+    },
+    {
+      "variable": "temperature",
+      "level": 200,
+      "channel_idx": 8,
+      "baseline_MAE": 0.003908435194877475,
+      "corrected_MAE": 0.0038825089089289796,
+      "baseline_RMSE": 0.049372671837760625,
+      "corrected_RMSE": 0.04913743986630955,
+      "delta_MAE_pct": 0.6633418402964832
+    },
+    {
+      "variable": "temperature",
+      "level": 250,
+      "channel_idx": 9,
+      "baseline_MAE": 0.003726963116371159,
+      "corrected_MAE": 0.003707281002905282,
+      "baseline_RMSE": 0.04651069519370716,
+      "corrected_RMSE": 0.046310694759202235,
+      "delta_MAE_pct": 0.5281005701242584
+    },
+    {
+      "variable": "temperature",
+      "level": 300,
+      "channel_idx": 10,
+      "baseline_MAE": 0.0033503462178576617,
+      "corrected_MAE": 0.0033406905452492376,
+      "baseline_RMSE": 0.04145718570939979,
+      "corrected_RMSE": 0.04131959579963359,
+      "delta_MAE_pct": 0.2881992480943764
+    },
+    {
+      "variable": "temperature",
+      "level": 400,
+      "channel_idx": 11,
+      "baseline_MAE": 0.0032554425244338166,
+      "corrected_MAE": 0.0032325503739860165,
+      "baseline_RMSE": 0.03975657434448171,
+      "corrected_RMSE": 0.03945604160947351,
+      "delta_MAE_pct": 0.7031962713512039
+    },
+    {
+      "variable": "temperature",
+      "level": 500,
+      "channel_idx": 12,
+      "baseline_MAE": 0.003194516053213487,
+      "corrected_MAE": 0.003163468733611645,
+      "baseline_RMSE": 0.03908224046987887,
+      "corrected_RMSE": 0.03868818162343814,
+      "delta_MAE_pct": 0.9718943052613697
+    },
+    {
+      "variable": "temperature",
+      "level": 600,
+      "channel_idx": 13,
+      "baseline_MAE": 0.003305401422905379,
+      "corrected_MAE": 0.0032709564899882824,
+      "baseline_RMSE": 0.04155173853416544,
+      "corrected_RMSE": 0.04117304009455549,
+      "delta_MAE_pct": 1.0420801745411088
+    },
+    {
+      "variable": "temperature",
+      "level": 700,
+      "channel_idx": 14,
+      "baseline_MAE": 0.003577778205317746,
+      "corrected_MAE": 0.0035611550611003235,
+      "baseline_RMSE": 0.04605190921237964,
+      "corrected_RMSE": 0.04584708548224339,
+      "delta_MAE_pct": 0.46462198782236436
+    },
+    {
+      "variable": "temperature",
+      "level": 850,
+      "channel_idx": 15,
+      "baseline_MAE": 0.004496466708539311,
+      "corrected_MAE": 0.0044585050099739286,
+      "baseline_RMSE": 0.05758702575938464,
+      "corrected_RMSE": 0.057165570788189055,
+      "delta_MAE_pct": 0.8442561910508203
+    },
+    {
+      "variable": "temperature",
+      "level": 925,
+      "channel_idx": 16,
+      "baseline_MAE": 0.004448090471978701,
+      "corrected_MAE": 0.004408634194847631,
+      "baseline_RMSE": 0.0586729755335391,
+      "corrected_RMSE": 0.058313927429864514,
+      "delta_MAE_pct": 0.8870385478809337
+    },
+    {
+      "variable": "temperature",
+      "level": 1000,
+      "channel_idx": 17,
+      "baseline_MAE": 0.004446902780076409,
+      "corrected_MAE": 0.004414138946863868,
+      "baseline_RMSE": 0.05992329044910436,
+      "corrected_RMSE": 0.0596235006398786,
+      "delta_MAE_pct": 0.736778716173722
+    },
+    {
+      "variable": "geopotential",
+      "level": 50,
+      "channel_idx": 18,
+      "baseline_MAE": 0.5807236513965623,
+      "corrected_MAE": 0.5787617399559102,
+      "baseline_RMSE": 7.144750291211324,
+      "corrected_RMSE": 7.110985935551776,
+      "delta_MAE_pct": 0.337839079902124
+    },
+    {
+      "variable": "geopotential",
+      "level": 100,
+      "channel_idx": 19,
+      "baseline_MAE": 0.3996041132474188,
+      "corrected_MAE": 0.3963329979534852,
+      "baseline_RMSE": 4.753204868044185,
+      "corrected_RMSE": 4.720794843233858,
+      "delta_MAE_pct": 0.8185889948305531
+    },
+    {
+      "variable": "geopotential",
+      "level": 150,
+      "channel_idx": 20,
+      "baseline_MAE": 0.3667668772321098,
+      "corrected_MAE": 0.3667758200446815,
+      "baseline_RMSE": 4.371891742168131,
+      "corrected_RMSE": 4.357278307851445,
+      "delta_MAE_pct": -0.0024382824968212416
+    },
+    {
+      "variable": "geopotential",
+      "level": 200,
+      "channel_idx": 21,
+      "baseline_MAE": 0.36504159442500667,
+      "corrected_MAE": 0.3640087051705903,
+      "baseline_RMSE": 4.373360211858178,
+      "corrected_RMSE": 4.34605327029798,
+      "delta_MAE_pct": 0.2829511130213279
+    },
+    {
+      "variable": "geopotential",
+      "level": 250,
+      "channel_idx": 22,
+      "baseline_MAE": 0.357152923604524,
+      "corrected_MAE": 0.35686897422794306,
+      "baseline_RMSE": 4.3270542437050645,
+      "corrected_RMSE": 4.29948365366213,
+      "delta_MAE_pct": 0.0795035845472614
+    },
+    {
+      "variable": "geopotential",
+      "level": 300,
+      "channel_idx": 23,
+      "baseline_MAE": 0.3503164635406266,
+      "corrected_MAE": 0.34937823744043855,
+      "baseline_RMSE": 4.280010201397429,
+      "corrected_RMSE": 4.248478783723451,
+      "delta_MAE_pct": 0.2678224399462914
+    },
+    {
+      "variable": "geopotential",
+      "level": 400,
+      "channel_idx": 24,
+      "baseline_MAE": 0.3181000229624761,
+      "corrected_MAE": 0.3172014893280535,
+      "baseline_RMSE": 3.9026275264869357,
+      "corrected_RMSE": 3.8794594825120163,
+      "delta_MAE_pct": 0.28246889957898497
+    },
+    {
+      "variable": "geopotential",
+      "level": 500,
+      "channel_idx": 25,
+      "baseline_MAE": 0.28856126588247555,
+      "corrected_MAE": 0.28691444855446185,
+      "baseline_RMSE": 3.5431586671238797,
+      "corrected_RMSE": 3.514430527729617,
+      "delta_MAE_pct": 0.5706993705400523
+    },
+    {
+      "variable": "geopotential",
+      "level": 600,
+      "channel_idx": 26,
+      "baseline_MAE": 0.26926097901331386,
+      "corrected_MAE": 0.2665311915248471,
+      "baseline_RMSE": 3.3032028403349623,
+      "corrected_RMSE": 3.264119314263708,
+      "delta_MAE_pct": 1.013807310093667
+    },
+    {
+      "variable": "geopotential",
+      "level": 700,
+      "channel_idx": 27,
+      "baseline_MAE": 0.26005382278134176,
+      "corrected_MAE": 0.259047606676129,
+      "baseline_RMSE": 3.196433387722375,
+      "corrected_RMSE": 3.1793010676495794,
+      "delta_MAE_pct": 0.38692609647148984
+    },
+    {
+      "variable": "geopotential",
+      "level": 850,
+      "channel_idx": 28,
+      "baseline_MAE": 0.2642126350995603,
+      "corrected_MAE": 0.2623695002298559,
+      "baseline_RMSE": 3.288807500460556,
+      "corrected_RMSE": 3.2669178418006593,
+      "delta_MAE_pct": 0.6975952792756714
+    },
+    {
+      "variable": "geopotential",
+      "level": 925,
+      "channel_idx": 29,
+      "baseline_MAE": 0.2744788232262614,
+      "corrected_MAE": 0.2721372270417998,
+      "baseline_RMSE": 3.4591786522496144,
+      "corrected_RMSE": 3.427062061636941,
+      "delta_MAE_pct": 0.8531063187090788
+    },
+    {
+      "variable": "geopotential",
+      "level": 1000,
+      "channel_idx": 30,
+      "baseline_MAE": 0.2894516959845598,
+      "corrected_MAE": 0.28814719412294665,
+      "baseline_RMSE": 3.6997657059255746,
+      "corrected_RMSE": 3.6777458312670817,
+      "delta_MAE_pct": 0.45068033102238714
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 50,
+      "channel_idx": 31,
+      "baseline_MAE": 0.011956671421691167,
+      "corrected_MAE": 0.011933068899659845,
+      "baseline_RMSE": 0.14539235914963294,
+      "corrected_RMSE": 0.14510120142165012,
+      "delta_MAE_pct": 0.19740044029731826
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 100,
+      "channel_idx": 32,
+      "baseline_MAE": 0.01108825991010832,
+      "corrected_MAE": 0.011078376947484054,
+      "baseline_RMSE": 0.13774585942950926,
+      "corrected_RMSE": 0.13764633823158323,
+      "delta_MAE_pct": 0.08912996903379282
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 150,
+      "channel_idx": 33,
+      "baseline_MAE": 0.011982096089634494,
+      "corrected_MAE": 0.011973235909510509,
+      "baseline_RMSE": 0.15176279687399716,
+      "corrected_RMSE": 0.15163551288413415,
+      "delta_MAE_pct": 0.0739451599929113
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 200,
+      "channel_idx": 34,
+      "baseline_MAE": 0.012731832554648121,
+      "corrected_MAE": 0.012716711381000377,
+      "baseline_RMSE": 0.1603461769100299,
+      "corrected_RMSE": 0.1601416856536225,
+      "delta_MAE_pct": 0.11876667072740617
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 250,
+      "channel_idx": 35,
+      "baseline_MAE": 0.013681990511684167,
+      "corrected_MAE": 0.01366590431473679,
+      "baseline_RMSE": 0.17133410285302414,
+      "corrected_RMSE": 0.17111691038751728,
+      "delta_MAE_pct": 0.11757205162245742
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 300,
+      "channel_idx": 36,
+      "baseline_MAE": 0.014008179017903162,
+      "corrected_MAE": 0.013995944969160713,
+      "baseline_RMSE": 0.17429130008005977,
+      "corrected_RMSE": 0.1741369419515749,
+      "delta_MAE_pct": 0.08733503995639573
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 400,
+      "channel_idx": 37,
+      "baseline_MAE": 0.012553133307122799,
+      "corrected_MAE": 0.01254074861949597,
+      "baseline_RMSE": 0.15647976935822525,
+      "corrected_RMSE": 0.1563186014441778,
+      "delta_MAE_pct": 0.09865813836137803
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 500,
+      "channel_idx": 38,
+      "baseline_MAE": 0.01067868569408851,
+      "corrected_MAE": 0.01067422354191455,
+      "baseline_RMSE": 0.13397795280225733,
+      "corrected_RMSE": 0.1339111098220061,
+      "delta_MAE_pct": 0.041785593300396176
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 600,
+      "channel_idx": 39,
+      "baseline_MAE": 0.009596892577666357,
+      "corrected_MAE": 0.009593158272676197,
+      "baseline_RMSE": 0.12091690118520834,
+      "corrected_RMSE": 0.12086911426062533,
+      "delta_MAE_pct": 0.038911605605029605
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 700,
+      "channel_idx": 40,
+      "baseline_MAE": 0.00896501753093535,
+      "corrected_MAE": 0.008954453273824176,
+      "baseline_RMSE": 0.11365095519501427,
+      "corrected_RMSE": 0.11353124085883746,
+      "delta_MAE_pct": 0.11783866651370091
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 850,
+      "channel_idx": 41,
+      "baseline_MAE": 0.008324424388554014,
+      "corrected_MAE": 0.008311421514969004,
+      "baseline_RMSE": 0.10584459251115803,
+      "corrected_RMSE": 0.10565773444953161,
+      "delta_MAE_pct": 0.15620147385672084
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 925,
+      "channel_idx": 42,
+      "baseline_MAE": 0.007520948675229376,
+      "corrected_MAE": 0.007509307792486561,
+      "baseline_RMSE": 0.09768301547125267,
+      "corrected_RMSE": 0.09744418553143089,
+      "delta_MAE_pct": 0.1547794466561739
+    },
+    {
+      "variable": "u_component_of_wind",
+      "level": 1000,
+      "channel_idx": 43,
+      "baseline_MAE": 0.005976380096940912,
+      "corrected_MAE": 0.0059612194917482144,
+      "baseline_RMSE": 0.07731302684548559,
+      "corrected_RMSE": 0.07712641457374117,
+      "delta_MAE_pct": 0.25367538454352156
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 50,
+      "channel_idx": 44,
+      "baseline_MAE": 0.012320715080048556,
+      "corrected_MAE": 0.012310557044591811,
+      "baseline_RMSE": 0.14899579042533037,
+      "corrected_RMSE": 0.14886281130238457,
+      "delta_MAE_pct": 0.08244680110486607
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 100,
+      "channel_idx": 45,
+      "baseline_MAE": 0.01126564230880055,
+      "corrected_MAE": 0.011259452188231083,
+      "baseline_RMSE": 0.13915988040385702,
+      "corrected_RMSE": 0.1390624827466216,
+      "delta_MAE_pct": 0.05494689428077832
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 150,
+      "channel_idx": 46,
+      "baseline_MAE": 0.012183662360436798,
+      "corrected_MAE": 0.012170623440957517,
+      "baseline_RMSE": 0.15373482097052446,
+      "corrected_RMSE": 0.15356423212707576,
+      "delta_MAE_pct": 0.10701970469586607
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 200,
+      "channel_idx": 47,
+      "baseline_MAE": 0.012814490992825757,
+      "corrected_MAE": 0.012805231226922682,
+      "baseline_RMSE": 0.16065837728760124,
+      "corrected_RMSE": 0.16054350025952227,
+      "delta_MAE_pct": 0.07226011480486241
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 250,
+      "channel_idx": 48,
+      "baseline_MAE": 0.0138397395333521,
+      "corrected_MAE": 0.013835866529538967,
+      "baseline_RMSE": 0.17245844816822128,
+      "corrected_RMSE": 0.17240112745886613,
+      "delta_MAE_pct": 0.027984658264702807
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 300,
+      "channel_idx": 49,
+      "baseline_MAE": 0.014298222227148119,
+      "corrected_MAE": 0.014279047707360866,
+      "baseline_RMSE": 0.1769607310382614,
+      "corrected_RMSE": 0.17676832574430637,
+      "delta_MAE_pct": 0.1341042227672659
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 400,
+      "channel_idx": 50,
+      "baseline_MAE": 0.012858720095080194,
+      "corrected_MAE": 0.012851549715783022,
+      "baseline_RMSE": 0.15944553668461292,
+      "corrected_RMSE": 0.15935732605445677,
+      "delta_MAE_pct": 0.05576277610954455
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 500,
+      "channel_idx": 51,
+      "baseline_MAE": 0.010899053171548273,
+      "corrected_MAE": 0.010892801872270966,
+      "baseline_RMSE": 0.1358223301314592,
+      "corrected_RMSE": 0.13574221753924326,
+      "delta_MAE_pct": 0.05735635177581714
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 600,
+      "channel_idx": 52,
+      "baseline_MAE": 0.009745059700054246,
+      "corrected_MAE": 0.009734923265048857,
+      "baseline_RMSE": 0.12204742066519066,
+      "corrected_RMSE": 0.12194364287824978,
+      "delta_MAE_pct": 0.10401614066388999
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 700,
+      "channel_idx": 53,
+      "baseline_MAE": 0.00906138099279311,
+      "corrected_MAE": 0.009057045881518275,
+      "baseline_RMSE": 0.11446783063530312,
+      "corrected_RMSE": 0.11441533390462376,
+      "delta_MAE_pct": 0.0478416179419436
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 850,
+      "channel_idx": 54,
+      "baseline_MAE": 0.008375570668576556,
+      "corrected_MAE": 0.00837254758722534,
+      "baseline_RMSE": 0.1065363776747659,
+      "corrected_RMSE": 0.10644092351950986,
+      "delta_MAE_pct": 0.03609403431526464
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 925,
+      "channel_idx": 55,
+      "baseline_MAE": 0.00760225749147531,
+      "corrected_MAE": 0.0075953031166917035,
+      "baseline_RMSE": 0.09904796062733652,
+      "corrected_RMSE": 0.09890788713847319,
+      "delta_MAE_pct": 0.09147775896048127
+    },
+    {
+      "variable": "v_component_of_wind",
+      "level": 1000,
+      "channel_idx": 56,
+      "baseline_MAE": 0.006070763912416904,
+      "corrected_MAE": 0.006060875244971238,
+      "baseline_RMSE": 0.07857415988914285,
+      "corrected_RMSE": 0.07844642244923133,
+      "delta_MAE_pct": 0.16289000179104499
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 50,
+      "channel_idx": 57,
+      "baseline_MAE": 8.962076007087707e-05,
+      "corrected_MAE": 8.959155275014649e-05,
+      "baseline_RMSE": 0.0012481398988233655,
+      "corrected_RMSE": 0.0012477568133141875,
+      "delta_MAE_pct": 0.03258990518210362
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 100,
+      "channel_idx": 58,
+      "baseline_MAE": 0.00016038316634580765,
+      "corrected_MAE": 0.00016020553500868483,
+      "baseline_RMSE": 0.002205734724626168,
+      "corrected_RMSE": 0.0022042208815521267,
+      "delta_MAE_pct": 0.11075435232387411
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 150,
+      "channel_idx": 59,
+      "baseline_MAE": 0.00028373760060397806,
+      "corrected_MAE": 0.0002836022253614246,
+      "baseline_RMSE": 0.004311649587928306,
+      "corrected_RMSE": 0.004310516890970285,
+      "delta_MAE_pct": 0.047711421491297513
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 200,
+      "channel_idx": 60,
+      "baseline_MAE": 0.00041147613138862175,
+      "corrected_MAE": 0.00041107733982675314,
+      "baseline_RMSE": 0.0067206702545483075,
+      "corrected_RMSE": 0.006717584587722907,
+      "delta_MAE_pct": 0.09691730125944042
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 250,
+      "channel_idx": 61,
+      "baseline_MAE": 0.000548116976014653,
+      "corrected_MAE": 0.0005468556694863576,
+      "baseline_RMSE": 0.008906381558959356,
+      "corrected_RMSE": 0.008897628053443064,
+      "delta_MAE_pct": 0.23011630427255053
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 300,
+      "channel_idx": 62,
+      "baseline_MAE": 0.0006849097199746016,
+      "corrected_MAE": 0.0006836336809284286,
+      "baseline_RMSE": 0.011006902143566477,
+      "corrected_RMSE": 0.011000805988395469,
+      "delta_MAE_pct": 0.18630762697021314
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 400,
+      "channel_idx": 63,
+      "baseline_MAE": 0.0008778616568558816,
+      "corrected_MAE": 0.0008745225532271777,
+      "baseline_RMSE": 0.014188659093976595,
+      "corrected_RMSE": 0.014176337158528103,
+      "delta_MAE_pct": 0.38036786350404356
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 500,
+      "channel_idx": 64,
+      "baseline_MAE": 0.0009399049385600824,
+      "corrected_MAE": 0.0009375945211600387,
+      "baseline_RMSE": 0.01567536665397752,
+      "corrected_RMSE": 0.015667717508844863,
+      "delta_MAE_pct": 0.2458139440764342
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 600,
+      "channel_idx": 65,
+      "baseline_MAE": 0.0009792087344485238,
+      "corrected_MAE": 0.0009776387503886907,
+      "baseline_RMSE": 0.016703888321493564,
+      "corrected_RMSE": 0.016697976127464247,
+      "delta_MAE_pct": 0.16033190928563912
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 700,
+      "channel_idx": 66,
+      "baseline_MAE": 0.0010168567990308378,
+      "corrected_MAE": 0.0010161904253886264,
+      "baseline_RMSE": 0.016913370008071634,
+      "corrected_RMSE": 0.0169102603008759,
+      "delta_MAE_pct": 0.06553269278885199
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 850,
+      "channel_idx": 67,
+      "baseline_MAE": 0.0009672714972373126,
+      "corrected_MAE": 0.0009669690062770541,
+      "baseline_RMSE": 0.014668037615073229,
+      "corrected_RMSE": 0.014666951677222815,
+      "delta_MAE_pct": 0.031272601448766736
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 925,
+      "channel_idx": 68,
+      "baseline_MAE": 0.0007456162064257819,
+      "corrected_MAE": 0.0007453444621111308,
+      "baseline_RMSE": 0.010663165631183054,
+      "corrected_RMSE": 0.010662001227505297,
+      "delta_MAE_pct": 0.0364456019476456
+    },
+    {
+      "variable": "vertical_velocity",
+      "level": 1000,
+      "channel_idx": 69,
+      "baseline_MAE": 0.00024520388894961844,
+      "corrected_MAE": 0.0002450988438471041,
+      "baseline_RMSE": 0.003683921330766383,
+      "corrected_RMSE": 0.0036833821363853013,
+      "delta_MAE_pct": 0.04283990069013316
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 50,
+      "channel_idx": 70,
+      "baseline_MAE": 1.6731887647809845e-10,
+      "corrected_MAE": 1.6660609657351733e-10,
+      "baseline_RMSE": 2.98286593934823e-09,
+      "corrected_RMSE": 2.976749924663214e-09,
+      "delta_MAE_pct": 0.4260008909839988
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 100,
+      "channel_idx": 71,
+      "baseline_MAE": 6.232174018841704e-10,
+      "corrected_MAE": 6.194264515666317e-10,
+      "baseline_RMSE": 1.1646507902560935e-08,
+      "corrected_RMSE": 1.1574120469915782e-08,
+      "delta_MAE_pct": 0.60828698076748
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 150,
+      "channel_idx": 72,
+      "baseline_MAE": 5.124256686228297e-09,
+      "corrected_MAE": 5.092075807033086e-09,
+      "baseline_RMSE": 9.718350911459777e-08,
+      "corrected_RMSE": 9.638876763445538e-08,
+      "delta_MAE_pct": 0.6280106787331499
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 200,
+      "channel_idx": 73,
+      "baseline_MAE": 3.061399269578689e-08,
+      "corrected_MAE": 3.028661381164167e-08,
+      "baseline_RMSE": 5.882938406105177e-07,
+      "corrected_RMSE": 5.829744620409154e-07,
+      "delta_MAE_pct": 1.0693766324386527
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 250,
+      "channel_idx": 74,
+      "baseline_MAE": 1.0638283275374907e-07,
+      "corrected_MAE": 1.043977865029805e-07,
+      "baseline_RMSE": 2.0171680075587982e-06,
+      "corrected_RMSE": 1.9905619814028176e-06,
+      "delta_MAE_pct": 1.8659460360145539
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 300,
+      "channel_idx": 75,
+      "baseline_MAE": 2.3802181007473148e-07,
+      "corrected_MAE": 2.3340688791625458e-07,
+      "baseline_RMSE": 4.379540253947779e-06,
+      "corrected_RMSE": 4.321272597904982e-06,
+      "delta_MAE_pct": 1.9388652481165307
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 400,
+      "channel_idx": 76,
+      "baseline_MAE": 6.988760423718734e-07,
+      "corrected_MAE": 6.886286540775994e-07,
+      "baseline_RMSE": 1.2215855740889095e-05,
+      "corrected_RMSE": 1.209968547258137e-05,
+      "delta_MAE_pct": 1.4662669304696796
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 500,
+      "channel_idx": 77,
+      "baseline_MAE": 1.315258518188139e-06,
+      "corrected_MAE": 1.3030721884397257e-06,
+      "baseline_RMSE": 2.2103511492911738e-05,
+      "corrected_RMSE": 2.2011292315023766e-05,
+      "delta_MAE_pct": 0.9265349419824153
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 600,
+      "channel_idx": 78,
+      "baseline_MAE": 1.9684660391035663e-06,
+      "corrected_MAE": 1.951739318419823e-06,
+      "baseline_RMSE": 3.133725663757913e-05,
+      "corrected_RMSE": 3.1218874028929484e-05,
+      "delta_MAE_pct": 0.8497337699237444
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 700,
+      "channel_idx": 79,
+      "baseline_MAE": 2.7278177660310914e-06,
+      "corrected_MAE": 2.709029573122738e-06,
+      "baseline_RMSE": 4.1750413699224385e-05,
+      "corrected_RMSE": 4.162784664362926e-05,
+      "delta_MAE_pct": 0.6887627590933217
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 850,
+      "channel_idx": 80,
+      "baseline_MAE": 3.578124059013057e-06,
+      "corrected_MAE": 3.553465583701139e-06,
+      "baseline_RMSE": 5.3103506832359166e-05,
+      "corrected_RMSE": 5.295649014254848e-05,
+      "delta_MAE_pct": 0.6891453427894682
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 925,
+      "channel_idx": 81,
+      "baseline_MAE": 3.0063351178550663e-06,
+      "corrected_MAE": 2.9826873535015126e-06,
+      "baseline_RMSE": 4.518209821349672e-05,
+      "corrected_RMSE": 4.5022573525527936e-05,
+      "delta_MAE_pct": 0.7865977486377431
+    },
+    {
+      "variable": "specific_humidity",
+      "level": 1000,
+      "channel_idx": 82,
+      "baseline_MAE": 2.2510243446597857e-06,
+      "corrected_MAE": 2.2345371791507e-06,
+      "baseline_RMSE": 3.358138885428185e-05,
+      "corrected_RMSE": 3.3382154286708904e-05,
+      "delta_MAE_pct": 0.7324294625333059
+    }
+  ]
+}
