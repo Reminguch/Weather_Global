@@ -622,6 +622,94 @@ MAE (4-var baseline MAE = 8.92 vs 11-var = 4.36 on the same frozen
 GraphCast). Per-variable RMSE/MAE is the fair comparator; the full 2K
 training run is in progress.
 
+**8) K-curriculum on FullMamba + paper-comparable lat-weighted eval (April 2026)**
+
+Following GraphCast's curriculum strategy, we trained a chain of FullMamba
+S6 residual heads (`d_state=16, expand=2, hidden=128, mesh m=5, full 11 vars`)
+on top of the frozen GraphCast small (1° + 13 levels) baseline. Each phase
+finetunes from the previous K's checkpoint with `target_steps = K`:
+
+```
+K=1 (4000 steps, 6h horizon) → K=2 (12h) → K=4 (24h) → K=6 (36h) → K=8 (48h)
+```
+
+All evaluation switched to **cos(lat) area-weighted MAE / RMSE** (matches
+GraphCast paper / WeatherBench2 convention). Training loss already used
+lat × var × level weights; we extended `_compute_group_metrics` and
+`scripts/eval_per_level.py` to emit `*_latw` fields alongside the legacy
+uniform metrics so all reported numbers below are paper-comparable.
+
+**Per-variable lat-weighted RMSE Δ% on each K's own horizon (TF mode)**:
+
+| Variable        | K=1 (6h) | K=2 (12h) | K=4 (24h) | K=6 (36h) |
+|-----------------|---------:|----------:|----------:|----------:|
+| **Z (13L mean)**| +1.67%   | +1.49%    | +1.76%    | **+1.96%** ⭐ |
+| q  (13L mean)   | +1.01%   | +0.91%    | +0.77%    | +0.77%    |
+| T  (13L mean)   | +0.73%   | +0.69%    | +0.70%    | +0.69%    |
+| u_wind (13L)    | +0.23%   | +0.20%    | +0.19%    | +0.19%    |
+| v_wind (13L)    | +0.14%   | +0.13%    | +0.11%    | +0.10%    |
+| w  (13L)        | +0.09%   | +0.06%    | +0.04%    | +0.03%    |
+| MSLP            | **+1.31%** | +0.13%  | +0.16%    | −1.02% ❌  |
+| precip_6h       | **+0.93%** | +0.69%  | +0.21%    | +0.08%    |
+| 10m_u           | +0.52%   | +0.37%   | +0.25%    | +0.02%    |
+| 10m_v           | +0.31%   | +0.19%   | +0.00%    | −0.38%    |
+| 2m_T            | +0.15%   | +0.13%   | +0.13%    | +0.09%    |
+
+**Per-target scorecard (GraphCast-style win rate)** — see
+[results/2026-04-26_scorecard/](results/2026-04-26_scorecard/) for raw JSON
+and heatmap plots:
+
+| ckpt          | Total targets (lead × channels) | RMSE improved | Win rate |
+|---------------|--------------------------------:|--------------:|---------:|
+| K=4 step 6000 | 4 × 83 = 332                    | 328           | **98.8%** TF |
+| K=4 step 6000 | 332                             | 274           | 82.5% AR |
+| K=6 step 8000 | 6 × 83 = 498                    | 473           | **95.0%** TF |
+| K=6 step 8000 | 498                             | 388           | 77.9% AR |
+
+The AR/TF gap closes monotonically with lead time within each ckpt:
+at +6h AR mode wins on only ~30% of channels (residual head has no
+self-fed history yet, prev_residual = 0), but climbs to 100% by +24h or
++36h as the SSM hidden state accumulates several self-fed steps. This
+validates that the Mamba memory mechanism contributes more value at
+longer rollout depths.
+
+**Horizon-specialized findings**: K↑ improves geopotential and other
+upper-air variables (Z RMSE TF: +1.67% → +1.96% across K=1 → K=6), but
+**hurts surface variables** — MSLP goes from +1.31% (K=1) to −1.02%
+(K=6), and 10m wind components similarly degrade. Physical interpretation:
+the residual head's loss for K=6 averages over six lead-time targets, of
+which the long-horizon (+30h, +36h) targets for synoptic-scale upper-air
+variables (Z, T, q) carry **structured systematic-bias signal** while the
+long-horizon targets for surface variables (MSLP, near-surface winds) are
+dominated by **near-random storm-position errors**. The head fits noise
+on surface variables → spurious patterns → corrected MAE drifts negative.
+
+This argues for a **cascaded specialist deployment**: use K=1 ckpt for
+surface-variable correction and K=6 ckpt for upper-air (Z/T/q) — same
+strategy adopted by Pangu-Weather and FuXi.
+
+**Caveat — undertraining at intermediate K**: the existing K=2 / K=4 / K=6
+ckpts above were trained for only 1000–2000 steps each, vs K=1's 4000-step
+budget. Loss MA(50) and Z RMSE Δ% are still trending in all three when
+training stops, so the absolute numbers are conservative. A clean re-chain
+(K=2 fresh from K=1 step 4000 with 4000 K=2 steps, then K=4 fresh from K=2
+step 8000, etc.) is in progress; expect Z RMSE Δ% to climb 0.1–0.3 pp
+per K phase once each is fully converged. The qualitative horizon-specialization
+finding is robust to undertraining (the trade-off direction is set by the
+loss-mixing structure, not the step count).
+
+**Spatial GNN processor ablation**: we added an optional MeshGraphNet
+processor (1–2 bidirectional message-passing layers on icosphere edges)
+between the mesh encoder and the temporal SSM in
+[`src/models/mz/processor/`](src/models/mz/processor/), to test whether
+adding spatial communication on the residual mesh unlocks synoptic-scale
+variables. Preliminary K=2+processor result at 1500 steps shows only
++0.04 pp AR-mode improvement vs K=2 baseline — much smaller than going
+K=2 → K=6 on Z. This is consistent with the frozen GraphCast baseline
+already executing 16 layers of mesh GNN internally; the residual head's
+remaining error structure is dominated by **per-grid-point temporal bias**
+rather than spatial coupling. Full convergence study is pending.
+
 **Takeaways:**
 - MZ residual improvement scales with **baseline weakness** (gives 3–7% on
   our in-house baselines, <0.2% on DeepMind paper-grade baseline with h=16).
@@ -636,6 +724,14 @@ training run is in progress.
 - AR (closed-loop) evaluation degrades gracefully: at r=6 MZ still captures
   +4.7% with 32 steps (8 days) of pure self-feedback, showing the learned
   A-matrix has stable eigenstructure.
+- **K-curriculum specializes the residual head per horizon**: longer K helps
+  upper-air (Z RMSE Δ% climbs +0.3 pp K=1 → K=6) but hurts surface
+  variables (MSLP flips from +1.3% to −1.0%) due to multi-task loss
+  dilution. Best deployment is a cascaded specialist (short-K for surface,
+  long-K for upper-air).
+- Per-target win rates (GraphCast-style) reach **98.8% TF / 82.5% AR** at
+  K=4 horizon=4 (332 targets), still on a 1°+13L baseline — encouraging
+  for the planned 0.25°+37L transfer.
 
 
 ---
