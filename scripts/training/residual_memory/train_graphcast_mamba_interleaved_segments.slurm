@@ -59,8 +59,12 @@ TARGET_STEPS=${TARGET_STEPS:-1}
 LEN_SEGMENT=${LEN_SEGMENT:-30}
 BPTT_STEPS=${BPTT_STEPS:-6}
 
-BATCH_SIZE=${BATCH_SIZE:-8}
-EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE:-4}
+# Residual segment training at res1 keeps multiple BPTT chunks live inside one
+# jitted step and is substantially heavier than the res2 segment sweep.
+# Default to a conservative batch size that fits on 80 GB A100s; callers can
+# still override via sbatch --export=BATCH_SIZE=...
+BATCH_SIZE=${BATCH_SIZE:-2}
+EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE:-2}
 MAX_STEPS=${MAX_STEPS:-20000}
 EVAL_EVERY=${EVAL_EVERY:-2000}
 CHECKPOINT_EVERY=${CHECKPOINT_EVERY:-2000}

@@ -14,8 +14,23 @@ from .batching import BatchBuilder, build_batch_from_indices_vectorized
 from .model import gc, scalarize_loss
 
 
+def _map_temporal_state_leaves(state: hk.State, fn) -> hk.State:
+    mutable_state = hk.data_structures.to_mutable_dict(state)
+    for module_state in mutable_state.values():
+        for state_name, leaf in module_state.items():
+            if not isinstance(leaf, jax.Array):
+                continue
+            if state_name.endswith("_ssm_state") or state_name.endswith("_conv_cache"):
+                module_state[state_name] = fn(leaf)
+    return hk.data_structures.to_immutable_dict(mutable_state)
+
+
+def _reset_temporal_eval_state(state: hk.State) -> hk.State:
+    return _map_temporal_state_leaves(state, jnp.zeros_like)
+
+
 def run_eval(
-    transformed_eval,
+    transformed_eval_loss,
     params: hk.Params,
     state: hk.State,
     rng: jax.Array,
@@ -35,10 +50,6 @@ def run_eval(
     del state
 
     losses: list[float] = []
-    # Per-variable accumulators for RMSE and MAE.
-    var_se_sums: dict[str, float] = {}
-    var_ae_sums: dict[str, float] = {}
-    var_counts: dict[str, int] = {}
 
     n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     index_batches = [
@@ -69,15 +80,15 @@ def run_eval(
 
     _fill()
 
-    state_by_batch_size: dict[int, hk.State] = {}
-    eval_fn_cache: dict[int, callable] = {}
+    loss_state_by_batch_size: dict[int, hk.State] = {}
+    loss_eval_fn_cache: dict[int, callable] = {}
 
-    def _eval_batch_fn(batch_size: int, batch_state: hk.State):
-        fn = eval_fn_cache.get(batch_size)
+    def _loss_eval_batch_fn(batch_size: int, batch_state: hk.State):
+        fn = loss_eval_fn_cache.get(batch_size)
         if fn is None:
             @jax.jit
             def fn(params, key, inputs, targets, forcings):
-                (loss_and_diag, preds), _ = transformed_eval.apply(
+                loss_and_diag, _ = transformed_eval_loss.apply(
                     params,
                     batch_state,
                     key,
@@ -86,43 +97,27 @@ def run_eval(
                     forcings,
                     False,
                 )
-                return scalarize_loss(loss_and_diag[0]), preds
+                return scalarize_loss(loss_and_diag[0])
 
-            eval_fn_cache[batch_size] = fn
-        return eval_fn_cache[batch_size]
+            loss_eval_fn_cache[batch_size] = fn
+        return loss_eval_fn_cache[batch_size]
 
     for batch_i in range(1, n_batches + 1):
         inputs, targets, forcings = pending.pop(0).result()
         _fill()
 
         batch_size = int(inputs.sizes["batch"])
-        rng, init_key, apply_key = jax.random.split(rng, 3)
-        if batch_size not in state_by_batch_size:
-            _, batch_state = transformed_eval.init(init_key, inputs, targets, forcings, False)
-            batch_state = jax.tree_util.tree_map(
-                lambda leaf: jnp.zeros_like(leaf) if isinstance(leaf, jax.Array) else leaf,
-                batch_state,
-            )
-            state_by_batch_size[batch_size] = batch_state
-        loss_value, preds = _eval_batch_fn(batch_size, state_by_batch_size[batch_size])(
-            params, apply_key, inputs, targets, forcings
-        )
+        rng, loss_init_key, loss_apply_key = jax.random.split(rng, 3)
+        if batch_size not in loss_state_by_batch_size:
+            _, batch_state = transformed_eval_loss.init(loss_init_key, inputs, targets, forcings, False)
+            loss_state_by_batch_size[batch_size] = _reset_temporal_eval_state(batch_state)
+
+        loss_value = _loss_eval_batch_fn(
+            batch_size,
+            _reset_temporal_eval_state(loss_state_by_batch_size[batch_size]),
+        )(params, loss_apply_key, inputs, targets, forcings)
         loss = float(loss_value)
         losses.append(loss)
-
-        for var_name in preds.data_vars:
-            if var_name not in targets.data_vars:
-                continue
-            common_dims = [d for d in targets[var_name].dims if d in preds[var_name].dims]
-            pred_aligned = preds[var_name].transpose(*common_dims)
-            tgt_aligned = targets[var_name].transpose(*common_dims)
-            pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
-            tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
-            diff = pred_vals - tgt_vals
-            n = diff.size
-            var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
-            var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
-            var_counts[var_name] = var_counts.get(var_name, 0) + n
         if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
             elapsed = time.time() - t_eval0
             print(
@@ -131,26 +126,4 @@ def run_eval(
             )
 
     executor.shutdown(wait=False)
-
-    results: dict[str, float] = {"total": float(np.mean(losses))}
-
-    if var_counts:
-        total_se, total_ae, total_n = 0.0, 0.0, 0
-        print(f"[{progress_label}] === Per-variable metrics ===")
-        for var_name in sorted(var_counts.keys()):
-            n = var_counts[var_name]
-            rmse = float(np.sqrt(var_se_sums[var_name] / n))
-            mae = float(var_ae_sums[var_name] / n)
-            results[f"{var_name}_RMSE"] = rmse
-            results[f"{var_name}_MAE"] = mae
-            print(f"[{progress_label}]   {var_name}: RMSE={rmse:.4f}  MAE={mae:.4f}")
-            total_se += var_se_sums[var_name]
-            total_ae += var_ae_sums[var_name]
-            total_n += n
-        overall_rmse = float(np.sqrt(total_se / total_n))
-        overall_mae = float(total_ae / total_n)
-        results["overall_RMSE"] = overall_rmse
-        results["overall_MAE"] = overall_mae
-        print(f"[{progress_label}]   OVERALL: RMSE={overall_rmse:.4f}  MAE={overall_mae:.4f}")
-
-    return results
+    return {"total": float(np.mean(losses))}

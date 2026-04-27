@@ -17,13 +17,10 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import functools
-import json
 import re
 import sys
 from pathlib import Path
 
-import haiku as hk
 import jax
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,7 +47,12 @@ def _require_graphcast() -> None:
 
 
 _require_graphcast()
-from graphcast import autoregressive, casting, checkpoint, data_utils, graphcast, normalization, rollout
+from graphcast import checkpoint, data_utils, graphcast
+
+from scripts.analyze_models.graphcast_analysis_utils import (
+    build_run_jitted,
+    suppress_graphcast_future_warnings,
+)
 
 
 DATASET_DEFAULT = "data/graphcast/graphcast/dataset/source-era5_cds_rolling-last30d_res-1.0_levels-13_steps-04.nc"
@@ -159,58 +161,6 @@ def _discover_latest_checkpoints(root_dir: Path, prefix: str) -> list[Path]:
     return sorted(ckpts, key=lambda p: _sort_key_from_run_name(p.parent.name))
 
 
-def _build_run_jitted(
-    ckpt_obj: graphcast.CheckPoint,
-    stats: dict[str, xarray.Dataset],
-    ckpt_path: Path,
-):
-    model_cfg = ckpt_obj.model_config
-    task_cfg = ckpt_obj.task_config
-    params = ckpt_obj.params
-    state = {}
-
-    def construct_wrapped_graphcast(model_config, task_config):
-        predictor = graphcast.GraphCast(model_config, task_config)
-        run_cfg_path = ckpt_path.parent / "run_config.json"
-        if run_cfg_path.exists():
-            with run_cfg_path.open("r", encoding="utf-8") as f:
-                run_cfg = json.load(f)
-            temporal_cfg = run_cfg.get("temporal_config", {})
-            if hasattr(predictor, "_temporal_backbone"):
-                predictor._temporal_backbone = temporal_cfg.get("backbone", "none")
-                predictor._temporal_location = temporal_cfg.get("location", "mesh_post_encoder")
-                predictor._temporal_hidden_size = temporal_cfg.get(
-                    "hidden_size", model_config.latent_size
-                )
-                predictor._temporal_layers = temporal_cfg.get("layers", 1)
-                predictor._temporal_dropout = temporal_cfg.get("dropout", 0.0)
-        predictor = casting.Bfloat16Cast(predictor)
-        predictor = normalization.InputsAndResiduals(
-            predictor,
-            diffs_stddev_by_level=stats["diffs_stddev_by_level"],
-            mean_by_level=stats["mean_by_level"],
-            stddev_by_level=stats["stddev_by_level"],
-        )
-        predictor = autoregressive.Predictor(predictor, gradient_checkpointing=False)
-        return predictor
-
-    @hk.transform_with_state
-    def run_forward(model_config, task_config, inputs, targets_template, forcings):
-        predictor = construct_wrapped_graphcast(model_config, task_config)
-        return predictor(inputs, targets_template=targets_template, forcings=forcings)
-
-    def with_configs(fn):
-        return functools.partial(fn, model_config=model_cfg, task_config=task_cfg)
-
-    def with_params(fn):
-        return functools.partial(fn, params=params, state=state)
-
-    def drop_state(fn):
-        return lambda **kw: fn(**kw)[0]
-
-    return drop_state(with_params(jax.jit(with_configs(run_forward.apply)))), task_cfg, model_cfg
-
-
 def _build_eval_batch(
     ds_res: xarray.Dataset,
     *,
@@ -297,7 +247,7 @@ def _eval_group(
         with ckpt_path.open("rb") as f:
             ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
 
-        run_jitted, task_cfg, model_cfg = _build_run_jitted(ckpt_obj, stats, ckpt_path)
+        run_jitted, task_cfg, model_cfg, _run_cfg = build_run_jitted(ckpt_obj, stats, ckpt_path)
         run_name = ckpt_path.parent.name if ckpt_path.parent != ckpt_path else ckpt_path.stem
         step_tag = ckpt_path.stem.replace("ckpt_step", "")
         label = f"{run_name} (step {step_tag})" if "ckpt_step" in ckpt_path.stem else run_name
@@ -327,13 +277,13 @@ def _eval_group(
             if batch_pack is None:
                 continue
             inputs_b, targets_b, forcings_b, real_b = batch_pack
-            pred_b = rollout.chunked_prediction(
-                run_jitted,
-                rng=jax.random.PRNGKey(100000 * m_i + b_i),
-                inputs=inputs_b,
-                targets_template=targets_b * np.nan,
-                forcings=forcings_b,
-            )
+            with suppress_graphcast_future_warnings():
+                pred_b = run_jitted(
+                    rng=jax.random.PRNGKey(100000 * m_i + b_i),
+                    inputs=inputs_b,
+                    targets_template=targets_b * np.nan,
+                    forcings=forcings_b,
+                )
             pred_bt = np.asarray(
                 pred_b["2m_temperature"].isel(lat=lat_idx, lon=lon_idx).transpose("batch", "time").values
             )

@@ -12,7 +12,7 @@ import xarray as xr
 
 from graphcast_train.batching import BatchBuilder, build_batch_from_indices_vectorized
 from graphcast_train.logging import _write_run_config
-from graphcast_train.model import build_predictor, gc, scalarize_loss
+from graphcast_train.model import build_predictor, build_residual_correction_predictor, gc, scalarize_loss
 
 from residual_memory.config import ResidualSegmentRunConfig
 
@@ -29,7 +29,7 @@ def build_loss_transform(
     cfg,
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
-        predictor = build_predictor(
+        predictor = build_residual_correction_predictor(
             model_cfg,
             task_cfg,
             norm_stats,
@@ -100,7 +100,7 @@ def build_predict_transform(
     return hk.transform_with_state(predict_fn)
 
 
-def build_loss_and_predictions_transform(
+def build_eval_loss_transform(
     model_cfg: gc.ModelConfig,
     task_cfg: gc.TaskConfig,
     norm_stats: dict[str, xr.Dataset],
@@ -119,9 +119,9 @@ def build_loss_and_predictions_transform(
     temporal_dropout: float,
     temporal_stateful: bool,
 ) -> hk.TransformedWithState:
-    def predict_fn(inputs, targets, forcings, is_training):
+    def forward_fn(inputs, targets, forcings, is_training):
         del is_training
-        predictor = build_predictor(
+        predictor = build_residual_correction_predictor(
             model_cfg,
             task_cfg,
             norm_stats,
@@ -141,9 +141,9 @@ def build_loss_and_predictions_transform(
             temporal_stateful=temporal_stateful,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, temporal_backbone),
         )
-        return predictor.loss_and_predictions(inputs, targets, forcings)
+        return predictor.loss(inputs, targets, forcings)
 
-    return hk.transform_with_state(predict_fn)
+    return hk.transform_with_state(forward_fn)
 
 
 def compute_residual_targets(targets: xr.Dataset, baseline_predictions: xr.Dataset) -> xr.Dataset:
@@ -224,9 +224,6 @@ def run_residual_eval(
     batch_builder: BatchBuilder = build_batch_from_indices_vectorized,
 ) -> dict[str, float]:
     losses: list[float] = []
-    var_se_sums: dict[str, float] = {}
-    var_ae_sums: dict[str, float] = {}
-    var_counts: dict[str, int] = {}
 
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
@@ -279,7 +276,7 @@ def run_residual_eval(
                     False,
                 )
                 residual_targets = compute_residual_targets(targets, baseline_preds)
-                (loss_and_diag, residual_preds), _ = residual_eval_transform.apply(
+                loss_and_diag, _ = residual_eval_transform.apply(
                     params,
                     residual_eval_state,
                     eval_key,
@@ -288,13 +285,12 @@ def run_residual_eval(
                     forcings,
                     False,
                 )
-                full_preds = reconstruct_full_predictions(baseline_preds, residual_preds)
-                return scalarize_loss(loss_and_diag[0]), full_preds
+                return scalarize_loss(loss_and_diag[0])
 
             eval_fn_by_batch_size[batch_size] = eval_batch
 
         rng, base_key, eval_key = jax.random.split(rng, 3)
-        loss_value, full_preds = eval_fn_by_batch_size[batch_size](
+        loss_value = eval_fn_by_batch_size[batch_size](
             params,
             baseline_params,
             base_key,
@@ -306,20 +302,6 @@ def run_residual_eval(
         loss = float(loss_value)
         losses.append(loss)
 
-        for var_name in full_preds.data_vars:
-            if var_name not in targets.data_vars:
-                continue
-            common_dims = [d for d in targets[var_name].dims if d in full_preds[var_name].dims]
-            pred_aligned = full_preds[var_name].transpose(*common_dims)
-            tgt_aligned = targets[var_name].transpose(*common_dims)
-            pred_vals = np.asarray(pred_aligned.values, dtype=np.float32)
-            tgt_vals = np.asarray(tgt_aligned.values, dtype=np.float32)
-            diff = pred_vals - tgt_vals
-            n = diff.size
-            var_se_sums[var_name] = var_se_sums.get(var_name, 0.0) + float(np.sum(diff ** 2))
-            var_ae_sums[var_name] = var_ae_sums.get(var_name, 0.0) + float(np.sum(np.abs(diff)))
-            var_counts[var_name] = var_counts.get(var_name, 0) + n
-
         if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
             elapsed = time.time() - t_eval0
             print(
@@ -327,27 +309,4 @@ def run_residual_eval(
                 f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
             )
 
-    results: dict[str, float] = {"total": float(np.mean(losses))}
-    if var_counts:
-        total_se = 0.0
-        total_ae = 0.0
-        total_n = 0
-        print(f"[{progress_label}] === Full-forecast metrics ===")
-        for var_name in sorted(var_counts):
-            n = var_counts[var_name]
-            rmse = float(np.sqrt(var_se_sums[var_name] / n))
-            mae = float(var_ae_sums[var_name] / n)
-            results[f"{var_name}_RMSE"] = rmse
-            results[f"{var_name}_MAE"] = mae
-            print(f"[{progress_label}]   {var_name}: RMSE={rmse:.4f}  MAE={mae:.4f}")
-            total_se += var_se_sums[var_name]
-            total_ae += var_ae_sums[var_name]
-            total_n += n
-        if total_n > 0:
-            results["overall_RMSE"] = float(np.sqrt(total_se / total_n))
-            results["overall_MAE"] = float(total_ae / total_n)
-            print(
-                f"[{progress_label}]   OVERALL: "
-                f"RMSE={results['overall_RMSE']:.4f}  MAE={results['overall_MAE']:.4f}"
-            )
-    return results
+    return {"total": float(np.mean(losses))}

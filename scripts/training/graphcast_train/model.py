@@ -31,6 +31,8 @@ from graphcast import (
     graphcast as gc,
     losses as gc_losses,
     normalization,
+    predictor_base,
+    xarray_tree,
     xarray_jax,
 )
 
@@ -96,6 +98,78 @@ def load_graphcast_checkpoint(path: Path) -> gc.CheckPoint:
         return checkpoint.load(f, gc.CheckPoint)
 
 
+class DirectResidualNormalizer(predictor_base.Predictor):
+    """Normalizes inputs normally and target corrections as direct residual fields."""
+
+    def __init__(
+        self,
+        predictor: predictor_base.Predictor,
+        *,
+        stddev_by_level: xr.Dataset,
+        mean_by_level: xr.Dataset,
+        diffs_stddev_by_level: xr.Dataset,
+    ):
+        self._predictor = predictor
+        self._scales = stddev_by_level
+        self._locations = mean_by_level
+        self._residual_scales = diffs_stddev_by_level
+        self._residual_locations = None
+
+    def __call__(
+        self,
+        inputs: xr.Dataset,
+        targets_template: xr.Dataset,
+        forcings: xr.Dataset,
+        **kwargs,
+    ) -> xr.Dataset:
+        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
+        norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
+        norm_predictions = self._predictor(
+            norm_inputs,
+            targets_template,
+            forcings=norm_forcings,
+            **kwargs,
+        )
+        return xarray_tree.map_structure(
+            lambda pred: normalization.unnormalize(pred, self._residual_scales, self._residual_locations),
+            norm_predictions,
+        )
+
+    def loss(
+        self,
+        inputs: xr.Dataset,
+        targets: xr.Dataset,
+        forcings: xr.Dataset,
+        **kwargs,
+    ) -> predictor_base.LossAndDiagnostics:
+        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
+        norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
+        norm_targets = normalization.normalize(targets, self._residual_scales, self._residual_locations)
+        return self._predictor.loss(norm_inputs, norm_targets, forcings=norm_forcings, **kwargs)
+
+    def loss_and_predictions(
+        self,
+        inputs: xr.Dataset,
+        targets: xr.Dataset,
+        forcings: xr.Dataset,
+        **kwargs,
+    ) -> predictor_base.LossAndDiagnostics:
+        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
+        norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
+        norm_targets = normalization.normalize(targets, self._residual_scales, self._residual_locations)
+        (loss, scalars), norm_predictions = self._predictor.loss_and_predictions(
+            norm_inputs,
+            norm_targets,
+            forcings=norm_forcings,
+            **kwargs,
+        )
+        predictions = xarray_tree.map_structure(
+            lambda pred: normalization.unnormalize(pred, self._residual_scales, self._residual_locations),
+            norm_predictions,
+        )
+        return (loss, scalars), predictions
+
+
 def build_predictor(
     model_cfg: gc.ModelConfig,
     task_cfg: gc.TaskConfig,
@@ -144,7 +218,55 @@ def build_predictor(
     return predictor
 
 
-def build_loss_and_predictions_transform(
+def build_residual_correction_predictor(
+    model_cfg: gc.ModelConfig,
+    task_cfg: gc.TaskConfig,
+    stats: dict[str, xr.Dataset],
+    *,
+    use_bf16: bool,
+    gradient_checkpointing: bool,
+    temporal_backbone: str,
+    temporal_location: str,
+    temporal_hidden_size: int,
+    temporal_d_inner: int | None,
+    temporal_d_state: int,
+    temporal_d_conv: int,
+    temporal_dt_rank: str,
+    temporal_bias: bool,
+    temporal_conv_bias: bool,
+    temporal_layers: int,
+    temporal_dropout: float,
+    temporal_stateful: bool = False,
+    zero_init_temporal_out: bool = False,
+):
+    predictor = gc.GraphCast(model_cfg, task_cfg)
+    if hasattr(predictor, "_temporal_backbone"):
+        predictor._temporal_backbone = temporal_backbone
+        predictor._temporal_location = temporal_location
+        predictor._temporal_stateful = temporal_stateful
+        predictor._temporal_hidden_size = temporal_hidden_size
+        predictor._temporal_d_inner = temporal_d_inner
+        predictor._temporal_d_state = temporal_d_state
+        predictor._temporal_d_conv = temporal_d_conv
+        predictor._temporal_dt_rank = temporal_dt_rank
+        predictor._temporal_bias = temporal_bias
+        predictor._temporal_conv_bias = temporal_conv_bias
+        predictor._temporal_layers = temporal_layers
+        predictor._temporal_dropout = temporal_dropout
+        predictor._temporal_zero_init_out = zero_init_temporal_out
+    if use_bf16:
+        predictor = casting.Bfloat16Cast(predictor)
+    predictor = DirectResidualNormalizer(
+        predictor,
+        stddev_by_level=stats["stddev_by_level"],
+        mean_by_level=stats["mean_by_level"],
+        diffs_stddev_by_level=stats["diffs_stddev_by_level"],
+    )
+    predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
+    return predictor
+
+
+def build_loss_transform(
     model_cfg: gc.ModelConfig,
     task_cfg: gc.TaskConfig,
     stats: dict[str, xr.Dataset],
@@ -187,7 +309,55 @@ def build_loss_and_predictions_transform(
             temporal_stateful=temporal_stateful,
             zero_init_temporal_out=zero_init_temporal_out,
         )
-        return predictor.loss_and_predictions(inputs, targets, forcings)
+        return predictor.loss(inputs, targets, forcings)
+
+    return hk.transform_with_state(forward_fn)
+
+
+def build_prediction_transform(
+    model_cfg: gc.ModelConfig,
+    task_cfg: gc.TaskConfig,
+    stats: dict[str, xr.Dataset],
+    *,
+    use_bf16: bool,
+    gradient_checkpointing: bool,
+    temporal_backbone: str,
+    temporal_location: str,
+    temporal_hidden_size: int,
+    temporal_d_inner: int | None,
+    temporal_d_state: int,
+    temporal_d_conv: int,
+    temporal_dt_rank: str,
+    temporal_bias: bool,
+    temporal_conv_bias: bool,
+    temporal_layers: int,
+    temporal_dropout: float,
+    temporal_stateful: bool = False,
+    zero_init_temporal_out: bool = False,
+) -> hk.TransformedWithState:
+    def forward_fn(inputs, targets, forcings, is_training):
+        del is_training
+        predictor = build_predictor(
+            model_cfg,
+            task_cfg,
+            stats,
+            use_bf16=use_bf16,
+            gradient_checkpointing=gradient_checkpointing,
+            temporal_backbone=temporal_backbone,
+            temporal_location=temporal_location,
+            temporal_hidden_size=temporal_hidden_size,
+            temporal_d_inner=temporal_d_inner,
+            temporal_d_state=temporal_d_state,
+            temporal_d_conv=temporal_d_conv,
+            temporal_dt_rank=temporal_dt_rank,
+            temporal_bias=temporal_bias,
+            temporal_conv_bias=temporal_conv_bias,
+            temporal_layers=temporal_layers,
+            temporal_dropout=temporal_dropout,
+            temporal_stateful=temporal_stateful,
+            zero_init_temporal_out=zero_init_temporal_out,
+        )
+        return predictor(inputs, targets, forcings)
 
     return hk.transform_with_state(forward_fn)
 

@@ -63,7 +63,7 @@ from graphcast_train.logging import (
     save_logs,
 )
 from graphcast_train.model import (
-    build_loss_and_predictions_transform,
+    build_loss_transform,
     build_predictor,
     gc,
     load_graphcast_checkpoint,
@@ -240,7 +240,7 @@ def main() -> None:
         return predictor.loss(inputs, targets, forcings)
 
     transformed = hk.transform_with_state(forward_fn)
-    transformed_eval = build_loss_and_predictions_transform(
+    transformed_eval_loss = build_loss_transform(
         model_cfg,
         task_cfg,
         norm_stats,
@@ -274,7 +274,7 @@ def main() -> None:
     if cfg.eval_only:
         print("Eval-only mode: running eval on loaded checkpoint, no training.")
         eval_metrics = run_eval(
-            transformed_eval,
+            transformed_eval_loss,
             params,
             state,
             rng,
@@ -614,7 +614,7 @@ def main() -> None:
 
         if step % cfg.eval_every == 0:
             eval_metrics = run_eval(
-                transformed_eval,
+                transformed_eval_loss,
                 params,
                 state,
                 rng,
@@ -681,7 +681,7 @@ def main() -> None:
         )
 
     final_eval = run_eval(
-        transformed_eval,
+        transformed_eval_loss,
         params,
         state,
         rng,

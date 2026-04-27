@@ -60,10 +60,9 @@ from graphcast_train.segments import (
 from residual_memory.config import parse_args
 from residual_memory.utils import (
     augment_run_config,
-    build_loss_and_predictions_transform,
+    build_eval_loss_transform,
     build_loss_transform,
     build_predict_transform,
-    compute_residual_targets,
     run_residual_eval,
 )
 
@@ -199,7 +198,7 @@ def main() -> None:
         eval_batch_builder = build_batch_from_indices_vectorized
 
     residual_loss_transform = build_loss_transform(model_cfg, task_cfg, norm_stats, cfg)
-    residual_eval_transform = build_loss_and_predictions_transform(
+    residual_eval_transform = build_eval_loss_transform(
         model_cfg,
         task_cfg,
         norm_stats,
@@ -275,33 +274,13 @@ def main() -> None:
         numpy_cache_active=numpy_cache_active,
     )
 
-    baseline_state_by_batch_size: dict[int, hk.State] = {}
-
-    def baseline_predict_batch(
-        inputs: xr.Dataset,
-        targets: xr.Dataset,
-        forcings: xr.Dataset,
-    ) -> xr.Dataset:
-        batch_size = int(inputs.sizes["batch"])
-        if batch_size not in baseline_state_by_batch_size:
-            _, baseline_state_by_batch_size[batch_size] = baseline_predict_transform.init(
-                rng,
-                inputs,
-                targets,
-                forcings,
-                False,
-            )
-        key = jax.random.PRNGKey(np.random.randint(0, 2**31 - 1))
-        preds, _ = baseline_predict_transform.apply(
-            baseline_ckpt.params,
-            baseline_state_by_batch_size[batch_size],
-            key,
-            inputs,
-            targets,
-            forcings,
-            False,
-        )
-        return preds
+    _, baseline_train_state = baseline_predict_transform.init(
+        rng,
+        sample_inputs,
+        sample_targets,
+        sample_forcings,
+        False,
+    )
 
     @functools.partial(jax.jit)
     def train_chunk(
@@ -321,12 +300,23 @@ def main() -> None:
             losses = []
             keys = jax.random.split(key, segment_cfg.bptt_steps)
             for bptt_i in range(segment_cfg.bptt_steps):
+                baseline_key, residual_key = jax.random.split(keys[bptt_i])
+                baseline_preds, _ = baseline_predict_transform.apply(
+                    baseline_ckpt.params,
+                    baseline_train_state,
+                    baseline_key,
+                    chunk_inputs[bptt_i],
+                    chunk_targets[bptt_i],
+                    chunk_forcings[bptt_i],
+                    False,
+                )
+                residual_targets = chunk_targets[bptt_i] - baseline_preds
                 (loss_and_diag, current_state) = residual_loss_transform.apply(
                     p,
                     current_state,
-                    keys[bptt_i],
+                    residual_key,
                     chunk_inputs[bptt_i],
-                    chunk_targets[bptt_i],
+                    residual_targets,
                     chunk_forcings[bptt_i],
                     True,
                 )
@@ -436,11 +426,7 @@ def main() -> None:
             chunk_load_workers=segment_cfg.chunk_load_workers,
             load_executor=load_executor,
         )
-        residual_targets = tuple(
-            compute_residual_targets(targets, baseline_predict_batch(inputs, targets, forcings))
-            for inputs, targets, forcings in zip(chunk_inputs, chunk_targets, chunk_forcings)
-        )
-        return chunk_inputs, residual_targets, chunk_forcings, reset_mask_np, chunk_epoch
+        return chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch
 
     def submit_next_chunk() -> concurrent.futures.Future:
         chunk_indices, reset_mask_np = scheduler.next_chunk()
@@ -481,6 +467,7 @@ def main() -> None:
                 pass_loss_accum = []
 
             rng, step_key = jax.random.split(rng)
+            next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
             t0 = time.time()
             params, state, opt_state, loss = train_chunk(
                 params,
@@ -493,7 +480,6 @@ def main() -> None:
                 jnp.asarray(reset_mask_np),
             )
 
-            next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
             loss_f = float(loss)
             gpu_train_s = time.time() - t0
             iteration_wall_s = time.time() - iteration_t0

@@ -39,3 +39,8 @@ data/
 artifacts/
 logs/
 .venv_data/
+
+# Temporary runtime files (GPU kernels, matplotlib cache, etc.)
+.tmp/
+.cache/
+.codex
