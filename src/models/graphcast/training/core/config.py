@@ -115,7 +115,7 @@ def parse_args() -> RunConfig:
     )
     parser.add_argument(
         "--temporal-location",
-        choices=["mesh_post_encoder", "mesh_processor_interleaved", "mesh_post_encoder_residual"],
+        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
         default="mesh_post_encoder",
         help="Where to insert temporal module when enabled.",
     )

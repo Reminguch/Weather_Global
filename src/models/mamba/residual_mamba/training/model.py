@@ -7,6 +7,7 @@ from typing import Any
 
 import haiku as hk
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -18,6 +19,12 @@ from src.models.graphcast.training.core.model import (
     build_residual_correction_predictor,
     gc,
     scalarize_loss,
+)
+from src.models.graphcast.training.core.segments import (
+    _build_chunk_batches,
+    _reset_temporal_state_lanes,
+    build_full_segments,
+    iter_eval_segment_chunks,
 )
 
 def _use_zero_init_temporal_out(cfg, temporal_backbone: str | None = None) -> bool:
@@ -223,44 +230,65 @@ def run_residual_eval(
     target_steps: int,
     task_cfg: gc.TaskConfig,
     dt: pd.Timedelta,
+    len_segment: int,
+    bptt_steps: int,
     progress_label: str,
     batch_builder: BatchBuilder = build_batch_from_indices_vectorized,
+    chunk_load_workers: int = 1,
+    load_executor=None,
 ) -> dict[str, float]:
-    losses: list[float] = []
-
+    eval_segments = build_full_segments(eval_indices, len_segment)
+    if not eval_segments:
+        raise ValueError(
+            "No full eval segments after timestamp-contiguous filtering. "
+            f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
+        )
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
     eval_fn_by_batch_size: dict[int, callable] = {}
-
-    n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
+    total_weighted_loss = 0.0
+    total_windows = 0
+    segment_len = len(eval_segments[0])
+    n_lane_groups = (len(eval_segments) + eval_batch_size - 1) // eval_batch_size
+    n_chunks_per_group = segment_len // bptt_steps
+    n_chunks = n_lane_groups * n_chunks_per_group
     t_eval0 = time.time()
 
-    for batch_i, i in enumerate(range(0, len(eval_indices), eval_batch_size), start=1):
-        idx = eval_indices[i : i + eval_batch_size]
-        inputs, targets, forcings = batch_builder(
+    for chunk_i, (chunk_indices, reset_mask_np) in enumerate(
+        iter_eval_segment_chunks(
+            eval_segments,
+            batch_size=eval_batch_size,
+            bptt_steps=bptt_steps,
+        ),
+        start=1,
+    ):
+        chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
             eval_ds,
-            indices=idx,
+            chunk_indices,
             input_steps=input_steps,
             target_steps=target_steps,
             task_cfg=task_cfg,
             dt=dt,
+            batch_builder=batch_builder,
+            chunk_load_workers=chunk_load_workers,
+            load_executor=load_executor,
         )
-        batch_size = len(idx)
+        batch_size = int(len(reset_mask_np))
 
         if batch_size not in residual_state_by_batch_size:
             rng, base_init_key, residual_init_key = jax.random.split(rng, 3)
             _, baseline_state_by_batch_size[batch_size] = baseline_predict_transform.init(
                 base_init_key,
-                inputs,
-                targets,
-                forcings,
+                chunk_inputs[0],
+                chunk_targets[0],
+                chunk_forcings[0],
                 False,
             )
             _, residual_state_by_batch_size[batch_size] = residual_eval_transform.init(
                 residual_init_key,
-                inputs,
-                targets,
-                forcings,
+                chunk_inputs[0],
+                chunk_targets[0],
+                chunk_forcings[0],
                 False,
             )
         if batch_size not in eval_fn_by_batch_size:
@@ -268,48 +296,69 @@ def run_residual_eval(
             baseline_eval_state = baseline_state_by_batch_size[batch_size]
 
             @jax.jit
-            def eval_batch(params, baseline_params, base_key, eval_key, inputs, targets, forcings):
-                baseline_preds, _ = baseline_predict_transform.apply(
-                    baseline_params,
-                    baseline_eval_state,
-                    base_key,
-                    inputs,
-                    targets,
-                    forcings,
-                    False,
-                )
-                residual_targets = compute_residual_targets(targets, baseline_preds)
-                loss_and_diag, _ = residual_eval_transform.apply(
-                    params,
-                    residual_eval_state,
-                    eval_key,
-                    inputs,
-                    residual_targets,
-                    forcings,
-                    False,
-                )
-                return scalarize_loss(loss_and_diag[0])
+            def eval_chunk(
+                params,
+                baseline_params,
+                residual_state,
+                base_key,
+                eval_key,
+                chunk_inputs,
+                chunk_targets,
+                chunk_forcings,
+                reset_mask,
+            ):
+                current_state = _reset_temporal_state_lanes(residual_state, reset_mask)
+                base_keys = jax.random.split(base_key, len(chunk_inputs))
+                eval_keys = jax.random.split(eval_key, len(chunk_inputs))
+                losses = []
+                for bptt_i in range(len(chunk_inputs)):
+                    baseline_preds, _ = baseline_predict_transform.apply(
+                        baseline_params,
+                        baseline_eval_state,
+                        base_keys[bptt_i],
+                        chunk_inputs[bptt_i],
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        False,
+                    )
+                    residual_targets = compute_residual_targets(chunk_targets[bptt_i], baseline_preds)
+                    loss_and_diag, current_state = residual_eval_transform.apply(
+                        params,
+                        current_state,
+                        eval_keys[bptt_i],
+                        chunk_inputs[bptt_i],
+                        residual_targets,
+                        chunk_forcings[bptt_i],
+                        False,
+                    )
+                    losses.append(scalarize_loss(loss_and_diag[0]))
+                return current_state, jnp.stack(losses)
 
-            eval_fn_by_batch_size[batch_size] = eval_batch
+            eval_fn_by_batch_size[batch_size] = eval_chunk
 
         rng, base_key, eval_key = jax.random.split(rng, 3)
-        loss_value = eval_fn_by_batch_size[batch_size](
+        next_state, chunk_losses = eval_fn_by_batch_size[batch_size](
             params,
             baseline_params,
+            residual_state_by_batch_size[batch_size],
             base_key,
             eval_key,
-            inputs,
-            targets,
-            forcings,
+            chunk_inputs,
+            chunk_targets,
+            chunk_forcings,
+            jnp.asarray(reset_mask_np),
         )
-        loss = float(loss_value)
-        losses.append(loss)
+        residual_state_by_batch_size[batch_size] = next_state
 
-        if batch_i == 1 or batch_i % 10 == 0 or batch_i == n_batches:
+        chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
+        total_weighted_loss += float(chunk_losses_np.sum()) * batch_size
+        total_windows += batch_size * len(chunk_inputs)
+
+        if chunk_i == 1 or chunk_i % 10 == 0 or chunk_i == n_chunks:
             elapsed = time.time() - t_eval0
             print(
-                f"[{progress_label}] batch {batch_i}/{n_batches} "
-                f"elapsed {elapsed:.1f}s current_loss {loss:.6f}"
+                f"[{progress_label}] chunk {chunk_i}/{n_chunks} "
+                f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
             )
 
-    return {"total": float(np.mean(losses))}
+    return {"total": float(total_weighted_loss / total_windows)}

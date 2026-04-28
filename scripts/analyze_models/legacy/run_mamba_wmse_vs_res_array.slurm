@@ -12,7 +12,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -40,15 +40,18 @@ RES="${RES_ARRAY[$SLURM_ARRAY_TASK_ID]}"
 mkdir -p "${SHARD_DATA_DIR}"
 
 CMD=(
-  python -u scripts/analyze_models/mamba_wmse_vs_res.py
+  python -u scripts/analyze_models/unified_resolution_eval.py
+  --families graphcast residual_mamba
+  --metrics weighted_allvars per_variable
+  --eval-modes cold warm
   --n-eval-days "${N_EVAL_DAYS}"
+  --lead-days 1 2 4
   --window-batch-size "${WINDOW_BATCH_SIZE}"
   --resolutions "${RES}"
   --output-data-dir "${SHARD_DATA_DIR}"
-  --output-csv-name "mamba_wmse_vs_res_res${RES}.csv"
+  --output-csv-name "mamba_wmse_vs_res_shard_res${RES}.csv"
   --warmup-steps "${WARMUP_STEPS}"
   --trunk-steps "${TRUNK_STEPS}"
-  --skip-plots
 )
 
 echo "Running: ${CMD[*]}"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Submit once to run an array sweep over the res_sweep_mesh_mp234 checkpoints:
-#   sbatch scripts/analyze_models/run_nyc_width_error_res_mp234_per_width.slurm
+#   sbatch scripts/analyze_models/legacy/run_nyc_width_error_res_mp234_per_width.slurm
 #
 # Sweep:
 #   (res, mp) pairs: (1, 4), (4, 3), (15, 2)
@@ -32,7 +32,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -73,7 +73,7 @@ if [[ "${RES}" -eq 1 ]]; then
 fi
 
 CMD=(
-  python -u scripts/analyze_models/nyc_width_error_by_res_mp.py
+  python -u scripts/analyze_models/legacy/nyc_width_error_by_res_mp.py
   --res "${RES}"
   --mp "${MP}"
   --width "${WIDTH}"

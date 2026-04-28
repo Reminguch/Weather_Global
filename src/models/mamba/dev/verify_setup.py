@@ -175,7 +175,7 @@ def main():
             model_cfg, task_cfg, stats,
             use_bf16=True, gradient_checkpointing=True,
             temporal_backbone="mamba",
-            temporal_location="mesh_post_encoder_residual",
+            temporal_location="mesh_processor_interleaved",
             temporal_hidden_size=mamba_hidden,
             temporal_d_inner=None,
             temporal_d_state=16,
@@ -279,7 +279,7 @@ def main():
         predictor = build_predictor(
             model_cfg, task_cfg, stats,
             use_bf16=True, gradient_checkpointing=True,
-            temporal_backbone="mamba", temporal_location="mesh_post_encoder_residual",
+            temporal_backbone="mamba", temporal_location="mesh_processor_interleaved",
             temporal_hidden_size=mamba_hidden,
             temporal_d_inner=None,
             temporal_d_state=16,

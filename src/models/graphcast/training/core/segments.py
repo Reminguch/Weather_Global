@@ -125,6 +125,54 @@ def build_full_segments(indices: np.ndarray, len_segment: int) -> list[np.ndarra
     return segments
 
 
+def iter_eval_segment_chunks(
+    segments: list[np.ndarray],
+    *,
+    batch_size: int,
+    bptt_steps: int,
+) -> Iterable[tuple[tuple[np.ndarray, ...], np.ndarray]]:
+    """Yield deterministic eval chunks over full segments without wraparound.
+
+    Segments are traversed in chronological order. Each yielded item contains
+    `bptt_steps` arrays of final-input indices, one per step in the chunk, plus
+    a reset mask for the active lanes. The reset mask is all-ones for the first
+    chunk of each lane group and all-zeros afterwards so temporal state is
+    preserved within an eval segment and reset only at segment boundaries.
+    """
+    if batch_size <= 0:
+        raise ValueError("batch_size must be > 0")
+    if bptt_steps <= 0:
+        raise ValueError("bptt_steps must be > 0")
+    if not segments:
+        return
+
+    segment_len = len(segments[0])
+    if segment_len == 0:
+        raise ValueError("Eval segments must be non-empty.")
+    if segment_len % bptt_steps != 0:
+        raise ValueError(
+            f"Eval segment length {segment_len} must be divisible by bptt_steps={bptt_steps}."
+        )
+    if any(len(segment) != segment_len for segment in segments):
+        raise ValueError("All eval segments must have the same full length.")
+
+    for start in range(0, len(segments), batch_size):
+        segment_group = segments[start : start + batch_size]
+        lane_count = len(segment_group)
+        for offset in range(0, segment_len, bptt_steps):
+            reset_mask = np.zeros(lane_count, dtype=np.bool_)
+            if offset == 0:
+                reset_mask[:] = True
+            chunk_indices = tuple(
+                np.asarray(
+                    [int(segment[offset + bptt_i]) for segment in segment_group],
+                    dtype=np.int64,
+                )
+                for bptt_i in range(bptt_steps)
+            )
+            yield chunk_indices, reset_mask
+
+
 def _map_temporal_state_leaves(state: hk.State, fn) -> hk.State:
     mutable_state = hk.data_structures.to_mutable_dict(state)
     for module_state in mutable_state.values():
@@ -190,7 +238,7 @@ def _write_segment_run_config(
 
 
 def _build_chunk_batches(
-    train_ds: xr.Dataset,
+    ds: xr.Dataset,
     chunk_indices: Iterable[np.ndarray],
     *,
     input_steps: int,
@@ -205,7 +253,7 @@ def _build_chunk_batches(
 
     def load_one(step_indices: np.ndarray) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
         return batch_builder(
-            train_ds,
+            ds,
             indices=step_indices,
             input_steps=input_steps,
             target_steps=target_steps,
@@ -257,6 +305,119 @@ def _save_chunk_timing_logs(out_dir: Path, chunk_timing: list[dict[str, Any]]) -
             f,
             indent=2,
         )
+
+
+def run_eval_segments(
+    transformed,
+    params: hk.Params,
+    rng: jax.Array,
+    eval_ds: xr.Dataset,
+    eval_indices: np.ndarray,
+    *,
+    eval_batch_size: int,
+    input_steps: int,
+    target_steps: int,
+    task_cfg: gc.TaskConfig,
+    dt: pd.Timedelta,
+    len_segment: int,
+    bptt_steps: int,
+    progress_label: str,
+    batch_builder: BatchBuilder = build_batch_from_indices_vectorized,
+    chunk_load_workers: int = 1,
+    load_executor: concurrent.futures.Executor | None = None,
+) -> dict[str, float]:
+    eval_segments = build_full_segments(eval_indices, len_segment)
+    if not eval_segments:
+        raise ValueError(
+            "No full eval segments after timestamp-contiguous filtering. "
+            f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
+        )
+
+    state_by_lane_count: dict[int, hk.State] = {}
+    eval_chunk_fn_by_lane_count: dict[int, callable] = {}
+    total_weighted_loss = 0.0
+    total_windows = 0
+    segment_len = len(eval_segments[0])
+    n_lane_groups = (len(eval_segments) + eval_batch_size - 1) // eval_batch_size
+    n_chunks_per_group = segment_len // bptt_steps
+    n_chunks = n_lane_groups * n_chunks_per_group
+    t_eval0 = time.time()
+
+    for chunk_i, (chunk_indices, reset_mask_np) in enumerate(
+        iter_eval_segment_chunks(
+            eval_segments,
+            batch_size=eval_batch_size,
+            bptt_steps=bptt_steps,
+        ),
+        start=1,
+    ):
+        chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
+            eval_ds,
+            chunk_indices,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            dt=dt,
+            batch_builder=batch_builder,
+            chunk_load_workers=chunk_load_workers,
+            load_executor=load_executor,
+        )
+        lane_count = int(len(reset_mask_np))
+        rng, init_key, apply_key = jax.random.split(rng, 3)
+
+        if lane_count not in state_by_lane_count:
+            _, state_by_lane_count[lane_count] = transformed.init(
+                init_key,
+                chunk_inputs[0],
+                chunk_targets[0],
+                chunk_forcings[0],
+                False,
+            )
+
+        if lane_count not in eval_chunk_fn_by_lane_count:
+            @jax.jit
+            def eval_chunk(params, state, key, chunk_inputs, chunk_targets, chunk_forcings, reset_mask):
+                current_state = _reset_temporal_state_lanes(state, reset_mask)
+                losses = []
+                keys = jax.random.split(key, len(chunk_inputs))
+                for bptt_i in range(len(chunk_inputs)):
+                    (loss_and_diag, current_state) = transformed.apply(
+                        params,
+                        current_state,
+                        keys[bptt_i],
+                        chunk_inputs[bptt_i],
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        False,
+                    )
+                    losses.append(scalarize_loss(loss_and_diag[0]))
+                return current_state, jnp.stack(losses)
+
+            eval_chunk_fn_by_lane_count[lane_count] = eval_chunk
+
+        next_state, chunk_losses = eval_chunk_fn_by_lane_count[lane_count](
+            params,
+            state_by_lane_count[lane_count],
+            apply_key,
+            chunk_inputs,
+            chunk_targets,
+            chunk_forcings,
+            jnp.asarray(reset_mask_np),
+        )
+        state_by_lane_count[lane_count] = next_state
+
+        chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
+        total_weighted_loss += float(chunk_losses_np.sum()) * lane_count
+        total_windows += lane_count * len(chunk_inputs)
+
+        if chunk_i == 1 or chunk_i % 10 == 0 or chunk_i == n_chunks:
+            elapsed = time.time() - t_eval0
+            print(
+                f"[{progress_label}] chunk {chunk_i}/{n_chunks} "
+                f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
+            )
+
+    return {"total": float(total_weighted_loss / total_windows)}
 
 
 def run_eval_fresh_state(

@@ -28,9 +28,15 @@ MODEL_NAME = "residual_mamba"
 def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
     temporal_cfg = run_cfg.get("temporal_config", {})
     residual_cfg = run_cfg.get("residual_training", {})
+    temporal_backbone = temporal_cfg.get("backbone", "none")
+    temporal_location = temporal_cfg.get("location")
+    if temporal_location is None:
+        temporal_location = (
+            "mesh_processor_interleaved" if temporal_backbone == "mamba" else "mesh_post_encoder"
+        )
     return {
-        "temporal_backbone": temporal_cfg.get("backbone", "none"),
-        "temporal_location": temporal_cfg.get("location", "mesh_post_encoder"),
+        "temporal_backbone": temporal_backbone,
+        "temporal_location": temporal_location,
         "temporal_hidden_size": temporal_cfg.get("hidden_size", model_cfg.latent_size),
         "temporal_d_inner": temporal_cfg.get("d_inner", None),
         "temporal_d_state": temporal_cfg.get("d_state", 16),

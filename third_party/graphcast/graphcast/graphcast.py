@@ -403,7 +403,7 @@ class GraphCast(predictor_base.Predictor):
                ) -> xarray.Dataset:
     self._maybe_init(inputs)
 
-    if self._temporal_backbone == "none" or self._temporal_location == "mesh_post_encoder_residual":
+    if self._temporal_backbone == "none":
       # Baseline encoding: concatenate all timesteps along channel dim.
       # xarray (batch, time, lat, lon, level, multiple vars, forcings)
       # -> [num_grid_nodes, batch, num_channels]
@@ -413,12 +413,6 @@ class GraphCast(predictor_base.Predictor):
       # [num_mesh_nodes, batch, latent_size], [num_grid_nodes, batch, latent_size]
       (latent_mesh_nodes, latent_grid_nodes
        ) = self._run_grid2mesh_gnn(grid_node_features)
-
-      # Residual memory: same encoding as baseline, then inject cross-rollout
-      # temporal state via stateful Mamba on the 3D mesh latent.
-      if self._temporal_location == "mesh_post_encoder_residual":
-        latent_mesh_nodes = self._run_temporal_mesh_block(
-            latent_mesh_nodes, is_training=is_training)
     else:
       grid_node_features = self._inputs_to_grid_node_features_by_time(
           inputs, forcings)

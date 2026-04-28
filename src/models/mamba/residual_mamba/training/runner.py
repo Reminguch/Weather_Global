@@ -127,15 +127,22 @@ def run_training(
         dt=dt_train,
     )
     segments = build_full_segments(train_final_indices, segment_cfg.len_segment)
+    eval_segments = build_full_segments(eval_final_indices, segment_cfg.len_segment)
     if not segments:
         raise ValueError(
             "No full training segments after timestamp-contiguous filtering. "
             f"len_segment={segment_cfg.len_segment}, valid_windows={len(train_final_indices)}"
         )
+    if not eval_segments:
+        raise ValueError(
+            "No full eval segments after timestamp-contiguous filtering. "
+            f"len_segment={segment_cfg.len_segment}, valid_windows={len(eval_final_indices)}"
+        )
     print(
         "Prepared residual segment windows: "
         f"train_windows={len(train_final_indices)}, eval_windows={len(eval_final_indices)}, "
-        f"segments={len(segments)}, len_segment={segment_cfg.len_segment}, "
+        f"train_segments={len(segments)}, eval_segments={len(eval_segments)}, "
+        f"len_segment={segment_cfg.len_segment}, "
         f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, target_steps={target_steps}"
     )
 
@@ -533,8 +540,12 @@ def run_training(
                     target_steps=target_steps,
                     task_cfg=task_cfg,
                     dt=dt_train,
+                    len_segment=segment_cfg.len_segment,
+                    bptt_steps=segment_cfg.bptt_steps,
                     progress_label=f"eval@step{step}",
                     batch_builder=eval_batch_builder,
+                    chunk_load_workers=segment_cfg.chunk_load_workers,
+                    load_executor=load_executor,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
@@ -586,8 +597,11 @@ def run_training(
         target_steps=target_steps,
         task_cfg=task_cfg,
         dt=dt_train,
+        len_segment=segment_cfg.len_segment,
+        bptt_steps=segment_cfg.bptt_steps,
         progress_label="eval@final",
         batch_builder=eval_batch_builder,
+        chunk_load_workers=segment_cfg.chunk_load_workers,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

@@ -64,7 +64,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--temporal-backbone", choices=["none", "mamba"], default="none")
     parser.add_argument(
         "--temporal-location",
-        choices=["mesh_post_encoder", "mesh_processor_interleaved", "mesh_post_encoder_residual"],
+        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
         default="mesh_post_encoder",
     )
     parser.add_argument("--temporal-hidden-size", type=int, default=128)
@@ -233,7 +233,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         _stop_gradient_temporal_state,
         _write_segment_run_config,
         build_full_segments,
-        run_eval_fresh_state,
+        run_eval_segments,
         valid_contiguous_final_input_indices,
     )
 
@@ -286,15 +286,22 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         dt=dt_train,
     )
     segments = build_full_segments(train_final_indices, segment_cfg.len_segment)
+    eval_segments = build_full_segments(eval_final_indices, segment_cfg.len_segment)
     if not segments:
         raise ValueError(
             "No full training segments after timestamp-contiguous filtering. "
             f"len_segment={segment_cfg.len_segment}, valid_windows={len(train_final_indices)}"
         )
+    if not eval_segments:
+        raise ValueError(
+            "No full eval segments after timestamp-contiguous filtering. "
+            f"len_segment={segment_cfg.len_segment}, valid_windows={len(eval_final_indices)}"
+        )
     print(
         "Prepared segment windows: "
         f"train_windows={len(train_final_indices)}, eval_windows={len(eval_final_indices)}, "
-        f"segments={len(segments)}, len_segment={segment_cfg.len_segment}, "
+        f"train_segments={len(segments)}, eval_segments={len(eval_segments)}, "
+        f"len_segment={segment_cfg.len_segment}, "
         f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, target_steps={target_steps}"
     )
 
@@ -641,7 +648,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 )
 
             if step % cfg.eval_every == 0:
-                eval_metrics = run_eval_fresh_state(
+                eval_metrics = run_eval_segments(
                     transformed,
                     params,
                     rng,
@@ -652,8 +659,12 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     target_steps=target_steps,
                     task_cfg=task_cfg,
                     dt=dt_train,
+                    len_segment=segment_cfg.len_segment,
+                    bptt_steps=segment_cfg.bptt_steps,
                     progress_label=f"eval@step{step}",
                     batch_builder=eval_batch_builder,
+                    chunk_load_workers=segment_cfg.chunk_load_workers,
+                    load_executor=load_executor,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
@@ -692,7 +703,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             }
         )
 
-    final_eval = run_eval_fresh_state(
+    final_eval = run_eval_segments(
         transformed,
         params,
         rng,
@@ -703,8 +714,11 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         target_steps=target_steps,
         task_cfg=task_cfg,
         dt=dt_train,
+        len_segment=segment_cfg.len_segment,
+        bptt_steps=segment_cfg.bptt_steps,
         progress_label="eval@final",
         batch_builder=eval_batch_builder,
+        chunk_load_workers=segment_cfg.chunk_load_workers,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

@@ -12,7 +12,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -34,7 +34,7 @@ DISCARD_START_STEPS="${DISCARD_START_STEPS:-14}"
 DISCARD_END_STEPS="${DISCARD_END_STEPS:-0}"
 
 CMD=(
-  python -u scripts/analyze_models/mae_vs_lead.py
+  python -u scripts/analyze_models/legacy/mae_vs_lead.py
   --model-group "${MODEL_GROUP}"
   --dataset-dir "${DATASET_DIR}"
   --n-eval-days "${N_EVAL_DAYS}"
@@ -49,4 +49,3 @@ fi
 
 echo "Running: ${CMD[*]}"
 "${CMD[@]}"
-

@@ -56,8 +56,8 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--temporal-backbone", choices=["none", "mamba"], default="none")
     parser.add_argument(
         "--temporal-location",
-        choices=["mesh_post_encoder", "mesh_processor_interleaved", "mesh_post_encoder_residual"],
-        default="mesh_post_encoder",
+        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
+        default="mesh_processor_interleaved",
     )
     parser.add_argument("--temporal-hidden-size", type=int, default=128)
     parser.add_argument("--temporal-d-inner", type=int, default=None)

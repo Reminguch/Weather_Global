@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate NYC temperature at a fixed target lead for res4 checkpoints.
+"""Legacy NYC temperature evaluation at a fixed target lead for res4 checkpoints.
 
 Replicates the notebook workflow:
 - discover latest checkpoint per run under artifacts/checkpoints/graphcast_res4_stream/res4_*
@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import xarray
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

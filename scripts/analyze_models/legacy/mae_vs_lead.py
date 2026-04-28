@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compute NYC MAE-vs-lead curves for GraphCast checkpoints.
+"""Legacy NYC MAE-vs-lead curves for GraphCast checkpoints.
 
 Supports model groups:
 - res1: latest checkpoints from artifacts/checkpoints/graphcast_res1_stream/res1_*
@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 import xarray
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 GRAPHCAST_LOCAL = ROOT / "third_party" / "graphcast"
@@ -49,7 +49,7 @@ def _require_graphcast() -> None:
 _require_graphcast()
 from graphcast import checkpoint, data_utils, graphcast
 
-from scripts.analyze_models.graphcast_analysis_utils import (
+from scripts.analyze_models.legacy.graphcast_analysis_utils import (
     build_run_jitted,
     suppress_graphcast_future_warnings,
 )

@@ -5,7 +5,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -25,7 +25,7 @@ ARRAY_JOB_ID=$(
     --parsable \
     --array="0-${ARRAY_MAX}" \
     --export=ALL,RESOLUTIONS="${RESOLUTIONS}",WARMUP_STEPS="${WARMUP_STEPS}",TRUNK_STEPS="${TRUNK_STEPS}" \
-    scripts/analyze_models/run_mamba_wmse_vs_res_array.slurm
+    scripts/analyze_models/legacy/run_mamba_wmse_vs_res_array.slurm
 )
 echo "Submitted array job: ${ARRAY_JOB_ID} for resolutions: ${RESOLUTIONS}"
 
@@ -34,6 +34,6 @@ MERGE_JOB_ID=$(
     --parsable \
     --dependency="afterok:${ARRAY_JOB_ID}" \
     --export=ALL,RESOLUTIONS="${RESOLUTIONS}",WARMUP_STEPS="${WARMUP_STEPS}",TRUNK_STEPS="${TRUNK_STEPS}" \
-    scripts/analyze_models/run_mamba_wmse_vs_res_merge.slurm
+    scripts/analyze_models/legacy/run_mamba_wmse_vs_res_merge.slurm
 )
 echo "Submitted merge job: ${MERGE_JOB_ID}"

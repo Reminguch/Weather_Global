@@ -1,4 +1,4 @@
-"""Shared rollout helpers for analysis scripts."""
+"""Legacy shared rollout helpers for analysis scripts."""
 
 from __future__ import annotations
 

@@ -224,29 +224,26 @@ When `temporal_backbone != "none"` with the original design, the model used a **
 
 This confounded every comparison: the performance difference could come from either the Mamba module or the weaker encoding path. Moreover, per-timestep encoding is inherently weaker than channel concatenation because the GNN cannot jointly process multiple frames in a single MLP pass.
 
-### Residual Memory Architecture (`mesh_post_encoder_residual`)
+### Residual Memory Architecture
 
-To isolate Mamba's contribution, we introduced a new location: **`mesh_post_encoder_residual`**. This preserves the baseline encoding path entirely and injects Mamba only as a residual on the mesh latent:
+Residual Mamba now uses the same time-preserving mesh path as `gc_mamba`, with
+**`mesh_processor_interleaved`** as the temporal insertion point. Each call
+processes the real input history window as a short sequence while still
+preserving Mamba state across rollout calls.
 
 ```
-Channel concat [t-1, t] → Grid2Mesh GNN → mesh_latent   ← identical to baseline
-                                                ↓
-                               ★ Mamba: load h_prev, process 1 frame,
-                                 output = mesh_latent + proj(mamba_out)
-                                 save h_new                              ← only change
-                                                ↓
-                               Mesh GNN → Mesh2Grid → prediction        ← identical to baseline
+Encode each input frame separately → Grid2Mesh per frame → [time, mesh, batch, D]
+                                                     ↓
+                            ★ Interleaved Mamba: load h_prev, process 2 frames,
+                              update mesh states across processor steps, save h_new
+                                                     ↓
+                               take last time step → Mesh2Grid → prediction
 ```
 
 Key properties:
-- **Fair comparison**: the only difference from baseline is the Mamba residual block
-- **Cannot degrade**: residual connection means worst case = identity (baseline behavior)
-- **Focused purpose**: Mamba no longer redundantly processes the input frames; it only injects cross-rollout memory via hidden state
-
-Code changes:
-- `graphcast.py`: new branch for `mesh_post_encoder_residual` uses `_inputs_to_grid_node_features()` (baseline encoding) then applies Mamba on the 3D `[mesh, batch, D]` latent
-- `temporal_mesh_mamba_stateful.py`: handles 3D input by unsqueezing a time=1 dimension, running the SSM step + state update, then squeezing back
-- `train_graphcast.py`: added `mesh_post_encoder_residual` to `--temporal-location` choices
+- **Same temporal path as gc_mamba**: no residual-only temporal location
+- **Explicit short history**: Mamba sees the `input_steps` sequence directly
+- **Cross-rollout memory**: stateful Mamba still accumulates information across calls
 
 ### Residual Memory Results
 
@@ -314,7 +311,7 @@ state = _stop_grad_state(state)        # h preserved, grad detached
 
 #### Training Evaluation Results
 
-**Training eval (target_steps=2, state starts from zero):**
+**Training eval (target_steps=2, historical fresh-state behavior):**
 
 | Step | Baseline RMSE | resmem seq RMSE | Gap |
 |------|--------------|-----------------|-----|
@@ -324,7 +321,7 @@ state = _stop_grad_state(state)        # h preserved, grad detached
 | 8k | **76.05** | 77.60 | +2.0% |
 | 10k | **70.13** | 75.20 | +7.2% |
 
-Sequential resmem is 2–22% worse than baseline on training eval, because during training the model learns to depend on accumulated state (within 30-day segments), but training eval resets state to zero.
+Sequential resmem was 2–22% worse than baseline under the earlier fresh-state eval path, because training learned to depend on accumulated state within 30-day segments while validation restarted from zero on each eval batch.
 
 #### Long Rollout Inference Results (Corrected, eval-only mode)
 
@@ -448,8 +445,7 @@ third_party/graphcast/graphcast/
   autoregressive.py                # Unmodified: hk.scan threads state automatically
 
 scripts/training/
-  train_graphcast.py               # Training loop: _reset_ssm_state, --temporal-stateful,
-                                   #   --temporal-location mesh_post_encoder_residual
+  train_graphcast.py               # Training loop: _reset_ssm_state, --temporal-stateful
   stateful_longrollout_20k.slurm   # target_steps=10, 20k steps (old encoding)
   stateful_longrollout_smoke.slurm # Smoke test for target_steps=10
   resmem_t2.slurm                  # Residual memory, target_steps=2, 2k steps
@@ -486,11 +482,11 @@ python scripts/training/train_graphcast.py \
   --input-duration 12h \
   --target-steps 10
 
-# Residual Memory (recommended): same encoding as baseline + Mamba cross-rollout state
+# Residual Mamba (recommended): interleaved 2-step input history + Mamba cross-rollout state
 python scripts/training/train_graphcast.py \
   --temporal-backbone mamba \
   --temporal-stateful \
-  --temporal-location mesh_post_encoder_residual \
+  --temporal-location mesh_processor_interleaved \
   --input-duration 12h \
   --target-steps 4
 ```

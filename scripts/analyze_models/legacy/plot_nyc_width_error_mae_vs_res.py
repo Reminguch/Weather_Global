@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot NYC loss-vs-resolution curves from per-(res, mp) CSVs.
+"""Legacy NYC loss-vs-resolution curves from per-(res, mp) CSVs.
 
 Each figure corresponds to one (mp, lead_days) pair:
   x-axis: resolution group (res)
@@ -7,12 +7,12 @@ Each figure corresponds to one (mp, lead_days) pair:
   curves: different model widths
 
 Expected input CSVs are produced by:
-  scripts/analyze_models/nyc_width_error_by_res_mp.py
+  scripts/analyze_models/legacy/nyc_width_error_by_res_mp.py
 
 Examples:
-  python scripts/analyze_models/plot_nyc_width_error_mae_vs_res.py
-  python scripts/analyze_models/plot_nyc_width_error_mae_vs_res.py --mp 1
-  python scripts/analyze_models/plot_nyc_width_error_mae_vs_res.py --mp 1 2 --lead-days 1 2 4
+  python scripts/analyze_models/legacy/plot_nyc_width_error_mae_vs_res.py
+  python scripts/analyze_models/legacy/plot_nyc_width_error_mae_vs_res.py --mp 1
+  python scripts/analyze_models/legacy/plot_nyc_width_error_mae_vs_res.py --mp 1 2 --lead-days 1 2 4
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_BASE_DIR = ROOT / "plots/analyze_models"
 DEFAULT_INPUT_DIR = DEFAULT_BASE_DIR / "data"
 DEFAULT_IMAGE_DIR = DEFAULT_BASE_DIR / "images"

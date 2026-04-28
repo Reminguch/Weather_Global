@@ -1,6 +1,6 @@
 #!/bin/bash
 # Submit once to run an array sweep over (res, mp, width):
-#   sbatch scripts/analyze_models/run_nyc_width_error_res_mp_per_width.slurm
+#   sbatch scripts/analyze_models/legacy/run_nyc_width_error_res_mp_per_width.slurm
 #
 # Default sweep:
 #   RES_LIST=(1 2 4 6 9 12 15)
@@ -17,7 +17,7 @@
 #   plots/analyze_models/data/nyc_width_error_res{res}_mp{mp}_w{width}.csv
 #
 # After all jobs finish, build MAE-vs-res plots from CSVs with:
-#   python scripts/analyze_models/plot_nyc_width_error_mae_vs_res.py --per-width-only
+#   python scripts/analyze_models/legacy/plot_nyc_width_error_mae_vs_res.py --per-width-only
 # which writes:
 #   plots/analyze_models/images/nyc_mae_vs_res_mp{mp}_lead{lead_days}d.png
 
@@ -36,7 +36,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -80,7 +80,7 @@ if [[ "${RES}" -eq 1 ]]; then
 fi
 
 CMD=(
-  python -u scripts/analyze_models/nyc_width_error_by_res_mp.py
+  python -u scripts/analyze_models/legacy/nyc_width_error_by_res_mp.py
   --res "${RES}"
   --mp "${MP}"
   --width "${WIDTH}"
