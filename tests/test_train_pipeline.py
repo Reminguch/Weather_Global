@@ -4,7 +4,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from src.data.contracts import CanonicalBatch
+from src.data_operations.contracts import CanonicalBatch
 from src.models.base import LossAndPredictions, TrainState
 from src.pipelines.train import train_one_step
 

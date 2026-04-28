@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.data.contracts import CanonicalBatch
+from src.data_operations.contracts import CanonicalBatch
 from src.models.graphcast.adapter import build_graphcast
 
 

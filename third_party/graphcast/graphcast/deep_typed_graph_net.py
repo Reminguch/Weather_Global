@@ -45,7 +45,10 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 import jraph
-from src.models.temporal_mesh_mamba import TemporalMeshBlock, TemporalMeshConfig
+from src.models.mamba.modules.temporal_mesh_mamba import (
+    TemporalMeshBlock,
+    TemporalMeshConfig,
+)
 
 
 GraphToGraphNetwork = Callable[[typed_graph.TypedGraph], typed_graph.TypedGraph]

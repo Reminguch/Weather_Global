@@ -5,7 +5,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from src.models.temporal_mesh_mamba import TemporalMeshBlock, TemporalMeshConfig
+from src.models.mamba.modules.temporal_mesh_mamba import (
+    TemporalMeshBlock,
+    TemporalMeshConfig,
+)
 
 
 def _run_block(cfg: TemporalMeshConfig, x_tnbd: jax.Array, *, is_training: bool) -> jax.Array:

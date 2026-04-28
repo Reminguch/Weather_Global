@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.data.graphcast_dataset import open_graphcast_era5
+from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
 
 
 def _require_graphcast() -> None:

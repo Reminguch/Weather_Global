@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.data.contracts import CanonicalBatch, validate_canonical_batch
+from src.data_operations.contracts import CanonicalBatch, validate_canonical_batch
 
 
 def test_validate_canonical_batch_accepts_minimal_valid_batch() -> None:

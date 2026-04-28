@@ -25,7 +25,7 @@ GRAPHCAST_LOCAL = ROOT / "third_party" / "graphcast"
 if GRAPHCAST_LOCAL.exists() and str(GRAPHCAST_LOCAL) not in sys.path:
     sys.path.insert(0, str(GRAPHCAST_LOCAL))
 
-from src.data.graphcast_dataset import open_graphcast_era5
+from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
 
 
 def _require_graphcast() -> None:

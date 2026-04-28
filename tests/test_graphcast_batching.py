@@ -9,15 +9,17 @@ import pandas as pd
 import xarray as xr
 
 ROOT = Path(__file__).resolve().parents[1]
-TRAINING_ROOT = ROOT / "scripts" / "training"
 GRAPHCAST_LOCAL = ROOT / "third_party" / "graphcast"
-for path in (ROOT, TRAINING_ROOT, GRAPHCAST_LOCAL):
+for path in (ROOT, GRAPHCAST_LOCAL):
     path_str = str(path)
     if path_str not in sys.path:
         sys.path.insert(0, path_str)
 
-from graphcast_train.batching import build_batch_from_indices, build_batch_from_indices_vectorized  # noqa: E402
-from graphcast_train.logging import build_batch_builder_metadata  # noqa: E402
+from src.models.graphcast.training.core.batching import (  # noqa: E402
+    build_batch_from_indices,
+    build_batch_from_indices_vectorized,
+)
+from src.models.graphcast.training.core.logging import build_batch_builder_metadata  # noqa: E402
 
 
 def _task_cfg() -> SimpleNamespace:

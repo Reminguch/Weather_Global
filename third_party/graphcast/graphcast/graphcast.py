@@ -40,13 +40,19 @@ import jax.numpy as jnp
 import jraph
 import numpy as np
 import xarray
-from src.models.temporal_mesh_mamba import TemporalMeshBlock as _StatelessTemporalBlock
-from src.models.temporal_mesh_mamba import TemporalMeshConfig
-from src.models.temporal_mesh_mamba_Ilya import (
+from src.models.mamba.modules.temporal_mesh_mamba import (
+    TemporalMeshBlock as _StatelessTemporalBlock,
+)
+from src.models.mamba.modules.temporal_mesh_mamba import TemporalMeshConfig
+from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
     TemporalMeshBlock as _StatefulTemporalBlock,
 )
-from src.models.temporal_mesh_mamba_Ilya import load_temporal_state_from_haiku
-from src.models.temporal_mesh_mamba_Ilya import store_temporal_state_to_haiku
+from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
+    load_temporal_state_from_haiku,
+)
+from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
+    store_temporal_state_to_haiku,
+)
 
 
 def _get_temporal_block_cls(stateful: bool):
