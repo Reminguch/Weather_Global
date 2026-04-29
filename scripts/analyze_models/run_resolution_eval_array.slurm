@@ -38,9 +38,16 @@ SHARD_SPECS="${SHARD_SPECS:?SHARD_SPECS must be provided as a space-separated li
 CHECKPOINT_ROOTS="${CHECKPOINT_ROOTS:-}"
 
 read -r -a SHARD_ARRAY <<< "${SHARD_SPECS}"
-SPEC="${SHARD_ARRAY[$SLURM_ARRAY_TASK_ID]}"
+TASK_INDEX="${SLURM_ARRAY_TASK_ID:-0}"
+SPEC="${SHARD_ARRAY[$TASK_INDEX]}"
 FAMILY="${SPEC%%:*}"
 RES="${SPEC##*:}"
+
+if [[ "${RES}" == "1" ]]; then
+  EFFECTIVE_WINDOW_BATCH_SIZE=4
+else
+  EFFECTIVE_WINDOW_BATCH_SIZE="${WINDOW_BATCH_SIZE}"
+fi
 
 mkdir -p "${SHARD_DATA_DIR}"
 
@@ -49,7 +56,7 @@ CMD=(
   --families "${FAMILY}"
   --resolutions "${RES}"
   --n-eval-days "${N_EVAL_DAYS}"
-  --window-batch-size "${WINDOW_BATCH_SIZE}"
+  --window-batch-size "${EFFECTIVE_WINDOW_BATCH_SIZE}"
   --warmup-steps "${WARMUP_STEPS}"
   --trunk-steps "${TRUNK_STEPS}"
   --output-data-dir "${SHARD_DATA_DIR}"
@@ -61,5 +68,6 @@ if [[ -n "${CHECKPOINT_ROOTS}" ]]; then
   CMD+=(--checkpoint-roots ${CHECKPOINT_ROOTS})
 fi
 
+echo "Effective window batch size: ${EFFECTIVE_WINDOW_BATCH_SIZE}"
 echo "Running: ${CMD[*]}"
 "${CMD[@]}"

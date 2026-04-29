@@ -28,7 +28,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
-    parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
+    parser.add_argument("--width", type=int, choices=[32, 128, 256, 512, 1024], default=128)
     parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4], default=1)
     parser.add_argument("--val-year", type=int, default=2021)
     parser.add_argument("--train-start-year", type=int, default=None)

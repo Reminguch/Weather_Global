@@ -29,6 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-shards", nargs="*", default=None)
     parser.add_argument("--shard-glob", type=str, default="resolution_eval_*.csv")
     parser.add_argument("--plot-prefix", type=str, default="resolution_eval")
+    parser.add_argument(
+        "--include-per-variable",
+        action="store_true",
+        help="Also render one plot per variable. By default only weighted_allvars plots are written.",
+    )
     return parser.parse_args()
 
 
@@ -87,7 +92,14 @@ def plot_vs_res(
     return True
 
 
-def render_default_plots(df: pd.DataFrame, *, lead_days: list[int], image_dir: Path, plot_prefix: str) -> None:
+def render_default_plots(
+    df: pd.DataFrame,
+    *,
+    lead_days: list[int],
+    image_dir: Path,
+    plot_prefix: str,
+    include_per_variable: bool = False,
+) -> None:
     image_dir.mkdir(parents=True, exist_ok=True)
     for lead_day in lead_days:
         for eval_mode in sorted(df["eval_mode"].dropna().astype(str).unique().tolist()):
@@ -102,6 +114,8 @@ def render_default_plots(df: pd.DataFrame, *, lead_days: list[int], image_dir: P
                 title=f"Normalized weighted all-variable MSE vs res | lead={lead_day}d | {eval_mode}",
                 ylabel="Normalized weighted MSE",
             )
+            if not include_per_variable:
+                continue
             for variable in sorted(
                 df[(df["lead_days"].astype(int) == int(lead_day)) & (df["metric_kind"] == "per_variable")]["variable"]
                 .dropna()
@@ -145,7 +159,13 @@ def main() -> None:
     df.to_csv(csv_path, index=False)
     print(f"Saved merged CSV: {csv_path}")
 
-    render_default_plots(df, lead_days=args.lead_days, image_dir=args.output_image_dir, plot_prefix=args.plot_prefix)
+    render_default_plots(
+        df,
+        lead_days=args.lead_days,
+        image_dir=args.output_image_dir,
+        plot_prefix=args.plot_prefix,
+        include_per_variable=args.include_per_variable,
+    )
 
 
 if __name__ == "__main__":

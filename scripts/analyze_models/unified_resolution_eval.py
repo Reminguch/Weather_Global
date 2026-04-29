@@ -90,6 +90,7 @@ class EvalShardCache:
     cold_misses: int = 0
     warm_hits: int = 0
     warm_misses: int = 0
+    cold_cache_mode: str = "enabled"
 
 
 def parse_args() -> argparse.Namespace:
@@ -384,18 +385,22 @@ def _evaluate_checkpoint(
     ds_res, res_grid_lats, res_grid_lons = _get_resolved_dataset(ds_base, stride, cache)
     n_batches = (len(target_indices) + window_batch_size - 1) // window_batch_size
     acc = _empty_metric_accumulator(max_lead_steps)
+    use_cold_batch_cache = stride > 1
+    if not use_cold_batch_cache:
+        cache.cold_cache_mode = "bypass_res1"
 
     for batch_i in range(n_batches):
         i0 = batch_i * window_batch_size
         i1 = min((batch_i + 1) * window_batch_size, len(target_indices))
         batch_key = (task_key, stride, max_lead_steps, batch_i)
-        if batch_key in cache.cold_batches:
+        if use_cold_batch_cache and batch_key in cache.cold_batches:
             batch = cache.cold_batches[batch_key]
             cache.cold_hits += 1
         else:
             batch = _build_batch(ds_res, target_indices[i0:i1], task_cfg_kwargs, max_lead_steps)
-            cache.cold_batches[batch_key] = batch
-            cache.cold_misses += 1
+            if use_cold_batch_cache:
+                cache.cold_batches[batch_key] = batch
+                cache.cold_misses += 1
         if batch is None:
             continue
         inputs_b, targets_b, forcings_b = batch
@@ -757,7 +762,8 @@ def main() -> None:
         "Cache summary: "
         f"cold_hits={cache.cold_hits} cold_misses={cache.cold_misses} "
         f"warm_hits={cache.warm_hits} warm_misses={cache.warm_misses} "
-        f"stride_cache={len(cache.ds_res_by_stride)} task_cfg_cache={len(cache.task_cfg_kwargs_by_key)}"
+        f"stride_cache={len(cache.ds_res_by_stride)} task_cfg_cache={len(cache.task_cfg_kwargs_by_key)} "
+        f"cold_cache_mode={cache.cold_cache_mode}"
     )
 
 
