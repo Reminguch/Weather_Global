@@ -736,6 +736,131 @@ rather than spatial coupling. Full convergence study is pending.
 
 ---
 
+## v3 K-curriculum + Mamba memory ablation (May 2026)
+
+The v3 trainer (`scripts/training/full_mamba_v3/train_mz_fullmamba_v3.py`)
+adds a three-group loss (upper / MSLP / small-surface) on top of v2's
+specialist heads + anchor-as-batch + lead-weighted Mod C, motivated by
+diagnostics on the K=4 plateau. Raw JSONs and plots in
+`results/2026-04-30_K4_perlead_diagnostic/`,
+`results/2026-04-30_mamba_memory_ablation/`,
+`results/2026-05-01_K6_train_eval_curves/`.
+
+### A. K-curriculum eval Δ% across phases
+
+Each phase evaluates at horizon=K. Δ% = `(baseline_RMSE − corrected_RMSE) /
+baseline_RMSE × 100`, lat-weighted, averaged across all eval points within
+the phase.
+
+| phase | step range | eval horizon | Z latw RMSE Δ% (mean ± std) | MSLP latw RMSE Δ% (mean ± std) | n eval points |
+|-------|------------|--------------|-----------------------------|-------------------------------|---------------|
+| K=2   | 3600–5400  | 2 | +1.25% ± 0.15 | ~+1.10% | 10 |
+| K=4   | 5600–7200  | 4 | +1.66% ± 0.10 | +1.02% ± 0.09 | 9 |
+| K=6   | 7200–8800  | 6 | **+2.09% ± 0.12** | **+1.41% ± 0.19** | 9 |
+
+Each K-switch produces a step-jump within ~200 train steps; phases
+internally plateau (train loss flat at the new floor for 1000+ steps,
+eval Δ% bounces in a ±0.1–0.2pp band). **Caveat**: eval horizon = K, so
+longer leads (with bigger baseline error) are averaged in at every
+K-switch boundary. Apples-to-apples (K4/K6 ckpt × eval horizon {4, 6})
+is needed to disentangle real-learning vs horizon-shift artifact and
+is in flight.
+
+### B. D3 ablation matrix — Mamba memory verified at K=4
+
+5-mode ablation on K=4 step 6000 (TF h=4, 64 segs). Modes: NORMAL (full),
+RESET (SSM hidden zeroed each step), ZEROPREV (prev-residual encoder
+input zeroed), NOFB (ZEROPREV + state_from_feedback off), BOTHOFF (RESET
++ ZEROPREV + state_fb off; per-step head with no temporal context).
+
+**+24h Z latw RMSE Δ% decomposition**:
+
+| mode | Δ% | meaning |
+|------|------|---------|
+| NORMAL | **+1.881%** | full model |
+| ZEROPREV | +1.770% | encoder-input direct contribution = 0.111pp |
+| NOFB | +1.773% | total residual-feedback contribution = 0.108pp |
+| RESET | +1.293% | hidden carries 0.588pp = **31% of NORMAL** |
+| BOTHOFF | +1.303% | floor / per-step residual head |
+
+- Hidden alone (`NOFB − BOTHOFF`) = **+0.469pp = 81% of total temporal lift**.
+- Encoder + Mamba SSM hidden are **complementary by lead time**:
+
+| lead | encoder residual contribution | Mamba hidden contribution |
+|------|-------------------------------|---------------------------|
+| +6h  | **0.65pp** (100% of correction) | **0.00pp** |
+| +12h | 0.13pp | 0.00pp |
+| +18h | 0.09pp | 0.31pp |
+| +24h | 0.11pp | **0.59pp** (81% of correction) |
+
+Encoder = short-lead patcher; SSM hidden = long-lead memory carrier. Hidden
+contribution is zero at +6h/+12h (SSM time axis hasn't built up enough
+state) and dominates at +24h.
+
+**Same matrix at K=2 step 5500** (TF h=2): hidden contribution ≈ 0pp on
+channel-mean MAE Δ% (−0.012pp). At K=2 (T=2 SSM time axis, 1 self-feed
+step), hidden has no time to accumulate. **Direct quantitative
+verification of the K-curriculum hypothesis**: K=2 hidden ≈ 0% → K=4 hidden
+31% on +24h Z.
+
+### C. Per-lead lead-time signature (K=4 step 7000)
+
+`results/2026-04-30_K4_perlead_diagnostic/perlead_K4_step7000_h4_tf.json`.
+Per-variable latw RMSE Δ% by lead time:
+
+| variable | +6h | +12h | +18h | +24h | trend |
+|----------|-----|------|------|------|-------|
+| geopotential | +1.14% | +1.35% | +1.68% | **+1.88%** | ↑ +0.73pp |
+| mean_sea_level_pressure | **−0.00%** | +0.66% | +1.00% | **+1.19%** | ↑ +1.19pp |
+| temperature | +0.60% | +0.71% | +0.72% | +0.72% | ↑ |
+| u_wind (upper) | +0.16% | +0.21% | +0.21% | +0.22% | ↑ |
+| 10m_u_wind | +0.33% | +0.38% | +0.40% | +0.41% | ↑ |
+| vertical_velocity | +0.08% | +0.04% | +0.03% | +0.03% | ↓ |
+| specific_humidity | +0.82% | +0.80% | +0.71% | +0.68% | ↓ |
+| total_precipitation | +0.57% | +0.56% | +0.22% | +0.15% | ↓ |
+| Channel-mean MAE | +0.63% | +0.76% | +0.81% | +0.86% | ↑ |
+
+Memory-friendly variables (Z, MSLP, T, winds): correction grows with lead
+→ memory accumulating. Noisy / displacement-dominated variables
+(precip, humidity, w): correction decays with lead → no long-horizon
+benefit; this is what limits uniform-channel uniform-lead training.
+
+### D. K=4 plateau diagnosis: multi-task averaging trade-off
+
+K=4 phase train_loss flat at 0.184 for 1500+ steps; grad_norm 0.013 ≪
+grad_clip 1.0. Three diagnostics:
+
+- **D4 (LR×3 from 1e-4 to 3e-4, 800 steps)**: train_loss 0.18363 →
+  0.18600 (slight rise). **Not optimization-stuck.**
+- **D5 (lead-weight power=1.0 only, 800 steps)**: train_loss rises
+  (long leads weigh more); eval Z marginally better, no plateau break.
+  **Lead-weighting alone insufficient.**
+- **D1 per-lead (above)**: Z/MSLP long-lead getting better while
+  precip/humidity long-lead getting worse → averaging cancels in
+  uniform-channel train_loss. **Plateau = multi-task trade-off, not
+  capacity ceiling.**
+
+This motivated the v3 three-group loss (upper / MSLP / small-surface)
+with weights 1.0 / 1.0 / 0.1 + linear lead weighting (LW=1.0). K=6 phase
+under this objective: grad_norm jumps from K=4 plateau's 0.013 to 0.063
+(5×); eval Z Δ% mean +1.66% → +2.09% (+0.43pp ≈ 4σ vs K=6 phase std);
+MSLP Δ% +1.02% → +1.41% (+0.39pp); precip stable (+0.30 → +0.24,
+not crashed).
+
+### Plots
+
+- `results/2026-05-01_K6_train_eval_curves/v3_K6_train_eval_curves.png`
+  — train+eval across K=4 and K=6 phases, per-group losses inside K=6.
+- `results/2026-05-01_K6_train_eval_curves/v3_K6_eval_per_variable_Z_MSLP.png`
+  — Z and MSLP absolute baseline vs corrected RMSE plus relative Δ%.
+- `results/2026-05-01_K6_train_eval_curves/v3_K_curriculum_stitched_dpct.png`
+  — K=2 → K=4 → K=6 connected eval Δ% trajectory with phase boundaries.
+- `results/2026-05-01_K6_train_eval_curves/v3_K_curriculum_baseline_horizon_artifact.png`
+  — baseline RMSE jumps at boundaries from horizon shift alone (control).
+
+
+---
+
 ## Repository Structure
 
 ```
