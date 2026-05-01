@@ -965,6 +965,26 @@ under this objective: grad_norm jumps from K=4 plateau's 0.013 to 0.063
 MSLP Δ% +1.02% → +1.41% (+0.39pp); precip stable (+0.30 → +0.24,
 not crashed).
 
+### E. Per-target win rate (TF mode)
+
+Per-target = (lead time × variable channel) bucket. With F=83 channels
+under `--full-variables` and horizon=K, total targets = K × 83. Win rate
+counts how many targets have `delta_RMSE_pct_latw > 0` (model corrected
+beats frozen GraphCast baseline at that variable / lead-time pair).
+
+| ckpt | K | targets | RMSE+ count | RMSE win rate | MAE+ count | MAE win rate |
+|------|---|---------|-------------|---------------|------------|--------------|
+| v3 K=1 step 4000 | 1 | 1 × 83 = 83 | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+| **v3 K=2 step 5500** | 2 | 2 × 83 = 166 | **166** | **100.0%** | 166 | 100.0% |
+| **v3 K=4 step 6000** | 4 | 4 × 83 = 332 | **331** | **99.7%** | 319 | 96.1% |
+| v3 K=4 step 7000 | 4 | 4 × 83 = 332 | 328 | 98.8% | 316 | 95.2% |
+| v3 K=6 step 8500 | 6 | 6 × 83 = 498 | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+
+K=1 row pending eval slurm 7562057 (`results/2026-05-01_v3_winrate/v3K1_step4000_h1_tf.json`);
+K=6 row pending the NORMAL JSON from the K=6 step 8500 ablation slurm 7558339
+(`results/2026-05-01_K6_step8500_memory_ablation/v3K6_step8500_h6_tf_NORMAL.json`).
+Both rows will be filled in once the JSONs land.
+
 ### Plots
 
 - `results/2026-05-01_K6_train_eval_curves/v3_K6_train_eval_curves.png`
