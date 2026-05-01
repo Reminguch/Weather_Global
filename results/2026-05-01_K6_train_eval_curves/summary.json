@@ -1,0 +1,32 @@
+{
+  "K=4 phase (step 5500-7200)": {
+    "n_eval_points": 9,
+    "overall_latw_mean": 1.6091652537305898,
+    "overall_latw_std": 0.09243784722840084,
+    "Z_latw_mean": 1.6573585402128888,
+    "Z_latw_std": 0.09646505162936361,
+    "MSLP_latw_mean": 1.0273552947276068,
+    "MSLP_latw_std": 0.09019314919365354,
+    "train_state_loss_final200": 0.18367186650633813,
+    "grad_norm_final200": 0.012925792229361832
+  },
+  "K=6 phase (step 7000-current)": {
+    "n_eval_points": 9,
+    "overall_latw_mean": 1.9239883329796044,
+    "overall_latw_std": 0.13512990356275562,
+    "Z_latw_mean": 2.0916093989624915,
+    "Z_latw_std": 0.12233887355533607,
+    "MSLP_latw_mean": 1.4105231544419639,
+    "MSLP_latw_std": 0.18988633283745313,
+    "train_state_loss_final200": 0.2510351467877626,
+    "grad_norm_final200": 0.06300846508704126,
+    "loss_upper_final200": 0.3303727424144745,
+    "loss_mslp_final200": 0.05170850969851017,
+    "loss_small_surface_final200": 0.27641285173594954
+  },
+  "K=6 - K=4 gain": {
+    "overall_latw": 0.31482307924901454,
+    "Z_latw": 0.4342508587496028,
+    "MSLP_latw": 0.3831678597143571
+  }
+}
