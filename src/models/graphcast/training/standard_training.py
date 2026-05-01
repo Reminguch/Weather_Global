@@ -233,6 +233,7 @@ def main() -> None:
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
+            zero_init_temporal_out=cfg.zero_init_temporal_out,
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -255,6 +256,7 @@ def main() -> None:
         temporal_layers=cfg.temporal_layers,
         temporal_dropout=cfg.temporal_dropout,
         temporal_stateful=cfg.temporal_stateful,
+        zero_init_temporal_out=cfg.zero_init_temporal_out,
     )
     rng = jax.random.PRNGKey(cfg.seed)
 

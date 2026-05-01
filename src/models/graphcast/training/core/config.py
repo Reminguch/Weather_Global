@@ -76,6 +76,9 @@ class RunConfig:
     prefetch_device_depth: int
     usage_every: int
     eval_only: bool
+    init_from_graphcast_ckpt: str | None = None
+    trainable_part: str = "all"
+    zero_init_temporal_out: bool = False
 
 
 def parse_args() -> RunConfig:

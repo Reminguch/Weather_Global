@@ -44,9 +44,10 @@ from scripts.analyze_models.legacy.analysis_metrics import (
 )
 from scripts.analyze_models.legacy.graphcast_analysis_utils import (
     build_run_jitted,
-    build_truth_anchored_residual_runner,
+    build_truth_anchored_runner,
     suppress_graphcast_future_warnings,
 )
+from src.models.mamba.gc_mamba.legacy_runtime import is_legacy_gc_mamba_checkpoint
 
 
 DATASET_PATH = "data/graphcast/graphcast/dataset/source-era5_cds_rolling-last30d_res-1.0_levels-13_steps-04.nc"
@@ -54,7 +55,7 @@ STATS_DIR = "data/graphcast/graphcast/stats"
 DEFAULT_OUTPUT_DATA_DIR = "plots/analyze_models/data/resolution_eval"
 DEFAULT_OUTPUT_IMAGE_DIR = "plots/analyze_models/images/resolution_eval"
 
-FAMILIES = ["graphcast", "gc_mamba", "residual_mamba"]
+FAMILIES = ["graphcast", "gc_mamba", "legacy_gc_mamba", "residual_mamba"]
 METRICS = ["weighted_allvars", "per_variable"]
 EVAL_MODES = ["cold", "warm"]
 LEAD_DAYS = [1, 2, 4]
@@ -66,6 +67,7 @@ WINDOW_BATCH_SIZE = 8
 WARMUP_STEPS = 24
 TRUNK_STEPS = 32
 RES_GRID_STRIDE = 15
+CSV_SORT_COLUMNS = ["family", "variant", "res", "lead_days", "eval_mode", "metric_kind", "variable"]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -442,7 +444,7 @@ def _evaluate_checkpoint_truth_anchored(
     total_horizon_steps = warmup_steps + trunk_steps + max_lead_steps
     with ckpt_path.open("rb") as f:
         ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
-    runner = build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path)
+    runner = build_truth_anchored_runner(ckpt_obj, stats, ckpt_path)
     task_cfg = runner["task_cfg"]
     model_cfg = runner["model_cfg"]
     task_key, task_cfg_kwargs = _task_cfg_cache_key(task_cfg)
@@ -555,6 +557,15 @@ def _iter_checkpoint_paths(checkpoint_roots: list[Path] | None = None):
     yield from sorted((ROOT / "artifacts/checkpoints").glob("**/ckpt_best.npz"))
 
 
+def _checkpoint_family(ckpt_path: Path, run_cfg: dict) -> str:
+    family = infer_family(run_cfg)
+    if family != "gc_mamba":
+        return family
+    with ckpt_path.open("rb") as f:
+        ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
+    return "legacy_gc_mamba" if is_legacy_gc_mamba_checkpoint(ckpt_obj) else family
+
+
 def discover_model_entries(
     families: list[str],
     resolutions: list[int] | None = None,
@@ -563,7 +574,7 @@ def discover_model_entries(
     entries: list[ModelEntry] = []
     for ckpt_path in _iter_checkpoint_paths(checkpoint_roots):
         run_cfg = load_run_config(ckpt_path)
-        family = infer_family(run_cfg)
+        family = _checkpoint_family(ckpt_path, run_cfg)
         if family not in families:
             continue
         res = _parse_res_from_path(ckpt_path, run_cfg)
@@ -629,8 +640,8 @@ def _append_metric_rows(
                     "n_points": n_by_day.get(day, 0),
                     "run_name": entry.run_name,
                     "ckpt_path": str(entry.ckpt_path),
-                    "warmup_steps": warmup_steps if entry.family == "residual_mamba" else np.nan,
-                    "trunk_steps": trunk_steps if entry.family == "residual_mamba" else np.nan,
+                    "warmup_steps": warmup_steps if eval_mode == "warm" else np.nan,
+                    "trunk_steps": trunk_steps if eval_mode == "warm" else np.nan,
                 }
             )
         if "per_variable" in metrics:
@@ -650,10 +661,19 @@ def _append_metric_rows(
                         "n_points": n_by_day.get(day, 0),
                         "run_name": entry.run_name,
                         "ckpt_path": str(entry.ckpt_path),
-                        "warmup_steps": warmup_steps if entry.family == "residual_mamba" else np.nan,
-                        "trunk_steps": trunk_steps if entry.family == "residual_mamba" else np.nan,
+                        "warmup_steps": warmup_steps if eval_mode == "warm" else np.nan,
+                        "trunk_steps": trunk_steps if eval_mode == "warm" else np.nan,
                     }
                 )
+
+
+def _write_rows_csv(rows: list[dict], csv_path: Path) -> Path:
+    df = pd.DataFrame(rows).sort_values(CSV_SORT_COLUMNS).reset_index(drop=True)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = csv_path.with_name(f"{csv_path.name}.tmp")
+    df.to_csv(tmp_path, index=False)
+    tmp_path.replace(csv_path)
+    return csv_path
 
 
 def main() -> None:
@@ -686,22 +706,23 @@ def main() -> None:
 
     print(f"Evaluating {len(entries)} checkpoints across families={args.families} resolutions={args.resolutions}")
     rows: list[dict] = []
+    csv_path = args.output_data_dir / args.output_csv_name
     for index, entry in enumerate(entries, start=1):
         print(f"\n[{index}/{len(entries)}] {entry.family} res={entry.res} {entry.run_name}")
-        cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day = _evaluate_checkpoint(
-            entry.ckpt_path,
-            stats,
-            ds_base,
-            start_target_idx,
-            n_steps,
-            args.lead_days,
-            lead_steps,
-            seed_base=100000 * index,
-            window_batch_size=args.window_batch_size,
-            target_indices=target_indices,
-            cache=cache,
-        )
         if "cold" in args.eval_modes:
+            cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day = _evaluate_checkpoint(
+                entry.ckpt_path,
+                stats,
+                ds_base,
+                start_target_idx,
+                n_steps,
+                args.lead_days,
+                lead_steps,
+                seed_base=100000 * index,
+                window_batch_size=args.window_batch_size,
+                target_indices=target_indices,
+                cache=cache,
+            )
             _append_metric_rows(
                 rows,
                 entry,
@@ -716,28 +737,20 @@ def main() -> None:
             )
 
         if "warm" in args.eval_modes:
-            if entry.family == "residual_mamba":
-                warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day = _evaluate_checkpoint_truth_anchored(
-                    entry.ckpt_path,
-                    stats,
-                    ds_base,
-                    start_target_idx,
-                    n_steps,
-                    args.lead_days,
-                    lead_steps,
-                    seed_base=200000 * index,
-                    warmup_steps=args.warmup_steps,
-                    trunk_steps=args.trunk_steps,
-                    window_batch_size=args.window_batch_size,
-                    cache=cache,
-                )
-            else:
-                warm_weighted_by_day = {day: np.nan for day in args.lead_days}
-                warm_per_variable_by_day = {
-                    variable: {day: np.nan for day in args.lead_days}
-                    for variable in cold_per_variable_by_day
-                }
-                warm_n_by_day = {day: 0 for day in args.lead_days}
+            warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day = _evaluate_checkpoint_truth_anchored(
+                entry.ckpt_path,
+                stats,
+                ds_base,
+                start_target_idx,
+                n_steps,
+                args.lead_days,
+                lead_steps,
+                seed_base=200000 * index,
+                warmup_steps=args.warmup_steps,
+                trunk_steps=args.trunk_steps,
+                window_batch_size=args.window_batch_size,
+                cache=cache,
+            )
             _append_metric_rows(
                 rows,
                 entry,
@@ -751,12 +764,10 @@ def main() -> None:
                 trunk_steps=args.trunk_steps,
             )
 
-    df = pd.DataFrame(rows).sort_values(
-        ["family", "variant", "res", "lead_days", "eval_mode", "metric_kind", "variable"]
-    ).reset_index(drop=True)
-    args.output_data_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = args.output_data_dir / args.output_csv_name
-    df.to_csv(csv_path, index=False)
+        _write_rows_csv(rows, csv_path)
+        print(f"Updated CSV after {index}/{len(entries)} checkpoints: {csv_path}")
+
+    _write_rows_csv(rows, csv_path)
     print(f"\nSaved CSV: {csv_path}")
     print(
         "Cache summary: "

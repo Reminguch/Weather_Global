@@ -106,7 +106,10 @@ class TemporalMeshBlock(hk.Module):
 
     def __call__(self, mesh_latent_tnbd: jax.Array, *, is_training: bool) -> jax.Array:
         if mesh_latent_tnbd.ndim == 3:
-            return mesh_latent_tnbd
+            if self.cfg.backbone == "none":
+                return mesh_latent_tnbd
+            mesh_4d = mesh_latent_tnbd[None]
+            return self._run_sequence(mesh_4d, is_training=is_training)[0]
         if mesh_latent_tnbd.ndim != 4:
             raise ValueError(
                 "Expected [time, n_mesh_nodes, batch, channels], got "

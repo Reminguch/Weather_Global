@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 DEFAULT_OUTPUT_DATA_DIR = ROOT / "plots/analyze_models/data/resolution_eval"
 DEFAULT_OUTPUT_IMAGE_DIR = ROOT / "plots/analyze_models/images/resolution_eval"
+RES_MESH_TOKEN_RE = re.compile(r"_res\d+_m\d+(?=_)")
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,8 +45,12 @@ def _sanitize_filename_part(value: str) -> str:
 
 def _curve_label(sub: pd.DataFrame) -> str:
     family = str(sub["family"].iloc[0])
-    variant = str(sub["variant"].iloc[0])
-    return variant if variant.startswith(family) else f"{family}:{variant}"
+    model_key = str(sub["model_key"].iloc[0])
+    return model_key if model_key.startswith(family) else f"{family}:{model_key}"
+
+
+def _model_key(variant: str) -> str:
+    return RES_MESH_TOKEN_RE.sub("", variant, count=1)
 
 
 def plot_vs_res(
@@ -69,7 +74,9 @@ def plot_vs_res(
 
     fig, ax = plt.subplots(figsize=(10, 4.8))
     plotted = False
-    for _, curve_df in sub.groupby(["family", "variant"], sort=True):
+    sub = sub.copy()
+    sub["model_key"] = sub["variant"].astype(str).map(_model_key)
+    for _, curve_df in sub.groupby(["family", "model_key"], sort=True):
         curve_df = curve_df.sort_values("res")
         if curve_df["value"].notna().sum() == 0:
             continue

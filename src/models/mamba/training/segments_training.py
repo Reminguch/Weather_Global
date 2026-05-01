@@ -77,6 +77,23 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
+    parser.add_argument(
+        "--init-from-graphcast-ckpt",
+        default=None,
+        help="Initialize matching params from a vanilla GraphCast checkpoint after constructing GC-Mamba.",
+    )
+    parser.add_argument(
+        "--trainable-part",
+        choices=["all", "graphcast", "mamba"],
+        default="all",
+        help="Which parameter subset should receive optimizer updates.",
+    )
+    parser.add_argument(
+        "--zero-init-temporal-out",
+        action="store_true",
+        default=False,
+        help="Zero initialize temporal output projections so inserted Mamba starts as a no-op.",
+    )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
     parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "numpy"], default="numpy")
@@ -120,6 +137,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--temporal-dropout must be in [0, 1)")
     if args.data_cache_max_gib <= 0:
         raise ValueError("--data-cache-max-gib must be > 0")
+    if args.resume_step is not None and args.init_from_graphcast_ckpt is not None:
+        raise ValueError("--resume-step cannot be combined with --init-from-graphcast-ckpt")
 
     base_cfg = RunConfig(
         data_path=args.data_path,
@@ -167,6 +186,9 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         prefetch_device_depth=0,
         usage_every=1,
         eval_only=False,
+        init_from_graphcast_ckpt=args.init_from_graphcast_ckpt,
+        trainable_part=args.trainable_part,
+        zero_init_temporal_out=args.zero_init_temporal_out,
     )
     return SegmentRunConfig(
         base_cfg=base_cfg,
@@ -236,6 +258,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         run_eval_segments,
         valid_contiguous_final_input_indices,
     )
+    from src.models.mamba.training.param_utils import build_trainable_labels, overlay_matching_params
 
     cfg = segment_cfg.base_cfg
     out_dir = Path(cfg.out_dir) / cfg.run_name
@@ -389,6 +412,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
+            zero_init_temporal_out=cfg.zero_init_temporal_out,
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -408,8 +432,25 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     if cfg.resume_step is not None:
         params = ckpt_in.params
         print(f"Resuming from step {cfg.resume_step} (params loaded from {cfg.ckpt_in})")
+    elif cfg.init_from_graphcast_ckpt is not None:
+        init_ckpt = load_graphcast_checkpoint(Path(cfg.init_from_graphcast_ckpt))
+        params, overlay_stats = overlay_matching_params(params, init_ckpt.params)
+        print(
+            "Initialized GC-Mamba from vanilla GraphCast checkpoint "
+            f"{cfg.init_from_graphcast_ckpt}: copied={overlay_stats.copied}, "
+            f"initialized_new={overlay_stats.initialized}"
+        )
 
-    opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
+    if cfg.trainable_part == "all":
+        opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
+    else:
+        opt = optax.multi_transform(
+            {
+                "train": optax.adamw(cfg.lr, weight_decay=cfg.weight_decay),
+                "freeze": optax.set_to_zero(),
+            },
+            build_trainable_labels(params, cfg.trainable_part),
+        )
     opt_state = opt.init(params)
     _write_segment_run_config(
         out_dir,

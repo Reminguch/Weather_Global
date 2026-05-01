@@ -298,6 +298,8 @@ def _write_run_config(
         "lr": cfg.lr,
         "weight_decay": cfg.weight_decay,
         "precision": cfg.precision,
+        "init_from_graphcast_ckpt": cfg.init_from_graphcast_ckpt,
+        "trainable_part": cfg.trainable_part,
         "data_pipeline": {
             "data_cache_mode": cfg.data_cache_mode,
             "data_cache_max_gib": cfg.data_cache_max_gib,
@@ -322,6 +324,7 @@ def _write_run_config(
             "conv_bias": cfg.temporal_conv_bias,
             "layers": cfg.temporal_layers,
             "dropout": cfg.temporal_dropout,
+            "zero_init_output": cfg.zero_init_temporal_out,
         },
         "model_config": dataclasses.asdict(model_cfg),
         "task_config": dataclasses.asdict(task_cfg),

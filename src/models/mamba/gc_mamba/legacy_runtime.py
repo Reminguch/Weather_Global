@@ -1,4 +1,4 @@
-"""GraphCast+Mamba runtime and rollout construction."""
+"""Runtime for legacy 98-channel GraphCast+Mamba checkpoints."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 import haiku as hk
 import jax
 import xarray
+from graphcast import casting, normalization
 
 from src.models.graphcast.runtime import (
     _constant_inputs,
@@ -16,48 +17,30 @@ from src.models.graphcast.runtime import (
     load_checkpoint_and_stats,
     load_run_config,
 )
+from src.models.mamba.gc_mamba.legacy_graphcast import LegacyGraphCastMamba
+from src.models.mamba.gc_mamba.runtime import _apply_temporal_config, _temporal_kwargs
 
-ROOT = Path(__file__).resolve().parents[4]
-from graphcast import casting, graphcast as gc, normalization  # noqa: E402
-
-MODEL_NAME = "gc_mamba"
-
-
-def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
-    temporal_cfg = run_cfg.get("temporal_config", {})
-    return {
-        "temporal_backbone": temporal_cfg.get("backbone", "none"),
-        "temporal_location": temporal_cfg.get("location", "mesh_post_encoder"),
-        "temporal_hidden_size": temporal_cfg.get("hidden_size", model_cfg.latent_size),
-        "temporal_d_inner": temporal_cfg.get("d_inner", None),
-        "temporal_d_state": temporal_cfg.get("d_state", 16),
-        "temporal_d_conv": temporal_cfg.get("d_conv", 4),
-        "temporal_dt_rank": temporal_cfg.get("dt_rank", "auto"),
-        "temporal_bias": temporal_cfg.get("bias", False),
-        "temporal_conv_bias": temporal_cfg.get("conv_bias", True),
-        "temporal_layers": temporal_cfg.get("layers", 1),
-        "temporal_dropout": temporal_cfg.get("dropout", 0.0),
-        "temporal_stateful": bool(temporal_cfg.get("stateful", False)),
-        "zero_init_temporal_out": bool(temporal_cfg.get("zero_init_output", False)),
-    }
+MODEL_NAME = "legacy_gc_mamba"
+LEGACY_GRID_ENCODER_INPUT_DIM = 98
 
 
-def _apply_temporal_config(predictor: gc.GraphCast, temporal_kwargs: dict) -> gc.GraphCast:
-    if hasattr(predictor, "_temporal_backbone"):
-        predictor._temporal_backbone = temporal_kwargs["temporal_backbone"]
-        predictor._temporal_location = temporal_kwargs["temporal_location"]
-        predictor._temporal_hidden_size = temporal_kwargs["temporal_hidden_size"]
-        predictor._temporal_d_inner = temporal_kwargs["temporal_d_inner"]
-        predictor._temporal_d_state = temporal_kwargs["temporal_d_state"]
-        predictor._temporal_d_conv = temporal_kwargs["temporal_d_conv"]
-        predictor._temporal_dt_rank = temporal_kwargs["temporal_dt_rank"]
-        predictor._temporal_bias = temporal_kwargs["temporal_bias"]
-        predictor._temporal_conv_bias = temporal_kwargs["temporal_conv_bias"]
-        predictor._temporal_layers = temporal_kwargs["temporal_layers"]
-        predictor._temporal_dropout = temporal_kwargs["temporal_dropout"]
-        predictor._temporal_stateful = temporal_kwargs["temporal_stateful"]
-        predictor._temporal_zero_init_out = temporal_kwargs["zero_init_temporal_out"]
-    return predictor
+def _iter_param_leaves(tree, prefix: str = ""):
+    if isinstance(tree, dict):
+        for key, value in tree.items():
+            yield from _iter_param_leaves(value, f"{prefix}/{key}")
+        return
+    yield prefix, tree
+
+
+def grid_encoder_input_dim(params) -> int | None:
+    for name, value in _iter_param_leaves(params):
+        if "encoder_nodes_grid_nodes_mlp" in name and name.endswith("linear_0/w"):
+            return int(value.shape[0])
+    return None
+
+
+def is_legacy_gc_mamba_checkpoint(ckpt_obj) -> bool:
+    return grid_encoder_input_dim(ckpt_obj.params) == LEGACY_GRID_ENCODER_INPUT_DIM
 
 
 def _build_one_step_bundle(ckpt_obj, stats, ckpt_path: Path):
@@ -66,12 +49,19 @@ def _build_one_step_bundle(ckpt_obj, stats, ckpt_path: Path):
     params = ckpt_obj.params
 
     run_cfg = load_run_config(ckpt_path)
+    family = infer_family(run_cfg)
+    if family != "gc_mamba":
+        raise ValueError(f"Checkpoint family mismatch: expected gc_mamba-compatible config, found {family}")
+    if not is_legacy_gc_mamba_checkpoint(ckpt_obj):
+        input_dim = grid_encoder_input_dim(params)
+        raise ValueError(f"Checkpoint is not legacy GC-Mamba: grid encoder input dim is {input_dim}")
+
     temporal_kwargs = _temporal_kwargs(model_cfg, run_cfg)
     use_bf16 = run_cfg.get("precision", "bf16") == "bf16"
 
     @hk.transform_with_state
     def run_forward(inputs, targets_template, forcings):
-        predictor = gc.GraphCast(model_cfg, task_cfg)
+        predictor = LegacyGraphCastMamba(model_cfg, task_cfg)
         predictor = _apply_temporal_config(predictor, temporal_kwargs)
         if use_bf16:
             predictor = casting.Bfloat16Cast(predictor)
@@ -109,11 +99,6 @@ def _build_one_step_bundle(ckpt_obj, stats, ckpt_path: Path):
 
 
 def build_run_jitted(ckpt_obj, stats, ckpt_path: Path):
-    run_cfg = load_run_config(ckpt_path)
-    family = infer_family(run_cfg)
-    if family != MODEL_NAME:
-        raise ValueError(f"Checkpoint family mismatch: expected {MODEL_NAME}, found {family}")
-
     bundle = _build_one_step_bundle(ckpt_obj, stats, ckpt_path)
     task_cfg = bundle["task_cfg"]
     model_cfg = bundle["model_cfg"]
@@ -144,4 +129,15 @@ def build_run_jitted(ckpt_obj, stats, ckpt_path: Path):
             rolling_inputs = _update_inputs(rolling_inputs, xarray.merge([pred_step, forcings_step]))
         return xarray.concat(preds, dim=target_times)
 
-    return run_jitted, task_cfg, model_cfg, run_cfg
+    return run_jitted, task_cfg, model_cfg, bundle["run_cfg"]
+
+
+__all__ = [
+    "LEGACY_GRID_ENCODER_INPUT_DIM",
+    "MODEL_NAME",
+    "_build_one_step_bundle",
+    "build_run_jitted",
+    "grid_encoder_input_dim",
+    "is_legacy_gc_mamba_checkpoint",
+    "load_checkpoint_and_stats",
+]

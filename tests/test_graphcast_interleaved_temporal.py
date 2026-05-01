@@ -19,6 +19,61 @@ if str(GRAPHCAST_LOCAL) not in sys.path:
 from graphcast import graphcast as gc  # noqa: E402
 
 
+def test_mamba_call_uses_vanilla_stacked_input_encoder() -> None:
+    calls: list[str] = []
+    predictor = object.__new__(gc.GraphCast)
+    predictor._temporal_backbone = "mamba"
+    predictor._temporal_location = "mesh_processor_interleaved"
+
+    def maybe_init(inputs):
+        calls.append("maybe_init")
+
+    def inputs_to_grid_node_features(inputs, forcings):
+        calls.append("stacked_inputs")
+        return "grid_features"
+
+    def run_grid2mesh_gnn(grid_features):
+        calls.append(f"grid2mesh:{grid_features}")
+        return "latent_mesh", "latent_grid"
+
+    def run_mesh_gnn(latent_mesh, *, is_training):
+        calls.append(f"mesh_gnn:{latent_mesh}:{is_training}")
+        return "updated_mesh"
+
+    def run_mesh2grid_gnn(updated_mesh, latent_grid):
+        calls.append(f"mesh2grid:{updated_mesh}:{latent_grid}")
+        return "grid_output"
+
+    def grid_node_outputs_to_prediction(grid_output, targets_template):
+        calls.append(f"prediction:{grid_output}:{targets_template}")
+        return "prediction"
+
+    predictor._maybe_init = maybe_init
+    predictor._inputs_to_grid_node_features = inputs_to_grid_node_features
+    predictor._run_grid2mesh_gnn = run_grid2mesh_gnn
+    predictor._run_mesh_gnn = run_mesh_gnn
+    predictor._run_mesh2grid_gnn = run_mesh2grid_gnn
+    predictor._grid_node_outputs_to_prediction = grid_node_outputs_to_prediction
+
+    out = gc.GraphCast.__call__(
+        predictor,
+        inputs="inputs",
+        targets_template="targets",
+        forcings="forcings",
+        is_training=True,
+    )
+
+    assert out == "prediction"
+    assert calls == [
+        "maybe_init",
+        "stacked_inputs",
+        "grid2mesh:grid_features",
+        "mesh_gnn:latent_mesh:True",
+        "mesh2grid:updated_mesh:latent_grid",
+        "prediction:grid_output:targets",
+    ]
+
+
 class _NodeSet(NamedTuple):
     features: jax.Array
 
@@ -58,8 +113,7 @@ class _TinyMeshGNN:
         )
 
 
-def test_stateful_interleaved_temporal_keeps_mesh_and_batch_axes_distinct() -> None:
-    time_size = 3
+def test_stateful_interleaved_temporal_uses_3d_mesh_latents() -> None:
     n_mesh = 5
     batch_size = 2
     channels = 8
@@ -85,16 +139,17 @@ def test_stateful_interleaved_temporal_keeps_mesh_and_batch_axes_distinct() -> N
         predictor._temporal_conv_bias = True
         predictor._temporal_layers = 1
         predictor._temporal_dropout = 0.0
+        predictor._temporal_zero_init_out = False
         return gc.GraphCast._run_mesh_gnn_interleaved(predictor, x)
 
     transformed = hk.transform_with_state(forward)
     rng = jax.random.PRNGKey(0)
-    x = jnp.ones((time_size, n_mesh, batch_size, channels), dtype=jnp.float32)
+    x = jnp.ones((n_mesh, batch_size, channels), dtype=jnp.float32)
 
     params, state = transformed.init(rng, x)
     y, next_state = transformed.apply(params, state, rng, x)
 
-    assert y.shape == (time_size, n_mesh, batch_size, channels)
+    assert y.shape == (n_mesh, batch_size, channels)
     flat_state = hk.data_structures.to_mutable_dict(next_state)
     ssm_states = [
         value

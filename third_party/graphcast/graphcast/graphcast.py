@@ -403,31 +403,24 @@ class GraphCast(predictor_base.Predictor):
                ) -> xarray.Dataset:
     self._maybe_init(inputs)
 
-    if self._temporal_backbone == "none":
-      # Baseline encoding: concatenate all timesteps along channel dim.
-      # xarray (batch, time, lat, lon, level, multiple vars, forcings)
-      # -> [num_grid_nodes, batch, num_channels]
-      grid_node_features = self._inputs_to_grid_node_features(inputs, forcings)
+    # Baseline GraphCast encoding: concatenate all input timesteps along the
+    # channel dim before grid2mesh. Mamba is a latent memory module and should
+    # not change the pretrained encoder's input feature shape.
+    grid_node_features = self._inputs_to_grid_node_features(inputs, forcings)
 
-      # Transfer data for the grid to the mesh,
-      # [num_mesh_nodes, batch, latent_size], [num_grid_nodes, batch, latent_size]
-      (latent_mesh_nodes, latent_grid_nodes
-       ) = self._run_grid2mesh_gnn(grid_node_features)
-    else:
-      grid_node_features = self._inputs_to_grid_node_features_by_time(
-          inputs, forcings)
-      latent_mesh_nodes, latent_grid_nodes = self._run_grid2mesh_gnn_over_time(
-          grid_node_features)
-      latent_grid_nodes = latent_grid_nodes[-1]
-      if self._temporal_location == "mesh_post_encoder":
-        latent_mesh_nodes = self._run_temporal_mesh_block(
-            latent_mesh_nodes, is_training=is_training)
+    # Transfer data for the grid to the mesh,
+    # [num_mesh_nodes, batch, latent_size], [num_grid_nodes, batch, latent_size]
+    latent_mesh_nodes, latent_grid_nodes = self._run_grid2mesh_gnn(
+        grid_node_features)
+    if (self._temporal_backbone != "none" and
+        self._temporal_location == "mesh_post_encoder"):
+      latent_mesh_nodes = self._run_temporal_mesh_block(
+          latent_mesh_nodes, is_training=is_training)
 
     # Run message passing in the multimesh.
     # [num_mesh_nodes, batch, latent_size]
-    updated_latent_mesh_nodes = self._run_mesh_gnn(latent_mesh_nodes)
-    if updated_latent_mesh_nodes.ndim == 4:
-      updated_latent_mesh_nodes = updated_latent_mesh_nodes[-1]
+    updated_latent_mesh_nodes = self._run_mesh_gnn(
+        latent_mesh_nodes, is_training=is_training)
 
     # Transfer data frome the mesh to the grid.
     # [num_grid_nodes, batch, output_size]
@@ -715,11 +708,22 @@ class GraphCast(predictor_base.Predictor):
     latent_grid_nodes = grid2mesh_out.nodes["grid_nodes"].features
     return latent_mesh_nodes, latent_grid_nodes
 
-  def _run_mesh_gnn(self, latent_mesh_nodes: chex.Array) -> chex.Array:
+  def _run_mesh_gnn(
+      self,
+      latent_mesh_nodes: chex.Array,
+      *,
+      is_training: bool = False,
+  ) -> chex.Array:
     """Runs the mesh_gnn, extracting updated latent mesh nodes."""
-    if (latent_mesh_nodes.ndim == 4 and
+    if (self._temporal_backbone != "none" and
         self._temporal_location == "mesh_processor_interleaved"):
-      return self._run_mesh_gnn_interleaved(latent_mesh_nodes)
+      return self._run_mesh_gnn_interleaved(
+          latent_mesh_nodes, is_training=is_training)
+
+    if latent_mesh_nodes.ndim != 3:
+      raise ValueError(
+          "Expected [num_mesh_nodes, batch, channels], got "
+          f"shape={latent_mesh_nodes.shape}")
 
     # Add the structural edge features of this graph. Note we don't need
     # to add the structural node features, because these are already part of
@@ -755,13 +759,18 @@ class GraphCast(predictor_base.Predictor):
     # Run the GNN.
     return self._mesh_gnn(input_graph).nodes["mesh_nodes"].features
 
-  def _run_mesh_gnn_interleaved(self, latent_mesh_nodes: chex.Array) -> chex.Array:
-    """Runs the mesh processor with interleaved spatial and temporal steps."""
-    if latent_mesh_nodes.ndim != 4:
+  def _run_mesh_gnn_interleaved(
+      self,
+      latent_mesh_nodes: chex.Array,
+      *,
+      is_training: bool = False,
+  ) -> chex.Array:
+    """Runs mesh processor steps interleaved with latent Mamba memory."""
+    if latent_mesh_nodes.ndim != 3:
       raise ValueError(
-          "Expected [time, num_mesh_nodes, batch, channels], got "
+          "Expected [num_mesh_nodes, batch, channels], got "
           f"shape={latent_mesh_nodes.shape}")
-    time_size, n_mesh, batch_size, _ = latent_mesh_nodes.shape
+    n_mesh, batch_size, _ = latent_mesh_nodes.shape
 
     mesh_graph = self._mesh_graph_structure
     assert mesh_graph is not None
@@ -776,33 +785,24 @@ class GraphCast(predictor_base.Predictor):
           nodes={"mesh_nodes": mesh_graph.nodes["mesh_nodes"]._replace(
               features=node_features)})
 
-    input_graph = build_graph(latent_mesh_nodes[0])
+    input_graph = build_graph(latent_mesh_nodes)
     embedder_network, processor_networks, _ = self._mesh_gnn._networks_builder(
         input_graph)
 
-    latent_graphs = [
-        self._mesh_gnn._embed(build_graph(latent_mesh_nodes[t]), embedder_network)
-        for t in range(time_size)
-    ]
+    latent_graph = self._mesh_gnn._embed(
+        build_graph(latent_mesh_nodes), embedder_network)
 
     for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
       for step_i, processor_network in enumerate(processor_networks):
-        latent_graphs = [
-            self._mesh_gnn._process_step(processor_network, latent_graph_t)
-            for latent_graph_t in latent_graphs
-        ]
-        node_sequence = jnp.stack(
-            [graph_t.nodes["mesh_nodes"].features for graph_t in latent_graphs],
-            axis=0)
-        # Graph node features are [num_mesh_nodes, batch, channels], so stacking
-        # over input time already gives the TemporalMeshBlock contract:
-        # [time, num_mesh_nodes, batch, channels].
-        expected_prefix = (time_size, n_mesh, batch_size)
-        if node_sequence.shape[:3] != expected_prefix:
+        latent_graph = self._mesh_gnn._process_step(
+            processor_network, latent_graph)
+        node_features = latent_graph.nodes["mesh_nodes"].features
+        expected_prefix = (n_mesh, batch_size)
+        if node_features.shape[:2] != expected_prefix:
           raise ValueError(
-              "Unexpected interleaved mesh node sequence shape before temporal "
+              "Unexpected interleaved mesh node shape before temporal "
               f"block: expected prefix {expected_prefix}, got "
-              f"{node_sequence.shape}.")
+              f"{node_features.shape}.")
         temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}"
         temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
             TemporalMeshConfig(
@@ -826,46 +826,41 @@ class GraphCast(predictor_base.Predictor):
               f"{temporal_block_name}_state",
               temporal_block.cfg,
               batch_size=batch_size,
-              n_mesh=node_sequence.shape[1],
-              dtype=node_sequence.dtype,
+              n_mesh=node_features.shape[0],
+              dtype=node_features.dtype,
           )
-          node_sequence, next_temporal_state = temporal_block(
-              node_sequence,
+          node_features, next_temporal_state = temporal_block(
+              node_features,
               prev_state=temporal_state,
-              is_training=False,
+              is_training=is_training,
           )
           store_temporal_state_to_haiku(
               f"{temporal_block_name}_state", next_temporal_state)
         else:
-          node_sequence = temporal_block(node_sequence, is_training=False)
-        if node_sequence.shape[:3] != expected_prefix:
+          node_features = temporal_block(
+              node_features, is_training=is_training)
+        if node_features.shape[:2] != expected_prefix:
           raise ValueError(
-              "Unexpected interleaved mesh node sequence shape after temporal "
+              "Unexpected interleaved mesh node shape after temporal "
               f"block: expected prefix {expected_prefix}, got "
-              f"{node_sequence.shape}.")
-        latent_graphs = [
-            graph_t._replace(
-                nodes={"mesh_nodes": graph_t.nodes["mesh_nodes"]._replace(
-                    features=node_sequence[t])})
-            for t, graph_t in enumerate(latent_graphs)
-        ]
+              f"{node_features.shape}.")
+        latent_graph = latent_graph._replace(
+            nodes={"mesh_nodes": latent_graph.nodes["mesh_nodes"]._replace(
+                features=node_features)})
 
-    return jnp.stack(
-        [graph_t.nodes["mesh_nodes"].features for graph_t in latent_graphs],
-        axis=0)
+    return latent_graph.nodes["mesh_nodes"].features
 
   def _run_temporal_mesh_block(self,
                                latent_mesh_nodes: chex.Array,
                                is_training: bool = False) -> chex.Array:
     """Optional temporal module over mesh latent states.
 
-    Supports both 3D [n_mesh, batch, D] (residual memory with baseline encoding)
-    and 4D [time, n_mesh, batch, D] (legacy per-timestep encoding) inputs.
-    The TemporalMeshBlock handles both shapes internally.
+    Supports 3D [n_mesh, batch, D] latent state from the vanilla GraphCast
+    encoder. Stateful Mamba treats each call as one recurrent step.
     """
-    if latent_mesh_nodes.ndim not in (3, 4):
+    if latent_mesh_nodes.ndim != 3:
       raise ValueError(
-          "Expected mesh latent rank 3 or 4, got "
+          "Expected mesh latent rank 3, got "
           f"{latent_mesh_nodes.ndim} with shape={latent_mesh_nodes.shape}")
     if not hasattr(self, '_temporal_block'):
       self._temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
@@ -888,8 +883,8 @@ class GraphCast(predictor_base.Predictor):
     if not self._temporal_stateful:
       return self._temporal_block(latent_mesh_nodes, is_training=is_training)
 
-    batch_size = latent_mesh_nodes.shape[2] if latent_mesh_nodes.ndim == 4 else latent_mesh_nodes.shape[1]
-    n_mesh = latent_mesh_nodes.shape[1] if latent_mesh_nodes.ndim == 4 else latent_mesh_nodes.shape[0]
+    batch_size = latent_mesh_nodes.shape[1]
+    n_mesh = latent_mesh_nodes.shape[0]
     temporal_state = load_temporal_state_from_haiku(
         "temporal_mesh_block_state",
         self._temporal_block.cfg,
@@ -965,64 +960,6 @@ class GraphCast(predictor_base.Predictor):
     return xarray_jax.unwrap(grid_xarray_lat_lon_leading.data).reshape(
         (-1,) + grid_xarray_lat_lon_leading.data.shape[2:])
 
-  def _inputs_to_grid_node_features_by_time(
-      self,
-      inputs: xarray.Dataset,
-      forcings: xarray.Dataset,
-      ) -> chex.Array:
-    """xarrays -> [time, num_grid_nodes, batch, num_channels]."""
-
-    stacked_inputs = model_utils.dataset_to_stacked(
-        inputs, preserved_dims=("batch", "time", "lat", "lon"))
-    grid_xarray_lat_lon_leading = model_utils.lat_lon_to_leading_axes(
-        stacked_inputs)
-    input_features = xarray_jax.unwrap(
-        grid_xarray_lat_lon_leading.data).reshape(
-            (-1,) + grid_xarray_lat_lon_leading.data.shape[2:])
-    input_features = jnp.transpose(input_features, (2, 0, 1, 3))
-
-    # Forcings in GraphCast are associated with the prediction horizon rather
-    # than the historical input window, so they do not share the same time
-    # coordinates as `inputs`. For the temporal mesh path we first replicate the
-    # forcing channels across the input history, which preserves the information
-    # content while keeping an explicit time axis for the encoder path.
-    stacked_forcings = model_utils.dataset_to_stacked(forcings)
-    forcings_lat_lon_leading = model_utils.lat_lon_to_leading_axes(
-        stacked_forcings)
-    forcing_features = xarray_jax.unwrap(
-        forcings_lat_lon_leading.data).reshape(
-            (-1,) + forcings_lat_lon_leading.data.shape[2:])
-    forcing_features = jnp.broadcast_to(
-        forcing_features[None, ...],
-        (input_features.shape[0],) + forcing_features.shape)
-    return jnp.concatenate([input_features, forcing_features], axis=-1)
-
-  def _run_grid2mesh_gnn_over_time(self, grid_node_features: chex.Array
-                                  ) -> tuple[chex.Array, chex.Array]:
-    """Runs grid2mesh independently per time step.
-
-    Args:
-      grid_node_features: [time, num_grid_nodes, batch, channels]
-
-    Returns:
-      Tuple of:
-        latent mesh nodes [time, num_mesh_nodes, batch, latent_size]
-        latent grid nodes [time, num_grid_nodes, batch, latent_size]
-    """
-    if grid_node_features.ndim != 4:
-      raise ValueError(
-          "Expected [time, num_grid_nodes, batch, channels], got "
-          f"shape={grid_node_features.shape}")
-
-    latent_mesh_nodes = []
-    latent_grid_nodes = []
-    for t in range(grid_node_features.shape[0]):
-      latent_mesh_t, latent_grid_t = self._run_grid2mesh_gnn(
-          grid_node_features[t])
-      latent_mesh_nodes.append(latent_mesh_t)
-      latent_grid_nodes.append(latent_grid_t)
-    return jnp.stack(latent_mesh_nodes, axis=0), jnp.stack(latent_grid_nodes,
-                                                           axis=0)
 
   def _grid_node_outputs_to_prediction(
       self,

@@ -37,3 +37,14 @@ def test_temporal_mesh_block_mamba_returns_expected_shape_and_finite_values() ->
     )
     assert y.shape == (6, 2, 8)
     assert np.isfinite(np.asarray(y)).all()
+
+
+def test_temporal_mesh_block_mamba_accepts_single_step_3d_latents() -> None:
+    x = jnp.ones((6, 2, 8), dtype=jnp.float32)
+    y = _run_block(
+        TemporalMeshConfig(backbone="mamba", hidden_size=8, layers=1, dropout=0.0),
+        x,
+        is_training=False,
+    )
+    assert y.shape == x.shape
+    assert np.isfinite(np.asarray(y)).all()
