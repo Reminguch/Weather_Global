@@ -262,6 +262,104 @@ For each segment (length T) within a continuous time window:
 
 **Cross-Rollout state in the MZ variant:** the Mamba hidden state flows along the segment's time axis inside one training step (via the internal `jax.lax.scan`). Across training steps the state is re-initialized to zero — there is no global cross-sample state — because each segment is treated as an i.i.d. trajectory. This is simpler than the stateful cross-rollout design above and matches the "segment as one Mori–Zwanzig trajectory" interpretation.
 
+### v3 changes on top of MZ-residual
+
+v3 (`scripts/training/full_mamba_v3/train_mz_fullmamba_v3.py`) keeps the
+MZ-residual structure above and adds three orthogonal mechanisms that
+together turned out to be needed to make the K-curriculum produce
+ablation-verifiable Mamba memory.
+
+**1. Specialist heads (Mod G; flag `--specialist-heads`)**
+
+The single residual head at the end of `MZResidualFullMambaMeshed._decode_from_mesh`
+is replaced by **two parallel `hk.Linear` projections** from the shared
+mesh post-SSM hidden, each writing to a disjoint slice of the F=83 output
+channels:
+
+```
+shared body output h: [B, M, H]
+   ├── upper_head   → [B, M, 78]     6 pressure-level vars × 13 levels
+   │                                  (Z, T, q, u, v, w)
+   └── surface_head → [B, M, 5]      2m_T, MSLP, 10m_u, 10m_v, total_precip
+                          ↓
+   scatter into a single [B, M, 83] residual via fixed
+   upper_channel_indices / surface_channel_indices permutations
+```
+
+Both heads share the body (encoder + processor + SSM); only the final
+projection is split. `parse_args` enforces `--full-variables` and a clean
+0..F−1 partition over the channel indices (Guard 2). Backward compat:
+`--specialist-heads` off keeps the original single `residual_head`.
+
+**2. Anchor-as-batch SSM layout (Mod A; `--anchor-as-batch`)**
+
+Legacy training flattened the K-step rollout as `T = S·K` along the SSM
+time axis with `B=1`, so the SSM hidden state crossed anchor boundaries
+non-physically. v3 transposes `[S, K, ...] → [K, S, ...]` before the SSM
+so:
+- T axis = K = monotonic physical lead time within one anchor
+- B axis = S = independent anchors (batched in parallel)
+- Hidden state resets implicitly between segments (each segment's `[B, M, H]`
+  init is zero) and propagates monotonically along physical time within
+  each anchor.
+
+`tf_mask` becomes `[1, 0, 0, ..., 0]` (one teacher-forcing slot at t=0
+broadcast over all S anchors). Patch 1 (`--anchor-as-batch-min-k`) keeps
+K=1 in the legacy `T = S·K` layout (which empirically wins for K=1) and
+only enables anchor-as-batch at K≥2.
+
+**3. Three-group loss + lead weighting (`--use-group-loss`)**
+
+The training objective splits into three channel groups with independently
+tunable weights, computed in normalised residual MSE space (lat-weighted,
+lead-weighted, **without** the GraphCast per-variable `w_chan`):
+
+```
+upper          = Z, T, q, u, v, w (78 ch)
+mslp           = mean_sea_level_pressure (1 ch)
+small_surface  = 2m_T, 10m_u, 10m_v, total_precipitation_6hr (4 ch)
+
+L_g = mean over group g of  ((corrected − truth) / diff_std)²
+                            · cos(lat)_norm
+                            · ((s+1)/mean(s+1))^p          ← Mod C lead weight
+```
+
+with the optimized total
+
+```
+L = (λ_u · L_upper + λ_m · L_mslp + λ_s · L_small) / (λ_u + λ_m + λ_s)
+```
+
+Defaults used in the K=6 phase: `λ_u = 1.0, λ_m = 1.0, λ_s = 0.1, p = 1.0`,
+i.e. upper-air and MSLP get equal full weight, small-surface
+(precip/10m_winds/2mT) is attenuated 10×, long leads emphasised linearly.
+Two design choices matter:
+
+- **w_chan dropped inside the group computation.** GraphCast's
+  `_PER_VARIABLE_LOSS_WEIGHTS` would otherwise re-multiply MSLP / 10m
+  wind / precip by 0.1 → effective MSLP weight `λ_m · 0.1 = 0.1` even at
+  `λ_m = 1.0`. v3 strips `w_chan` from the group computation so the
+  group weights are the full per-group weighting.
+
+- **Normalised by Σλ** so changing the relative weights does not also
+  rescale the loss magnitude — LR transferable from legacy chains.
+
+The legacy single-mean weighted MSE is still computed every step as
+`state_loss` and `loss_upper / loss_mslp / loss_small_surface` are also
+logged unconditionally. With `--use-group-loss` off, `total_loss = state_loss`
+and existing K=1/K=2/K=4 chains reproduce byte-for-byte.
+
+**Why v3 needed all three together.** D3 ablation at K=4 step 6000 shows
+Mamba SSM hidden state carries 31% of NORMAL +24h Z latw Δ%, but K=4
+phase plateaued at train_loss 0.184 (D4 LR×3 confirmed not optimization-
+stuck; D1 per-lead showed Z/MSLP long-lead improving while precip/humidity
+long-lead degrading — uniform-channel averaging cancelled out). The
+three-group loss attenuates the noisy small-surface gradients on the
+shared SSM body so the body's gradient prioritises the variables for
+which D3 confirmed Mamba hidden actually does work. K=6 phase under this
+objective: grad_norm 0.013 → 0.063 (5×), Z eval Δ% +1.66% → +2.09%,
+MSLP +1.02% → +1.41%.
+
 ---
 
 ## Key Bug Fix: Transpose in Stateless Version
