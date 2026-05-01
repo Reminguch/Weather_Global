@@ -30,6 +30,14 @@ TRAIN_DIR = ROOT / "scripts" / "training"
 if str(TRAIN_DIR) not in sys.path:
     sys.path.insert(0, str(TRAIN_DIR))
 
+# v3 trainer holds the anchor-as-batch implementation of _segment_to_tensors;
+# add it to the path so we can route v3 ckpts through that build path during
+# eval. Falls back transparently to the legacy [T=S*K, B=1, ...] layout when
+# anchor_as_batch=False, so v1 ckpts keep working.
+TRAIN_V3_DIR = ROOT / "scripts" / "training" / "full_mamba_v3"
+if str(TRAIN_V3_DIR) not in sys.path:
+    sys.path.insert(0, str(TRAIN_V3_DIR))
+
 import train_graphcast as base_train  # noqa: E402
 
 
@@ -43,6 +51,29 @@ def main():
         "--horizon", type=int, default=1,
         help="Forecast horizon K (1=6h only, 2=6h+12h, ...). MAE is averaged "
              "over all T=S*K positions, matching the K-step training loss.",
+    )
+    p.add_argument(
+        "--reset-hidden", action="store_true", default=False,
+        help="Ablation: zero the SSM hidden state at every step inside "
+             "rollout_ar, isolating Mamba memory contribution. If a normal "
+             "eval and a --reset-hidden eval produce identical metrics, "
+             "Mamba is acting as a per-step residual head and its hidden "
+             "state carries no useful long-range memory.",
+    )
+    p.add_argument(
+        "--zero-prev-residual", action="store_true", default=False,
+        help="Ablation: force the previous-residual encoder input to zero "
+             "at every step (kills both the TF prev-residual injection and "
+             "the AR self-fed residual). Combined with --reset-hidden, the "
+             "model acts as a pure per-step residual head with no temporal "
+             "context of any kind.",
+    )
+    p.add_argument(
+        "--disable-state-feedback", action="store_true", default=False,
+        help="Ablation: skip the state_feedback branch (state_from_feedback = "
+             "bsln_n[t-1] + prev_residual * rescale_f) so cs_t is always "
+             "the precomputed baseline anchor state. Tests whether the "
+             "Option-2 state feedback materially shapes the SSM trajectory.",
     )
     p.add_argument(
         "--mode", choices=["tf", "ar"], default="ar",
@@ -184,7 +215,11 @@ def main():
     output_denorm_f = jnp.asarray(diffs_std, dtype=jnp.float32)
     residual_input_std_f = jnp.asarray(diffs_std, dtype=jnp.float32)
 
-    import train_mz_residual_memory_resume as mz_train
+    # Use v3 trainer's helpers — its _segment_to_tensors supports
+    # anchor_as_batch=True (the layout v3 ckpts were trained with). When
+    # anchor_as_batch=False it falls back to the same [T=S*K, B=1, ...]
+    # path the resume trainer uses, so v1/v2 ckpts get the same behaviour.
+    import train_mz_fullmamba_v3 as mz_train
 
     # Resolve effective segment_steps: --segment-steps > 0 overrides the run
     # config's value (use this to bound T = seg × horizon and avoid OOM when a
@@ -198,6 +233,31 @@ def main():
             f"({cfg.segment_steps}) -> CLI ({eff_segment_steps}); "
             f"horizon={horizon} -> T = {eff_segment_steps * horizon} positions/segment"
         )
+
+    # Resolve effective layout (Mod A — anchor-as-batch).
+    #   * v3 ckpts were trained with anchor_as_batch=True, fallback at K<min_k.
+    #   * v1/v2 ckpts have no anchor_as_batch flag in run_config -> default False.
+    # The `effective` flag must mirror v3 trainer logic:
+    #   effective_anchor_as_batch = anchor_as_batch and horizon >= anchor_as_batch_min_k
+    # When True, _segment_to_tensors yields [T=K, B=S, ...] with tf_mask=[1,0,...,0]
+    # and rollout_ar must be called with allow_tf_at_t0=True so tf_mask[0]
+    # actually injects the previous-anchor residual.
+    cfg_anchor_as_batch = bool(getattr(cfg, "anchor_as_batch", False))
+    cfg_anchor_as_batch_min_k = int(getattr(cfg, "anchor_as_batch_min_k", 2))
+    effective_anchor_as_batch = (
+        cfg_anchor_as_batch and horizon >= cfg_anchor_as_batch_min_k
+    )
+    print(
+        f"[eval] layout: cfg.anchor_as_batch={cfg_anchor_as_batch}  "
+        f"min_k={cfg_anchor_as_batch_min_k}  horizon={horizon}  "
+        f"effective_anchor_as_batch={effective_anchor_as_batch}  "
+        f"allow_tf_at_t0={effective_anchor_as_batch}"
+    )
+    print(
+        f"[eval] ablations: reset_hidden={args.reset_hidden}  "
+        f"zero_prev_residual={args.zero_prev_residual}  "
+        f"disable_state_feedback={args.disable_state_feedback}"
+    )
 
     # Bound the valid pool to the horizon we will actually evaluate at —
     # otherwise a horizon=2 eval can land on an index whose t+12h falls off
@@ -250,11 +310,36 @@ def main():
     )
 
     if variant == "full_mamba":
+        # v2 ckpt support: if run_config has use_specialist_heads, build the
+        # model with split upper/surface heads so the param tree matches.
+        use_specialist_heads = bool(getattr(cfg, "use_specialist_heads", False))
+        upper_idx_t = ()
+        surface_idx_t = ()
+        if use_specialist_heads:
+            surface_names = {
+                "2m_temperature", "mean_sea_level_pressure",
+                "10m_u_component_of_wind", "10m_v_component_of_wind",
+                "total_precipitation_6hr",
+            }
+            upper_idx, surface_idx = [], []
+            for name in feature_order:
+                sl = feature_slices[name]
+                target = surface_idx if name in surface_names else upper_idx
+                target.extend(range(sl.start, sl.stop))
+            upper_idx_t = tuple(upper_idx)
+            surface_idx_t = tuple(surface_idx)
+            print(
+                f"[eval] specialist_heads on: upper_dim={len(upper_idx_t)} "
+                f"surface_dim={len(surface_idx_t)} total={len(upper_idx_t)+len(surface_idx_t)}"
+            )
         mz_cfg = MZResidualFullMambaConfig(
             input_size=feature_dim*2, output_size=feature_dim,
             hidden_size=cfg.hidden_size, d_state=cfg.d_state, expand=cfg.expand,
             layers=cfg.layers, dropout=getattr(cfg, "dropout", 0.0),
             a_log_init_min=cfg.a_log_init_min, a_log_init_max=cfg.a_log_init_max,
+            use_specialist_heads=use_specialist_heads,
+            upper_channel_indices=upper_idx_t,
+            surface_channel_indices=surface_idx_t,
         )
         mk = lambda: MZResidualFullMambaMeshed(mz_cfg, n_mesh_nodes=n_mesh, **proj)
     else:
@@ -297,6 +382,10 @@ def main():
             tf_mask_per_step=tf_mask,
             baseline_absolute_n_tblnf=baseline_absolute_n,
             residual_to_state_rescale_f=residual_to_state_rescale_f,
+            allow_tf_at_t0=effective_anchor_as_batch,
+            reset_hidden_each_step=args.reset_hidden,
+            zero_prev_residual_input=args.zero_prev_residual,
+            disable_state_feedback=args.disable_state_feedback,
         )
         pred = _pred_to_real(pred_residual_n)
         return {"corrected": baseline_next + pred}
@@ -318,6 +407,9 @@ def main():
             teacher_forcing_prob=0.0,
             baseline_absolute_n_tblnf=baseline_absolute_n,
             residual_to_state_rescale_f=residual_to_state_rescale_f,
+            reset_hidden_each_step=args.reset_hidden,
+            zero_prev_residual_input=args.zero_prev_residual,
+            disable_state_feedback=args.disable_state_feedback,
         )
         pred = _pred_to_real(pred_residual_n)
         return {"corrected": baseline_next + pred}
@@ -374,25 +466,42 @@ def main():
         seq_inputs, baseline_next, truth_next, tf_mask = mz_train._segment_to_tensors(
             baseline_predict, baseline_params, baseline_state, key,
             eval_ds, seg, input_steps=input_steps, task_cfg=task_cfg,
-            dt=dt, feature_order=feature_order, target_steps=horizon)
+            dt=dt, feature_order=feature_order, target_steps=horizon,
+            anchor_as_batch=effective_anchor_as_batch)
         out = infer_step(mem_params, key, seq_inputs, baseline_next, truth_next, tf_mask)
         b = np.asarray(baseline_next, dtype=np.float32)
         c = np.asarray(out["corrected"], dtype=np.float32)
         t = np.asarray(truth_next, dtype=np.float32)
-        diff_b = b - t          # [T = S*K, B, lat, lon, F]
+        diff_b = b - t
         diff_c = c - t
+        # Layout depends on effective_anchor_as_batch:
+        #   anchor_as_batch=True  -> [T=K_lead, B=S, lat, lon, F]
+        #     T axis IS the lead-time axis directly; no reshape needed.
+        #   anchor_as_batch=False -> [T=S*K, B=1, lat, lon, F]
+        #     T axis interleaves (anchor, lead-step) row-major; reshape T->(S,K).
         T_total = b.shape[0]
-        if T_total % K_lead != 0:
-            raise RuntimeError(
-                f"T_total={T_total} not divisible by K_lead={K_lead}; cannot reshape to (S, K)"
-            )
-        S_anchors = T_total // K_lead
+        B_eff = b.shape[1]
+        if effective_anchor_as_batch:
+            if T_total != K_lead:
+                raise RuntimeError(
+                    f"anchor_as_batch=True expects T_total==K_lead but got "
+                    f"T_total={T_total}, K_lead={K_lead}"
+                )
+            S_anchors = B_eff
+            # ab/sq tensors shaped [K, S, lat, lon, F]; per-lead axis is axis 0.
+            per_lead_axes = (1, 2, 3)  # sum over (B=S, lat, lon)
+        else:
+            if T_total % K_lead != 0:
+                raise RuntimeError(
+                    f"T_total={T_total} not divisible by K_lead={K_lead}; cannot reshape to (S, K)"
+                )
+            S_anchors = T_total // K_lead
         n = b.shape[0] * b.shape[1] * b.shape[2] * b.shape[3] * b.shape[4]
         ab_b = np.abs(diff_b)
         ab_c = np.abs(diff_c)
         sq_b = np.square(diff_b)
         sq_c = np.square(diff_c)
-        # Uniform (unweighted)
+        # Uniform (unweighted) — T*B regardless of layout
         abs_err_base += ab_b.reshape(-1, F).sum(axis=0)
         abs_err_corr += ab_c.reshape(-1, F).sum(axis=0)
         sq_err_base += sq_b.reshape(-1, F).sum(axis=0)
@@ -402,22 +511,30 @@ def main():
         abs_err_corr_latw += (ab_c * lat_w_b).reshape(-1, F).sum(axis=0)
         sq_err_base_latw += (sq_b * lat_w_b).reshape(-1, F).sum(axis=0)
         sq_err_corr_latw += (sq_c * lat_w_b).reshape(-1, F).sum(axis=0)
-        # Per-lead-time lat-weighted: reshape T -> (S, K), sum over (S, B, lat, lon)
-        ab_b_skblnf = ab_b.reshape(S_anchors, K_lead, *ab_b.shape[1:])
-        ab_c_skblnf = ab_c.reshape(S_anchors, K_lead, *ab_c.shape[1:])
-        sq_b_skblnf = sq_b.reshape(S_anchors, K_lead, *sq_b.shape[1:])
-        sq_c_skblnf = sq_c.reshape(S_anchors, K_lead, *sq_c.shape[1:])
-        # Multiply by lat weight then sum over (S=axis0, B=axis2, lat=axis3, lon=axis4)
-        # leaving (K, F) shape after summing axes 0, 2, 3, 4
-        abs_err_base_lead_latw += (ab_b_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
-        abs_err_corr_lead_latw += (ab_c_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
-        sq_err_base_lead_latw += (sq_b_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
-        sq_err_corr_lead_latw += (sq_c_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
-        # count per lead-time slot: S_anchors × B × lat × lon
+        # Per-lead-time lat-weighted accumulator. Two layouts:
+        if effective_anchor_as_batch:
+            # [K, S, lat, lon, F]: axis 0 is lead time. Keep K, F; sum over B,lat,lon.
+            lat_w_klbnf = lat_w[None, None, :, None, None]   # broadcast over K,B,lon,F
+            abs_err_base_lead_latw += (ab_b * lat_w_klbnf).sum(axis=(1, 2, 3))
+            abs_err_corr_lead_latw += (ab_c * lat_w_klbnf).sum(axis=(1, 2, 3))
+            sq_err_base_lead_latw += (sq_b * lat_w_klbnf).sum(axis=(1, 2, 3))
+            sq_err_corr_lead_latw += (sq_c * lat_w_klbnf).sum(axis=(1, 2, 3))
+        else:
+            # [S*K, 1, lat, lon, F] -> reshape T to (S, K), sum over (S, B, lat, lon)
+            ab_b_skblnf = ab_b.reshape(S_anchors, K_lead, *ab_b.shape[1:])
+            ab_c_skblnf = ab_c.reshape(S_anchors, K_lead, *ab_c.shape[1:])
+            sq_b_skblnf = sq_b.reshape(S_anchors, K_lead, *sq_b.shape[1:])
+            sq_c_skblnf = sq_c.reshape(S_anchors, K_lead, *sq_c.shape[1:])
+            abs_err_base_lead_latw += (ab_b_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
+            abs_err_corr_lead_latw += (ab_c_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
+            sq_err_base_lead_latw += (sq_b_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
+            sq_err_corr_lead_latw += (sq_c_skblnf * lat_w_skblnf).sum(axis=(0, 2, 3, 4))
+        # Count: total over (T, B, lat, lon) for global; (S, lat, lon) per lead slot.
         count += n
-        count_per_lead += S_anchors * b.shape[1] * b.shape[2] * b.shape[3]
+        count_per_lead += S_anchors * b.shape[2] * b.shape[3]
         if i == 0 or (i+1) % 8 == 0:
-            print(f"  segment {i+1}/{len(eval_segments)}")
+            print(f"  segment {i+1}/{len(eval_segments)}  "
+                  f"shape={tuple(b.shape)}  S_anchors={S_anchors}  layout={'anchor_as_batch' if effective_anchor_as_batch else 'legacy'}")
 
     base_mae = abs_err_base / count
     corr_mae = abs_err_corr / count

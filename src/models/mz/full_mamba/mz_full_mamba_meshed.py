@@ -39,6 +39,18 @@ class MZResidualFullMambaConfig:
     # before the temporal SSM kicks in.
     processor_layers: int = 0
     processor_hidden_size: int | None = None  # None -> hidden_size
+    # Specialist heads (Mod G). When enabled, the final residual_head is split
+    # into two parallel Linear projections: one for upper-air channels and one
+    # for surface channels. Each gets its own weights and bias, so surface
+    # gradients no longer pull on upper-air capacity (and vice versa). The
+    # shared body up through the SSM remains identical.
+    use_specialist_heads: bool = False
+    # Channel indices, in the same order as the model's flat output axis F.
+    # Required when use_specialist_heads=True. Concatenation order at output
+    # is preserved by scatter according to these indices, so the model's
+    # output shape stays [..., F] and downstream code is unchanged.
+    upper_channel_indices: tuple = ()
+    surface_channel_indices: tuple = ()
 
 
 # ---- geometric aggregation (unchanged from mz_meshed) -----------------------
@@ -129,12 +141,43 @@ class MZResidualFullMambaMeshed(hk.Module):
             )
             for i in range(cfg.layers)
         ]
-        self._residual_head = hk.Linear(
-            cfg.output_size,
-            w_init=hk.initializers.Constant(0.0),
-            b_init=hk.initializers.Constant(0.0),
-            name="residual_head",
-        )
+        if cfg.use_specialist_heads:
+            n_up = len(cfg.upper_channel_indices)
+            n_sf = len(cfg.surface_channel_indices)
+            if n_up + n_sf != cfg.output_size:
+                raise ValueError(
+                    f"specialist heads: upper({n_up}) + surface({n_sf}) "
+                    f"!= output_size ({cfg.output_size})"
+                )
+            self._residual_head = None
+            self._upper_head = hk.Linear(
+                n_up, w_init=hk.initializers.Constant(0.0),
+                b_init=hk.initializers.Constant(0.0), name="upper_head",
+            )
+            self._surface_head = hk.Linear(
+                n_sf, w_init=hk.initializers.Constant(0.0),
+                b_init=hk.initializers.Constant(0.0), name="surface_head",
+            )
+            # Precompute a single permutation that turns concat([up, sf])
+            # into the canonical channel order, so _decode_from_mesh can do
+            # one concat + one take (= one gather) instead of two scatter
+            # ops + zero-allocation. Scatter is ~3x slower than gather on
+            # GPU and dominates the per-step cost when on the model's hot
+            # path; this fix removes that without changing semantics.
+            combined = list(cfg.upper_channel_indices) + list(cfg.surface_channel_indices)
+            perm = np.zeros(cfg.output_size, dtype=np.int32)
+            for j, ci in enumerate(combined):
+                perm[ci] = j
+            self._canonical_perm = jnp.asarray(perm, dtype=jnp.int32)
+        else:
+            self._residual_head = hk.Linear(
+                cfg.output_size,
+                w_init=hk.initializers.Constant(0.0),
+                b_init=hk.initializers.Constant(0.0),
+                name="residual_head",
+            )
+            self._upper_head = None
+            self._surface_head = None
 
     # ------------------------------------------------- grid <-> mesh helpers
     def _encode_to_mesh(self, x_grid_b_p_f: jax.Array) -> jax.Array:
@@ -149,7 +192,15 @@ class MZResidualFullMambaMeshed(hk.Module):
         if self._mesh_post is not None:
             h = jax.nn.silu(self._mesh_post(h))
         h = _mesh_to_grid_aggregate(h, self._m2g_idx, self._m2g_w.astype(h.dtype))
-        return self._residual_head(h)
+        if self._residual_head is not None:
+            return self._residual_head(h)
+        # Specialist-heads path: compute upper and surface independently,
+        # then reorder via a single precomputed permutation gather. Faster
+        # than two scatters into a zero-allocated buffer.
+        up = self._upper_head(h)         # [..., n_up]
+        sf = self._surface_head(h)       # [..., n_sf]
+        combined = jnp.concatenate([up, sf], axis=-1)             # [..., F]
+        return jnp.take(combined, self._canonical_perm, axis=-1)  # [..., F]
 
     # ------------------------------------------------------ teacher-forced
     def __call__(self, seq_tblnf: jax.Array, *, is_training: bool) -> jax.Array:
@@ -191,6 +242,10 @@ class MZResidualFullMambaMeshed(hk.Module):
         residual_clip: float | None = None,
         baseline_absolute_n_tblnf: jax.Array | None = None,
         residual_to_state_rescale_f: jax.Array | None = None,
+        allow_tf_at_t0: bool = False,
+        reset_hidden_each_step: bool = False,
+        zero_prev_residual_input: bool = False,
+        disable_state_feedback: bool = False,
     ) -> jax.Array:
         if current_state_n_tblnf.ndim != 5:
             raise ValueError(f"Expected 5D, got {current_state_n_tblnf.shape}")
@@ -234,19 +289,40 @@ class MZResidualFullMambaMeshed(hk.Module):
 
         preds: list[jax.Array] = []
         for t in range(T):
-            if t == 0 or tpr is None:
+            # Patch 2: under anchor-as-batch each anchor's first physical step
+            # lands at t=0, and we want tf_mask[0]=1 to actually inject the
+            # observable previous-anchor residual via tpr[0]. allow_tf_at_t0=True
+            # opts in to this; allow_tf_at_t0=False preserves the v1 behaviour
+            # where t=0 always uses prev_residual=zero (since legacy anchor_0
+            # has no observable predecessor).
+            if tpr is None:
                 r_prev = prev_residual
             elif tf_mask_per_step is not None:
-                m_t = tf_mask_per_step[t]
-                r_prev = m_t * tpr[t] + (1.0 - m_t) * prev_residual
+                if t == 0 and not allow_tf_at_t0:
+                    r_prev = prev_residual
+                else:
+                    m_t = tf_mask_per_step[t]
+                    r_prev = m_t * tpr[t] + (1.0 - m_t) * prev_residual
             else:
-                key = hk.next_rng_key()
-                mask = (
-                    jax.random.uniform(key, shape=(B, 1, 1)) < teacher_forcing_prob
-                ).astype(dtype)
-                r_prev = mask * tpr[t] + (1.0 - mask) * prev_residual
+                if t == 0:
+                    r_prev = prev_residual
+                else:
+                    key = hk.next_rng_key()
+                    mask = (
+                        jax.random.uniform(key, shape=(B, 1, 1)) < teacher_forcing_prob
+                    ).astype(dtype)
+                    r_prev = mask * tpr[t] + (1.0 - mask) * prev_residual
 
-            if use_state_feedback and t > 0:
+            # Ablation: force the prev-residual encoder input to zero. Kills the
+            # residual-feedback path (both TF and self-fed). Combined with
+            # reset_hidden_each_step, the model acts as a per-step residual head
+            # with no memory of any kind. Note: this only zeros the *encoder*
+            # input; prev_residual is still tracked and may flow into
+            # state_from_feedback (gate that separately with disable_state_feedback).
+            if zero_prev_residual_input:
+                r_prev = jnp.zeros_like(r_prev)
+
+            if use_state_feedback and t > 0 and not disable_state_feedback:
                 state_from_feedback = bsln_n[t - 1] + prev_residual * rescale_f
                 if tf_mask_per_step is not None:
                     m_t = tf_mask_per_step[t]
@@ -262,9 +338,18 @@ class MZResidualFullMambaMeshed(hk.Module):
                 h_mesh = self._processor(h_mesh)
             h_mesh = h_mesh.reshape(B * M, H)
 
+            # Ablation: reset_hidden_each_step zeros the SSM hidden state
+            # *before* this step's update, forcing every t to start from h=0.
+            # This isolates the SSM-memory contribution from prev_residual /
+            # state feedback contributions: if normal eval >> reset eval, the
+            # Mamba hidden state is genuinely accumulating useful long-range
+            # memory; if normal ≈ reset, the SSM is functioning as a per-step
+            # residual head and the "memory" claim doesn't hold.
             new_h_states: list[jax.Array] = []
             y_t = h_mesh
             for ssm, h_prev in zip(self._ssm_blocks, h_states):
+                if reset_hidden_each_step:
+                    h_prev = jnp.zeros_like(h_prev)
                 y_t, h_new = ssm.step(y_t, h_prev, is_training=is_training)
                 new_h_states.append(h_new)
             h_states = new_h_states
