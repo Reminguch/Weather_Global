@@ -274,16 +274,36 @@ ablation-verifiable Mamba memory.
 The single residual head at the end of `MZResidualFullMambaMeshed._decode_from_mesh`
 is replaced by **two parallel `hk.Linear` projections** from the shared
 mesh post-SSM hidden, each writing to a disjoint slice of the F=83 output
-channels:
+channels. Full v3 forward path:
 
 ```
-shared body output h: [B, M, H]
-   ├── upper_head   → [B, M, 78]     6 pressure-level vars × 13 levels
-   │                                  (Z, T, q, u, v, w)
-   └── surface_head → [B, M, 5]      2m_T, MSLP, 10m_u, 10m_v, total_precip
-                          ↓
-   scatter into a single [B, M, 83] residual via fixed
-   upper_channel_indices / surface_channel_indices permutations
+input = current_state + prev_residual              [B, lat, lon, 2F]
+        ↓
+grid → mesh   (Grid2Mesh GNN, KNN aggregation)
+        ↓
+shared FullMamba body                              [K, S, M, H]  per-anchor SSM
+   (input_proj → SSM block(s) → output_proj,
+    optional MeshGraphNet processor on the mesh)
+        ↓
+shared hidden representation h                     [B, M, H]
+        ↓
+ ┌──────────────────────────┬──────────────────────────┐
+ ↓                          ↓
+upper_head                  surface_head
+78 upper channels           5 surface channels
+ ↓                          ↓
+Z / T / q / u / v / w        2m_T / MSLP / 10m_u / 10m_v / precip
+        ↓                          ↓
+        └────────── scatter ───────┘
+                    ↓
+   [B, M, 83] residual via fixed upper_channel_indices /
+              surface_channel_indices permutations
+        ↓
+mesh → grid   (Mesh2Grid GNN)
+        ↓
+predicted residual r̂                              [B, lat, lon, F=83]
+        ↓
+corrected = baseline + r̂                          [B, lat, lon, F]
 ```
 
 Both heads share the body (encoder + processor + SSM); only the final
