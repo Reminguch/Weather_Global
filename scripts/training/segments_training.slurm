@@ -26,6 +26,8 @@ if [[ "${MODEL}" != "gc_mamba" && "${MODEL}" != "residual_mamba" ]]; then
 fi
 
 DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}
+DATA_SOURCE=${DATA_SOURCE:-raw}
+PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-prepared}
 STATS_DIR=${STATS_DIR:-data/graphcast/graphcast/stats}
 CKPT_IN=${CKPT_IN:-"data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"}
 BASELINE_CKPT=${BASELINE_CKPT:-${CKPT_IN}}
@@ -79,6 +81,8 @@ CMD=(
   python -u -m src.models.mamba.training.segments_training
   --model "${MODEL}"
   --data-path "${DATA_PATH}"
+  --data-source "${DATA_SOURCE}"
+  --prepared-data-root "${PREPARED_DATA_ROOT}"
   --stats-dir "${STATS_DIR}"
   --out-dir "${OUT_DIR}"
   --run-name "${RUN_NAME}"

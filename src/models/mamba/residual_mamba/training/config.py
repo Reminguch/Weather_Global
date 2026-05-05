@@ -5,6 +5,7 @@ import dataclasses
 
 from src.models.graphcast.training.core.config import (
     DEFAULT_DATA_PATH,
+    DEFAULT_PREPARED_DATA_ROOT,
     DEFAULT_STATS_DIR,
     RunConfig,
 )
@@ -26,10 +27,12 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         description="Train GraphCast/Mamba on one-step residuals over shuffled chronological segments."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
+    parser.add_argument("--data-source", choices=["raw", "prepared"], default="raw")
+    parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[32, 128, 256, 512, 1024], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4], default=1)
+    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4, 8], default=1)
     parser.add_argument("--val-year", type=int, default=2021)
     parser.add_argument("--train-start-year", type=int, default=None)
     parser.add_argument("--train-end-year", type=int, default=None)
@@ -71,7 +74,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "numpy"], default="numpy")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy"], default="numpy")
     parser.add_argument(
         "--training-target",
         choices=["residual"],
@@ -125,10 +128,13 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
 
     base_cfg = RunConfig(
         data_path=args.data_path,
+        data_source=args.data_source,
+        prepared_data_root=args.prepared_data_root,
         resolution=args.resolution,
         mesh_size=args.mesh_size,
         width=args.width,
         processor_msg_steps=args.processor_msg_steps,
+        grad_accum_steps=1,
         val_year=args.val_year,
         train_start_year=args.train_start_year,
         train_end_year=args.train_end_year,

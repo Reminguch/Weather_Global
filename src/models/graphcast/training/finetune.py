@@ -15,6 +15,7 @@ import argparse
 import dataclasses
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -33,6 +34,22 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
+
+
+_STEP_CKPT_RE = re.compile(r"^ckpt_step(\d+)\.npz$")
+
+
+def prune_old_step_checkpoints(out_dir: Path, *, keep_step: int) -> None:
+    keep_name = f"ckpt_step{keep_step}.npz"
+    removed = 0
+    for path in out_dir.glob("ckpt_step*.npz"):
+        match = _STEP_CKPT_RE.match(path.name)
+        if match is None or path.name == keep_name:
+            continue
+        path.unlink()
+        removed += 1
+    if removed:
+        print(f"pruned {removed} old step checkpoint(s), kept {out_dir / keep_name}")
 
 
 def _require_graphcast() -> None:
@@ -473,6 +490,8 @@ def save_checkpoint(
     with path.open("wb") as f:
         checkpoint.dump(f, ckpt_out)
     print(f"saved checkpoint: {path}")
+    if filename is None:
+        prune_old_step_checkpoints(out_dir, keep_step=step)
 
 
 def save_logs(

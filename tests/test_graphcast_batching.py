@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,8 +18,11 @@ for path in (ROOT, GRAPHCAST_LOCAL):
 
 from src.models.graphcast.training.core.batching import (  # noqa: E402
     build_batch_from_indices,
+    build_batch_from_indices_direct,
     build_batch_from_indices_vectorized,
+    select_batch_builders,
 )
+from src.models.graphcast.training.core.dataset import validate_prepared_dataset  # noqa: E402
 from src.models.graphcast.training.core.logging import build_batch_builder_metadata  # noqa: E402
 
 
@@ -125,6 +129,145 @@ def test_vectorized_batch_builder_matches_legacy_for_single_index() -> None:
 
     for actual, expected in zip(vectorized, legacy):
         _assert_datasets_match(actual, expected)
+
+
+def test_direct_batch_builder_matches_legacy_for_multiple_indices() -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+
+    legacy = build_batch_from_indices(
+        ds,
+        indices=[1, 4],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+    direct = build_batch_from_indices_direct(
+        ds,
+        indices=[1, 4],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+
+    for actual, expected in zip(direct, legacy):
+        _assert_datasets_match(actual, expected)
+
+
+def test_direct_batch_builder_matches_legacy_for_single_index() -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+
+    legacy = build_batch_from_indices(
+        ds,
+        indices=[3],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+    direct = build_batch_from_indices_direct(
+        ds,
+        indices=[3],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+
+    for actual, expected in zip(direct, legacy):
+        _assert_datasets_match(actual, expected)
+
+
+def test_direct_batch_builder_works_without_source_batch_dim() -> None:
+    ds = _make_dataset().isel(batch=0, drop=True)
+    cfg = _task_cfg()
+
+    inputs, targets, forcings = build_batch_from_indices_direct(
+        ds,
+        indices=[2, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+
+    assert inputs["land_sea_mask"].dims == ("batch", "lat", "lon")
+    assert inputs["temperature"].dims == ("batch", "time", "level", "lat", "lon")
+    assert targets["temperature"].sizes["level"] == 2
+    assert forcings["toa_incident_solar_radiation"].dims == ("batch", "time", "lat", "lon")
+
+
+def test_numpy_builder_requires_active_cache() -> None:
+    ds = _make_dataset()
+    with pytest.raises(ValueError, match="--batch-builder numpy requires an active full-RAM train cache"):
+        select_batch_builders(
+            ds,
+            ds,
+            requested="numpy",
+            should_cache_train=False,
+            task_cfg=_task_cfg(),
+        )
+
+
+def _make_prepared_validation_dataset() -> xr.Dataset:
+    ds = _make_dataset().isel(batch=0, drop=True)
+    time = np.array("2020-12-31T00:00:00", dtype="datetime64[ns]") + np.arange(8) * np.timedelta64(6, "h")
+    ds = ds.assign_coords(time=time, datetime=("time", time))
+    ds["temperature"] = ds["temperature"].assign_coords(time=time)
+    ds["toa_incident_solar_radiation"] = ds["toa_incident_solar_radiation"].assign_coords(time=time)
+    ds.attrs.update(
+        {
+            "prepared_format_version": 1,
+            "resolution": 1.0,
+            "pressure_levels": [500, 850],
+            "task_input_variables": ["temperature", "land_sea_mask"],
+            "task_target_variables": ["temperature"],
+            "task_forcing_variables": ["toa_incident_solar_radiation"],
+        }
+    )
+    return ds
+
+
+def test_validate_prepared_dataset_accepts_matching_metadata() -> None:
+    cfg = SimpleNamespace(resolution=1.0, val_year=2021, train_start_year=None, train_end_year=None)
+    validate_prepared_dataset(_make_prepared_validation_dataset(), cfg, _task_cfg())
+
+
+def test_validate_prepared_dataset_rejects_resolution_mismatch() -> None:
+    cfg = SimpleNamespace(resolution=2.0, val_year=2021, train_start_year=None, train_end_year=None)
+    with pytest.raises(ValueError, match="does not match requested"):
+        validate_prepared_dataset(_make_prepared_validation_dataset(), cfg, _task_cfg())
+
+
+def test_direct_builder_reads_tiny_prepared_zarr(tmp_path) -> None:
+    pytest.importorskip("zarr")
+    ds = _make_dataset().isel(batch=0, drop=True)
+    store_path = tmp_path / "res1"
+    ds.to_zarr(store_path, mode="w", consolidated=True)
+    opened = xr.open_zarr(store_path, consolidated=True)
+
+    expected = build_batch_from_indices_direct(
+        ds,
+        indices=[2, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    actual = build_batch_from_indices_direct(
+        opened,
+        indices=[2, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+
+    for actual_ds, expected_ds in zip(actual, expected):
+        _assert_datasets_match(actual_ds, expected_ds)
 
 
 def test_vectorized_batch_builder_avoids_vectorized_time_indexing(monkeypatch) -> None:

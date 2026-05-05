@@ -9,28 +9,24 @@ import functools
 import json
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import pandas as pd
 import xarray as xr
 
 from src.models.graphcast.training.core.batching import (
-    NumpyBatchCache,
-    build_batch_from_indices,
-    build_batch_from_indices_vectorized,
     infer_time_step,
     input_steps_from_duration,
+    select_batch_builders,
 )
 from src.models.graphcast.training.core.dataset import (
-    _open_local_splits,
     _training_cache_decision,
     maybe_cache_training_data,
-    prepare_dataset_for_task,
+    open_training_splits,
 )
 from src.models.graphcast.training.core.logging import (
     _filter_pairs_upto_step,
@@ -97,12 +93,16 @@ def run_training(
         hidden_layers=1,
         mesh2grid_edge_normalization_factor=None,
     )
+    if cfg.data_source == "prepared" and not np.isclose(float(base_model_cfg.resolution), cfg.resolution, atol=1e-6):
+        raise ValueError(
+            "Prepared residual training requires the frozen baseline checkpoint resolution "
+            f"to match the prepared store/model resolution: baseline={base_model_cfg.resolution}, "
+            f"requested={cfg.resolution}."
+        )
 
     norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
-    train_ds, eval_ds = _open_local_splits(cfg)
-    train_ds = prepare_dataset_for_task(train_ds, task_cfg)
-    eval_ds = prepare_dataset_for_task(eval_ds, task_cfg)
+    train_ds, eval_ds = open_training_splits(cfg, task_cfg)
 
     dt_train = infer_time_step(train_ds)
     dt_eval = infer_time_step(eval_ds)
@@ -149,67 +149,20 @@ def run_training(
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
     train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
 
-    numpy_cache_active = False
-    train_numpy_cache: NumpyBatchCache | None = None
-    eval_numpy_cache: NumpyBatchCache | None = None
-    effective_train_batch_builder = cfg.batch_builder
-    effective_eval_batch_builder = cfg.batch_builder
-    if cfg.batch_builder == "numpy":
-        if should_cache_train:
-            train_numpy_cache = NumpyBatchCache(train_ds, task_cfg, label="residual-segment-train")
-            eval_numpy_cache = NumpyBatchCache(eval_ds, task_cfg, label="residual-segment-eval")
-            numpy_cache_active = True
-        else:
-            effective_train_batch_builder = "vectorized"
-            effective_eval_batch_builder = "vectorized"
-            print(
-                "[numpy-cache] requested for residual segments but train split is not cached; "
-                "falling back to vectorized builder. Use --data-cache-mode=always to force it."
-            )
-
-    if numpy_cache_active:
-        assert train_numpy_cache is not None
-        assert eval_numpy_cache is not None
-
-        def train_batch_builder(
-            _ds: xr.Dataset,
-            *,
-            indices: Iterable[int],
-            input_steps: int,
-            target_steps: int,
-            task_cfg,
-            dt: pd.Timedelta,
-        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-            return train_numpy_cache.build_batch_from_indices(
-                indices=indices,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt,
-            )
-
-        def eval_batch_builder(
-            _ds: xr.Dataset,
-            *,
-            indices: Iterable[int],
-            input_steps: int,
-            target_steps: int,
-            task_cfg,
-            dt: pd.Timedelta,
-        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-            return eval_numpy_cache.build_batch_from_indices(
-                indices=indices,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt,
-            )
-    elif cfg.batch_builder == "legacy":
-        train_batch_builder = build_batch_from_indices
-        eval_batch_builder = build_batch_from_indices
-    else:
-        train_batch_builder = build_batch_from_indices_vectorized
-        eval_batch_builder = build_batch_from_indices_vectorized
+    builder_selection = select_batch_builders(
+        train_ds,
+        eval_ds,
+        requested=cfg.batch_builder,
+        should_cache_train=should_cache_train,
+        task_cfg=task_cfg,
+        train_label="residual-segment-train",
+        eval_label="residual-segment-eval",
+    )
+    train_batch_builder = builder_selection.train_builder
+    eval_batch_builder = builder_selection.eval_builder
+    numpy_cache_active = builder_selection.numpy_cache_active
+    effective_train_batch_builder = builder_selection.effective_train_batch_builder
+    effective_eval_batch_builder = builder_selection.effective_eval_batch_builder
 
     residual_loss_transform = build_loss_transform(model_cfg, task_cfg, norm_stats, cfg)
     residual_eval_transform = build_eval_loss_transform(

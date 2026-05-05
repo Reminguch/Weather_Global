@@ -274,9 +274,9 @@ def _write_year(ds_year: xr.Dataset, output: Path, *, mode: str) -> None:
     if mode == "w":
         # Force Zarr v2 for compatibility with upstream WB2 encodings that
         # include numcodecs compressors (e.g., Blosc), which fail under v3.
-        ds_year.to_zarr(output, mode="w", consolidated=True, zarr_format=2)
+        ds_year.to_zarr(output, mode="w", consolidated=True, zarr_version=2)
     else:
-        ds_year.to_zarr(output, mode="a", append_dim="time", zarr_format=2)
+        ds_year.to_zarr(output, mode="a", append_dim="time", zarr_version=2)
         zarr.consolidate_metadata(str(output))
 
 
@@ -451,13 +451,33 @@ def main() -> None:
                 raise RuntimeError("Internal error: rebuild requested but existing dataset was not loaded.")
 
             tmp_output = output.parent / f"{output.name}.tmp_rebuild"
-            if tmp_output.exists():
-                shutil.rmtree(tmp_output)
-
             years_to_write = sorted(set(existing_years) | set(missing_years))
+            completed_tmp_years: list[int] = []
+            if tmp_output.exists():
+                tmp_ds = xr.open_zarr(tmp_output, consolidated=False)
+                tmp_ds = _ensure_datetime_time(_normalize_coords(tmp_ds))
+                _validate_local_layout(tmp_ds)
+                completed_tmp_years, partial_tmp = _infer_existing_years(tmp_ds)
+                if partial_tmp:
+                    detail = "; ".join(f"{y}: {msg}" for y, msg in sorted(partial_tmp.items()))
+                    raise ValueError(
+                        "Detected partial/incomplete years in existing rebuild temp output. "
+                        f"Remove {tmp_output} and retry. Details: {detail}"
+                    )
+                expected_prefix = years_to_write[: len(completed_tmp_years)]
+                if completed_tmp_years != expected_prefix:
+                    raise ValueError(
+                        "Existing rebuild temp output is not a prefix of the requested rebuild. "
+                        f"tmp_years={completed_tmp_years} expected_prefix={expected_prefix}. "
+                        f"Remove {tmp_output} and retry."
+                    )
+                appended_years.extend(y for y in completed_tmp_years if y in set(missing_years))
+                print(f"resuming rebuild temp: completed_years={completed_tmp_years}")
+
             total = len(years_to_write)
-            mode = "w"
-            for i, year in enumerate(years_to_write, start=1):
+            mode = "a" if completed_tmp_years else "w"
+            remaining_years = years_to_write[len(completed_tmp_years) :]
+            for i, year in enumerate(remaining_years, start=len(completed_tmp_years) + 1):
                 t0 = time.time()
                 print(f"processing year {year} ({i}/{total}) ({'missing->source' if year in missing_years else 'existing->local'})")
                 if year in missing_years:

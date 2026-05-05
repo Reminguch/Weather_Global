@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Iterable
+import json
+from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,9 @@ from . import bootstrap as _bootstrap  # noqa: F401
 from .config import GRAPHCAST_VARS, RunConfig
 from .model import data_utils, gc
 from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
+
+
+PREPARED_FORMAT_VERSION = 1
 
 
 def _ensure_datetime_coord(ds: xr.Dataset) -> xr.Dataset:
@@ -78,6 +82,17 @@ def _load_static_vars(ds: xr.Dataset, label: str) -> xr.Dataset:
     for name in static_vars:
         ds[name] = loaded[name]
     return ds
+
+
+def resolution_tag(resolution: float) -> str:
+    value = float(resolution)
+    if np.isclose(value, round(value), atol=1e-6):
+        return f"res{int(round(value))}"
+    return f"res{str(value).replace('.', 'p')}"
+
+
+def prepared_store_path(cfg: RunConfig) -> Path:
+    return Path(cfg.prepared_data_root) / resolution_tag(cfg.resolution)
 
 
 def _training_cache_decision(
@@ -157,6 +172,73 @@ def _build_no_pole_latitudes(resolution: float) -> np.ndarray:
     return (90.0 - colat).astype(np.float32)
 
 
+def select_resolution(ds: xr.Dataset, resolution: float) -> tuple[xr.Dataset, float, int]:
+    base_res = _infer_base_resolution_deg(ds)
+    ratio = resolution / base_res
+    stride = int(round(ratio))
+    if not np.isclose(ratio, stride, atol=1e-6):
+        raise ValueError(
+            f"resolution={resolution} is not an integer multiple of base grid {base_res}deg."
+        )
+    if stride <= 0:
+        raise ValueError(f"Invalid resolution stride: {stride}")
+
+    lat_divides_180 = np.isclose(np.mod(180.0, resolution), 0.0, atol=1e-6)
+    if lat_divides_180:
+        ds = ds.isel(lat=slice(0, None, stride))
+    else:
+        n_steps = int(180.0 // resolution)
+        x = (180.0 - n_steps * resolution) / 2.0
+        lat_targets = _build_no_pole_latitudes(resolution)
+        print(
+            "Using no-pole latitude grid because 180 is not divisible by resolution: "
+            f"resolution={resolution}, x={x}, lat_count={lat_targets.size}"
+        )
+        ds = ds.sel(lat=lat_targets, method="nearest").sortby("lat", ascending=False)
+
+    ds = ds.isel(lon=slice(0, None, stride))
+
+    for name in list(ds.data_vars):
+        if ds[name].dtype.kind == "f" and ds[name].dtype != np.float32:
+            ds[name] = ds[name].astype(np.float32)
+    return ds, base_res, stride
+
+
+def _split_by_year(ds: xr.Dataset, cfg: RunConfig, *, label: str) -> tuple[xr.Dataset, xr.Dataset, list[int]]:
+    if "time" not in ds.coords:
+        raise KeyError(f"Expected `time` coordinate in {label} dataset.")
+
+    time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
+    years = sorted(set(time_index.year.astype(int).tolist()))
+    if cfg.val_year not in years:
+        raise ValueError(
+            f"Requested val year {cfg.val_year} not present in {label} dataset years: {years}"
+        )
+
+    train_years = [y for y in years if y != cfg.val_year]
+    if cfg.train_start_year is not None:
+        train_years = [y for y in train_years if cfg.train_start_year <= y <= cfg.train_end_year]
+
+    if not train_years:
+        raise ValueError(f"No train years left in {label} data after year selection.")
+
+    train_mask = np.isin(time_index.year, np.asarray(train_years))
+    val_mask = time_index.year == cfg.val_year
+    train_ds = ds.isel(time=np.where(train_mask)[0])
+    val_ds = ds.isel(time=np.where(val_mask)[0])
+
+    if train_ds.sizes.get("time", 0) == 0:
+        raise ValueError("Empty train split after year selection.")
+    if val_ds.sizes.get("time", 0) == 0:
+        raise ValueError("Empty validation split after year selection.")
+
+    train_times = pd.DatetimeIndex(pd.to_datetime(train_ds.time.values))
+    val_times = pd.DatetimeIndex(pd.to_datetime(val_ds.time.values))
+    if train_times.intersection(val_times).size > 0:
+        raise ValueError("Train/validation overlap detected in year split.")
+    return train_ds, val_ds, train_years
+
+
 def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
     _assert_local_path(cfg.data_path, "--data-path")
     print(f"Opening local dataset: {cfg.data_path}")
@@ -171,64 +253,8 @@ def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
         raise ValueError("None of the required GraphCast variables were found in local dataset.")
     ds = ds[available_vars]
 
-    base_res = _infer_base_resolution_deg(ds)
-    ratio = cfg.resolution / base_res
-    stride = int(round(ratio))
-    if not np.isclose(ratio, stride, atol=1e-6):
-        raise ValueError(
-            f"resolution={cfg.resolution} is not an integer multiple of base grid {base_res}deg."
-        )
-    if stride <= 0:
-        raise ValueError(f"Invalid resolution stride: {stride}")
-
-    lat_divides_180 = np.isclose(np.mod(180.0, cfg.resolution), 0.0, atol=1e-6)
-    if lat_divides_180:
-        ds = ds.isel(lat=slice(0, None, stride))
-    else:
-        n_steps = int(180.0 // cfg.resolution)
-        x = (180.0 - n_steps * cfg.resolution) / 2.0
-        lat_targets = _build_no_pole_latitudes(cfg.resolution)
-        print(
-            "Using no-pole latitude grid because 180 is not divisible by resolution: "
-            f"resolution={cfg.resolution}, x={x}, lat_count={lat_targets.size}"
-        )
-        # Match requested no-pole latitude layout while keeping monotonic descending order.
-        ds = ds.sel(lat=lat_targets, method="nearest").sortby("lat", ascending=False)
-
-    ds = ds.isel(lon=slice(0, None, stride))
-
-    for name in list(ds.data_vars):
-        if ds[name].dtype.kind == "f" and ds[name].dtype != np.float32:
-            ds[name] = ds[name].astype(np.float32)
-
-    time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
-    years = sorted(set(time_index.year.astype(int).tolist()))
-    if cfg.val_year not in years:
-        raise ValueError(
-            f"Requested val year {cfg.val_year} not present in local dataset years: {years}"
-        )
-
-    train_years = [y for y in years if y != cfg.val_year]
-    if cfg.train_start_year is not None:
-        train_years = [y for y in train_years if cfg.train_start_year <= y <= cfg.train_end_year]
-
-    if not train_years:
-        raise ValueError("No train years left after excluding val year and applying train-year bounds.")
-
-    train_mask = np.isin(time_index.year, np.asarray(train_years))
-    val_mask = time_index.year == cfg.val_year
-    train_raw = ds.isel(time=np.where(train_mask)[0])
-    val_raw = ds.isel(time=np.where(val_mask)[0])
-
-    if train_raw.sizes.get("time", 0) == 0:
-        raise ValueError("Empty train split after year selection.")
-    if val_raw.sizes.get("time", 0) == 0:
-        raise ValueError("Empty validation split after year selection.")
-
-    train_times = pd.DatetimeIndex(pd.to_datetime(train_raw.time.values))
-    val_times = pd.DatetimeIndex(pd.to_datetime(val_raw.time.values))
-    if train_times.intersection(val_times).size > 0:
-        raise ValueError("Train/validation overlap detected in year split.")
+    ds, base_res, stride = select_resolution(ds, cfg.resolution)
+    train_raw, val_raw, train_years = _split_by_year(ds, cfg, label="local")
 
     print(
         "Data split: "
@@ -237,3 +263,110 @@ def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
         f"base_res={base_res}, target_res={cfg.resolution}, stride={stride}"
     )
     return train_raw, val_raw
+
+
+def _task_var_names(task_cfg: gc.TaskConfig) -> set[str]:
+    return set(task_cfg.input_variables) | set(task_cfg.target_variables) | set(task_cfg.forcing_variables)
+
+
+def _attr_list(value: object) -> list:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except Exception:
+            return [value]
+        return parsed if isinstance(parsed, list) else [parsed]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, Sequence):
+        return list(value)
+    return [value]
+
+
+def _validate_six_hour_sorted_time(ds: xr.Dataset) -> None:
+    if "time" not in ds.coords:
+        raise KeyError("Prepared store is missing `time` coordinate.")
+    time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
+    if len(time_index) < 2:
+        raise ValueError("Prepared store must contain at least two time steps.")
+    if not time_index.is_monotonic_increasing:
+        raise ValueError("Prepared store time coordinate must be sorted ascending.")
+    deltas = np.diff(time_index.values).astype("timedelta64[ns]")
+    expected = np.array(np.timedelta64(6, "h")).astype("timedelta64[ns]")
+    if not np.all(deltas == expected):
+        raise ValueError("Prepared store time grid must be strictly 6-hourly.")
+
+
+def validate_prepared_dataset(ds: xr.Dataset, cfg: RunConfig, task_cfg: gc.TaskConfig) -> None:
+    version = ds.attrs.get("prepared_format_version")
+    if version is not None and int(version) != PREPARED_FORMAT_VERSION:
+        raise ValueError(
+            f"Unsupported prepared_format_version={version}; expected {PREPARED_FORMAT_VERSION}."
+        )
+    resolution = ds.attrs.get("resolution")
+    if resolution is not None and not np.isclose(float(resolution), cfg.resolution, atol=1e-6):
+        raise ValueError(
+            f"Prepared store resolution={resolution} does not match requested {cfg.resolution}."
+        )
+
+    prepared_levels = _attr_list(ds.attrs.get("pressure_levels"))
+    if prepared_levels:
+        prepared_levels_int = [int(level) for level in prepared_levels]
+        requested_levels = [int(level) for level in task_cfg.pressure_levels]
+        if prepared_levels_int != requested_levels:
+            raise ValueError(
+                "Prepared store pressure_levels do not match checkpoint task: "
+                f"prepared={prepared_levels_int}, requested={requested_levels}."
+            )
+
+    missing = sorted(name for name in _task_var_names(task_cfg) if name not in ds.data_vars)
+    if missing:
+        raise ValueError(f"Prepared store is missing task variables: {missing}")
+    attr_checks = [
+        ("task_input_variables", list(task_cfg.input_variables)),
+        ("task_target_variables", list(task_cfg.target_variables)),
+        ("task_forcing_variables", list(task_cfg.forcing_variables)),
+    ]
+    for attr_name, expected in attr_checks:
+        prepared_values = _attr_list(ds.attrs.get(attr_name))
+        if prepared_values and list(prepared_values) != expected:
+            raise ValueError(
+                f"Prepared store {attr_name} does not match checkpoint task: "
+                f"prepared={prepared_values}, requested={expected}."
+            )
+
+    _validate_six_hour_sorted_time(ds)
+    _split_by_year(ds, cfg, label="prepared")
+
+
+def _open_prepared_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[xr.Dataset, xr.Dataset]:
+    store_path = prepared_store_path(cfg)
+    _assert_local_path(str(store_path), "--prepared-data-root")
+    if not store_path.exists():
+        raise FileNotFoundError(
+            f"Prepared data store not found: {store_path}. "
+            "Run python -m src.data_operations.preprocessing.prepare_graphcast_training_store first."
+        )
+    print(f"Opening prepared dataset: {store_path}")
+    ds = xr.open_zarr(store_path, consolidated=True)
+    ds = _ensure_datetime_coord(ds)
+    validate_prepared_dataset(ds, cfg, task_cfg)
+    train_ds, val_ds, train_years = _split_by_year(ds, cfg, label="prepared")
+    print(
+        "Prepared data split: "
+        f"train_years={train_years[0]}-{train_years[-1]} (excluding {cfg.val_year}), "
+        f"val_year={cfg.val_year}, train_time={train_ds.sizes['time']}, val_time={val_ds.sizes['time']}, "
+        f"store={store_path}"
+    )
+    return train_ds, val_ds
+
+
+def open_training_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[xr.Dataset, xr.Dataset]:
+    if cfg.data_source == "raw":
+        train_ds, eval_ds = _open_local_splits(cfg)
+        return prepare_dataset_for_task(train_ds, task_cfg), prepare_dataset_for_task(eval_ds, task_cfg)
+    if cfg.data_source == "prepared":
+        return _open_prepared_splits(cfg, task_cfg)
+    raise ValueError(f"Unknown data_source={cfg.data_source!r}; expected raw or prepared.")

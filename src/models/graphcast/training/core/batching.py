@@ -200,10 +200,124 @@ def build_batch_from_indices_vectorized(
     )
 
 
+def _drop_singleton_source_batch(ds: xr.Dataset) -> xr.Dataset:
+    if "batch" not in ds.dims:
+        return ds
+    if ds.sizes["batch"] != 1:
+        raise ValueError(f"Expected source dataset batch size 1, got {ds.sizes['batch']}.")
+    return ds.isel(batch=0, drop=True)
+
+
 def _timedelta_coords(count: int, start_steps: int, dt: pd.Timedelta) -> np.ndarray:
     step_ns = int(dt / pd.Timedelta(1, "ns"))
     offsets = (start_steps + np.arange(count, dtype=np.int64)) * np.timedelta64(step_ns, "ns")
     return offsets.astype("timedelta64[ns]")
+
+
+def _is_input_time_positions(positions: np.ndarray, input_steps: int) -> bool:
+    return len(positions) == input_steps and positions.size > 0 and int(positions[0]) == 0
+
+
+def _select_levels_for_array(var: xr.DataArray, task_cfg: gc.TaskConfig) -> xr.DataArray:
+    if "level" not in var.dims:
+        return var
+    return var.sel(level=list(task_cfg.pressure_levels))
+
+
+def build_batch_from_indices_direct(
+    ds: xr.Dataset,
+    *,
+    indices: Iterable[int],
+    input_steps: int,
+    target_steps: int,
+    task_cfg: gc.TaskConfig,
+    dt: pd.Timedelta,
+) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+    """Build a GraphCast batch by direct array gathers from xarray/Zarr variables."""
+    batch_indices = np.asarray(list(indices), dtype=np.int64)
+    if batch_indices.size == 0:
+        raise ValueError("Cannot build an empty batch.")
+
+    source = _drop_singleton_source_batch(ds)
+    window_offsets = np.arange(-(input_steps - 1), target_steps + 1, dtype=np.int64)
+    window_indices = batch_indices[:, None] + window_offsets[None, :]
+    if window_indices.min() < 0 or window_indices.max() >= source.sizes["time"]:
+        raise IndexError(
+            f"Requested batch outside valid time range: min={window_indices.min()}, "
+            f"max={window_indices.max()}, total={source.sizes['time']}."
+        )
+
+    unique_time_indices = np.unique(window_indices.reshape(-1))
+    local_window_indices = np.searchsorted(unique_time_indices, window_indices)
+
+    input_time = _timedelta_coords(input_steps, -(input_steps - 1), dt)
+    target_time = _timedelta_coords(target_steps, 1, dt)
+    input_pos = np.arange(input_steps, dtype=np.int64)
+    target_pos = np.arange(input_steps, input_steps + target_steps, dtype=np.int64)
+    batch_coord = np.arange(batch_indices.size)
+    coord_values = {
+        name: np.asarray(coord.values)
+        for name, coord in source.coords.items()
+        if name in {"lat", "lon", "level"}
+    }
+
+    def build_var(name: str, positions: np.ndarray, *, expand_static_time: np.ndarray | None) -> xr.DataArray:
+        if name not in source.data_vars:
+            raise KeyError(f"[direct-builder] variable {name!r} is not present in dataset.")
+        var = _select_levels_for_array(source[name], task_cfg)
+        dims = tuple(var.dims)
+        coords = {
+            dim: np.asarray(var.coords[dim].values)
+            for dim in dims
+            if dim in var.coords and dim != "time"
+        }
+
+        if "time" in dims:
+            time_axis = dims.index("time")
+            selected = var.isel(time=unique_time_indices)
+            data = np.asarray(selected.values)
+            gather_indices = local_window_indices[:, positions]
+            gathered = np.take(data, gather_indices, axis=time_axis)
+            remaining_dims = tuple(dim for dim in dims if dim != "time")
+            dims_out = ("batch", "time", *remaining_dims)
+            out_coords: dict[str, Any] = {"batch": batch_coord}
+            out_coords["time"] = input_time if _is_input_time_positions(positions, input_steps) else target_time
+            for dim in remaining_dims:
+                if dim in coords:
+                    out_coords[dim] = coords[dim]
+                elif dim in coord_values:
+                    out_coords[dim] = coord_values[dim]
+            return xr.DataArray(gathered, dims=dims_out, coords=out_coords)
+
+        data = np.asarray(var.values)
+        dims_out = dims
+        out_coords: dict[str, Any] = {}
+        if expand_static_time is not None:
+            data = np.broadcast_to(data[None, ...], (batch_indices.size, *data.shape))
+            dims_out = ("batch", *dims)
+            out_coords["batch"] = batch_coord
+        for dim in dims:
+            if dim in coords:
+                out_coords[dim] = coords[dim]
+            elif dim in coord_values:
+                out_coords[dim] = coord_values[dim]
+        return xr.DataArray(data, dims=dims_out, coords=out_coords)
+
+    inputs = xr.Dataset(
+        {name: build_var(name, input_pos, expand_static_time=input_time) for name in task_cfg.input_variables},
+        coords={"batch": batch_coord, "time": input_time},
+    )
+    targets = xr.Dataset(
+        {name: build_var(name, target_pos, expand_static_time=None) for name in task_cfg.target_variables},
+        coords={"batch": batch_coord, "time": target_time},
+    )
+    forcing_vars = {
+        name: build_var(name, target_pos, expand_static_time=None)
+        for name in task_cfg.forcing_variables
+    }
+    forcing_coords = {"batch": batch_coord, "time": target_time} if forcing_vars else {"batch": batch_coord}
+    forcings = xr.Dataset(forcing_vars, coords=forcing_coords)
+    return inputs, targets, forcings
 
 
 @dataclasses.dataclass(frozen=True)
@@ -355,3 +469,107 @@ class NumpyBatchCache:
 
 
 BatchBuilder = Callable[..., tuple[xr.Dataset, xr.Dataset, xr.Dataset]]
+
+
+@dataclasses.dataclass(frozen=True)
+class BatchBuilderSelection:
+    train_builder: BatchBuilder
+    eval_builder: BatchBuilder
+    numpy_cache_active: bool
+    effective_train_batch_builder: str
+    effective_eval_batch_builder: str
+
+
+def _numpy_cache_required_message() -> str:
+    return (
+        "--batch-builder numpy requires an active full-RAM train cache. "
+        "Use --data-cache-mode auto/always with a sufficient --data-cache-max-gib, "
+        "or choose --batch-builder direct."
+    )
+
+
+def select_batch_builders(
+    train_ds: xr.Dataset,
+    eval_ds: xr.Dataset,
+    *,
+    requested: str,
+    should_cache_train: bool,
+    task_cfg: gc.TaskConfig,
+    train_label: str = "train",
+    eval_label: str = "eval",
+) -> BatchBuilderSelection:
+    if requested == "legacy":
+        return BatchBuilderSelection(
+            train_builder=build_batch_from_indices,
+            eval_builder=build_batch_from_indices,
+            numpy_cache_active=False,
+            effective_train_batch_builder="legacy",
+            effective_eval_batch_builder="legacy",
+        )
+    if requested == "vectorized":
+        return BatchBuilderSelection(
+            train_builder=build_batch_from_indices_vectorized,
+            eval_builder=build_batch_from_indices_vectorized,
+            numpy_cache_active=False,
+            effective_train_batch_builder="vectorized",
+            effective_eval_batch_builder="vectorized",
+        )
+    if requested == "direct":
+        return BatchBuilderSelection(
+            train_builder=build_batch_from_indices_direct,
+            eval_builder=build_batch_from_indices_direct,
+            numpy_cache_active=False,
+            effective_train_batch_builder="direct",
+            effective_eval_batch_builder="direct",
+        )
+    if requested != "numpy":
+        raise ValueError(
+            f"Unknown batch builder {requested!r}; expected legacy, vectorized, direct, or numpy."
+        )
+    if not should_cache_train:
+        raise ValueError(_numpy_cache_required_message())
+
+    train_cache = NumpyBatchCache(train_ds, task_cfg, label=train_label)
+    eval_cache = NumpyBatchCache(eval_ds, task_cfg, label=eval_label)
+
+    def train_numpy_builder(
+        _ds: xr.Dataset,
+        *,
+        indices: Iterable[int],
+        input_steps: int,
+        target_steps: int,
+        task_cfg: gc.TaskConfig,
+        dt: pd.Timedelta,
+    ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+        return train_cache.build_batch_from_indices(
+            indices=indices,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            dt=dt,
+        )
+
+    def eval_numpy_builder(
+        _ds: xr.Dataset,
+        *,
+        indices: Iterable[int],
+        input_steps: int,
+        target_steps: int,
+        task_cfg: gc.TaskConfig,
+        dt: pd.Timedelta,
+    ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+        return eval_cache.build_batch_from_indices(
+            indices=indices,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            dt=dt,
+        )
+
+    return BatchBuilderSelection(
+        train_builder=train_numpy_builder,
+        eval_builder=eval_numpy_builder,
+        numpy_cache_active=True,
+        effective_train_batch_builder="numpy",
+        effective_eval_batch_builder="numpy",
+    )

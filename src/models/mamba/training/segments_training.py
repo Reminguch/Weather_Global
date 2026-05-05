@@ -22,6 +22,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     from src.models.graphcast.training.core.config import (
         DEFAULT_CKPT,
         DEFAULT_DATA_PATH,
+        DEFAULT_PREPARED_DATA_ROOT,
         DEFAULT_STATS_DIR,
         RunConfig,
     )
@@ -30,10 +31,12 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         description="Train GraphCast on shuffled chronological segments with chunked BPTT."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
+    parser.add_argument("--data-source", choices=["raw", "prepared"], default="raw")
+    parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4], default=1)
+    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4, 8], default=1)
     parser.add_argument("--val-year", type=int, default=2021)
     parser.add_argument("--train-start-year", type=int, default=None)
     parser.add_argument("--train-end-year", type=int, default=None)
@@ -96,7 +99,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "numpy"], default="numpy")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy"], default="numpy")
     args = parser.parse_args(argv)
 
     if args.max_steps <= 0:
@@ -142,10 +145,13 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
 
     base_cfg = RunConfig(
         data_path=args.data_path,
+        data_source=args.data_source,
+        prepared_data_root=args.prepared_data_root,
         resolution=args.resolution,
         mesh_size=args.mesh_size,
         width=args.width,
         processor_msg_steps=args.processor_msg_steps,
+        grad_accum_steps=1,
         val_year=args.val_year,
         train_start_year=args.train_start_year,
         train_end_year=args.train_end_year,
@@ -210,22 +216,17 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     import jax.numpy as jnp
     import numpy as np
     import optax
-    import pandas as pd
     import xarray as xr
 
     from src.models.graphcast.training.core.batching import (
-        BatchBuilder,
-        NumpyBatchCache,
-        build_batch_from_indices,
-        build_batch_from_indices_vectorized,
         infer_time_step,
         input_steps_from_duration,
+        select_batch_builders,
     )
     from src.models.graphcast.training.core.dataset import (
-        _open_local_splits,
         _training_cache_decision,
         maybe_cache_training_data,
-        prepare_dataset_for_task,
+        open_training_splits,
     )
     from src.models.graphcast.training.core.logging import (
         _filter_pairs_upto_step,
@@ -282,9 +283,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
     norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
-    train_ds, eval_ds = _open_local_splits(cfg)
-    train_ds = prepare_dataset_for_task(train_ds, task_cfg)
-    eval_ds = prepare_dataset_for_task(eval_ds, task_cfg)
+    train_ds, eval_ds = open_training_splits(cfg, task_cfg)
 
     dt_train = infer_time_step(train_ds)
     dt_eval = infer_time_step(eval_ds)
@@ -331,67 +330,20 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
     train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
 
-    numpy_cache_active = False
-    train_numpy_cache: NumpyBatchCache | None = None
-    eval_numpy_cache: NumpyBatchCache | None = None
-    effective_train_batch_builder = cfg.batch_builder
-    effective_eval_batch_builder = cfg.batch_builder
-    if cfg.batch_builder == "numpy":
-        if should_cache_train:
-            train_numpy_cache = NumpyBatchCache(train_ds, task_cfg, label="segment-train")
-            eval_numpy_cache = NumpyBatchCache(eval_ds, task_cfg, label="segment-eval")
-            numpy_cache_active = True
-        else:
-            effective_train_batch_builder = "vectorized"
-            effective_eval_batch_builder = "vectorized"
-            print(
-                "[numpy-cache] requested for segments but train split is not cached; "
-                "falling back to vectorized builder. Use --data-cache-mode=always to force it."
-            )
-
-    if numpy_cache_active:
-        assert train_numpy_cache is not None
-        assert eval_numpy_cache is not None
-
-        def train_batch_builder(
-            _ds: xr.Dataset,
-            *,
-            indices: Iterable[int],
-            input_steps: int,
-            target_steps: int,
-            task_cfg: gc.TaskConfig,
-            dt: pd.Timedelta,
-        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-            return train_numpy_cache.build_batch_from_indices(
-                indices=indices,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt,
-            )
-
-        def eval_batch_builder(
-            _ds: xr.Dataset,
-            *,
-            indices: Iterable[int],
-            input_steps: int,
-            target_steps: int,
-            task_cfg: gc.TaskConfig,
-            dt: pd.Timedelta,
-        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-            return eval_numpy_cache.build_batch_from_indices(
-                indices=indices,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt,
-            )
-    elif cfg.batch_builder == "legacy":
-        train_batch_builder = build_batch_from_indices
-        eval_batch_builder = build_batch_from_indices
-    else:
-        train_batch_builder = build_batch_from_indices_vectorized
-        eval_batch_builder = build_batch_from_indices_vectorized
+    builder_selection = select_batch_builders(
+        train_ds,
+        eval_ds,
+        requested=cfg.batch_builder,
+        should_cache_train=should_cache_train,
+        task_cfg=task_cfg,
+        train_label="segment-train",
+        eval_label="segment-eval",
+    )
+    train_batch_builder = builder_selection.train_builder
+    eval_batch_builder = builder_selection.eval_builder
+    numpy_cache_active = builder_selection.numpy_cache_active
+    effective_train_batch_builder = builder_selection.effective_train_batch_builder
+    effective_eval_batch_builder = builder_selection.effective_eval_batch_builder
 
     def forward_fn(inputs, targets, forcings, is_training):
         predictor = build_predictor(

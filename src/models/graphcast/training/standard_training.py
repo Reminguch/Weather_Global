@@ -28,24 +28,19 @@ def main() -> None:
     import jax.numpy as jnp
     import numpy as np
     import optax
-    import pandas as pd
     import xarray as xr
 
     from .core.batching import (
-        BatchBuilder,
-        NumpyBatchCache,
-        build_batch_from_indices,
-        build_batch_from_indices_vectorized,
         build_sequential_segments,
         infer_time_step,
         input_steps_from_duration,
+        select_batch_builders,
         valid_final_input_indices,
     )
     from .core.dataset import (
-        _open_local_splits,
         _training_cache_decision,
         maybe_cache_training_data,
-        prepare_dataset_for_task,
+        open_training_splits,
     )
     from .core.eval import run_eval
     from .core.logging import (
@@ -95,10 +90,7 @@ def main() -> None:
     norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
 
-    train_ds, eval_ds = _open_local_splits(cfg)
-
-    train_ds = prepare_dataset_for_task(train_ds, task_cfg)
-    eval_ds = prepare_dataset_for_task(eval_ds, task_cfg)
+    train_ds, eval_ds = open_training_splits(cfg, task_cfg)
 
     dt_train = infer_time_step(train_ds)
     dt_eval = infer_time_step(eval_ds)
@@ -136,72 +128,18 @@ def main() -> None:
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
     train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
 
-    numpy_cache_active = False
-    train_numpy_cache: NumpyBatchCache | None = None
-    eval_numpy_cache: NumpyBatchCache | None = None
-    effective_train_batch_builder = cfg.batch_builder
-    effective_eval_batch_builder = cfg.batch_builder
-    if cfg.batch_builder == "numpy":
-        if should_cache_train:
-            train_numpy_cache = NumpyBatchCache(train_ds, task_cfg, label="train")
-            eval_numpy_cache = NumpyBatchCache(eval_ds, task_cfg, label="eval")
-            numpy_cache_active = True
-        else:
-            effective_train_batch_builder = "vectorized"
-            effective_eval_batch_builder = "vectorized"
-            print(
-                "[numpy-cache] requested but train split is not cached; "
-                "falling back to vectorized builder. Use --data-cache-mode=always to force it."
-            )
-
-    batch_builder_fn: BatchBuilder
-    eval_batch_builder_fn: BatchBuilder
-    if numpy_cache_active:
-        assert train_numpy_cache is not None
-        assert eval_numpy_cache is not None
-
-        def train_numpy_builder(
-            _ds: xr.Dataset,
-            *,
-            indices: Iterable[int],
-            input_steps: int,
-            target_steps: int,
-            task_cfg: gc.TaskConfig,
-            dt: pd.Timedelta,
-        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-            return train_numpy_cache.build_batch_from_indices(
-                indices=indices,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt,
-            )
-
-        def eval_numpy_builder(
-            _ds: xr.Dataset,
-            *,
-            indices: Iterable[int],
-            input_steps: int,
-            target_steps: int,
-            task_cfg: gc.TaskConfig,
-            dt: pd.Timedelta,
-        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-            return eval_numpy_cache.build_batch_from_indices(
-                indices=indices,
-                input_steps=input_steps,
-                target_steps=target_steps,
-                task_cfg=task_cfg,
-                dt=dt,
-            )
-
-        batch_builder_fn = train_numpy_builder
-        eval_batch_builder_fn = eval_numpy_builder
-    elif cfg.batch_builder == "legacy":
-        batch_builder_fn = build_batch_from_indices
-        eval_batch_builder_fn = build_batch_from_indices
-    else:
-        batch_builder_fn = build_batch_from_indices_vectorized
-        eval_batch_builder_fn = build_batch_from_indices_vectorized
+    builder_selection = select_batch_builders(
+        train_ds,
+        eval_ds,
+        requested=cfg.batch_builder,
+        should_cache_train=should_cache_train,
+        task_cfg=task_cfg,
+    )
+    batch_builder_fn = builder_selection.train_builder
+    eval_batch_builder_fn = builder_selection.eval_builder
+    numpy_cache_active = builder_selection.numpy_cache_active
+    effective_train_batch_builder = builder_selection.effective_train_batch_builder
+    effective_eval_batch_builder = builder_selection.effective_eval_batch_builder
 
     def build_train_batch(indices: Iterable[int]) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
         return batch_builder_fn(
@@ -337,10 +275,9 @@ def main() -> None:
     use_sequential = cfg.sequential_segment_steps is not None
 
     @functools.partial(jax.jit, static_argnames=("reset_state",))
-    def train_step(
+    def train_microbatch_grad(
         params: hk.Params,
         state: hk.State,
-        opt_state: optax.OptState,
         rng_key: jax.Array,
         inputs: xr.Dataset,
         targets: xr.Dataset,
@@ -360,9 +297,17 @@ def main() -> None:
             return loss, new_state
 
         (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
+        return new_state, grads, loss
+
+    @jax.jit
+    def apply_grads(
+        params: hk.Params,
+        opt_state: optax.OptState,
+        grads: hk.Params,
+    ):
         updates, new_opt_state = opt.update(grads, opt_state, params)
         new_params = optax.apply_updates(params, updates)
-        return new_params, new_state, new_opt_state, loss
+        return new_params, new_opt_state
 
     step = cfg.resume_step if cfg.resume_step is not None else 0
 
@@ -477,109 +422,153 @@ def main() -> None:
 
     while step < cfg.max_steps:
         loop_t0 = time.time()
-        prepared_batch: PreparedBatch | None = None
-        if use_sequential:
-            # Sequential segment sampling keeps state-carry semantics explicit.
-            _new_epoch = False
-            if seg_idx >= len(segments):
-                # All segments exhausted -> new epoch
-                epoch_summaries.append(
-                    {
-                        "pass": pass_idx,
-                        "steps": step - pass_start_step + 1,
-                        "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
-                        "time_per_step_mean": float(
-                            np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
-                        ),
-                        "mem_gib_max": float(
-                            np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
-                        ),
-                    }
-                )
-                pass_idx += 1
-                pass_start_step = step + 1
-                pass_loss_accum = []
-                segments = build_sequential_segments(train_final_indices, cfg.sequential_segment_steps)
-                np_rng.shuffle(segments)
-                seg_idx = 0
-                seg_cursor = 0
-            elif seg_cursor >= len(segments[seg_idx]):
-                # Current segment exhausted -> move to next segment (reset state)
-                seg_idx += 1
-                seg_cursor = 0
-                if seg_idx >= len(segments):
-                    continue  # will trigger new epoch on next iteration
+        update_new_epoch = False
+        data_wait_total = 0.0
+        host_build_total = 0.0
+        device_put_total = 0.0
+        compute_sync_total = 0.0
+        device_staged_count = 0
+        micro_losses: list[float] = []
+        micro_timing: list[dict[str, float | int | bool]] = []
+        accum_grads = None
 
-            # At start of segment, reset state; otherwise carry with stop_gradient
-            reset_state = (seg_cursor == 0)
-            seg = segments[seg_idx]
-            batch_idx = seg[seg_cursor : seg_cursor + cfg.batch_size]
-            seg_cursor += cfg.batch_size
-            t_build = time.time()
-            batch_inputs, batch_targets, batch_forcings = build_train_batch(batch_idx)
-            data_wait = 0.0
-            host_build_time = time.time() - t_build
-            device_put_time = 0.0
-            device_staged = False
-        else:
-            if prefetcher is not None:
-                prepared_batch, data_wait = prefetcher.get()
-                batch_inputs = prepared_batch.inputs
-                batch_targets = prepared_batch.targets
-                batch_forcings = prepared_batch.forcings
-                reset_state = prepared_batch.request.reset_state
-                _new_epoch = prepared_batch.request.new_epoch
-                host_build_time = prepared_batch.host_build_time
-                device_put_time = prepared_batch.device_put_time
-                device_staged = prepared_batch.device_staged
-            else:
-                request = next_random_request()
-                _new_epoch = request.new_epoch
-                reset_state = request.reset_state
+        for accum_i in range(cfg.grad_accum_steps):
+            prepared_batch: PreparedBatch | None = None
+            if use_sequential:
+                # Sequential segment sampling keeps state-carry semantics explicit.
+                _new_epoch = False
+                if seg_idx >= len(segments):
+                    # All segments exhausted -> new epoch
+                    epoch_summaries.append(
+                        {
+                            "pass": pass_idx,
+                            "steps": step - pass_start_step + 1,
+                            "train_loss_mean": float(np.mean(pass_loss_accum)) if pass_loss_accum else float("nan"),
+                            "time_per_step_mean": float(
+                                np.mean([t for s, t in step_times if s >= pass_start_step] or [float("nan")])
+                            ),
+                            "mem_gib_max": float(
+                                np.max([m for s, m in mem_usage if s >= pass_start_step] or [float("nan")])
+                            ),
+                        }
+                    )
+                    pass_idx += 1
+                    pass_start_step = step + 1
+                    pass_loss_accum = []
+                    segments = build_sequential_segments(train_final_indices, cfg.sequential_segment_steps)
+                    np_rng.shuffle(segments)
+                    seg_idx = 0
+                    seg_cursor = 0
+                elif seg_cursor >= len(segments[seg_idx]):
+                    # Current segment exhausted -> move to next segment (reset state)
+                    seg_idx += 1
+                    seg_cursor = 0
+                    if seg_idx >= len(segments):
+                        continue  # will trigger new epoch on next iteration
+
+                # At start of segment, reset state; otherwise carry with stop_gradient
+                reset_state = (seg_cursor == 0)
+                seg = segments[seg_idx]
+                batch_idx = seg[seg_cursor : seg_cursor + cfg.batch_size]
+                seg_cursor += cfg.batch_size
                 t_build = time.time()
-                batch_inputs, batch_targets, batch_forcings = build_train_batch(request.indices)
+                batch_inputs, batch_targets, batch_forcings = build_train_batch(batch_idx)
                 data_wait = 0.0
                 host_build_time = time.time() - t_build
                 device_put_time = 0.0
                 device_staged = False
+            else:
+                if prefetcher is not None:
+                    prepared_batch, data_wait = prefetcher.get()
+                    batch_inputs = prepared_batch.inputs
+                    batch_targets = prepared_batch.targets
+                    batch_forcings = prepared_batch.forcings
+                    reset_state = prepared_batch.request.reset_state
+                    _new_epoch = prepared_batch.request.new_epoch
+                    host_build_time = prepared_batch.host_build_time
+                    device_put_time = prepared_batch.device_put_time
+                    device_staged = prepared_batch.device_staged
+                else:
+                    request = next_random_request()
+                    _new_epoch = request.new_epoch
+                    reset_state = request.reset_state
+                    t_build = time.time()
+                    batch_inputs, batch_targets, batch_forcings = build_train_batch(request.indices)
+                    data_wait = 0.0
+                    host_build_time = time.time() - t_build
+                    device_put_time = 0.0
+                    device_staged = False
 
-        rng, step_key = jax.random.split(rng)
-        t_compute = time.time()
-        params, state, opt_state, loss = train_step(
-            params,
-            state,
-            opt_state,
-            step_key,
-            batch_inputs,
-            batch_targets,
-            batch_forcings,
-            reset_state=reset_state,
-        )
-        loss.block_until_ready()
-        compute_sync_time = time.time() - t_compute
+            rng, step_key = jax.random.split(rng)
+            t_compute = time.time()
+            state, grads, loss = train_microbatch_grad(
+                params,
+                state,
+                step_key,
+                batch_inputs,
+                batch_targets,
+                batch_forcings,
+                reset_state=reset_state,
+            )
+            loss.block_until_ready()
+            compute_sync_time = time.time() - t_compute
+            if prefetcher is not None and prepared_batch is not None:
+                prefetcher.release_device_slot(prepared_batch)
+
+            accum_grads = grads if accum_grads is None else jax.tree_util.tree_map(jnp.add, accum_grads, grads)
+            loss_f_micro = float(loss)
+            micro_losses.append(loss_f_micro)
+            update_new_epoch = update_new_epoch or _new_epoch
+            data_wait_total += data_wait
+            host_build_total += host_build_time
+            device_put_total += device_put_time
+            compute_sync_total += compute_sync_time
+            device_staged_count += int(device_staged)
+            micro_timing.append(
+                {
+                    "microstep": accum_i + 1,
+                    "loss": loss_f_micro,
+                    "data_wait": data_wait,
+                    "host_build": host_build_time,
+                    "device_put": device_put_time,
+                    "device_staged": bool(device_staged),
+                    "compute_sync": compute_sync_time,
+                }
+            )
+
+        if accum_grads is None:
+            continue
+        avg_grads = jax.tree_util.tree_map(lambda g: g / cfg.grad_accum_steps, accum_grads)
+        params, opt_state = apply_grads(params, opt_state, avg_grads)
+        param_leaves = jax.tree_util.tree_leaves(params)
+        if param_leaves:
+            param_leaves[0].block_until_ready()
         step_wall_time = time.time() - loop_t0
-        if prefetcher is not None and prepared_batch is not None:
-            prefetcher.release_device_slot(prepared_batch)
 
         step += 1
-        loss_f = float(loss)
+        loss_f = float(np.mean(micro_losses))
         train_losses.append((step, loss_f))
         pass_loss_accum.append(loss_f)
         step_times.append((step, step_wall_time))
         timing_details.append(
             {
                 "step": step,
-                "data_wait": data_wait,
-                "host_build": host_build_time,
-                "device_put": device_put_time,
-                "device_staged": device_staged,
-                "compute_sync": compute_sync_time,
+                "data_wait": data_wait_total,
+                "host_build": host_build_total,
+                "device_put": device_put_total,
+                "device_staged": device_staged_count > 0,
+                "device_staged_microbatches": device_staged_count,
+                "compute_sync": compute_sync_total,
                 "step_wall": step_wall_time,
+                "grad_accum_steps": cfg.grad_accum_steps,
+                "microbatch_size": cfg.batch_size,
+                "effective_batch_size": cfg.batch_size * cfg.grad_accum_steps,
+                "microbatches": micro_timing,
             }
         )
 
         # Random mode: log epoch summary after the last step of each epoch completes.
-        if _new_epoch:
+        if update_new_epoch:
             epoch_summaries.append(
                 {
                     "pass": pass_idx,
@@ -606,9 +595,10 @@ def main() -> None:
         if step % 200 == 0:
             print(
                 f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
-                f"data_wait={data_wait:.3f}s host_build={host_build_time:.3f}s "
-                f"device_put={device_put_time:.3f}s compute_sync={compute_sync_time:.4f}s "
-                f"step_wall={step_wall_time:.3f}s staged={int(device_staged)}"
+                f"accum={cfg.grad_accum_steps} data_wait={data_wait_total:.3f}s "
+                f"host_build={host_build_total:.3f}s device_put={device_put_total:.3f}s "
+                f"compute_sync={compute_sync_total:.4f}s step_wall={step_wall_time:.3f}s "
+                f"staged_microbatches={device_staged_count}"
             )
 
         if step % cfg.eval_every == 0:

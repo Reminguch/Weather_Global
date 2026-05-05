@@ -20,6 +20,8 @@ mkdir -p logs
 source scripts/graphcast_env.sh
 
 DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}
+DATA_SOURCE=${DATA_SOURCE:-raw}
+PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-prepared}
 VAL_YEAR=${VAL_YEAR:-2022}
 TRAIN_START_YEAR=${TRAIN_START_YEAR:-}
 TRAIN_END_YEAR=${TRAIN_END_YEAR:-}
@@ -38,6 +40,7 @@ LR=${LR:-1e-4}
 WEIGHT_DECAY=${WEIGHT_DECAY:-1e-4}
 SEED=${SEED:-0}
 PRECISION=${PRECISION:-bf16}
+BATCH_BUILDER=${BATCH_BUILDER:-vectorized}
 
 OUT_DIR=${OUT_DIR:-artifacts/checkpoints/graphcast_res${RESOLUTION%.*}_manual}
 RES_TAG="res${RESOLUTION%.0}"
@@ -59,6 +62,8 @@ fi
 CMD=(
   python -u -m src.models.graphcast.training.standard_training
   --data-path "${DATA_PATH}"
+  --data-source "${DATA_SOURCE}"
+  --prepared-data-root "${PREPARED_DATA_ROOT}"
   --val-year "${VAL_YEAR}"
   --resolution "${RESOLUTION}"
   --mesh-size "${MESH_SIZE}"
@@ -73,6 +78,7 @@ CMD=(
   --weight-decay "${WEIGHT_DECAY}"
   --seed "${SEED}"
   --precision "${PRECISION}"
+  --batch-builder "${BATCH_BUILDER}"
   --out-dir "${OUT_DIR}"
   --run-name "${RUN_NAME}"
   --ckpt-in "${CKPT_IN}"

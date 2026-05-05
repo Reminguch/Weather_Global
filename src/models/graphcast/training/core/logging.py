@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -11,7 +12,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .config import RunConfig
+from .dataset import prepared_store_path
 from .model import checkpoint, gc
+
+
+_STEP_CKPT_RE = re.compile(r"^ckpt_step(\d+)\.npz$")
+
+
+def prune_old_step_checkpoints(out_dir: Path, *, keep_step: int) -> None:
+    keep_name = f"ckpt_step{keep_step}.npz"
+    removed = 0
+    for path in out_dir.glob("ckpt_step*.npz"):
+        match = _STEP_CKPT_RE.match(path.name)
+        if match is None or path.name == keep_name:
+            continue
+        path.unlink()
+        removed += 1
+    if removed:
+        print(f"pruned {removed} old step checkpoint(s), kept {out_dir / keep_name}")
 
 
 def save_checkpoint(
@@ -36,6 +54,8 @@ def save_checkpoint(
     with path.open("wb") as f:
         checkpoint.dump(f, ckpt_out)
     print(f"saved checkpoint: {path}")
+    if filename is None:
+        prune_old_step_checkpoints(out_dir, keep_step=step)
 
 
 def save_logs(
@@ -286,10 +306,14 @@ def _write_run_config(
     )
     payload = {
         "data_path": cfg.data_path,
+        "data_source": cfg.data_source,
+        "prepared_data_root": cfg.prepared_data_root,
+        "prepared_store_path": str(prepared_store_path(cfg)) if cfg.data_source == "prepared" else None,
         "val_year": cfg.val_year,
         "train_start_year": cfg.train_start_year,
         "train_end_year": cfg.train_end_year,
         "batch_size": cfg.batch_size,
+        "grad_accum_steps": cfg.grad_accum_steps,
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
         "eval_batch_size": cfg.eval_batch_size,
@@ -301,6 +325,9 @@ def _write_run_config(
         "init_from_graphcast_ckpt": cfg.init_from_graphcast_ckpt,
         "trainable_part": cfg.trainable_part,
         "data_pipeline": {
+            "data_source": cfg.data_source,
+            "prepared_data_root": cfg.prepared_data_root,
+            "prepared_store_path": str(prepared_store_path(cfg)) if cfg.data_source == "prepared" else None,
             "data_cache_mode": cfg.data_cache_mode,
             "data_cache_max_gib": cfg.data_cache_max_gib,
             "batch_builder": cfg.batch_builder,
@@ -310,6 +337,12 @@ def _write_run_config(
             "usage_every": cfg.usage_every,
             **builder_metadata,
             "train_cache_estimate_gib": train_cache_estimate_gib,
+        },
+        "optimization": {
+            "step_unit": "optimizer_updates",
+            "microbatch_size": cfg.batch_size,
+            "grad_accum_steps": cfg.grad_accum_steps,
+            "effective_batch_size": cfg.batch_size * cfg.grad_accum_steps,
         },
         "temporal_config": {
             "backbone": cfg.temporal_backbone,

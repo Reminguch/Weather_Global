@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import dataclasses
 
-DEFAULT_DATA_PATH = "data/graphcast/graphcast/dataset/wb2_res1_levels13_1979_2021.zarr"
+DEFAULT_DATA_PATH = "data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr"
 DEFAULT_CKPT = (
     "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - "
     "pressure levels 13 - mesh 2to5 - precipitation input and output.npz"
 )
 DEFAULT_STATS_DIR = "data/graphcast/graphcast/stats"
 DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_res2_stream"
+DEFAULT_PREPARED_DATA_ROOT = "prepared"
 
 GRAPHCAST_VARS = [
     "2m_temperature",
@@ -32,10 +33,13 @@ GRAPHCAST_VARS = [
 @dataclasses.dataclass
 class RunConfig:
     data_path: str
+    data_source: str
+    prepared_data_root: str
     resolution: float
     mesh_size: int
     width: int
     processor_msg_steps: int
+    grad_accum_steps: int
     val_year: int
     train_start_year: int | None
     train_end_year: int | None
@@ -84,10 +88,27 @@ class RunConfig:
 def parse_args() -> RunConfig:
     parser = argparse.ArgumentParser(description="Train GraphCast at 2.0deg from local ERA5 data.")
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH, help="Local dataset path (.zarr or .nc).")
+    parser.add_argument(
+        "--data-source",
+        choices=["raw", "prepared"],
+        default="raw",
+        help="Read from raw WeatherBench/GraphCast data or a prepared/res{N} store.",
+    )
+    parser.add_argument(
+        "--prepared-data-root",
+        default=DEFAULT_PREPARED_DATA_ROOT,
+        help="Root directory containing prepared/res{N} Zarr stores.",
+    )
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4], default=1)
+    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4, 8], default=1)
+    parser.add_argument(
+        "--grad-accum-steps",
+        type=int,
+        default=1,
+        help="Number of microbatches to average before one optimizer update.",
+    )
     parser.add_argument("--val-year", type=int, default=2021, help="Validation year (excluded from train split).")
     parser.add_argument("--train-start-year", type=int, default=None, help="Optional lower bound for train years.")
     parser.add_argument("--train-end-year", type=int, default=None, help="Optional upper bound for train years.")
@@ -150,8 +171,8 @@ def parse_args() -> RunConfig:
                         help="Cache the prepared training split in RAM. 'auto' uses --data-cache-max-gib.")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0,
                         help="Maximum estimated train split size for --data-cache-mode=auto.")
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "numpy"], default="vectorized",
-                        help="Batch construction implementation. Numpy bypasses xarray gathers when cached.")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy"], default="vectorized",
+                        help="Batch construction implementation. Numpy requires an active full-RAM train cache.")
     parser.add_argument("--prefetch-workers", type=int, default=4,
                         help="Background workers used to build future random-sampling batches.")
     parser.add_argument("--prefetch-depth", type=int, default=8,
@@ -168,6 +189,8 @@ def parse_args() -> RunConfig:
         raise ValueError("--max-steps must be > 0")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be > 0")
+    if args.grad_accum_steps <= 0:
+        raise ValueError("--grad-accum-steps must be > 0")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -205,13 +228,21 @@ def parse_args() -> RunConfig:
         raise ValueError("--prefetch-device-depth must be >= 0")
     if args.usage_every < 0:
         raise ValueError("--usage-every must be >= 0")
+    if args.grad_accum_steps > 1:
+        if args.temporal_backbone != "none":
+            raise ValueError("--grad-accum-steps > 1 is currently supported only for vanilla GraphCast.")
+        if args.sequential_segment_steps is not None:
+            raise ValueError("--grad-accum-steps > 1 is not supported with --sequential-segment-steps.")
 
     return RunConfig(
         data_path=args.data_path,
+        data_source=args.data_source,
+        prepared_data_root=args.prepared_data_root,
         resolution=args.resolution,
         mesh_size=args.mesh_size,
         width=args.width,
         processor_msg_steps=args.processor_msg_steps,
+        grad_accum_steps=args.grad_accum_steps,
         val_year=args.val_year,
         train_start_year=args.train_start_year,
         train_end_year=args.train_end_year,
