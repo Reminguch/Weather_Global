@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-import json
-from typing import Iterable, Sequence
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -14,9 +13,6 @@ from .config import GRAPHCAST_VARS, RunConfig
 from .model import data_utils, gc
 from .prepared_array import PreparedArrayStore, is_prepared_array_store
 from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
-
-
-PREPARED_FORMAT_VERSION = 1
 
 
 def _ensure_datetime_coord(ds: xr.Dataset) -> xr.Dataset:
@@ -140,7 +136,7 @@ def maybe_cache_training_data(
         print("[cache] train split exceeds cache cap; streaming time-varying train data.")
         return train_ds, eval_ds
 
-    print("[cache] loading prepared train split into RAM.")
+    print("[cache] loading train split into RAM.")
     t0 = time.time()
     train_ds = train_ds.load()
     print(f"[cache] train split loaded in {time.time() - t0:.1f}s.")
@@ -303,104 +299,6 @@ def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
     return train_raw, val_raw
 
 
-def _task_var_names(task_cfg: gc.TaskConfig) -> set[str]:
-    return set(task_cfg.input_variables) | set(task_cfg.target_variables) | set(task_cfg.forcing_variables)
-
-
-def _attr_list(value: object) -> list:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except Exception:
-            return [value]
-        return parsed if isinstance(parsed, list) else [parsed]
-    if isinstance(value, np.ndarray):
-        return value.tolist()
-    if isinstance(value, Sequence):
-        return list(value)
-    return [value]
-
-
-def _validate_six_hour_sorted_time(ds: xr.Dataset) -> None:
-    if "time" not in ds.coords:
-        raise KeyError("Prepared store is missing `time` coordinate.")
-    time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
-    if len(time_index) < 2:
-        raise ValueError("Prepared store must contain at least two time steps.")
-    if not time_index.is_monotonic_increasing:
-        raise ValueError("Prepared store time coordinate must be sorted ascending.")
-    deltas = np.diff(time_index.values).astype("timedelta64[ns]")
-    expected = np.array(np.timedelta64(6, "h")).astype("timedelta64[ns]")
-    if not np.all(deltas == expected):
-        raise ValueError("Prepared store time grid must be strictly 6-hourly.")
-
-
-def validate_prepared_dataset(ds: xr.Dataset, cfg: RunConfig, task_cfg: gc.TaskConfig) -> None:
-    version = ds.attrs.get("prepared_format_version")
-    if version is not None and int(version) != PREPARED_FORMAT_VERSION:
-        raise ValueError(
-            f"Unsupported prepared_format_version={version}; expected {PREPARED_FORMAT_VERSION}."
-        )
-    resolution = ds.attrs.get("resolution")
-    if resolution is not None and not np.isclose(float(resolution), cfg.resolution, atol=1e-6):
-        raise ValueError(
-            f"Prepared store resolution={resolution} does not match requested {cfg.resolution}."
-        )
-
-    prepared_levels = _attr_list(ds.attrs.get("pressure_levels"))
-    if prepared_levels:
-        prepared_levels_int = [int(level) for level in prepared_levels]
-        requested_levels = [int(level) for level in task_cfg.pressure_levels]
-        if prepared_levels_int != requested_levels:
-            raise ValueError(
-                "Prepared store pressure_levels do not match checkpoint task: "
-                f"prepared={prepared_levels_int}, requested={requested_levels}."
-            )
-
-    missing = sorted(name for name in _task_var_names(task_cfg) if name not in ds.data_vars)
-    if missing:
-        raise ValueError(f"Prepared store is missing task variables: {missing}")
-    attr_checks = [
-        ("task_input_variables", list(task_cfg.input_variables)),
-        ("task_target_variables", list(task_cfg.target_variables)),
-        ("task_forcing_variables", list(task_cfg.forcing_variables)),
-    ]
-    for attr_name, expected in attr_checks:
-        prepared_values = _attr_list(ds.attrs.get(attr_name))
-        if prepared_values and list(prepared_values) != expected:
-            raise ValueError(
-                f"Prepared store {attr_name} does not match checkpoint task: "
-                f"prepared={prepared_values}, requested={expected}."
-            )
-
-    _validate_six_hour_sorted_time(ds)
-    _split_by_year(ds, cfg, label="prepared")
-
-
-def _open_prepared_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[xr.Dataset, xr.Dataset]:
-    store_path = prepared_store_path(cfg)
-    _assert_local_path(str(store_path), "--prepared-data-root")
-    if not store_path.exists():
-        raise FileNotFoundError(
-            f"Prepared data store not found: {store_path}. "
-            "Run python -m src.data_operations.preprocessing.prepare_graphcast_training_store first."
-        )
-    print(f"Opening prepared dataset: {store_path}")
-    ds = xr.open_zarr(store_path, consolidated=True)
-    ds = _ensure_datetime_coord(ds)
-    validate_prepared_dataset(ds, cfg, task_cfg)
-    train_ds, val_ds, train_years = _split_by_year(ds, cfg, label="prepared")
-    print(
-        "Prepared data split: "
-        f"train_years={train_years[0]}-{train_years[-1]} (excluding {cfg.val_year}), "
-        f"val_year={cfg.val_year}, train_time={train_ds.sizes['time']}, val_time={val_ds.sizes['time']}, "
-        f"store={store_path}"
-    )
-    return train_ds, val_ds
-
-
 def _open_prepared_array_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[PreparedArrayStore, PreparedArrayStore]:
     store_path = prepared_store_path(cfg)
     _assert_local_path(str(store_path), "--prepared-data-root")
@@ -426,8 +324,6 @@ def open_training_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[xr.Da
     if cfg.data_source == "raw":
         train_ds, eval_ds = _open_local_splits(cfg)
         return prepare_dataset_for_task(train_ds, task_cfg), prepare_dataset_for_task(eval_ds, task_cfg)
-    if cfg.data_source == "prepared":
-        return _open_prepared_splits(cfg, task_cfg)
     if cfg.data_source == "prepared_array":
         return _open_prepared_array_splits(cfg, task_cfg)
-    raise ValueError(f"Unknown data_source={cfg.data_source!r}; expected raw, prepared, or prepared_array.")
+    raise ValueError(f"Unknown data_source={cfg.data_source!r}; expected raw or prepared_array.")

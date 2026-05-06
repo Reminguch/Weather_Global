@@ -329,7 +329,7 @@ class _CachedVar:
 
 
 class NumpyBatchCache:
-    """Fast batch builder that gathers prepared GraphCast variables with numpy."""
+    """Fast batch builder that gathers GraphCast variables with numpy."""
 
     def __init__(self, ds: xr.Dataset, task_cfg: gc.TaskConfig, *, label: str, log_build: bool = True) -> None:
         t0 = time.time()

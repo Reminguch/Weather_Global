@@ -27,7 +27,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         description="Train GraphCast/Mamba on one-step residuals over shuffled chronological segments."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
-    parser.add_argument("--data-source", choices=["raw", "prepared", "prepared_array"], default="raw")
+    parser.add_argument("--data-source", choices=["raw", "prepared_array"], default="raw")
     parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)

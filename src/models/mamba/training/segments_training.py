@@ -34,7 +34,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         description="Train GraphCast on shuffled chronological segments with chunked BPTT."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
-    parser.add_argument("--data-source", choices=["raw", "prepared", "prepared_array"], default="raw")
+    parser.add_argument("--data-source", choices=["raw", "prepared_array"], default="raw")
     parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
@@ -78,7 +78,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         dest="use_segment_block_loader",
         action="store_false",
         default=True,
-        help="Disable prepared-data segment block loading and use the selected batch builder.",
+        help="Disable prepared-array segment block loading and use the selected batch builder.",
     )
     parser.add_argument(
         "--no-filter-nan-segments",
@@ -389,13 +389,13 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     requested_batch_builder = cfg.batch_builder
     use_segment_block_loader = (
         segment_cfg.use_segment_block_loader
-        and cfg.data_source in {"prepared", "prepared_array"}
+        and cfg.data_source == "prepared_array"
         and not should_cache_train
     )
     if use_segment_block_loader and requested_batch_builder == "numpy":
         print(
             "[segment-block] batch_builder=numpy requires a full train cache; "
-            "using segment block loader with direct eval fallback for streaming prepared data."
+            "using segment block loader with direct eval fallback for streaming prepared-array data."
         )
         requested_batch_builder = "direct"
 

@@ -9,18 +9,19 @@ source scripts/graphcast_env.sh
 
 ## Prepared Data
 
-Build reusable prepared stores once per source/checkpoint task:
+Build reusable memmap-backed streaming stores once per source/checkpoint task:
 
 ```bash
-python -m src.data_operations.preprocessing.prepare_graphcast_training_store \
+python -m src.data_operations.preprocessing.prepare_graphcast_streaming_store \
   --data-path "${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}" \
   --ckpt-in "${CKPT_IN:-data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz}" \
-  --out-root "${PREPARED_DATA_ROOT:-prepared}" \
-  --resolutions 1 2 4 9 15
+  --out-root "${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}" \
+  --resolutions 1 2 3 4 9 18
 ```
 
-Then train with `--data-source prepared --batch-builder direct`. The store path is derived from
-`--prepared-data-root` and `--resolution`, for example `prepared/res1`.
+Then train with `--data-source prepared_array --batch-builder prepared_array`. The store path is
+derived from `--prepared-data-root` and `--resolution`, for example
+`data/graphcast/graphcast/dataset/prepared_stream/res1`.
 
 ## Which Command?
 
@@ -32,7 +33,7 @@ Direct Python:
 python -u -m src.models.graphcast.training.standard_training \
   --data-path "${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}" \
   --data-source "${DATA_SOURCE:-raw}" \
-  --prepared-data-root "${PREPARED_DATA_ROOT:-prepared}" \
+  --prepared-data-root "${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}" \
   --stats-dir "${STATS_DIR:-data/graphcast/graphcast/stats}" \
   --ckpt-in "${CKPT_IN:-data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz}" \
   --out-dir "${OUT_DIR:-artifacts/checkpoints/graphcast_manual}" \
@@ -63,7 +64,7 @@ python -u -m src.models.mamba.training.segments_training \
   --model gc_mamba \
   --data-path "${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}" \
   --data-source "${DATA_SOURCE:-raw}" \
-  --prepared-data-root "${PREPARED_DATA_ROOT:-prepared}" \
+  --prepared-data-root "${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}" \
   --stats-dir "${STATS_DIR:-data/graphcast/graphcast/stats}" \
   --ckpt-in "${CKPT_IN:-data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz}" \
   --out-dir "${OUT_DIR:-artifacts/checkpoints/gc_mamba_segments}" \
@@ -106,7 +107,7 @@ python -u -m src.models.mamba.training.segments_training \
   --model gc_mamba \
   --data-path "${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}" \
   --data-source "${DATA_SOURCE:-raw}" \
-  --prepared-data-root "${PREPARED_DATA_ROOT:-prepared}" \
+  --prepared-data-root "${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}" \
   --stats-dir "${STATS_DIR:-data/graphcast/graphcast/stats}" \
   --ckpt-in "${CKPT_IN}" \
   --init-from-graphcast-ckpt "${CKPT_IN}" \
@@ -146,7 +147,7 @@ python -u -m src.models.mamba.training.segments_training \
   --model residual_mamba \
   --data-path "${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}" \
   --data-source "${DATA_SOURCE:-raw}" \
-  --prepared-data-root "${PREPARED_DATA_ROOT:-prepared}" \
+  --prepared-data-root "${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}" \
   --stats-dir "${STATS_DIR:-data/graphcast/graphcast/stats}" \
   --baseline-ckpt "${BASELINE_CKPT}" \
   --out-dir "${OUT_DIR:-artifacts/checkpoints/residual_mamba_segments}" \
@@ -185,8 +186,8 @@ MODEL=residual_mamba BASELINE_CKPT=artifacts/checkpoints/path/to/ckpt_best.npz \
 | Group | Variable / flag | Meaning |
 | --- | --- | --- |
 | Data/checkpoints | `DATA_PATH`, `--data-path` | Local GraphCast-style ERA5 dataset, usually `.zarr`. |
-| Data/checkpoints | `DATA_SOURCE`, `--data-source` | `raw` reads `DATA_PATH`; `prepared` reads `PREPARED_DATA_ROOT/res{RESOLUTION}`. |
-| Data/checkpoints | `PREPARED_DATA_ROOT`, `--prepared-data-root` | Root for prepared Zarr stores, default `prepared`. |
+| Data/checkpoints | `DATA_SOURCE`, `--data-source` | `raw` reads `DATA_PATH`; `prepared_array` reads `PREPARED_DATA_ROOT/res{RESOLUTION}`. |
+| Data/checkpoints | `PREPARED_DATA_ROOT`, `--prepared-data-root` | Root for prepared-array memmap stores, default `data/graphcast/graphcast/dataset/prepared_stream`. |
 | Data/checkpoints | `STATS_DIR`, `--stats-dir` | Normalization and weighting stats directory. |
 | Data/checkpoints | `CKPT_IN`, `--ckpt-in` | GraphCast checkpoint used by `gc` and `gc_mamba`. |
 | Data/checkpoints | `BASELINE_CKPT`, `--baseline-ckpt` | Required for `res_mamba`; frozen baseline used for residual targets. |
@@ -204,7 +205,7 @@ MODEL=residual_mamba BASELINE_CKPT=artifacts/checkpoints/path/to/ckpt_best.npz \
 | Optimization | `LR`, `--lr` | Learning rate. |
 | Optimization | `WEIGHT_DECAY`, `--weight-decay` | AdamW weight decay. |
 | Optimization | `PRECISION`, `--precision` | One of `bf16`, `fp16`, or `fp32`. |
-| Data pipeline | `BATCH_BUILDER`, `--batch-builder` | `legacy`, `vectorized`, `direct`, or `numpy`; `numpy` requires an active full-RAM cache. |
+| Data pipeline | `BATCH_BUILDER`, `--batch-builder` | `legacy`, `vectorized`, `direct`, `numpy`, or `prepared_array`; `numpy` requires an active full-RAM cache. |
 | Mamba | `TEMPORAL_BACKBONE`, `--temporal-backbone` | Use `mamba` to enable Mamba, `none` for no temporal module. |
 | Mamba | `TEMPORAL_LOCATION`, `--temporal-location` | Usually `mesh_processor_interleaved`; also supports `mesh_post_encoder`. |
 | Mamba | `TEMPORAL_STATEFUL`, `--temporal-stateful` | Carry Mamba state across autoregressive/segment steps. |

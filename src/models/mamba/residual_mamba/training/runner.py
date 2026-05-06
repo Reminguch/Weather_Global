@@ -96,13 +96,6 @@ def run_training(
         hidden_layers=1,
         mesh2grid_edge_normalization_factor=None,
     )
-    if cfg.data_source == "prepared" and not np.isclose(float(base_model_cfg.resolution), cfg.resolution, atol=1e-6):
-        raise ValueError(
-            "Prepared residual training requires the frozen baseline checkpoint resolution "
-            f"to match the prepared store/model resolution: baseline={base_model_cfg.resolution}, "
-            f"requested={cfg.resolution}."
-        )
-
     norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
     train_ds, eval_ds = open_training_splits(cfg, task_cfg)
@@ -152,7 +145,7 @@ def run_training(
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
     train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
     requested_batch_builder = cfg.batch_builder
-    use_segment_block_loader = cfg.data_source in {"prepared", "prepared_array"} and not should_cache_train
+    use_segment_block_loader = cfg.data_source == "prepared_array" and not should_cache_train
     if use_segment_block_loader and requested_batch_builder == "numpy":
         print(
             "[residual-segment-block] batch_builder=numpy requires a full train cache; "
@@ -176,7 +169,7 @@ def run_training(
     effective_eval_batch_builder = builder_selection.effective_eval_batch_builder
     if use_segment_block_loader:
         effective_train_batch_builder = "segment_block"
-        effective_eval_batch_builder = "segment_block" if cfg.data_source == "prepared_array" else effective_eval_batch_builder
+        effective_eval_batch_builder = "segment_block"
 
     residual_loss_transform = build_loss_transform(model_cfg, task_cfg, norm_stats, cfg)
     residual_eval_transform = build_eval_loss_transform(

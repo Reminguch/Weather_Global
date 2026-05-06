@@ -357,7 +357,7 @@ def _timedelta_coords(count: int, start_steps: int, dt: pd.Timedelta) -> np.ndar
 
 
 class SegmentBlockBatchLoader:
-    """Build segment BPTT chunks from per-lane contiguous prepared-data blocks."""
+    """Build segment BPTT chunks from per-lane contiguous data blocks."""
 
     def __init__(
         self,

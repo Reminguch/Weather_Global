@@ -25,7 +25,7 @@ from src.models.graphcast.training.core.prepared_array import PREPARED_ARRAY_FOR
 
 DEFAULT_PREPARED_STREAM_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
 DEFAULT_PREPARE_DATA_PATH = "data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr"
-DEFAULT_RESOLUTIONS = (1.0, 2.0, 4.0, 9.0, 15.0)
+DEFAULT_RESOLUTIONS = (1.0, 2.0, 3.0, 4.0, 6.0, 9.0, 18.0)
 
 
 def _jsonable_tuple(values: Iterable) -> list:

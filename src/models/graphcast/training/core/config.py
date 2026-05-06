@@ -10,7 +10,7 @@ DEFAULT_CKPT = (
 )
 DEFAULT_STATS_DIR = "data/graphcast/graphcast/stats"
 DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_res2_stream"
-DEFAULT_PREPARED_DATA_ROOT = "prepared"
+DEFAULT_PREPARED_DATA_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
 
 GRAPHCAST_VARS = [
     "2m_temperature",
@@ -89,14 +89,14 @@ def parse_args() -> RunConfig:
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH, help="Local dataset path (.zarr or .nc).")
     parser.add_argument(
         "--data-source",
-        choices=["raw", "prepared", "prepared_array"],
+        choices=["raw", "prepared_array"],
         default="raw",
-        help="Read from raw WeatherBench/GraphCast data, prepared/res{N} Zarr, or prepared_array/res{N} memmaps.",
+        help="Read from raw WeatherBench/GraphCast data or prepared_array/res{N} memmaps.",
     )
     parser.add_argument(
         "--prepared-data-root",
         default=DEFAULT_PREPARED_DATA_ROOT,
-        help="Root directory containing prepared/res{N} Zarr stores.",
+        help="Root directory containing prepared_array/res{N} memmap stores.",
     )
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
@@ -166,7 +166,7 @@ def parse_args() -> RunConfig:
                              "E.g. 120 = 30 days. Segments are shuffled across epochs, sequential within. "
                              "Mamba state carries across samples within a segment (truncated BPTT).")
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto",
-                        help="Cache the prepared training split in RAM. 'auto' uses --data-cache-max-gib.")
+                        help="Cache the training split in RAM. 'auto' uses --data-cache-max-gib.")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0,
                         help="Maximum estimated train split size for --data-cache-mode=auto.")
     parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="vectorized",

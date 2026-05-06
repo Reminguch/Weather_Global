@@ -308,7 +308,7 @@ def _write_run_config(
         "data_path": cfg.data_path,
         "data_source": cfg.data_source,
         "prepared_data_root": cfg.prepared_data_root,
-        "prepared_store_path": str(prepared_store_path(cfg)) if cfg.data_source in {"prepared", "prepared_array"} else None,
+        "prepared_store_path": str(prepared_store_path(cfg)) if cfg.data_source == "prepared_array" else None,
         "val_year": cfg.val_year,
         "train_start_year": cfg.train_start_year,
         "train_end_year": cfg.train_end_year,
@@ -327,7 +327,7 @@ def _write_run_config(
         "data_pipeline": {
             "data_source": cfg.data_source,
             "prepared_data_root": cfg.prepared_data_root,
-            "prepared_store_path": str(prepared_store_path(cfg)) if cfg.data_source in {"prepared", "prepared_array"} else None,
+            "prepared_store_path": str(prepared_store_path(cfg)) if cfg.data_source == "prepared_array" else None,
             "data_cache_mode": cfg.data_cache_mode,
             "data_cache_max_gib": cfg.data_cache_max_gib,
             "batch_builder": cfg.batch_builder,
