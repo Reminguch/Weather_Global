@@ -17,8 +17,7 @@ import jax.numpy as jnp
 class TemporalMeshConfig:
     backbone: str = "none"
     location: str = "mesh_post_encoder"
-    hidden_size: int = 128
-    d_inner: int | None = None
+    d_inner: int = 0
     d_state: int = 16
     dt_rank: int | str = "auto"
     d_conv: int = 4
@@ -34,13 +33,13 @@ class _SelectiveSSMBlock(hk.Module):
 
     def __init__(
         self,
-        hidden_size: int,
+        d_inner: int,
         dropout: float,
         zero_init_output: bool = False,
         name: str | None = None,
     ):
         super().__init__(name=name)
-        self._hidden_size = hidden_size
+        self._d_inner = d_inner
         self._dropout = dropout
         self._zero_init_output = zero_init_output
 
@@ -50,19 +49,19 @@ class _SelectiveSSMBlock(hk.Module):
         residual = x_btd
         x_btd = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x_btd)
         x_btd = x_btd.astype(x_dtype)
-        projected = hk.Linear(2 * self._hidden_size, name="in_proj")(x_btd).astype(x_dtype)
+        projected = hk.Linear(2 * self._d_inner, name="in_proj")(x_btd).astype(x_dtype)
         u_btd, gate_btd = jnp.split(projected, 2, axis=-1)
         dt_btd = jax.nn.softplus(
-            hk.Linear(self._hidden_size, name="dt_proj")(u_btd)).astype(x_dtype)
+            hk.Linear(self._d_inner, name="dt_proj")(u_btd)).astype(x_dtype)
 
         a_log = hk.get_parameter(
             "a_log",
-            shape=(self._hidden_size,),
+            shape=(self._d_inner,),
             init=hk.initializers.Constant(-1.0),
         ).astype(x_dtype)
         skip = hk.get_parameter(
             "skip",
-            shape=(self._hidden_size,),
+            shape=(self._d_inner,),
             init=hk.initializers.Constant(1.0),
         ).astype(x_dtype)
 
@@ -75,7 +74,7 @@ class _SelectiveSSMBlock(hk.Module):
             y_bh = next_state * jax.nn.sigmoid(gate_bh) + skip[None, :] * u_bh
             return next_state.astype(x_dtype), y_bh.astype(x_dtype)
 
-        init_state = jnp.zeros((x_btd.shape[0], self._hidden_size), dtype=x_btd.dtype)
+        init_state = jnp.zeros((x_btd.shape[0], self._d_inner), dtype=x_btd.dtype)
         _, y_tbh = jax.lax.scan(
             step_fn,
             init_state,
@@ -133,13 +132,17 @@ class TemporalMeshBlock(hk.Module):
         return sequence[-1]
 
     def _run_sequence(self, mesh_latent_tnbd: jax.Array, *, is_training: bool) -> jax.Array:
+        d_inner = self.cfg.d_inner
+        if d_inner is None or int(d_inner) <= 0:
+            raise ValueError("Temporal Mamba requires explicit positive `d_inner`.")
+        d_inner = int(d_inner)
         time_steps, n_mesh, batch_size, channels = mesh_latent_tnbd.shape
         x_bntd = jnp.transpose(mesh_latent_tnbd, (2, 1, 0, 3))
         x_bntd = x_bntd.reshape(batch_size * n_mesh, time_steps, channels)
 
         for layer_idx in range(self.cfg.layers):
             x_bntd = _SelectiveSSMBlock(
-                hidden_size=self.cfg.hidden_size,
+                d_inner=d_inner,
                 dropout=self.cfg.dropout,
                 zero_init_output=self.cfg.zero_init_output,
                 name=f"mamba_block_{layer_idx}",

@@ -16,6 +16,9 @@ class SegmentRunConfig:
     len_segment: int
     bptt_steps: int
     chunk_load_workers: int
+    segment_prefetch_depth: int = 2
+    use_segment_block_loader: bool = True
+    filter_nan_segments: bool = True
 
 
 def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
@@ -31,12 +34,12 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         description="Train GraphCast on shuffled chronological segments with chunked BPTT."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
-    parser.add_argument("--data-source", choices=["raw", "prepared"], default="raw")
+    parser.add_argument("--data-source", choices=["raw", "prepared", "prepared_array"], default="raw")
     parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4, 8], default=1)
+    parser.add_argument("--processor-msg-steps", type=int, default=1)
     parser.add_argument("--val-year", type=int, default=2021)
     parser.add_argument("--train-start-year", type=int, default=None)
     parser.add_argument("--train-end-year", type=int, default=None)
@@ -64,13 +67,32 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         default=6,
         help="Parallel workers for loading the independent BPTT batches in each chunk.",
     )
+    parser.add_argument(
+        "--segment-prefetch-depth",
+        type=int,
+        default=2,
+        help="Number of segment chunks to keep queued for async loading.",
+    )
+    parser.add_argument(
+        "--no-segment-block-loader",
+        dest="use_segment_block_loader",
+        action="store_false",
+        default=True,
+        help="Disable prepared-data segment block loading and use the selected batch builder.",
+    )
+    parser.add_argument(
+        "--no-filter-nan-segments",
+        dest="filter_nan_segments",
+        action="store_false",
+        default=True,
+        help="Disable startup filtering of segments with nonfinite task data.",
+    )
     parser.add_argument("--temporal-backbone", choices=["none", "mamba"], default="none")
     parser.add_argument(
         "--temporal-location",
         choices=["mesh_post_encoder", "mesh_processor_interleaved"],
         default="mesh_post_encoder",
     )
-    parser.add_argument("--temporal-hidden-size", type=int, default=128)
     parser.add_argument("--temporal-d-inner", type=int, default=None)
     parser.add_argument("--temporal-d-state", type=int, default=16)
     parser.add_argument("--temporal-d-conv", type=int, default=4)
@@ -99,7 +121,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy"], default="numpy")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="numpy")
     args = parser.parse_args(argv)
 
     if args.max_steps <= 0:
@@ -112,6 +134,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--bptt-steps must be > 0")
     if args.chunk_load_workers <= 0:
         raise ValueError("--chunk-load-workers must be > 0")
+    if args.segment_prefetch_depth <= 0:
+        raise ValueError("--segment-prefetch-depth must be > 0")
     if args.len_segment % args.bptt_steps != 0:
         raise ValueError("--bptt-steps must divide --len-segment")
     if args.target_steps != 1:
@@ -124,10 +148,10 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--train-start-year must be <= --train-end-year")
     if args.resume_step is not None and args.resume_step < 0:
         raise ValueError("--resume-step must be >= 0")
-    if args.temporal_hidden_size <= 0:
-        raise ValueError("--temporal-hidden-size must be > 0")
     if args.temporal_d_inner is not None and args.temporal_d_inner <= 0:
         raise ValueError("--temporal-d-inner must be > 0")
+    if args.temporal_backbone == "mamba" and args.temporal_d_inner is None:
+        raise ValueError("--temporal-d-inner is required when --temporal-backbone=mamba")
     if args.temporal_d_state <= 0:
         raise ValueError("--temporal-d-state must be > 0")
     if args.temporal_d_conv <= 0:
@@ -172,7 +196,6 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         input_duration=args.input_duration,
         temporal_backbone=args.temporal_backbone,
         temporal_location=args.temporal_location,
-        temporal_hidden_size=args.temporal_hidden_size,
         temporal_d_inner=args.temporal_d_inner,
         temporal_d_state=args.temporal_d_state,
         temporal_d_conv=args.temporal_d_conv,
@@ -201,15 +224,19 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         len_segment=args.len_segment,
         bptt_steps=args.bptt_steps,
         chunk_load_workers=args.chunk_load_workers,
+        segment_prefetch_depth=args.segment_prefetch_depth,
+        use_segment_block_loader=args.use_segment_block_loader,
+        filter_nan_segments=args.filter_nan_segments,
     )
 
 
 def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
+    from collections import deque
     import dataclasses
     import functools
     import json
     import time
-    from typing import Iterable
+    from typing import Any, Iterable
 
     import haiku as hk
     import jax
@@ -250,12 +277,16 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     )
     from src.models.graphcast.training.core.segments import (
         SegmentBatchScheduler,
+        SegmentBlockBatchLoader,
+        SegmentChunk,
+        SegmentLoadStats,
         _build_chunk_batches,
         _reset_temporal_state_lanes,
         _save_chunk_timing_logs,
         _stop_gradient_temporal_state,
         _write_segment_run_config,
         build_full_segments,
+        filter_finite_segments,
         run_eval_segments,
         valid_contiguous_final_input_indices,
     )
@@ -329,11 +360,49 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
     train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
+    finite_segment_filter_stats: dict[str, Any] | None = None
+    if segment_cfg.filter_nan_segments:
+        segments, train_filter_stats = filter_finite_segments(
+            train_ds,
+            segments,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            label="train",
+        )
+        eval_segments, eval_filter_stats = filter_finite_segments(
+            eval_ds,
+            eval_segments,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            label="eval",
+        )
+        finite_segment_filter_stats = {"train": train_filter_stats, "eval": eval_filter_stats}
+        train_final_indices = np.concatenate(segments) if segments else np.asarray([], dtype=np.int64)
+        eval_final_indices = np.concatenate(eval_segments) if eval_segments else np.asarray([], dtype=np.int64)
+        if not segments:
+            raise ValueError("No training segments remain after nonfinite-data filtering.")
+        if not eval_segments:
+            raise ValueError("No eval segments remain after nonfinite-data filtering.")
+
+    requested_batch_builder = cfg.batch_builder
+    use_segment_block_loader = (
+        segment_cfg.use_segment_block_loader
+        and cfg.data_source in {"prepared", "prepared_array"}
+        and not should_cache_train
+    )
+    if use_segment_block_loader and requested_batch_builder == "numpy":
+        print(
+            "[segment-block] batch_builder=numpy requires a full train cache; "
+            "using segment block loader with direct eval fallback for streaming prepared data."
+        )
+        requested_batch_builder = "direct"
 
     builder_selection = select_batch_builders(
         train_ds,
         eval_ds,
-        requested=cfg.batch_builder,
+        requested=requested_batch_builder,
         should_cache_train=should_cache_train,
         task_cfg=task_cfg,
         train_label="segment-train",
@@ -344,6 +413,9 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     numpy_cache_active = builder_selection.numpy_cache_active
     effective_train_batch_builder = builder_selection.effective_train_batch_builder
     effective_eval_batch_builder = builder_selection.effective_eval_batch_builder
+    if use_segment_block_loader:
+        effective_train_batch_builder = "segment_block"
+        effective_eval_batch_builder = "segment_block"
 
     def forward_fn(inputs, targets, forcings, is_training):
         predictor = build_predictor(
@@ -354,7 +426,6 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             gradient_checkpointing=True,
             temporal_backbone=cfg.temporal_backbone,
             temporal_location=cfg.temporal_location,
-            temporal_hidden_size=cfg.temporal_hidden_size,
             temporal_d_inner=cfg.temporal_d_inner,
             temporal_d_state=cfg.temporal_d_state,
             temporal_d_conv=cfg.temporal_d_conv,
@@ -413,6 +484,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         train_cache_estimate_gib=train_cache_estimate_gib,
         effective_train_batch_builder=effective_train_batch_builder,
         effective_eval_batch_builder=effective_eval_batch_builder,
+        finite_segment_filter_stats=finite_segment_filter_stats,
     )
     batch_builder_metadata = build_batch_builder_metadata(
         requested_batch_builder=cfg.batch_builder,
@@ -537,41 +609,78 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
     load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=segment_cfg.chunk_load_workers)
     prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
-    def load_chunk_payload(
-        chunk_indices: tuple[np.ndarray, ...],
-        reset_mask_np: np.ndarray,
-        chunk_epoch: int,
-    ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], np.ndarray, int]:
-        chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
+    train_segment_loader = (
+        SegmentBlockBatchLoader(
             train_ds,
-            chunk_indices,
+            segments,
             input_steps=input_steps,
             target_steps=target_steps,
             task_cfg=task_cfg,
             dt=dt_train,
-            batch_builder=train_batch_builder,
-            chunk_load_workers=segment_cfg.chunk_load_workers,
             load_executor=load_executor,
+            max_workers=segment_cfg.chunk_load_workers,
+            label="segment-block-train",
         )
-        return chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch
+        if use_segment_block_loader
+        else None
+    )
+    eval_segment_loader = (
+        SegmentBlockBatchLoader(
+            eval_ds,
+            eval_segments,
+            input_steps=input_steps,
+            target_steps=target_steps,
+            task_cfg=task_cfg,
+            dt=dt_train,
+            load_executor=load_executor,
+            max_workers=segment_cfg.chunk_load_workers,
+            label="segment-block-eval",
+        )
+        if use_segment_block_loader
+        else None
+    )
+
+    def load_chunk_payload(
+        chunk: SegmentChunk,
+    ) -> tuple[
+        tuple[xr.Dataset, ...],
+        tuple[xr.Dataset, ...],
+        tuple[xr.Dataset, ...],
+        np.ndarray,
+        int,
+        SegmentLoadStats,
+    ]:
+        t_load = time.time()
+        if train_segment_loader is not None:
+            chunk_inputs, chunk_targets, chunk_forcings, load_stats = train_segment_loader.load_chunk(chunk)
+        else:
+            chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
+                train_ds,
+                chunk.chunk_indices,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt_train,
+                batch_builder=train_batch_builder,
+                chunk_load_workers=segment_cfg.chunk_load_workers,
+                load_executor=load_executor,
+            )
+            load_stats = SegmentLoadStats(load_s=time.time() - t_load)
+        return chunk_inputs, chunk_targets, chunk_forcings, chunk.reset_mask, chunk.epoch, load_stats
 
     def submit_next_chunk() -> concurrent.futures.Future:
-        chunk_indices, reset_mask_np = scheduler.next_chunk()
-        return prefetch_executor.submit(
-            load_chunk_payload,
-            chunk_indices,
-            reset_mask_np,
-            scheduler.epoch,
-        )
+        return prefetch_executor.submit(load_chunk_payload, scheduler.next_chunk())
 
-    pending_chunk = submit_next_chunk()
+    pending_chunks: deque[concurrent.futures.Future] = deque()
+    for _ in range(min(segment_cfg.segment_prefetch_depth, max(0, cfg.max_steps - step))):
+        pending_chunks.append(submit_next_chunk())
 
     try:
         while step < cfg.max_steps:
             iteration_t0 = time.time()
             t_data = time.time()
-            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch = pending_chunk.result()
+            pending_chunk = pending_chunks.popleft()
+            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch, load_stats = pending_chunk.result()
             data_wait_s = time.time() - t_data
 
             if observed_epoch is None:
@@ -607,7 +716,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 jnp.asarray(reset_mask_np),
             )
 
-            next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
+            if step + 1 + len(pending_chunks) < cfg.max_steps:
+                pending_chunks.append(submit_next_chunk())
             loss_f = float(loss)
             gpu_train_s = time.time() - t0
             iteration_wall_s = time.time() - iteration_t0
@@ -625,6 +735,11 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     "batch_size": cfg.batch_size,
                     "bptt_steps": segment_cfg.bptt_steps,
                     "chunk_load_workers": segment_cfg.chunk_load_workers,
+                    "loader": load_stats.loader,
+                    "load_s": load_stats.load_s,
+                    "cache_hits": load_stats.cache_hits,
+                    "cache_misses": load_stats.cache_misses,
+                    "loaded_gib": load_stats.loaded_gib,
                 }
             )
 
@@ -637,7 +752,9 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 print(
                     f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
                     f"segment_epoch {chunk_epoch} reset_lanes {int(reset_mask_np.sum())} "
-                    f"data_wait={data_wait_s:.3f}s gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s"
+                    f"load={load_stats.load_s:.3f}s data_wait={data_wait_s:.3f}s "
+                    f"gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s "
+                    f"cache={load_stats.cache_hits}/{load_stats.cache_misses}"
                 )
 
             if step % cfg.eval_every == 0:
@@ -658,6 +775,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     batch_builder=eval_batch_builder,
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
+                    segment_loader=eval_segment_loader,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
@@ -676,12 +794,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     description=ckpt_in.description,
                     license_text=ckpt_in.license,
                 )
-
-            if next_chunk is not None:
-                pending_chunk = next_chunk
     finally:
         prefetch_executor.shutdown(wait=False, cancel_futures=True)
-        load_executor.shutdown(wait=False, cancel_futures=True)
 
     if pass_loss_accum:
         epoch_summaries.append(
@@ -712,6 +826,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         progress_label="eval@final",
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
+        segment_loader=eval_segment_loader,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
@@ -728,6 +843,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     )
     save_all_logs()
     plot_loss_curves(out_dir, train_losses, eval_losses)
+    load_executor.shutdown(wait=False, cancel_futures=True)
     print(f"Done. Final eval total {final_eval['total']:.6f}. Outputs in {out_dir}")
 
 

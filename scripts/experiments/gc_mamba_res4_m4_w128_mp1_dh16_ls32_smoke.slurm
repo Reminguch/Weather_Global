@@ -55,7 +55,6 @@ SEED=${SEED:-0}
 
 TEMPORAL_BACKBONE=mamba
 TEMPORAL_LOCATION=${TEMPORAL_LOCATION:-mesh_processor_interleaved}
-TEMPORAL_HIDDEN_SIZE=16
 TEMPORAL_D_INNER=${TEMPORAL_D_INNER:-16}
 TEMPORAL_D_STATE=${TEMPORAL_D_STATE:-16}
 TEMPORAL_D_CONV=${TEMPORAL_D_CONV:-4}
@@ -97,7 +96,6 @@ CMD=(
   --seed "${SEED}"
   --temporal-backbone "${TEMPORAL_BACKBONE}"
   --temporal-location "${TEMPORAL_LOCATION}"
-  --temporal-hidden-size "${TEMPORAL_HIDDEN_SIZE}"
   --temporal-d-inner "${TEMPORAL_D_INNER}"
   --temporal-d-state "${TEMPORAL_D_STATE}"
   --temporal-d-conv "${TEMPORAL_D_CONV}"

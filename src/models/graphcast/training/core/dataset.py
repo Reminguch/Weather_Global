@@ -12,6 +12,7 @@ import xarray as xr
 from . import bootstrap as _bootstrap  # noqa: F401
 from .config import GRAPHCAST_VARS, RunConfig
 from .model import data_utils, gc
+from .prepared_array import PreparedArrayStore, is_prepared_array_store
 from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
 
 
@@ -100,6 +101,10 @@ def _training_cache_decision(
     cfg: RunConfig,
     task_cfg: gc.TaskConfig,
 ) -> tuple[bool, float]:
+    if is_prepared_array_store(train_ds):
+        task_vars = set(task_cfg.input_variables) | set(task_cfg.target_variables) | set(task_cfg.forcing_variables)
+        estimate_gib = train_ds.estimate_task_nbytes(task_vars) / (1024**3)
+        return False, estimate_gib
     if cfg.data_cache_mode == "never":
         return False, 0.0
     task_vars = set(task_cfg.input_variables) | set(task_cfg.target_variables) | set(task_cfg.forcing_variables)
@@ -114,6 +119,9 @@ def maybe_cache_training_data(
     cfg: RunConfig,
     task_cfg: gc.TaskConfig,
 ) -> tuple[xr.Dataset, xr.Dataset]:
+    if is_prepared_array_store(train_ds):
+        print("[cache] prepared_array uses memmap streaming; full train RAM cache disabled.")
+        return train_ds, eval_ds
     train_ds = _load_static_vars(train_ds, "train")
     eval_ds = _load_static_vars(eval_ds, "eval")
 
@@ -237,6 +245,36 @@ def _split_by_year(ds: xr.Dataset, cfg: RunConfig, *, label: str) -> tuple[xr.Da
     if train_times.intersection(val_times).size > 0:
         raise ValueError("Train/validation overlap detected in year split.")
     return train_ds, val_ds, train_years
+
+
+def _split_prepared_array_by_year(
+    store: PreparedArrayStore,
+    cfg: RunConfig,
+    *,
+    label: str,
+) -> tuple[PreparedArrayStore, PreparedArrayStore, list[int]]:
+    time_index = pd.DatetimeIndex(pd.to_datetime(store.time.values))
+    years = sorted(set(time_index.year.astype(int).tolist()))
+    if cfg.val_year not in years:
+        raise ValueError(f"Requested val year {cfg.val_year} not present in {label} dataset years: {years}")
+
+    train_years = [y for y in years if y != cfg.val_year]
+    if cfg.train_start_year is not None:
+        train_years = [y for y in train_years if cfg.train_start_year <= y <= cfg.train_end_year]
+    if not train_years:
+        raise ValueError(f"No train years left in {label} data after year selection.")
+
+    train_idx = np.where(np.isin(time_index.year, np.asarray(train_years)))[0]
+    val_idx = np.where(time_index.year == cfg.val_year)[0]
+    if train_idx.size == 0:
+        raise ValueError("Empty train split after year selection.")
+    if val_idx.size == 0:
+        raise ValueError("Empty validation split after year selection.")
+    return (
+        store.split_by_time_indices(train_idx, label=f"{label}-train"),
+        store.split_by_time_indices(val_idx, label=f"{label}-eval"),
+        train_years,
+    )
 
 
 def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
@@ -363,10 +401,33 @@ def _open_prepared_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[xr.D
     return train_ds, val_ds
 
 
+def _open_prepared_array_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[PreparedArrayStore, PreparedArrayStore]:
+    store_path = prepared_store_path(cfg)
+    _assert_local_path(str(store_path), "--prepared-data-root")
+    if not store_path.exists():
+        raise FileNotFoundError(
+            f"Prepared array store not found: {store_path}. "
+            "Run python -m src.data_operations.preprocessing.prepare_graphcast_streaming_store first."
+        )
+    print(f"Opening prepared array dataset: {store_path}")
+    store = PreparedArrayStore(store_path, label="prepared-array")
+    store.validate(resolution=cfg.resolution, task_cfg=task_cfg)
+    train_ds, val_ds, train_years = _split_prepared_array_by_year(store, cfg, label="prepared_array")
+    print(
+        "Prepared array data split: "
+        f"train_years={train_years[0]}-{train_years[-1]} (excluding {cfg.val_year}), "
+        f"val_year={cfg.val_year}, train_time={train_ds.sizes['time']}, val_time={val_ds.sizes['time']}, "
+        f"store={store_path}"
+    )
+    return train_ds, val_ds
+
+
 def open_training_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[xr.Dataset, xr.Dataset]:
     if cfg.data_source == "raw":
         train_ds, eval_ds = _open_local_splits(cfg)
         return prepare_dataset_for_task(train_ds, task_cfg), prepare_dataset_for_task(eval_ds, task_cfg)
     if cfg.data_source == "prepared":
         return _open_prepared_splits(cfg, task_cfg)
-    raise ValueError(f"Unknown data_source={cfg.data_source!r}; expected raw or prepared.")
+    if cfg.data_source == "prepared_array":
+        return _open_prepared_array_splits(cfg, task_cfg)
+    raise ValueError(f"Unknown data_source={cfg.data_source!r}; expected raw, prepared, or prepared_array.")

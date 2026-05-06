@@ -179,7 +179,6 @@ def build_predictor(
     gradient_checkpointing: bool,
     temporal_backbone: str,
     temporal_location: str,
-    temporal_hidden_size: int,
     temporal_d_inner: int | None,
     temporal_d_state: int,
     temporal_d_conv: int,
@@ -196,7 +195,6 @@ def build_predictor(
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location
         predictor._temporal_stateful = temporal_stateful
-        predictor._temporal_hidden_size = temporal_hidden_size
         predictor._temporal_d_inner = temporal_d_inner
         predictor._temporal_d_state = temporal_d_state
         predictor._temporal_d_conv = temporal_d_conv
@@ -227,7 +225,6 @@ def build_residual_correction_predictor(
     gradient_checkpointing: bool,
     temporal_backbone: str,
     temporal_location: str,
-    temporal_hidden_size: int,
     temporal_d_inner: int | None,
     temporal_d_state: int,
     temporal_d_conv: int,
@@ -244,7 +241,6 @@ def build_residual_correction_predictor(
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location
         predictor._temporal_stateful = temporal_stateful
-        predictor._temporal_hidden_size = temporal_hidden_size
         predictor._temporal_d_inner = temporal_d_inner
         predictor._temporal_d_state = temporal_d_state
         predictor._temporal_d_conv = temporal_d_conv
@@ -275,7 +271,6 @@ def build_loss_transform(
     gradient_checkpointing: bool,
     temporal_backbone: str,
     temporal_location: str,
-    temporal_hidden_size: int,
     temporal_d_inner: int | None,
     temporal_d_state: int,
     temporal_d_conv: int,
@@ -297,7 +292,6 @@ def build_loss_transform(
             gradient_checkpointing=gradient_checkpointing,
             temporal_backbone=temporal_backbone,
             temporal_location=temporal_location,
-            temporal_hidden_size=temporal_hidden_size,
             temporal_d_inner=temporal_d_inner,
             temporal_d_state=temporal_d_state,
             temporal_d_conv=temporal_d_conv,
@@ -323,7 +317,6 @@ def build_prediction_transform(
     gradient_checkpointing: bool,
     temporal_backbone: str,
     temporal_location: str,
-    temporal_hidden_size: int,
     temporal_d_inner: int | None,
     temporal_d_state: int,
     temporal_d_conv: int,
@@ -345,7 +338,6 @@ def build_prediction_transform(
             gradient_checkpointing=gradient_checkpointing,
             temporal_backbone=temporal_backbone,
             temporal_location=temporal_location,
-            temporal_hidden_size=temporal_hidden_size,
             temporal_d_inner=temporal_d_inner,
             temporal_d_state=temporal_d_state,
             temporal_d_conv=temporal_d_conv,

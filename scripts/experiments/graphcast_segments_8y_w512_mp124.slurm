@@ -33,8 +33,8 @@ MSG="${MPS_OVERRIDE:-${MPS[$MP_IDX]}}"
 
 MODEL=gc_mamba
 DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}
-DATA_SOURCE=${DATA_SOURCE:-prepared}
-PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared}
+DATA_SOURCE=${DATA_SOURCE:-prepared_array}
+PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}
 STATS_DIR=${STATS_DIR:-data/graphcast/graphcast/stats}
 CKPT_IN=${CKPT_IN:-"data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"}
 OUT_DIR=${OUT_DIR:-artifacts/checkpoints/8_years/pilot_graphcast_segments_w512_mp_sweep}
@@ -45,6 +45,7 @@ TARGET_STEPS=${TARGET_STEPS:-1}
 LEN_SEGMENT=${LEN_SEGMENT:-30}
 BPTT_STEPS=${BPTT_STEPS:-6}
 CHUNK_LOAD_WORKERS=${CHUNK_LOAD_WORKERS:-6}
+SEGMENT_PREFETCH_DEPTH=${SEGMENT_PREFETCH_DEPTH:-2}
 VAL_YEAR=${VAL_YEAR:-2022}
 TRAIN_START_YEAR=${TRAIN_START_YEAR:-2015}
 TRAIN_END_YEAR=${TRAIN_END_YEAR:-2021}
@@ -56,7 +57,7 @@ EVAL_EVERY=${EVAL_EVERY:-2000}
 CHECKPOINT_EVERY=${CHECKPOINT_EVERY:-2000}
 DATA_CACHE_MODE=${DATA_CACHE_MODE:-auto}
 DATA_CACHE_MAX_GIB=${DATA_CACHE_MAX_GIB:-48}
-BATCH_BUILDER=${BATCH_BUILDER:-numpy}
+BATCH_BUILDER=${BATCH_BUILDER:-prepared_array}
 LR=${LR:-1e-4}
 WEIGHT_DECAY=${WEIGHT_DECAY:-1e-4}
 PRECISION=${PRECISION:-bf16}
@@ -64,7 +65,6 @@ SEED=${SEED:-0}
 
 TEMPORAL_BACKBONE=${TEMPORAL_BACKBONE:-none}
 TEMPORAL_LOCATION=${TEMPORAL_LOCATION:-mesh_processor_interleaved}
-TEMPORAL_HIDDEN_SIZE=${TEMPORAL_HIDDEN_SIZE:-128}
 TEMPORAL_D_INNER=${TEMPORAL_D_INNER:-16}
 TEMPORAL_D_STATE=${TEMPORAL_D_STATE:-16}
 TEMPORAL_D_CONV=${TEMPORAL_D_CONV:-4}
@@ -95,6 +95,7 @@ python -u -m src.models.mamba.training.segments_training \
   --len-segment "${LEN_SEGMENT}" \
   --bptt-steps "${BPTT_STEPS}" \
   --chunk-load-workers "${CHUNK_LOAD_WORKERS}" \
+  --segment-prefetch-depth "${SEGMENT_PREFETCH_DEPTH}" \
   --batch-size "${BATCH_SIZE}" \
   --eval-batch-size "${EVAL_BATCH_SIZE}" \
   --data-cache-mode "${DATA_CACHE_MODE}" \
@@ -109,7 +110,6 @@ python -u -m src.models.mamba.training.segments_training \
   --seed "${SEED}" \
   --temporal-backbone "${TEMPORAL_BACKBONE}" \
   --temporal-location "${TEMPORAL_LOCATION}" \
-  --temporal-hidden-size "${TEMPORAL_HIDDEN_SIZE}" \
   --temporal-d-inner "${TEMPORAL_D_INNER}" \
   --temporal-d-state "${TEMPORAL_D_STATE}" \
   --temporal-d-conv "${TEMPORAL_D_CONV}" \

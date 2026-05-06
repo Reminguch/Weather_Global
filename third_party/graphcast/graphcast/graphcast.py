@@ -261,7 +261,6 @@ class GraphCast(predictor_base.Predictor):
     """Initializes the predictor."""
     self._temporal_backbone = "none"
     self._temporal_location = "mesh_post_encoder"
-    self._temporal_hidden_size = model_config.latent_size
     self._temporal_d_inner = None
     self._temporal_d_state = 16
     self._temporal_d_conv = 4
@@ -322,7 +321,6 @@ class GraphCast(predictor_base.Predictor):
         f32_aggregation=False,
         temporal_backbone=self._temporal_backbone,
         temporal_location=self._temporal_location,
-        temporal_hidden_size=self._temporal_hidden_size,
         temporal_d_inner=self._temporal_d_inner,
         temporal_d_state=self._temporal_d_state,
         temporal_d_conv=self._temporal_d_conv,
@@ -808,7 +806,6 @@ class GraphCast(predictor_base.Predictor):
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
                 location=self._temporal_location,
-                hidden_size=self._temporal_hidden_size,
                 d_inner=self._temporal_d_inner,
                 d_state=self._temporal_d_state,
                 dt_rank=self._temporal_dt_rank,
@@ -867,7 +864,6 @@ class GraphCast(predictor_base.Predictor):
           TemporalMeshConfig(
               backbone=self._temporal_backbone,
               location=self._temporal_location,
-              hidden_size=self._temporal_hidden_size,
               d_inner=self._temporal_d_inner,
               d_state=self._temporal_d_state,
               dt_rank=self._temporal_dt_rank,

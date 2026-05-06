@@ -31,7 +31,7 @@ def test_temporal_mesh_block_none_returns_last_step() -> None:
 def test_temporal_mesh_block_mamba_returns_expected_shape_and_finite_values() -> None:
     x = jnp.ones((4, 6, 2, 8), dtype=jnp.float32)
     y = _run_block(
-        TemporalMeshConfig(backbone="mamba", hidden_size=8, layers=2, dropout=0.0),
+        TemporalMeshConfig(backbone="mamba", d_inner=8, layers=2, dropout=0.0),
         x,
         is_training=False,
     )
@@ -42,7 +42,7 @@ def test_temporal_mesh_block_mamba_returns_expected_shape_and_finite_values() ->
 def test_temporal_mesh_block_mamba_accepts_single_step_3d_latents() -> None:
     x = jnp.ones((6, 2, 8), dtype=jnp.float32)
     y = _run_block(
-        TemporalMeshConfig(backbone="mamba", hidden_size=8, layers=1, dropout=0.0),
+        TemporalMeshConfig(backbone="mamba", d_inner=8, layers=1, dropout=0.0),
         x,
         is_training=False,
     )

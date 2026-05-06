@@ -24,12 +24,19 @@ MODEL_NAME = "gc_mamba"
 
 
 def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
+    del model_cfg
     temporal_cfg = run_cfg.get("temporal_config", {})
+    temporal_backbone = temporal_cfg.get("backbone", "none")
+    temporal_d_inner = temporal_cfg.get("d_inner", None)
+    if temporal_backbone == "mamba" and temporal_d_inner is None:
+        raise ValueError(
+            "GC-Mamba checkpoint is missing temporal_config.d_inner. "
+            "Older checkpoints that only stored hidden_size are no longer supported."
+        )
     return {
-        "temporal_backbone": temporal_cfg.get("backbone", "none"),
+        "temporal_backbone": temporal_backbone,
         "temporal_location": temporal_cfg.get("location", "mesh_post_encoder"),
-        "temporal_hidden_size": temporal_cfg.get("hidden_size", model_cfg.latent_size),
-        "temporal_d_inner": temporal_cfg.get("d_inner", None),
+        "temporal_d_inner": temporal_d_inner,
         "temporal_d_state": temporal_cfg.get("d_state", 16),
         "temporal_d_conv": temporal_cfg.get("d_conv", 4),
         "temporal_dt_rank": temporal_cfg.get("dt_rank", "auto"),
@@ -46,7 +53,6 @@ def _apply_temporal_config(predictor: gc.GraphCast, temporal_kwargs: dict) -> gc
     if hasattr(predictor, "_temporal_backbone"):
         predictor._temporal_backbone = temporal_kwargs["temporal_backbone"]
         predictor._temporal_location = temporal_kwargs["temporal_location"]
-        predictor._temporal_hidden_size = temporal_kwargs["temporal_hidden_size"]
         predictor._temporal_d_inner = temporal_kwargs["temporal_d_inner"]
         predictor._temporal_d_state = temporal_kwargs["temporal_d_state"]
         predictor._temporal_d_conv = temporal_kwargs["temporal_d_conv"]

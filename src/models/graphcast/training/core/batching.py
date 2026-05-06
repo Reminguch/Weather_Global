@@ -9,6 +9,7 @@ import pandas as pd
 import xarray as xr
 
 from .model import data_utils, gc
+from .prepared_array import PreparedArrayStore, is_prepared_array_store
 
 
 def infer_time_step(ds: xr.Dataset) -> pd.Timedelta:
@@ -498,6 +499,57 @@ def select_batch_builders(
     train_label: str = "train",
     eval_label: str = "eval",
 ) -> BatchBuilderSelection:
+    if is_prepared_array_store(train_ds):
+        if not is_prepared_array_store(eval_ds):
+            raise ValueError("prepared_array train data requires prepared_array eval data.")
+        if requested != "prepared_array":
+            print(
+                f"[prepared-array] requested batch_builder={requested}; "
+                "using prepared_array memmap builder for streaming."
+            )
+
+        def train_prepared_array_builder(
+            ds: PreparedArrayStore,
+            *,
+            indices: Iterable[int],
+            input_steps: int,
+            target_steps: int,
+            task_cfg: gc.TaskConfig,
+            dt: pd.Timedelta,
+        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+            return ds.build_batch_from_indices(
+                indices=indices,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt,
+            )
+
+        def eval_prepared_array_builder(
+            ds: PreparedArrayStore,
+            *,
+            indices: Iterable[int],
+            input_steps: int,
+            target_steps: int,
+            task_cfg: gc.TaskConfig,
+            dt: pd.Timedelta,
+        ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+            return ds.build_batch_from_indices(
+                indices=indices,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt,
+            )
+
+        return BatchBuilderSelection(
+            train_builder=train_prepared_array_builder,
+            eval_builder=eval_prepared_array_builder,
+            numpy_cache_active=False,
+            effective_train_batch_builder="prepared_array",
+            effective_eval_batch_builder="prepared_array",
+        )
+
     if requested == "legacy":
         return BatchBuilderSelection(
             train_builder=build_batch_from_indices,

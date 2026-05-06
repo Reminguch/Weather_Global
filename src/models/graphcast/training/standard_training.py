@@ -104,8 +104,8 @@ def main() -> None:
         print(
             "Temporal module configured "
             f"(backbone={cfg.temporal_backbone}, location={cfg.temporal_location}, "
-            f"stateful={cfg.temporal_stateful}, hidden={cfg.temporal_hidden_size}, "
-            f"d_inner={cfg.temporal_d_inner}, d_state={cfg.temporal_d_state}, "
+            f"stateful={cfg.temporal_stateful}, d_inner={cfg.temporal_d_inner}, "
+            f"d_state={cfg.temporal_d_state}, "
             f"d_conv={cfg.temporal_d_conv}, dt_rank={cfg.temporal_dt_rank}, "
             f"layers={cfg.temporal_layers}, dropout={cfg.temporal_dropout})"
         )
@@ -161,7 +161,6 @@ def main() -> None:
             gradient_checkpointing=True,
             temporal_backbone=cfg.temporal_backbone,
             temporal_location=cfg.temporal_location,
-            temporal_hidden_size=cfg.temporal_hidden_size,
             temporal_d_inner=cfg.temporal_d_inner,
             temporal_d_state=cfg.temporal_d_state,
             temporal_d_conv=cfg.temporal_d_conv,
@@ -184,7 +183,6 @@ def main() -> None:
         gradient_checkpointing=False,
         temporal_backbone=cfg.temporal_backbone,
         temporal_location=cfg.temporal_location,
-        temporal_hidden_size=cfg.temporal_hidden_size,
         temporal_d_inner=cfg.temporal_d_inner,
         temporal_d_state=cfg.temporal_d_state,
         temporal_d_conv=cfg.temporal_d_conv,

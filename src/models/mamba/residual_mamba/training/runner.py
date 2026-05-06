@@ -48,6 +48,9 @@ from src.models.graphcast.training.core.model import (
 )
 from src.models.graphcast.training.core.segments import (
     SegmentBatchScheduler,
+    SegmentBlockBatchLoader,
+    SegmentChunk,
+    SegmentLoadStats,
     _build_chunk_batches,
     _reset_temporal_state_lanes,
     _save_chunk_timing_logs,
@@ -148,11 +151,19 @@ def run_training(
 
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
     train_ds, eval_ds = maybe_cache_training_data(train_ds, eval_ds, cfg, task_cfg)
+    requested_batch_builder = cfg.batch_builder
+    use_segment_block_loader = cfg.data_source in {"prepared", "prepared_array"} and not should_cache_train
+    if use_segment_block_loader and requested_batch_builder == "numpy":
+        print(
+            "[residual-segment-block] batch_builder=numpy requires a full train cache; "
+            "using segment block loader with direct fallback for streaming data."
+        )
+        requested_batch_builder = "direct"
 
     builder_selection = select_batch_builders(
         train_ds,
         eval_ds,
-        requested=cfg.batch_builder,
+        requested=requested_batch_builder,
         should_cache_train=should_cache_train,
         task_cfg=task_cfg,
         train_label="residual-segment-train",
@@ -163,6 +174,9 @@ def run_training(
     numpy_cache_active = builder_selection.numpy_cache_active
     effective_train_batch_builder = builder_selection.effective_train_batch_builder
     effective_eval_batch_builder = builder_selection.effective_eval_batch_builder
+    if use_segment_block_loader:
+        effective_train_batch_builder = "segment_block"
+        effective_eval_batch_builder = "segment_block" if cfg.data_source == "prepared_array" else effective_eval_batch_builder
 
     residual_loss_transform = build_loss_transform(model_cfg, task_cfg, norm_stats, cfg)
     residual_eval_transform = build_eval_loss_transform(
@@ -172,7 +186,6 @@ def run_training(
         cfg,
         temporal_backbone=cfg.temporal_backbone,
         temporal_location=cfg.temporal_location,
-        temporal_hidden_size=cfg.temporal_hidden_size,
         temporal_d_inner=cfg.temporal_d_inner,
         temporal_d_state=cfg.temporal_d_state,
         temporal_d_conv=cfg.temporal_d_conv,
@@ -190,7 +203,6 @@ def run_training(
         cfg,
         temporal_backbone="none",
         temporal_location="mesh_post_encoder",
-        temporal_hidden_size=cfg.temporal_hidden_size,
         temporal_d_inner=None,
         temporal_d_state=cfg.temporal_d_state,
         temporal_d_conv=cfg.temporal_d_conv,
@@ -376,33 +388,45 @@ def run_training(
 
     load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=segment_cfg.chunk_load_workers)
     prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
-    def load_chunk_payload(
-        chunk_indices: tuple[np.ndarray, ...],
-        reset_mask_np: np.ndarray,
-        chunk_epoch: int,
-    ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], np.ndarray, int]:
-        chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
+    train_segment_loader = (
+        SegmentBlockBatchLoader(
             train_ds,
-            chunk_indices,
+            segments,
             input_steps=input_steps,
             target_steps=target_steps,
             task_cfg=task_cfg,
             dt=dt_train,
-            batch_builder=train_batch_builder,
-            chunk_load_workers=segment_cfg.chunk_load_workers,
             load_executor=load_executor,
+            max_workers=segment_cfg.chunk_load_workers,
+            label="residual-segment-block-train",
         )
-        return chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch
+        if use_segment_block_loader
+        else None
+    )
+
+    def load_chunk_payload(
+        chunk: SegmentChunk,
+    ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], np.ndarray, int, SegmentLoadStats]:
+        t_load = time.time()
+        if train_segment_loader is not None:
+            chunk_inputs, chunk_targets, chunk_forcings, load_stats = train_segment_loader.load_chunk(chunk)
+        else:
+            chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
+                train_ds,
+                chunk.chunk_indices,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt_train,
+                batch_builder=train_batch_builder,
+                chunk_load_workers=segment_cfg.chunk_load_workers,
+                load_executor=load_executor,
+            )
+            load_stats = SegmentLoadStats(load_s=time.time() - t_load)
+        return chunk_inputs, chunk_targets, chunk_forcings, chunk.reset_mask, chunk.epoch, load_stats
 
     def submit_next_chunk() -> concurrent.futures.Future:
-        chunk_indices, reset_mask_np = scheduler.next_chunk()
-        return prefetch_executor.submit(
-            load_chunk_payload,
-            chunk_indices,
-            reset_mask_np,
-            scheduler.epoch,
-        )
+        return prefetch_executor.submit(load_chunk_payload, scheduler.next_chunk())
 
     pending_chunk = submit_next_chunk()
 
@@ -410,7 +434,7 @@ def run_training(
         while step < cfg.max_steps:
             iteration_t0 = time.time()
             t_data = time.time()
-            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch = pending_chunk.result()
+            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch, load_stats = pending_chunk.result()
             data_wait_s = time.time() - t_data
 
             if observed_epoch is None:
@@ -464,6 +488,11 @@ def run_training(
                     "batch_size": cfg.batch_size,
                     "bptt_steps": segment_cfg.bptt_steps,
                     "chunk_load_workers": segment_cfg.chunk_load_workers,
+                    "loader": load_stats.loader,
+                    "load_s": load_stats.load_s,
+                    "cache_hits": load_stats.cache_hits,
+                    "cache_misses": load_stats.cache_misses,
+                    "loaded_gib": load_stats.loaded_gib,
                 }
             )
 
@@ -476,7 +505,9 @@ def run_training(
                 print(
                     f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
                     f"segment_epoch {chunk_epoch} reset_lanes {int(reset_mask_np.sum())} "
-                    f"data_wait={data_wait_s:.3f}s gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s"
+                    f"load={load_stats.load_s:.3f}s data_wait={data_wait_s:.3f}s "
+                    f"gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s "
+                    f"cache={load_stats.cache_hits}/{load_stats.cache_misses}"
                 )
 
             if step % cfg.eval_every == 0:

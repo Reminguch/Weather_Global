@@ -24,8 +24,7 @@ import jax.numpy as jnp
 class TemporalMeshConfig:
     backbone: str = "none"
     location: str = "mesh_post_encoder"
-    hidden_size: int | None = None
-    d_inner: int | None = None
+    d_inner: int = 0
     d_state: int = 16
     dt_rank: int | str = "auto"
     d_conv: int = 4
@@ -50,13 +49,13 @@ def _cfg_value(cfg: object, name: str, default):
 
 
 def _resolve_d_inner(cfg: object) -> int:
-    d_inner = getattr(cfg, "d_inner", None)
-    if d_inner is not None:
-        return int(d_inner)
-    hidden_size = getattr(cfg, "hidden_size", None)
-    if hidden_size is not None:
-        return int(hidden_size)
-    raise ValueError("Temporal Mamba requires either `d_inner` or `hidden_size`.")
+    value = getattr(cfg, "d_inner", 0)
+    if value is None:
+        raise ValueError("Temporal Mamba requires explicit positive `d_inner`.")
+    d_inner = int(value)
+    if d_inner <= 0:
+        raise ValueError("Temporal Mamba requires explicit positive `d_inner`.")
+    return d_inner
 
 
 def _resolve_dt_rank(cfg: object, d_model: int) -> int:

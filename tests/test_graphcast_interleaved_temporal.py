@@ -130,7 +130,6 @@ def test_stateful_interleaved_temporal_uses_3d_mesh_latents() -> None:
         predictor._temporal_backbone = "mamba"
         predictor._temporal_location = "mesh_processor_interleaved"
         predictor._temporal_stateful = True
-        predictor._temporal_hidden_size = channels
         predictor._temporal_d_inner = 4
         predictor._temporal_d_state = 3
         predictor._temporal_d_conv = 1

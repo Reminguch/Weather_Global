@@ -85,7 +85,6 @@ python -u -m src.models.mamba.training.segments_training \
   --precision "${PRECISION:-bf16}" \
   --temporal-backbone "${TEMPORAL_BACKBONE:-mamba}" \
   --temporal-location "${TEMPORAL_LOCATION:-mesh_processor_interleaved}" \
-  --temporal-hidden-size "${TEMPORAL_HIDDEN_SIZE:-128}" \
   --temporal-d-inner "${TEMPORAL_D_INNER:-16}" \
   --temporal-d-state "${TEMPORAL_D_STATE:-16}" \
   --temporal-stateful
@@ -132,7 +131,6 @@ python -u -m src.models.mamba.training.segments_training \
   --precision "${PRECISION:-bf16}" \
   --temporal-backbone mamba \
   --temporal-location "${TEMPORAL_LOCATION:-mesh_processor_interleaved}" \
-  --temporal-hidden-size "${TEMPORAL_HIDDEN_SIZE:-128}" \
   --temporal-d-inner "${TEMPORAL_D_INNER:-16}" \
   --temporal-d-state "${TEMPORAL_D_STATE:-16}" \
   --temporal-stateful
@@ -170,7 +168,6 @@ python -u -m src.models.mamba.training.segments_training \
   --precision "${PRECISION:-bf16}" \
   --temporal-backbone "${TEMPORAL_BACKBONE:-mamba}" \
   --temporal-location "${TEMPORAL_LOCATION:-mesh_processor_interleaved}" \
-  --temporal-hidden-size "${TEMPORAL_HIDDEN_SIZE:-128}" \
   --temporal-d-inner "${TEMPORAL_D_INNER:-16}" \
   --temporal-d-state "${TEMPORAL_D_STATE:-16}" \
   --temporal-stateful

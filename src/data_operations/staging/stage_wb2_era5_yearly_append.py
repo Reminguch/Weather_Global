@@ -296,10 +296,56 @@ def _resolve_requested_years(
     return list(range(DEFAULT_BOOTSTRAP_START, DEFAULT_BOOTSTRAP_END + 1))
 
 
+def _canonical_report_path(output: Path) -> Path:
+    return output.parent / f"{output.name}.stage_report.json"
+
+
+def _load_json_report(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as f:
+        payload = json.load(f)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Report must contain a JSON object: {path}")
+    return payload
+
+
+def _collect_superseded_reports(canonical_path: Path) -> tuple[list[dict], list[Path]]:
+    superseded: list[dict] = []
+    auxiliary_paths: list[Path] = []
+    if canonical_path.exists():
+        existing_report = _load_json_report(canonical_path)
+        existing_superseded = existing_report.get("superseded_reports", [])
+        if isinstance(existing_superseded, list):
+            superseded.extend(existing_superseded)
+
+    output_name = canonical_path.name[: -len(".stage_report.json")]
+    for path in sorted(canonical_path.parent.glob(f"{output_name}.*report.json")):
+        if path == canonical_path:
+            continue
+        auxiliary_paths.append(path)
+        superseded.append(
+            {
+                "path": str(path),
+                "report": _load_json_report(path),
+            }
+        )
+    return superseded, auxiliary_paths
+
+
 def _save_report(path: Path, report: RunReport) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(asdict(report), f, indent=2)
+    payload = asdict(report)
+    superseded_reports, auxiliary_paths = _collect_superseded_reports(path)
+    if superseded_reports:
+        payload["superseded_reports"] = superseded_reports
+
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    with tmp_path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+        f.write("\n")
+    tmp_path.replace(path)
+
+    for auxiliary_path in auxiliary_paths:
+        auxiliary_path.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -308,7 +354,7 @@ def main() -> None:
 
     output = args.output.resolve()
     lock_path = output.parent / f"{output.name}.lock"
-    report_path = output.parent / f"{output.name}.stage_report.json"
+    report_path = _canonical_report_path(output)
 
     print(f"Opening source WB2 Zarr: {args.uri}")
     source = xr.open_zarr(args.uri, consolidated=True, storage_options={"token": "anon"})

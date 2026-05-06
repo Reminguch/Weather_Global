@@ -60,7 +60,6 @@ class RunConfig:
     input_duration: str | None
     temporal_backbone: str
     temporal_location: str
-    temporal_hidden_size: int
     temporal_d_inner: int | None
     temporal_d_state: int
     temporal_d_conv: int
@@ -90,9 +89,9 @@ def parse_args() -> RunConfig:
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH, help="Local dataset path (.zarr or .nc).")
     parser.add_argument(
         "--data-source",
-        choices=["raw", "prepared"],
+        choices=["raw", "prepared", "prepared_array"],
         default="raw",
-        help="Read from raw WeatherBench/GraphCast data or a prepared/res{N} store.",
+        help="Read from raw WeatherBench/GraphCast data, prepared/res{N} Zarr, or prepared_array/res{N} memmaps.",
     )
     parser.add_argument(
         "--prepared-data-root",
@@ -102,7 +101,7 @@ def parse_args() -> RunConfig:
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[128, 256, 512, 1024], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4, 8], default=1)
+    parser.add_argument("--processor-msg-steps", type=int, default=1)
     parser.add_argument(
         "--grad-accum-steps",
         type=int,
@@ -143,9 +142,8 @@ def parse_args() -> RunConfig:
         default="mesh_post_encoder",
         help="Where to insert temporal module when enabled.",
     )
-    parser.add_argument("--temporal-hidden-size", type=int, default=128)
     parser.add_argument("--temporal-d-inner", type=int, default=None,
-                        help="Mamba internal channel width. Default: use --temporal-hidden-size.")
+                        help="Mamba internal channel width. Required when --temporal-backbone=mamba.")
     parser.add_argument("--temporal-d-state", type=int, default=16,
                         help="Mamba SSM state size per internal channel.")
     parser.add_argument("--temporal-d-conv", type=int, default=4,
@@ -171,7 +169,7 @@ def parse_args() -> RunConfig:
                         help="Cache the prepared training split in RAM. 'auto' uses --data-cache-max-gib.")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0,
                         help="Maximum estimated train split size for --data-cache-mode=auto.")
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy"], default="vectorized",
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="vectorized",
                         help="Batch construction implementation. Numpy requires an active full-RAM train cache.")
     parser.add_argument("--prefetch-workers", type=int, default=4,
                         help="Background workers used to build future random-sampling batches.")
@@ -199,10 +197,10 @@ def parse_args() -> RunConfig:
         raise ValueError("--train-start-year must be <= --train-end-year")
     if args.resume_step is not None and args.resume_step < 0:
         raise ValueError("--resume-step must be >= 0")
-    if args.temporal_hidden_size <= 0:
-        raise ValueError("--temporal-hidden-size must be > 0")
     if args.temporal_d_inner is not None and args.temporal_d_inner <= 0:
         raise ValueError("--temporal-d-inner must be > 0")
+    if args.temporal_backbone == "mamba" and args.temporal_d_inner is None:
+        raise ValueError("--temporal-d-inner is required when --temporal-backbone=mamba")
     if args.temporal_d_state <= 0:
         raise ValueError("--temporal-d-state must be > 0")
     if args.temporal_d_conv <= 0:
@@ -263,7 +261,6 @@ def parse_args() -> RunConfig:
         input_duration=args.input_duration,
         temporal_backbone=args.temporal_backbone,
         temporal_location=args.temporal_location,
-        temporal_hidden_size=args.temporal_hidden_size,
         temporal_d_inner=args.temporal_d_inner,
         temporal_d_state=args.temporal_d_state,
         temporal_d_conv=args.temporal_d_conv,

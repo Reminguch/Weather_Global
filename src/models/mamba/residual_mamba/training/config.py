@@ -27,12 +27,12 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         description="Train GraphCast/Mamba on one-step residuals over shuffled chronological segments."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
-    parser.add_argument("--data-source", choices=["raw", "prepared"], default="raw")
+    parser.add_argument("--data-source", choices=["raw", "prepared", "prepared_array"], default="raw")
     parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
     parser.add_argument("--width", type=int, choices=[32, 128, 256, 512, 1024], default=128)
-    parser.add_argument("--processor-msg-steps", type=int, choices=[1, 2, 3, 4, 8], default=1)
+    parser.add_argument("--processor-msg-steps", type=int, default=1)
     parser.add_argument("--val-year", type=int, default=2021)
     parser.add_argument("--train-start-year", type=int, default=None)
     parser.add_argument("--train-end-year", type=int, default=None)
@@ -62,7 +62,6 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         choices=["mesh_post_encoder", "mesh_processor_interleaved"],
         default="mesh_processor_interleaved",
     )
-    parser.add_argument("--temporal-hidden-size", type=int, default=128)
     parser.add_argument("--temporal-d-inner", type=int, default=None)
     parser.add_argument("--temporal-d-state", type=int, default=16)
     parser.add_argument("--temporal-d-conv", type=int, default=4)
@@ -74,7 +73,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy"], default="numpy")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="numpy")
     parser.add_argument(
         "--training-target",
         choices=["residual"],
@@ -109,10 +108,10 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         raise ValueError("--baseline-ckpt is required for residual_mamba training.")
     if args.resume_step is not None and not args.resume_ckpt:
         raise ValueError("--resume-ckpt is required when --resume-step is set.")
-    if args.temporal_hidden_size <= 0:
-        raise ValueError("--temporal-hidden-size must be > 0")
     if args.temporal_d_inner is not None and args.temporal_d_inner <= 0:
         raise ValueError("--temporal-d-inner must be > 0")
+    if args.temporal_backbone == "mamba" and args.temporal_d_inner is None:
+        raise ValueError("--temporal-d-inner is required when --temporal-backbone=mamba")
     if args.temporal_d_state <= 0:
         raise ValueError("--temporal-d-state must be > 0")
     if args.temporal_d_conv <= 0:
@@ -155,7 +154,6 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         input_duration=args.input_duration,
         temporal_backbone=args.temporal_backbone,
         temporal_location=args.temporal_location,
-        temporal_hidden_size=args.temporal_hidden_size,
         temporal_d_inner=args.temporal_d_inner,
         temporal_d_state=args.temporal_d_state,
         temporal_d_conv=args.temporal_d_conv,

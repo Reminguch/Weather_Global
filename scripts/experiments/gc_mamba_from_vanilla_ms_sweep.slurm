@@ -151,7 +151,6 @@ CMD=(
   --temporal-backbone mamba
   --temporal-location mesh_processor_interleaved
   --temporal-stateful
-  --temporal-hidden-size "${WIDTH}"
   --temporal-d-inner "${D_INNER}"
   --temporal-d-state 1
   --temporal-d-conv 4

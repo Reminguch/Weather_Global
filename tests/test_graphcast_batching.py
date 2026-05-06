@@ -24,6 +24,11 @@ from src.models.graphcast.training.core.batching import (  # noqa: E402
 )
 from src.models.graphcast.training.core.dataset import validate_prepared_dataset  # noqa: E402
 from src.models.graphcast.training.core.logging import build_batch_builder_metadata  # noqa: E402
+from src.models.graphcast.training.core.prepared_array import (  # noqa: E402
+    PREPARED_ARRAY_FORMAT_VERSION,
+    PreparedArrayStore,
+)
+from src.models.graphcast.training.core.segments import SegmentBlockBatchLoader, SegmentChunk  # noqa: E402
 
 
 def _task_cfg() -> SimpleNamespace:
@@ -268,6 +273,113 @@ def test_direct_builder_reads_tiny_prepared_zarr(tmp_path) -> None:
 
     for actual_ds, expected_ds in zip(actual, expected):
         _assert_datasets_match(actual_ds, expected_ds)
+
+
+def _write_tiny_prepared_array_store(tmp_path: Path, ds: xr.Dataset) -> PreparedArrayStore:
+    store = tmp_path / "res1"
+    (store / "coords").mkdir(parents=True)
+    (store / "vars").mkdir()
+    source = ds.isel(batch=0, drop=True)
+    for coord in ("time", "lat", "lon", "level"):
+        np.save(store / "coords" / f"{coord}.npy", np.asarray(source.coords[coord].values))
+    variables = {}
+    for name in ("temperature", "toa_incident_solar_radiation", "land_sea_mask"):
+        values = np.asarray(source[name].values)
+        np.save(store / "vars" / f"{name}.npy", values)
+        variables[name] = {
+            "dims": list(source[name].dims),
+            "shape": list(values.shape),
+            "dtype": str(values.dtype),
+        }
+    metadata = {
+        "prepared_array_format_version": PREPARED_ARRAY_FORMAT_VERSION,
+        "resolution": 1.0,
+        "pressure_levels": [500, 850],
+        "task_input_variables": ["temperature", "land_sea_mask"],
+        "task_target_variables": ["temperature"],
+        "task_forcing_variables": ["toa_incident_solar_radiation"],
+        "variables": variables,
+    }
+    (store / "metadata.json").write_text(__import__("json").dumps(metadata))
+    return PreparedArrayStore(store)
+
+
+def test_prepared_array_batch_builder_matches_direct(tmp_path) -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+    store = _write_tiny_prepared_array_store(tmp_path, ds)
+
+    expected = build_batch_from_indices_direct(
+        ds,
+        indices=[2, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+    actual = store.build_batch_from_indices(
+        indices=[2, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+
+    for actual_ds, expected_ds in zip(actual, expected):
+        _assert_datasets_match(actual_ds, expected_ds)
+
+
+def test_select_batch_builders_uses_prepared_array_without_full_cache(tmp_path) -> None:
+    store = _write_tiny_prepared_array_store(tmp_path, _make_dataset())
+    selection = select_batch_builders(
+        store,
+        store,
+        requested="numpy",
+        should_cache_train=False,
+        task_cfg=_task_cfg(),
+    )
+
+    assert selection.effective_train_batch_builder == "prepared_array"
+    assert selection.effective_eval_batch_builder == "prepared_array"
+    assert selection.numpy_cache_active is False
+
+
+def test_prepared_array_segment_block_loader_matches_direct(tmp_path) -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+    store = _write_tiny_prepared_array_store(tmp_path, ds)
+    segments = [np.asarray([1, 2, 3], dtype=np.int64), np.asarray([4, 5, 6], dtype=np.int64)]
+    chunk = SegmentChunk(
+        chunk_indices=(np.asarray([1, 4], dtype=np.int64), np.asarray([2, 5], dtype=np.int64)),
+        reset_mask=np.asarray([True, True]),
+        lane_segment_ids=np.asarray([0, 1], dtype=np.int64),
+        lane_offsets=np.asarray([0, 0], dtype=np.int64),
+        epoch=0,
+    )
+    loader = SegmentBlockBatchLoader(
+        store,
+        segments,
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+        label="test-prepared-array-segment",
+    )
+
+    inputs, targets, forcings, stats = loader.load_chunk(chunk)
+
+    assert stats.cache_misses == 2
+    for bptt_i, step_indices in enumerate(chunk.chunk_indices):
+        expected = build_batch_from_indices_direct(
+            ds,
+            indices=step_indices,
+            input_steps=2,
+            target_steps=1,
+            task_cfg=cfg,
+            dt=pd.Timedelta("6h"),
+        )
+        for actual_ds, expected_ds in zip((inputs[bptt_i], targets[bptt_i], forcings[bptt_i]), expected):
+            _assert_datasets_match(actual_ds, expected_ds)
 
 
 def test_vectorized_batch_builder_avoids_vectorized_time_indexing(monkeypatch) -> None:
