@@ -222,6 +222,7 @@ def main() -> None:
             dt=dt_train,
             progress_label="eval-only",
             batch_builder=eval_batch_builder_fn,
+            max_batches=cfg.final_eval_num_batches,
         )
         print(f"[eval-only] total {eval_metrics['total']:.6f}")
         return
@@ -614,13 +615,14 @@ def main() -> None:
                 dt=dt_train,
                 progress_label=f"eval@step{step}",
                 batch_builder=eval_batch_builder_fn,
+                max_batches=cfg.eval_num_batches,
             )
             eval_losses.append((step, eval_metrics["total"]))
             maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
             eval_details.append(
                 {
                     "step": step,
-                    "total": eval_metrics["total"],
+                    **eval_metrics,
                     **batch_builder_metadata,
                 }
             )
@@ -681,6 +683,7 @@ def main() -> None:
         dt=dt_train,
         progress_label="eval@final",
         batch_builder=eval_batch_builder_fn,
+        max_batches=cfg.final_eval_num_batches,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
@@ -688,7 +691,7 @@ def main() -> None:
         {
             "step": step,
             "final": True,
-            "total": final_eval["total"],
+            **final_eval,
             **batch_builder_metadata,
         }
     )

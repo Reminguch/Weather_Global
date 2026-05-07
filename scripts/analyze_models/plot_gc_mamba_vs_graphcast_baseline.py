@@ -16,6 +16,7 @@ DEFAULT_BASELINE_CSV = (
 )
 DEFAULT_OUTPUT_DIR = ROOT / "plots/analyze_models/data/resolution_eval/gc_mamba_vs_graphcast_baseline"
 DEFAULT_IMAGE_DIR = ROOT / "plots/analyze_models/images/resolution_eval/gc_mamba_vs_graphcast_baseline"
+DEFAULT_RESOLUTIONS = [1, 2, 3, 4, 6, 9, 18]
 VARIANT_RE = re.compile(r"res(?P<res>\d+)_m(?P<mesh>\d+)_w(?P<width>\d+)_mp(?P<mp>\d+)(?:_(?:di|dh|h)(?P<di>\d+))?")
 RES_MESH_TOKEN_RE = re.compile(r"_res\d+_m\d+(?=_)")
 
@@ -28,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-dir", type=Path, default=DEFAULT_IMAGE_DIR)
     parser.add_argument("--output-prefix", default="gc_mamba_vs_graphcast")
     parser.add_argument("--source-label", default="GC-Mamba")
+    parser.add_argument("--resolutions", type=int, nargs="+", default=DEFAULT_RESOLUTIONS)
     parser.add_argument("--lead-days", type=int, nargs="+", default=None)
     parser.add_argument("--eval-modes", nargs="+", default=None)
     parser.add_argument("--metric-kind", default="weighted_allvars")
@@ -80,6 +82,9 @@ def main() -> None:
     if args.metric_kind == "weighted_allvars":
         eval_df = eval_df[eval_df["variable"].fillna("") == ""]
         baseline_df = baseline_df[baseline_df["variable"].fillna("") == ""]
+    if args.resolutions is not None:
+        eval_df = eval_df[eval_df["res"].astype(int).isin(args.resolutions)]
+        baseline_df = baseline_df[baseline_df["res"].astype(int).isin(args.resolutions)]
     if args.lead_days is not None:
         eval_df = eval_df[eval_df["lead_days"].astype(int).isin(args.lead_days)]
         baseline_df = baseline_df[baseline_df["lead_days"].astype(int).isin(args.lead_days)]

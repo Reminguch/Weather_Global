@@ -19,7 +19,17 @@ for path in (ROOT, GRAPHCAST_LOCAL):
         sys.path.insert(0, path_str)
 
 from src.models.graphcast.training.core.segments import iter_eval_segment_chunks, run_eval_segments  # noqa: E402
+from src.models.graphcast.evaluation.device_resolution_eval import (  # noqa: E402
+    _accumulate_step as accumulate_device_step,
+    _empty_device_accumulator,
+    add_device_accumulator_to_host,
+    build_metric_spec,
+)
 from src.models.mamba.residual_mamba.training.model import run_residual_eval  # noqa: E402
+from scripts.analyze_models.unified_resolution_eval import (  # noqa: E402
+    _accumulate_metrics,
+    _empty_metric_accumulator,
+)
 from graphcast import xarray_jax  # noqa: E402
 
 
@@ -166,3 +176,94 @@ def test_run_residual_eval_preserves_residual_state_within_segment() -> None:
 
     assert metrics.keys() == {"total"}
     np.testing.assert_allclose(metrics["total"], 4.0)
+
+
+def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:
+    batch = np.arange(2)
+    time = np.arange(2)
+    level = np.asarray([100, 300], dtype=np.int32)
+    lat = np.asarray([-10.0, 0.0, 10.0], dtype=np.float32)
+    lon = np.asarray([0.0, 90.0, 180.0], dtype=np.float32)
+
+    surface_target = np.arange(batch.size * time.size * lat.size * lon.size, dtype=np.float32).reshape(
+        batch.size, time.size, lat.size, lon.size
+    )
+    surface_pred = surface_target + 1.5
+    level_target = np.arange(batch.size * time.size * level.size * lat.size * lon.size, dtype=np.float32).reshape(
+        batch.size, time.size, level.size, lat.size, lon.size
+    )
+    level_pred = level_target - 2.0
+
+    coords = {"batch": batch, "time": time, "level": level, "lat": lat, "lon": lon}
+    targets = xr.Dataset(
+        {
+            "2m_temperature": (("batch", "time", "lat", "lon"), surface_target),
+            "temperature": (("batch", "time", "level", "lat", "lon"), level_target),
+        },
+        coords=coords,
+    )
+    preds = xr.Dataset(
+        {
+            "2m_temperature": (("batch", "time", "lat", "lon"), surface_pred),
+            "temperature": (("batch", "time", "level", "lat", "lon"), level_pred),
+        },
+        coords=coords,
+    )
+    stats = {
+        "diffs_stddev_by_level": xr.Dataset(
+            {
+                "2m_temperature": ((), np.asarray(2.0, dtype=np.float32)),
+                "temperature": (("level",), np.asarray([2.0, 4.0, 6.0], dtype=np.float32)),
+            },
+            coords={"level": np.asarray([100, 200, 300], dtype=np.int32)},
+        )
+    }
+    res_grid_lats = xr.DataArray(np.asarray([-10.0, 10.0], dtype=np.float32), dims=("lat",))
+    res_grid_lons = xr.DataArray(np.asarray([0.0, 180.0], dtype=np.float32), dims=("lon",))
+
+    host_acc = _empty_metric_accumulator(max_lead_steps=2)
+    _accumulate_metrics(
+        host_acc,
+        preds,
+        targets,
+        res_grid_lats=res_grid_lats,
+        res_grid_lons=res_grid_lons,
+        stats=stats,
+    )
+
+    metric_spec = build_metric_spec(
+        targets,
+        stats=stats,
+        res_grid_lats=res_grid_lats,
+        res_grid_lons=res_grid_lons,
+        per_variable_weights={"2m_temperature": 1.0, "temperature": 1.0},
+        max_lead_steps=2,
+    )
+    device_acc = _empty_device_accumulator(metric_spec)
+    for lead_i in range(2):
+        device_acc = accumulate_device_step(
+            device_acc,
+            preds.isel(time=slice(lead_i, lead_i + 1)),
+            targets.isel(time=slice(lead_i, lead_i + 1)),
+            lead_i=lead_i,
+            metric_spec=metric_spec,
+        )
+    device_host_acc = _empty_metric_accumulator(max_lead_steps=2)
+    add_device_accumulator_to_host(
+        device_host_acc,
+        device_acc,
+        variable_names=tuple(var.name for var in metric_spec.variables),
+    )
+
+    np.testing.assert_allclose(device_host_acc["weighted_sum"], host_acc["weighted_sum"], rtol=1e-6)
+    np.testing.assert_array_equal(device_host_acc["weighted_count"], host_acc["weighted_count"])
+    for name in host_acc["per_variable_sum"]:
+        np.testing.assert_allclose(
+            device_host_acc["per_variable_sum"][name],
+            host_acc["per_variable_sum"][name],
+            rtol=1e-6,
+        )
+        np.testing.assert_array_equal(
+            device_host_acc["per_variable_count"][name],
+            host_acc["per_variable_count"][name],
+        )

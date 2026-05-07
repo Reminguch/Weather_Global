@@ -317,6 +317,8 @@ def _write_run_config(
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
         "eval_batch_size": cfg.eval_batch_size,
+        "eval_num_batches": cfg.eval_num_batches,
+        "final_eval_num_batches": cfg.final_eval_num_batches,
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,

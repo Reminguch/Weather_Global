@@ -126,6 +126,8 @@ def _build_one_step_bundle(ckpt_obj, stats, ckpt_path: Path, *, residual_mode: b
         "model_cfg": model_cfg,
         "task_cfg": task_cfg,
         "run_cfg": run_cfg,
+        "params": params,
+        "transformed": run_forward,
         "step": step,
     }
 

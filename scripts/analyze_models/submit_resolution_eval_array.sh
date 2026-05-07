@@ -29,7 +29,7 @@ TRUNK_STEPS="${TRUNK_STEPS:-32}"
 METRICS="${METRICS:-weighted_allvars per_variable}"
 EVAL_MODES="${EVAL_MODES:-cold}"
 CHECKPOINT_ROOTS="${CHECKPOINT_ROOTS:-${DEFAULT_CHECKPOINT_ROOTS[*]}}"
-RES1_MEM="${RES1_MEM:-48G}"
+RES1_MEM="${RES1_MEM:-30G}"
 DEFAULT_ARRAY_TIME="${DEFAULT_ARRAY_TIME:-00:40:00}"
 
 DISCOVER_CMD=(python -u scripts/analyze_models/unified_resolution_eval.py --families ${FAMILIES} --print-shards)

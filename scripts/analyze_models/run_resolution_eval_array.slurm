@@ -2,7 +2,7 @@
 #SBATCH --job-name=res-eval
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=20G
+#SBATCH --mem=30G
 #SBATCH --time=00:40:00
 #SBATCH --output=logs/resolution_eval_%A_%a.out
 #SBATCH --error=logs/resolution_eval_%A_%a.err
@@ -28,9 +28,14 @@ which python
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
 N_EVAL_DAYS="${N_EVAL_DAYS:-365}"
+EVAL_START="${EVAL_START:-}"
+EVAL_END="${EVAL_END:-}"
 WINDOW_BATCH_SIZE="${WINDOW_BATCH_SIZE:-8}"
 WARMUP_STEPS="${WARMUP_STEPS:-24}"
 TRUNK_STEPS="${TRUNK_STEPS:-32}"
+PREPARED_LOAD_WORKERS="${PREPARED_LOAD_WORKERS:-2}"
+PREPARED_STREAM_BLOCK_STEPS="${PREPARED_STREAM_BLOCK_STEPS:-32}"
+DISABLE_PREPARED_DEVICE_EVAL="${DISABLE_PREPARED_DEVICE_EVAL:-0}"
 METRICS="${METRICS:-weighted_allvars per_variable}"
 EVAL_MODES="${EVAL_MODES:-cold warm}"
 SHARD_DATA_DIR="${SHARD_DATA_DIR:-plots/analyze_models/data/resolution_eval/shards}"
@@ -59,6 +64,8 @@ CMD=(
   --window-batch-size "${EFFECTIVE_WINDOW_BATCH_SIZE}"
   --warmup-steps "${WARMUP_STEPS}"
   --trunk-steps "${TRUNK_STEPS}"
+  --prepared-load-workers "${PREPARED_LOAD_WORKERS}"
+  --prepared-stream-block-steps "${PREPARED_STREAM_BLOCK_STEPS}"
   --output-data-dir "${SHARD_DATA_DIR}"
   --output-csv-name "resolution_eval_${FAMILY}_res${RES}.csv"
   --metrics ${METRICS}
@@ -67,7 +74,17 @@ CMD=(
 if [[ -n "${CHECKPOINT_ROOTS}" ]]; then
   CMD+=(--checkpoint-roots ${CHECKPOINT_ROOTS})
 fi
+if [[ -n "${EVAL_START}" || -n "${EVAL_END}" ]]; then
+  CMD+=(--eval-start "${EVAL_START}" --eval-end "${EVAL_END}")
+fi
+if [[ "${DISABLE_PREPARED_DEVICE_EVAL}" == "1" ]]; then
+  CMD+=(--disable-prepared-device-eval)
+fi
 
 echo "Effective window batch size: ${EFFECTIVE_WINDOW_BATCH_SIZE}"
+echo "Eval start/end: ${EVAL_START:-<default>} ${EVAL_END:-<default>}"
+echo "Prepared load workers: ${PREPARED_LOAD_WORKERS}"
+echo "Prepared stream block steps: ${PREPARED_STREAM_BLOCK_STEPS}"
+echo "Disable prepared device eval: ${DISABLE_PREPARED_DEVICE_EVAL}"
 echo "Running: ${CMD[*]}"
 "${CMD[@]}"

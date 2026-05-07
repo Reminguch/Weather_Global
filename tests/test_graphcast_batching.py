@@ -27,6 +27,7 @@ from src.models.graphcast.training.core.prepared_array import (  # noqa: E402
     PREPARED_ARRAY_FORMAT_VERSION,
     PreparedArrayStore,
 )
+from src.models.graphcast.training.core.prepared_block_batches import PreparedBlockBatchLoader  # noqa: E402
 from src.models.graphcast.training.core.segments import SegmentBlockBatchLoader, SegmentChunk  # noqa: E402
 
 
@@ -348,6 +349,88 @@ def test_prepared_array_segment_block_loader_matches_direct(tmp_path) -> None:
             dt=pd.Timedelta("6h"),
         )
         for actual_ds, expected_ds in zip((inputs[bptt_i], targets[bptt_i], forcings[bptt_i]), expected):
+            _assert_datasets_match(actual_ds, expected_ds)
+
+
+def test_prepared_block_loader_load_chunk_matches_direct(tmp_path) -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+    store = _write_tiny_prepared_array_store(tmp_path, ds)
+    segments = [np.asarray([1, 2, 3], dtype=np.int64), np.asarray([4, 5, 6], dtype=np.int64)]
+    chunk = SegmentChunk(
+        chunk_indices=(np.asarray([1, 4], dtype=np.int64), np.asarray([2, 5], dtype=np.int64)),
+        reset_mask=np.asarray([True, True]),
+        lane_segment_ids=np.asarray([0, 1], dtype=np.int64),
+        lane_offsets=np.asarray([0, 0], dtype=np.int64),
+        epoch=0,
+    )
+    loader = PreparedBlockBatchLoader(
+        store,
+        segments,
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+        label="test-prepared-block",
+    )
+
+    inputs, targets, forcings, stats = loader.load_chunk(chunk)
+
+    assert stats.cache_misses == 2
+    for bptt_i, step_indices in enumerate(chunk.chunk_indices):
+        expected = build_batch_from_indices_direct(
+            ds,
+            indices=step_indices,
+            input_steps=2,
+            target_steps=1,
+            task_cfg=cfg,
+            dt=pd.Timedelta("6h"),
+        )
+        for actual_ds, expected_ds in zip((inputs[bptt_i], targets[bptt_i], forcings[bptt_i]), expected):
+            _assert_datasets_match(actual_ds, expected_ds)
+
+
+def test_prepared_block_loader_iter_chunk_batches_matches_load_chunk(tmp_path) -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+    store = _write_tiny_prepared_array_store(tmp_path, ds)
+    segments = [np.asarray([1, 2, 3], dtype=np.int64), np.asarray([4, 5, 6], dtype=np.int64)]
+    chunk = SegmentChunk(
+        chunk_indices=(np.asarray([1, 4], dtype=np.int64), np.asarray([2, 5], dtype=np.int64)),
+        reset_mask=np.asarray([True, True]),
+        lane_segment_ids=np.asarray([0, 1], dtype=np.int64),
+        lane_offsets=np.asarray([0, 0], dtype=np.int64),
+        epoch=0,
+    )
+    load_chunk_loader = PreparedBlockBatchLoader(
+        store,
+        segments,
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+        label="test-prepared-block-load",
+    )
+    iter_loader = PreparedBlockBatchLoader(
+        store,
+        segments,
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+        label="test-prepared-block-iter",
+    )
+
+    expected_inputs, expected_targets, expected_forcings, _ = load_chunk_loader.load_chunk(chunk)
+    actual_batches = list(iter_loader.iter_chunk_batches(chunk))
+
+    assert len(actual_batches) == len(chunk.chunk_indices)
+    for bptt_i, (actual, stats) in enumerate(actual_batches):
+        assert stats.cache_misses == 2
+        for actual_ds, expected_ds in zip(
+            actual,
+            (expected_inputs[bptt_i], expected_targets[bptt_i], expected_forcings[bptt_i]),
+        ):
             _assert_datasets_match(actual_ds, expected_ds)
 
 

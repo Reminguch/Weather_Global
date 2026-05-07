@@ -19,6 +19,17 @@ class SegmentRunConfig:
     segment_prefetch_depth: int = 2
     use_segment_block_loader: bool = True
     filter_nan_segments: bool = True
+    eval_num_segments: int | None = 16
+    final_eval_num_segments: int | None = None
+
+
+def _positive_int_or_all(value: str) -> int | None:
+    if value.lower() == "all":
+        return None
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
+    return parsed
 
 
 def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
@@ -34,7 +45,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         description="Train GraphCast on shuffled chronological segments with chunked BPTT."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
-    parser.add_argument("--data-source", choices=["raw", "prepared_array"], default="raw")
+    parser.add_argument("--data-source", choices=["raw", "prepared_array"], default="prepared_array")
     parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
@@ -51,6 +62,18 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--max-steps", type=int, default=10000, help="Optimizer updates, not forecast windows.")
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--eval-num-segments",
+        type=_positive_int_or_all,
+        default=16,
+        help="Number of deterministic validation segments for intermediate evals, or 'all'.",
+    )
+    parser.add_argument(
+        "--final-eval-num-segments",
+        type=_positive_int_or_all,
+        default=None,
+        help="Number of validation segments for final eval, or 'all' (default).",
+    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -121,7 +144,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="numpy")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default=None)
     args = parser.parse_args(argv)
 
     if args.max_steps <= 0:
@@ -167,6 +190,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     if args.resume_step is not None and args.init_from_graphcast_ckpt is not None:
         raise ValueError("--resume-step cannot be combined with --init-from-graphcast-ckpt")
 
+    batch_builder = args.batch_builder or ("prepared_array" if args.data_source == "prepared_array" else "numpy")
+
     base_cfg = RunConfig(
         data_path=args.data_path,
         data_source=args.data_source,
@@ -187,6 +212,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_num_batches=None,
+        final_eval_num_batches=None,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -209,7 +236,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         sequential_segment_steps=None,
         data_cache_mode=args.data_cache_mode,
         data_cache_max_gib=args.data_cache_max_gib,
-        batch_builder=args.batch_builder,
+        batch_builder=batch_builder,
         prefetch_workers=0,
         prefetch_depth=0,
         prefetch_device_depth=0,
@@ -227,6 +254,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         segment_prefetch_depth=args.segment_prefetch_depth,
         use_segment_block_loader=args.use_segment_block_loader,
         filter_nan_segments=args.filter_nan_segments,
+        eval_num_segments=args.eval_num_segments,
+        final_eval_num_segments=args.final_eval_num_segments,
     )
 
 
@@ -776,10 +805,11 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
                     segment_loader=eval_segment_loader,
+                    max_segments=segment_cfg.eval_num_segments,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
-                eval_details.append({"step": step, "total": eval_metrics["total"], **batch_builder_metadata})
+                eval_details.append({"step": step, **eval_metrics, **batch_builder_metadata})
                 print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
                 plot_loss_curves(out_dir, train_losses, eval_losses)
                 save_all_logs()
@@ -827,10 +857,11 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
         segment_loader=eval_segment_loader,
+        max_segments=segment_cfg.final_eval_num_segments,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
-    eval_details.append({"step": step, "final": True, "total": final_eval["total"], **batch_builder_metadata})
+    eval_details.append({"step": step, "final": True, **final_eval, **batch_builder_metadata})
 
     save_checkpoint(
         out_dir,

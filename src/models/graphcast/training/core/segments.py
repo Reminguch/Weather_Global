@@ -19,7 +19,8 @@ from .batching import BatchBuilder, build_batch_from_indices_vectorized, valid_f
 from .config import RunConfig
 from .logging import _write_run_config
 from .model import gc, scalarize_loss
-from .prepared_array import PreparedArrayBlock, PreparedArrayStore, is_prepared_array_store
+from .prepared_array import PreparedArrayStore, is_prepared_array_store
+from .prepared_block_batches import PreparedBlockBatchLoader
 
 
 @dataclasses.dataclass(frozen=True)
@@ -31,6 +32,8 @@ class SegmentRunConfig:
     segment_prefetch_depth: int = 2
     use_segment_block_loader: bool = True
     filter_nan_segments: bool = True
+    eval_num_segments: int | None = 16
+    final_eval_num_segments: int | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -310,6 +313,8 @@ def _write_segment_run_config(
         "prefetch_chunks": segment_cfg.segment_prefetch_depth,
         "segment_block_loader": segment_cfg.use_segment_block_loader,
         "filter_nan_segments": segment_cfg.filter_nan_segments,
+        "eval_num_segments": segment_cfg.eval_num_segments,
+        "final_eval_num_segments": segment_cfg.final_eval_num_segments,
         "shuffle_segments": True,
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
@@ -373,6 +378,21 @@ class SegmentBlockBatchLoader:
         label: str = "segment-block",
     ) -> None:
         self._array_store = ds if is_prepared_array_store(ds) else None
+        self._prepared_loader = (
+            PreparedBlockBatchLoader(
+                self._array_store,
+                segments,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt,
+                load_executor=load_executor,
+                max_workers=max_workers,
+                label=label,
+            )
+            if self._array_store is not None
+            else None
+        )
         self._source = None if self._array_store is not None else _drop_source_batch(ds)
         self._segments = segments
         self._input_steps = int(input_steps)
@@ -382,7 +402,7 @@ class SegmentBlockBatchLoader:
         self._load_executor = load_executor
         self._max_workers = max(1, int(max_workers))
         self._label = label
-        self._cache: dict[int, _LaneBlock | PreparedArrayBlock] = {}
+        self._cache: dict[int, _LaneBlock] = {}
         self._cache_segment_ids: dict[int, int] = {}
         self._task_vars = tuple(
             sorted(set(task_cfg.input_variables) | set(task_cfg.target_variables) | set(task_cfg.forcing_variables))
@@ -402,6 +422,9 @@ class SegmentBlockBatchLoader:
         self,
         chunk: SegmentChunk,
     ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], SegmentLoadStats]:
+        if self._prepared_loader is not None:
+            return self._prepared_loader.load_chunk(chunk)
+
         t0 = time.time()
         hits = 0
         misses: list[tuple[int, int]] = []
@@ -431,18 +454,7 @@ class SegmentBlockBatchLoader:
         targets: list[xr.Dataset] = []
         forcings: list[xr.Dataset] = []
         for bptt_i, step_indices in enumerate(chunk.chunk_indices):
-            if self._array_store is not None:
-                blocks = [self._cache[lane] for lane in range(len(step_indices))]
-                batch_inputs, batch_targets, batch_forcings = self._array_store.build_step_from_blocks(
-                    blocks,
-                    step_indices,
-                    input_steps=self._input_steps,
-                    target_steps=self._target_steps,
-                    task_cfg=self._task_cfg,
-                    dt=self._dt,
-                )
-            else:
-                batch_inputs, batch_targets, batch_forcings = self._build_step_batch(step_indices)
+            batch_inputs, batch_targets, batch_forcings = self._build_step_batch(step_indices)
             inputs.append(batch_inputs)
             targets.append(batch_targets)
             forcings.append(batch_forcings)
@@ -457,16 +469,10 @@ class SegmentBlockBatchLoader:
         self.last_stats = stats
         return tuple(inputs), tuple(targets), tuple(forcings), stats
 
-    def _load_lane_block(self, segment_id: int) -> _LaneBlock | PreparedArrayBlock:
+    def _load_lane_block(self, segment_id: int) -> _LaneBlock:
         segment = self._segments[int(segment_id)]
         block_start = int(segment[0]) - self._input_steps + 1
         block_stop = int(segment[-1]) + self._target_steps + 1
-        if self._array_store is not None:
-            return self._array_store.load_time_block(
-                block_start,
-                block_stop,
-                task_cfg=self._task_cfg,
-            )
         assert self._source is not None
         if block_start < 0 or block_stop > self._source.sizes["time"]:
             raise IndexError(
@@ -854,6 +860,7 @@ def run_eval_segments(
     chunk_load_workers: int = 1,
     load_executor: concurrent.futures.Executor | None = None,
     segment_loader: SegmentBlockBatchLoader | None = None,
+    max_segments: int | None = None,
 ) -> dict[str, float]:
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
@@ -861,6 +868,15 @@ def run_eval_segments(
             "No full eval segments after timestamp-contiguous filtering. "
             f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
         )
+    available_segments = len(eval_segments)
+    if max_segments is not None:
+        if max_segments <= 0:
+            raise ValueError("max_segments must be positive or None.")
+        eval_segments = eval_segments[:max_segments]
+    if not eval_segments:
+        raise ValueError("No eval segments selected.")
+    if max_segments is not None and len(eval_segments) < available_segments:
+        print(f"[{progress_label}] using first {len(eval_segments)}/{available_segments} validation segments")
 
     state_by_lane_count: dict[int, hk.State] = {}
     eval_chunk_fn_by_lane_count: dict[int, callable] = {}
@@ -949,7 +965,11 @@ def run_eval_segments(
                 f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
             )
 
-    return {"total": float(total_weighted_loss / total_windows)}
+    return {
+        "total": float(total_weighted_loss / total_windows),
+        "segments": float(len(eval_segments)),
+        "chunks": float(n_chunks),
+    }
 
 
 def run_eval_fresh_state(

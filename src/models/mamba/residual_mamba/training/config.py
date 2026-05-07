@@ -20,6 +20,17 @@ class ResidualSegmentRunConfig:
     baseline_ckpt: str
     resume_ckpt: str | None
     training_target: str
+    eval_num_segments: int | None = 16
+    final_eval_num_segments: int | None = None
+
+
+def _positive_int_or_all(value: str) -> int | None:
+    if value.lower() == "all":
+        return None
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
+    return parsed
 
 
 def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
@@ -45,6 +56,8 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--max-steps", type=int, default=10000)
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument("--eval-num-segments", type=_positive_int_or_all, default=16)
+    parser.add_argument("--final-eval-num-segments", type=_positive_int_or_all, default=None)
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -145,6 +158,8 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_num_batches=None,
+        final_eval_num_batches=None,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -182,4 +197,6 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         baseline_ckpt=args.baseline_ckpt,
         resume_ckpt=args.resume_ckpt,
         training_target=args.training_target,
+        eval_num_segments=args.eval_num_segments,
+        final_eval_num_segments=args.final_eval_num_segments,
     )

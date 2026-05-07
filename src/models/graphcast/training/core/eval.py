@@ -46,16 +46,26 @@ def run_eval(
     batch_builder: BatchBuilder = build_batch_from_indices_vectorized,
     prefetch_workers: int = 4,
     prefetch_depth: int = 4,
+    max_batches: int | None = None,
 ) -> dict[str, float]:
     del state
 
     losses: list[float] = []
 
-    n_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     index_batches = [
         eval_indices[i : i + eval_batch_size]
         for i in range(0, len(eval_indices), eval_batch_size)
     ]
+    available_batches = len(index_batches)
+    if max_batches is not None:
+        if max_batches <= 0:
+            raise ValueError("max_batches must be positive or None.")
+        index_batches = index_batches[:max_batches]
+    n_batches = len(index_batches)
+    if n_batches == 0:
+        raise ValueError("No eval batches selected.")
+    if max_batches is not None and n_batches < available_batches:
+        print(f"[{progress_label}] using first {n_batches}/{available_batches} validation batches")
 
     def _build(idx):
         return batch_builder(
@@ -126,4 +136,4 @@ def run_eval(
             )
 
     executor.shutdown(wait=False)
-    return {"total": float(np.mean(losses))}
+    return {"total": float(np.mean(losses)), "batches": float(n_batches)}

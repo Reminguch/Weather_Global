@@ -191,6 +191,8 @@ def augment_run_config(
         "bptt_steps": segment_cfg.bptt_steps,
         "chunk_load_workers": segment_cfg.chunk_load_workers,
         "prefetch_chunks": 1,
+        "eval_num_segments": segment_cfg.eval_num_segments,
+        "final_eval_num_segments": segment_cfg.final_eval_num_segments,
         "shuffle_segments": True,
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
@@ -231,6 +233,7 @@ def run_residual_eval(
     batch_builder: BatchBuilder = build_batch_from_indices_vectorized,
     chunk_load_workers: int = 1,
     load_executor=None,
+    max_segments: int | None = None,
 ) -> dict[str, float]:
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
@@ -238,6 +241,15 @@ def run_residual_eval(
             "No full eval segments after timestamp-contiguous filtering. "
             f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
         )
+    available_segments = len(eval_segments)
+    if max_segments is not None:
+        if max_segments <= 0:
+            raise ValueError("max_segments must be positive or None.")
+        eval_segments = eval_segments[:max_segments]
+    if not eval_segments:
+        raise ValueError("No eval segments selected.")
+    if max_segments is not None and len(eval_segments) < available_segments:
+        print(f"[{progress_label}] using first {len(eval_segments)}/{available_segments} validation segments")
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
     eval_fn_by_batch_size: dict[int, callable] = {}
@@ -356,4 +368,8 @@ def run_residual_eval(
                 f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
             )
 
-    return {"total": float(total_weighted_loss / total_windows)}
+    return {
+        "total": float(total_weighted_loss / total_windows),
+        "segments": float(len(eval_segments)),
+        "chunks": float(n_chunks),
+    }

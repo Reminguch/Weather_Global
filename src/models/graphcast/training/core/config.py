@@ -51,6 +51,8 @@ class RunConfig:
     max_steps: int
     eval_every: int
     eval_batch_size: int
+    eval_num_batches: int | None
+    final_eval_num_batches: int | None
     checkpoint_every: int
     lr: float
     weight_decay: float
@@ -84,13 +86,22 @@ class RunConfig:
     zero_init_temporal_out: bool = False
 
 
+def _positive_int_or_all(value: str) -> int | None:
+    if value.lower() == "all":
+        return None
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
+    return parsed
+
+
 def parse_args() -> RunConfig:
     parser = argparse.ArgumentParser(description="Train GraphCast at 2.0deg from local ERA5 data.")
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH, help="Local dataset path (.zarr or .nc).")
     parser.add_argument(
         "--data-source",
         choices=["raw", "prepared_array"],
-        default="raw",
+        default="prepared_array",
         help="Read from raw WeatherBench/GraphCast data or prepared_array/res{N} memmaps.",
     )
     parser.add_argument(
@@ -119,6 +130,18 @@ def parse_args() -> RunConfig:
     parser.add_argument("--max-steps", type=int, default=10000)
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--eval-num-batches",
+        type=_positive_int_or_all,
+        default=16,
+        help="Number of validation batches for intermediate training evals, or 'all'.",
+    )
+    parser.add_argument(
+        "--final-eval-num-batches",
+        type=_positive_int_or_all,
+        default=None,
+        help="Number of validation batches for final/eval-only evals, or 'all' (default).",
+    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -169,8 +192,8 @@ def parse_args() -> RunConfig:
                         help="Cache the training split in RAM. 'auto' uses --data-cache-max-gib.")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0,
                         help="Maximum estimated train split size for --data-cache-mode=auto.")
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="vectorized",
-                        help="Batch construction implementation. Numpy requires an active full-RAM train cache.")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default=None,
+                        help="Batch construction implementation. Default: prepared_array for prepared data, vectorized for raw data.")
     parser.add_argument("--prefetch-workers", type=int, default=4,
                         help="Background workers used to build future random-sampling batches.")
     parser.add_argument("--prefetch-depth", type=int, default=8,
@@ -232,6 +255,8 @@ def parse_args() -> RunConfig:
         if args.sequential_segment_steps is not None:
             raise ValueError("--grad-accum-steps > 1 is not supported with --sequential-segment-steps.")
 
+    batch_builder = args.batch_builder or ("prepared_array" if args.data_source == "prepared_array" else "vectorized")
+
     return RunConfig(
         data_path=args.data_path,
         data_source=args.data_source,
@@ -252,6 +277,8 @@ def parse_args() -> RunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_num_batches=args.eval_num_batches,
+        final_eval_num_batches=args.final_eval_num_batches,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -274,7 +301,7 @@ def parse_args() -> RunConfig:
         sequential_segment_steps=args.sequential_segment_steps,
         data_cache_mode=args.data_cache_mode,
         data_cache_max_gib=args.data_cache_max_gib,
-        batch_builder=args.batch_builder,
+        batch_builder=batch_builder,
         prefetch_workers=args.prefetch_workers,
         prefetch_depth=args.prefetch_depth,
         prefetch_device_depth=args.prefetch_device_depth,

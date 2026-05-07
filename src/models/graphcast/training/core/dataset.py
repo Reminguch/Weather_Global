@@ -12,6 +12,12 @@ from . import bootstrap as _bootstrap  # noqa: F401
 from .config import GRAPHCAST_VARS, RunConfig
 from .model import data_utils, gc
 from .prepared_array import PreparedArrayStore, is_prepared_array_store
+from .prepared_data import (
+    open_prepared_store,
+    prepared_store_path_from_root,
+    resolution_tag as _resolution_tag,
+    split_prepared_store_by_year,
+)
 from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
 
 
@@ -82,14 +88,11 @@ def _load_static_vars(ds: xr.Dataset, label: str) -> xr.Dataset:
 
 
 def resolution_tag(resolution: float) -> str:
-    value = float(resolution)
-    if np.isclose(value, round(value), atol=1e-6):
-        return f"res{int(round(value))}"
-    return f"res{str(value).replace('.', 'p')}"
+    return _resolution_tag(resolution)
 
 
 def prepared_store_path(cfg: RunConfig) -> Path:
-    return Path(cfg.prepared_data_root) / resolution_tag(cfg.resolution)
+    return prepared_store_path_from_root(cfg.prepared_data_root, cfg.resolution)
 
 
 def _training_cache_decision(
@@ -243,36 +246,6 @@ def _split_by_year(ds: xr.Dataset, cfg: RunConfig, *, label: str) -> tuple[xr.Da
     return train_ds, val_ds, train_years
 
 
-def _split_prepared_array_by_year(
-    store: PreparedArrayStore,
-    cfg: RunConfig,
-    *,
-    label: str,
-) -> tuple[PreparedArrayStore, PreparedArrayStore, list[int]]:
-    time_index = pd.DatetimeIndex(pd.to_datetime(store.time.values))
-    years = sorted(set(time_index.year.astype(int).tolist()))
-    if cfg.val_year not in years:
-        raise ValueError(f"Requested val year {cfg.val_year} not present in {label} dataset years: {years}")
-
-    train_years = [y for y in years if y != cfg.val_year]
-    if cfg.train_start_year is not None:
-        train_years = [y for y in train_years if cfg.train_start_year <= y <= cfg.train_end_year]
-    if not train_years:
-        raise ValueError(f"No train years left in {label} data after year selection.")
-
-    train_idx = np.where(np.isin(time_index.year, np.asarray(train_years)))[0]
-    val_idx = np.where(time_index.year == cfg.val_year)[0]
-    if train_idx.size == 0:
-        raise ValueError("Empty train split after year selection.")
-    if val_idx.size == 0:
-        raise ValueError("Empty validation split after year selection.")
-    return (
-        store.split_by_time_indices(train_idx, label=f"{label}-train"),
-        store.split_by_time_indices(val_idx, label=f"{label}-eval"),
-        train_years,
-    )
-
-
 def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
     _assert_local_path(cfg.data_path, "--data-path")
     print(f"Opening local dataset: {cfg.data_path}")
@@ -302,15 +275,21 @@ def _open_local_splits(cfg: RunConfig) -> tuple[xr.Dataset, xr.Dataset]:
 def _open_prepared_array_splits(cfg: RunConfig, task_cfg: gc.TaskConfig) -> tuple[PreparedArrayStore, PreparedArrayStore]:
     store_path = prepared_store_path(cfg)
     _assert_local_path(str(store_path), "--prepared-data-root")
-    if not store_path.exists():
+    print(f"Opening prepared array dataset: {store_path}")
+    try:
+        store = open_prepared_store(cfg.prepared_data_root, cfg.resolution, task_cfg, label="prepared-array")
+    except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"Prepared array store not found: {store_path}. "
             "Run python -m src.data_operations.preprocessing.prepare_graphcast_streaming_store first."
-        )
-    print(f"Opening prepared array dataset: {store_path}")
-    store = PreparedArrayStore(store_path, label="prepared-array")
-    store.validate(resolution=cfg.resolution, task_cfg=task_cfg)
-    train_ds, val_ds, train_years = _split_prepared_array_by_year(store, cfg, label="prepared_array")
+        ) from exc
+    train_ds, val_ds, train_years = split_prepared_store_by_year(
+        store,
+        cfg.val_year,
+        train_start_year=cfg.train_start_year,
+        train_end_year=cfg.train_end_year,
+        label="prepared_array",
+    )
     print(
         "Prepared array data split: "
         f"train_years={train_years[0]}-{train_years[-1]} (excluding {cfg.val_year}), "

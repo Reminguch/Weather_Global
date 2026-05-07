@@ -523,6 +523,7 @@ def run_training(
                     batch_builder=eval_batch_builder,
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
+                    max_segments=segment_cfg.eval_num_segments,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
@@ -579,6 +580,7 @@ def run_training(
         progress_label="eval@final",
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
+        max_segments=segment_cfg.final_eval_num_segments,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
+import contextlib
 import dataclasses
-import json
 import re
 import sys
-from collections.abc import Hashable
+import time
+from collections.abc import Hashable, Iterable
 from pathlib import Path
 
 import jax
@@ -24,7 +26,22 @@ if GRAPHCAST_LOCAL.exists() and str(GRAPHCAST_LOCAL) not in sys.path:
     sys.path.insert(0, str(GRAPHCAST_LOCAL))
 
 from src.data_operations.loaders.graphcast_dataset import open_graphcast_era5
+from src.models.graphcast.evaluation.device_resolution_eval import (
+    PreparedDeviceResolutionEvaluator,
+    add_device_accumulator_to_host,
+)
 from src.models.graphcast.runtime import infer_family, load_run_config
+from src.models.graphcast.training.core.prepared_array import PreparedArrayStore
+from src.models.graphcast.training.core.prepared_block_batches import PreparedBlockBatchLoader
+from src.models.graphcast.training.core.prepared_data import (
+    PreparedDataError,
+    load_prepared_metric_grid,
+    open_prepared_store,
+    prepared_eval_metadata,
+    prepared_store_path_from_root,
+    select_prepared_eval_window,
+)
+from src.models.graphcast.training.core.segments import SegmentChunk
 
 
 def _require_graphcast() -> None:
@@ -54,11 +71,14 @@ DATASET_PATH = "data/graphcast/graphcast/dataset/source-era5_cds_rolling-last30d
 STATS_DIR = "data/graphcast/graphcast/stats"
 DEFAULT_OUTPUT_DATA_DIR = "plots/analyze_models/data/resolution_eval"
 DEFAULT_OUTPUT_IMAGE_DIR = "plots/analyze_models/images/resolution_eval"
+DEFAULT_PREPARED_DATA_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
 
 FAMILIES = ["graphcast", "gc_mamba", "legacy_gc_mamba", "residual_mamba"]
 METRICS = ["weighted_allvars", "per_variable"]
 EVAL_MODES = ["cold", "warm"]
+DATA_SOURCES = ["prepared_array", "raw"]
 LEAD_DAYS = [1, 2, 4]
+DEFAULT_RESOLUTIONS = [1, 2, 3, 4, 6, 9, 18]
 N_EVAL_DAYS = 365
 HOURS_PER_STEP = 6
 N_INPUT_STEPS = 2
@@ -66,7 +86,8 @@ N_EXTRA_STEPS = 14
 WINDOW_BATCH_SIZE = 8
 WARMUP_STEPS = 24
 TRUNK_STEPS = 32
-RES_GRID_STRIDE = 15
+PREPARED_STREAM_BLOCK_STEPS = 32
+RES_GRID_STRIDE = 18
 CSV_SORT_COLUMNS = ["family", "variant", "res", "lead_days", "eval_mode", "metric_kind", "variable"]
 
 
@@ -86,8 +107,8 @@ class EvalShardCache:
     ds_res_by_stride: dict[int, xarray.Dataset]
     metric_grid_by_stride: dict[int, tuple[xarray.DataArray, xarray.DataArray]]
     task_cfg_kwargs_by_key: dict[Hashable, dict]
-    cold_batches: dict[tuple[Hashable, int, int, int], tuple[xarray.Dataset, xarray.Dataset, xarray.Dataset] | None]
-    warm_batches: dict[tuple[Hashable, int, int, int, int], tuple[xarray.Dataset, xarray.Dataset, xarray.Dataset] | None]
+    cold_batches: dict[tuple, tuple[xarray.Dataset, xarray.Dataset, xarray.Dataset] | None]
+    warm_batches: dict[tuple, tuple[xarray.Dataset, xarray.Dataset, xarray.Dataset] | None]
     cold_hits: int = 0
     cold_misses: int = 0
     warm_hits: int = 0
@@ -98,7 +119,12 @@ class EvalShardCache:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Unified resolution evaluation across model families.")
     parser.add_argument("--families", nargs="+", choices=FAMILIES, default=FAMILIES)
-    parser.add_argument("--resolutions", type=int, nargs="+", default=None)
+    parser.add_argument("--resolutions", type=int, nargs="+", default=DEFAULT_RESOLUTIONS)
+    parser.add_argument("--data-source", choices=DATA_SOURCES, default="prepared_array")
+    parser.add_argument("--prepared-data-root", type=Path, default=ROOT / DEFAULT_PREPARED_DATA_ROOT)
+    parser.add_argument("--eval-start", type=str, default=None, help="Prepared-array eval start timestamp, inclusive.")
+    parser.add_argument("--eval-end", type=str, default=None, help="Prepared-array eval end timestamp, exclusive.")
+    parser.add_argument("--eval-year", type=int, default=None, help="Prepared-array eval year override.")
     parser.add_argument(
         "--checkpoint-roots",
         type=Path,
@@ -113,6 +139,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window-batch-size", type=int, default=WINDOW_BATCH_SIZE)
     parser.add_argument("--warmup-steps", type=int, default=WARMUP_STEPS)
     parser.add_argument("--trunk-steps", type=int, default=TRUNK_STEPS)
+    parser.add_argument("--prepared-load-workers", type=int, default=1)
+    parser.add_argument("--prepared-stream-block-steps", type=int, default=PREPARED_STREAM_BLOCK_STEPS)
+    parser.add_argument(
+        "--disable-prepared-device-eval",
+        action="store_true",
+        help="Use the streamed host/xarray prepared eval path instead of jitted device-side metric accumulation.",
+    )
     parser.add_argument("--output-data-dir", type=Path, default=ROOT / DEFAULT_OUTPUT_DATA_DIR)
     parser.add_argument("--output-image-dir", type=Path, default=ROOT / DEFAULT_OUTPUT_IMAGE_DIR)
     parser.add_argument("--output-csv-name", type=str, default="resolution_eval.csv")
@@ -158,6 +191,103 @@ def _prepare_dataset(max_lead_steps: int, n_eval_days: int) -> tuple[xarray.Data
         raise ValueError(f"Dataset has only {n_steps} steps; not enough context for lead={max_lead_steps}.")
     start_target_idx = n_steps - n_target_times
     return ds, start_target_idx, n_steps
+
+
+def _warn_skip(message: str) -> None:
+    print(f"WARNING: {message}", file=sys.stderr)
+
+
+def _print_progress(label: str, current: int, total: int, start_time: float) -> None:
+    elapsed = time.time() - start_time
+    frac = float(current) / float(total) if total else 0.0
+    rate = float(current) / elapsed if elapsed > 0 else 0.0
+    eta = (float(total - current) / rate) if rate > 0 else float("nan")
+    eta_text = "unknown" if not np.isfinite(eta) else f"{eta:.1f}s"
+    print(
+        f"[{label}] {current}/{total} ({100.0 * frac:.1f}%) "
+        f"elapsed {elapsed:.1f}s eta {eta_text}",
+        flush=True,
+    )
+
+
+def _prepared_target_indices(n_steps: int, max_lead_steps: int) -> list[int]:
+    first_anchor = N_INPUT_STEPS - 1
+    stop = n_steps - max_lead_steps
+    if stop <= first_anchor:
+        raise PreparedDataError(
+            f"Prepared eval split has {n_steps} steps; need at least {N_INPUT_STEPS + max_lead_steps}."
+        )
+    return np.arange(first_anchor, stop, dtype=int).tolist()
+
+
+def _prepared_chunk_start_indices(
+    n_steps: int,
+    *,
+    trunk_steps: int,
+    total_horizon_steps: int,
+) -> list[int]:
+    stop = n_steps - (N_INPUT_STEPS + total_horizon_steps) + 1
+    if stop <= 0:
+        raise PreparedDataError(
+            f"Prepared eval split has {n_steps} steps; need at least {N_INPUT_STEPS + total_horizon_steps}."
+        )
+    return np.arange(0, stop, trunk_steps, dtype=int).tolist()
+
+
+def _prepared_stream_segments(indices: list[int], block_steps: int) -> list[np.ndarray]:
+    if block_steps <= 0:
+        raise ValueError("--prepared-stream-block-steps must be positive.")
+    return [
+        np.asarray(indices[start : start + block_steps], dtype=np.int64)
+        for start in range(0, len(indices), block_steps)
+        if indices[start : start + block_steps]
+    ]
+
+
+def _iter_prepared_stream_chunks(
+    segments: list[np.ndarray],
+    *,
+    batch_size: int,
+) -> Iterable[SegmentChunk]:
+    if batch_size <= 0:
+        raise ValueError("--window-batch-size must be positive.")
+    for start in range(0, len(segments), batch_size):
+        segment_group = segments[start : start + batch_size]
+        if not segment_group:
+            continue
+        max_len = max(len(segment) for segment in segment_group)
+        chunk_indices: list[np.ndarray] = []
+        lane_offsets: list[np.ndarray] = []
+        for offset in range(max_len):
+            step_indices = []
+            step_offsets = []
+            for segment in segment_group:
+                if offset >= len(segment):
+                    continue
+                step_indices.append(int(segment[offset]))
+                step_offsets.append(offset)
+            if step_indices:
+                chunk_indices.append(np.asarray(step_indices, dtype=np.int64))
+                lane_offsets.append(np.asarray(step_offsets, dtype=np.int64))
+        if not chunk_indices:
+            continue
+        lane_count = len(chunk_indices[0])
+        yield SegmentChunk(
+            chunk_indices=tuple(chunk_indices),
+            reset_mask=np.zeros(lane_count, dtype=np.bool_),
+            lane_segment_ids=np.arange(start, start + lane_count, dtype=np.int64),
+            lane_offsets=lane_offsets[0],
+            epoch=0,
+        )
+
+
+@contextlib.contextmanager
+def _prepared_load_executor(max_workers: int):
+    if max_workers <= 1:
+        yield None
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        yield executor
 
 
 def _freeze_cache_key(value):
@@ -526,6 +656,360 @@ def _evaluate_checkpoint_truth_anchored(
     return _finalize_metrics(acc, lead_days, lead_steps)
 
 
+def _open_prepared_eval_store_for_checkpoint(
+    prepared_data_root: Path,
+    *,
+    resolution: int,
+    task_cfg,
+    run_cfg: dict,
+    eval_start: str | None,
+    eval_end: str | None,
+    eval_year: int | None,
+) -> tuple[PreparedArrayStore, dict[str, object]]:
+    store_path = prepared_store_path_from_root(prepared_data_root, resolution)
+    store = open_prepared_store(
+        prepared_data_root,
+        resolution,
+        task_cfg,
+        label=f"prepared-res{int(resolution)}",
+    )
+    selected_year = eval_year
+    if eval_start is None and eval_end is None and selected_year is None:
+        raw_year = run_cfg.get("val_year")
+        selected_year = None if raw_year is None else int(raw_year)
+
+    selected_window = select_prepared_eval_window(
+        store,
+        eval_start=eval_start,
+        eval_end=eval_end,
+        eval_year=selected_year,
+    )
+    return selected_window.store, prepared_eval_metadata(store_path, selected_window)
+
+
+def _evaluate_checkpoint_prepared(
+    ckpt_path: Path,
+    stats: dict[str, xarray.Dataset],
+    prepared_data_root: Path,
+    entry_res: int,
+    lead_days: list[int],
+    lead_steps: list[int],
+    seed_base: int,
+    *,
+    window_batch_size: int,
+    prepared_load_workers: int,
+    prepared_stream_block_steps: int,
+    use_device_eval: bool,
+    cache: EvalShardCache,
+    res_grid_lats: xarray.DataArray,
+    res_grid_lons: xarray.DataArray,
+    eval_start: str | None,
+    eval_end: str | None,
+    eval_year: int | None,
+) -> tuple[dict[int, float], dict[str, dict[int, float]], dict[int, int], dict[str, object]]:
+    max_lead_steps = max(lead_steps)
+    with ckpt_path.open("rb") as f:
+        ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
+    device_evaluator = None
+    if use_device_eval:
+        device_evaluator = PreparedDeviceResolutionEvaluator(
+            ckpt_obj,
+            stats,
+            ckpt_path,
+            res_grid_lats=res_grid_lats,
+            res_grid_lons=res_grid_lons,
+            per_variable_weights=GRAPHCAST_PER_VARIABLE_WEIGHTS,
+            max_lead_steps=max_lead_steps,
+        )
+        task_cfg = device_evaluator.task_cfg
+        run_cfg = device_evaluator.run_cfg
+    else:
+        run_jitted, task_cfg, _model_cfg, run_cfg = build_run_jitted(ckpt_obj, stats, ckpt_path)
+    task_key, task_cfg_kwargs = _task_cfg_cache_key(task_cfg)
+    cache.task_cfg_kwargs_by_key.setdefault(task_key, task_cfg_kwargs)
+
+    store, eval_metadata = _open_prepared_eval_store_for_checkpoint(
+        prepared_data_root,
+        resolution=entry_res,
+        task_cfg=task_cfg,
+        run_cfg=run_cfg,
+        eval_start=eval_start,
+        eval_end=eval_end,
+        eval_year=eval_year,
+    )
+    target_indices = _prepared_target_indices(store.sizes["time"], max_lead_steps)
+    acc = _empty_metric_accumulator(max_lead_steps)
+
+    segments = _prepared_stream_segments(target_indices, prepared_stream_block_steps)
+    stream_chunks = list(_iter_prepared_stream_chunks(segments, batch_size=window_batch_size))
+    total_batches = sum(len(chunk.chunk_indices) for chunk in stream_chunks)
+    progress_label = f"prepared-cold-res{entry_res}:{ckpt_path.parent.name}"
+    print(
+        f"[{progress_label}] start anchors={len(target_indices)} "
+        f"stream_chunks={len(stream_chunks)} batches={total_batches} "
+        f"device_eval={use_device_eval}",
+        flush=True,
+    )
+    progress_t0 = time.time()
+    next_progress = 1
+    with _prepared_load_executor(prepared_load_workers) as load_executor:
+        loader = PreparedBlockBatchLoader(
+            store,
+            segments,
+            input_steps=N_INPUT_STEPS,
+            target_steps=max_lead_steps,
+            task_cfg=task_cfg,
+            dt=pd.Timedelta(hours=HOURS_PER_STEP),
+            load_executor=load_executor,
+            max_workers=prepared_load_workers,
+            label=f"prepared-cold-res{entry_res}",
+        )
+        batch_i = 0
+        for chunk_i, chunk in enumerate(stream_chunks, start=1):
+            for batch, _load_stats in loader.iter_chunk_batches(chunk):
+                inputs_b, targets_b, forcings_b = batch
+                if device_evaluator is not None:
+                    device_acc = device_evaluator.evaluate_cold_batch(
+                        jax.random.PRNGKey(seed_base + batch_i),
+                        inputs_b,
+                        targets_b,
+                        forcings_b,
+                    )
+                    add_device_accumulator_to_host(
+                        acc,
+                        device_acc,
+                        variable_names=device_evaluator.metric_variable_names,
+                    )
+                else:
+                    with suppress_graphcast_future_warnings():
+                        pred_b = run_jitted(
+                            rng=jax.random.PRNGKey(seed_base + batch_i),
+                            inputs=inputs_b,
+                            targets_template=targets_b * np.nan,
+                            forcings=forcings_b,
+                        )
+                    _accumulate_metrics(
+                        acc,
+                        pred_b.isel(time=slice(0, max_lead_steps)),
+                        targets_b.isel(time=slice(0, max_lead_steps)),
+                        res_grid_lats=res_grid_lats,
+                        res_grid_lons=res_grid_lons,
+                        stats=stats,
+                    )
+                batch_i += 1
+                if (
+                    batch_i == next_progress
+                    or batch_i == total_batches
+                    or batch_i % 25 == 0
+                ):
+                    _print_progress(progress_label, batch_i, total_batches, progress_t0)
+                    while next_progress <= batch_i:
+                        next_progress *= 2
+            if chunk_i == 1 or chunk_i == len(stream_chunks) or chunk_i % 10 == 0:
+                print(
+                    f"[{progress_label}] stream_chunk {chunk_i}/{len(stream_chunks)} "
+                    f"batches_done={batch_i}/{total_batches}",
+                    flush=True,
+                )
+
+    weighted_by_day, per_variable_by_day, n_by_day = _finalize_metrics(acc, lead_days, lead_steps)
+    return weighted_by_day, per_variable_by_day, n_by_day, eval_metadata
+
+
+def _evaluate_checkpoint_truth_anchored_prepared(
+    ckpt_path: Path,
+    stats: dict[str, xarray.Dataset],
+    prepared_data_root: Path,
+    entry_res: int,
+    lead_days: list[int],
+    lead_steps: list[int],
+    seed_base: int,
+    *,
+    warmup_steps: int,
+    trunk_steps: int,
+    window_batch_size: int,
+    prepared_load_workers: int,
+    use_device_eval: bool,
+    cache: EvalShardCache,
+    res_grid_lats: xarray.DataArray,
+    res_grid_lons: xarray.DataArray,
+    eval_start: str | None,
+    eval_end: str | None,
+    eval_year: int | None,
+) -> tuple[dict[int, float], dict[str, dict[int, float]], dict[int, int], dict[str, object]]:
+    max_lead_steps = max(lead_steps)
+    total_horizon_steps = warmup_steps + trunk_steps + max_lead_steps
+    with ckpt_path.open("rb") as f:
+        ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
+    device_evaluator = None
+    if use_device_eval:
+        device_evaluator = PreparedDeviceResolutionEvaluator(
+            ckpt_obj,
+            stats,
+            ckpt_path,
+            res_grid_lats=res_grid_lats,
+            res_grid_lons=res_grid_lons,
+            per_variable_weights=GRAPHCAST_PER_VARIABLE_WEIGHTS,
+            max_lead_steps=max_lead_steps,
+        )
+        task_cfg = device_evaluator.task_cfg
+        run_cfg = device_evaluator.run_cfg
+    else:
+        runner = build_truth_anchored_runner(ckpt_obj, stats, ckpt_path)
+        task_cfg = runner["task_cfg"]
+        run_cfg = load_run_config(ckpt_path)
+    task_key, task_cfg_kwargs = _task_cfg_cache_key(task_cfg)
+    cache.task_cfg_kwargs_by_key.setdefault(task_key, task_cfg_kwargs)
+
+    store, eval_metadata = _open_prepared_eval_store_for_checkpoint(
+        prepared_data_root,
+        resolution=entry_res,
+        task_cfg=task_cfg,
+        run_cfg=run_cfg,
+        eval_start=eval_start,
+        eval_end=eval_end,
+        eval_year=eval_year,
+    )
+    chunk_start_indices = _prepared_chunk_start_indices(
+        store.sizes["time"],
+        trunk_steps=trunk_steps,
+        total_horizon_steps=total_horizon_steps,
+    )
+    acc = _empty_metric_accumulator(max_lead_steps)
+
+    segments = [
+        np.arange(
+            int(chunk_start) + N_INPUT_STEPS - 1,
+            int(chunk_start) + N_INPUT_STEPS - 1 + warmup_steps + trunk_steps,
+            dtype=np.int64,
+        )
+        for chunk_start in chunk_start_indices
+    ]
+    stream_chunks = list(_iter_prepared_stream_chunks(segments, batch_size=window_batch_size))
+    total_chunks = len(stream_chunks)
+    progress_label = f"prepared-warm-res{entry_res}:{ckpt_path.parent.name}"
+    print(
+        f"[{progress_label}] start anchors={len(chunk_start_indices)} "
+        f"stream_chunks={total_chunks} warmup={warmup_steps} trunk={trunk_steps} "
+        f"max_lead={max_lead_steps} device_eval={use_device_eval}",
+        flush=True,
+    )
+    progress_t0 = time.time()
+    next_progress = 1
+    with _prepared_load_executor(prepared_load_workers) as load_executor:
+        loader = PreparedBlockBatchLoader(
+            store,
+            segments,
+            input_steps=N_INPUT_STEPS,
+            target_steps=max_lead_steps,
+            task_cfg=task_cfg,
+            dt=pd.Timedelta(hours=HOURS_PER_STEP),
+            load_executor=load_executor,
+            max_workers=prepared_load_workers,
+            label=f"prepared-warm-res{entry_res}",
+        )
+        for batch_i, chunk in enumerate(stream_chunks):
+            step_iter = loader.iter_chunk_batches(chunk)
+            try:
+                first_batch, _load_stats = next(step_iter)
+            except StopIteration:
+                continue
+            inputs_b, targets_b, forcings_b = first_batch
+            if device_evaluator is not None:
+                target_batches = [targets_b]
+                forcing_batches = [forcings_b]
+                for _step_i in range(1, warmup_steps + trunk_steps):
+                    _inputs_b, next_targets, next_forcings = next(step_iter)[0]
+                    target_batches.append(next_targets)
+                    forcing_batches.append(next_forcings)
+                device_acc = device_evaluator.evaluate_warm_chunk(
+                    jax.random.PRNGKey(seed_base + batch_i),
+                    inputs_b,
+                    tuple(target_batches),
+                    tuple(forcing_batches),
+                    warmup_steps=warmup_steps,
+                    trunk_steps=trunk_steps,
+                )
+                add_device_accumulator_to_host(
+                    acc,
+                    device_acc,
+                    variable_names=device_evaluator.metric_variable_names,
+                )
+                current = batch_i + 1
+                if (
+                    current == next_progress
+                    or current == total_chunks
+                    or current % 10 == 0
+                ):
+                    _print_progress(progress_label, current, total_chunks, progress_t0)
+                    while next_progress <= current:
+                        next_progress *= 2
+                continue
+            with suppress_graphcast_future_warnings():
+                context = runner["initialize_context"](
+                    inputs=inputs_b,
+                    targets_template=targets_b * np.nan,
+                    forcings=forcings_b,
+                )
+                step_keys = jax.random.split(
+                    jax.random.PRNGKey(seed_base + batch_i),
+                    2 * warmup_steps + trunk_steps * (2 + max_lead_steps * 2),
+                )
+                key_i = 0
+                current_targets = targets_b
+                current_forcings = forcings_b
+                for step_i in range(warmup_steps):
+                    _truth_pred, context = runner["truth_step"](
+                        rng=(step_keys[key_i], step_keys[key_i + 1]),
+                        context=context,
+                        target_step=current_targets.isel(time=slice(0, 1)),
+                        forcings_step=current_forcings.isel(time=slice(0, 1)),
+                    )
+                    key_i += 2
+                    if step_i != warmup_steps - 1 or trunk_steps > 0:
+                        _inputs_b, current_targets, current_forcings = next(step_iter)[0]
+
+                for anchor_i in range(trunk_steps):
+                    branch_targets = current_targets.isel(time=slice(0, max_lead_steps))
+                    branch_forcings = current_forcings.isel(time=slice(0, max_lead_steps))
+                    branch_pred = runner["branch_rollout"](
+                        rng=step_keys[key_i],
+                        context=context,
+                        targets_template=branch_targets * np.nan,
+                        forcings=branch_forcings,
+                    )
+                    _accumulate_metrics(
+                        acc,
+                        branch_pred,
+                        branch_targets,
+                        res_grid_lats=res_grid_lats,
+                        res_grid_lons=res_grid_lons,
+                        stats=stats,
+                    )
+                    key_i += 1
+                    _truth_pred, context = runner["truth_step"](
+                        rng=(step_keys[key_i], step_keys[key_i + 1]),
+                        context=context,
+                        target_step=current_targets.isel(time=slice(0, 1)),
+                        forcings_step=current_forcings.isel(time=slice(0, 1)),
+                    )
+                    key_i += 2
+                    if anchor_i != trunk_steps - 1:
+                        _inputs_b, current_targets, current_forcings = next(step_iter)[0]
+            current = batch_i + 1
+            if (
+                current == next_progress
+                or current == total_chunks
+                or current % 10 == 0
+            ):
+                _print_progress(progress_label, current, total_chunks, progress_t0)
+                while next_progress <= current:
+                    next_progress *= 2
+
+    weighted_by_day, per_variable_by_day, n_by_day = _finalize_metrics(acc, lead_days, lead_steps)
+    return weighted_by_day, per_variable_by_day, n_by_day, eval_metadata
+
+
 def _parse_res_from_path(ckpt_path: Path, run_cfg: dict) -> int | None:
     candidates = [ckpt_path.parent.name, ckpt_path.parent.parent.name]
     baseline_ckpt = run_cfg.get("residual_training", {}).get("baseline_checkpoint")
@@ -622,7 +1106,15 @@ def _append_metric_rows(
     *,
     warmup_steps: int,
     trunk_steps: int,
+    eval_metadata: dict[str, object],
 ) -> None:
+    metadata = {
+        "data_source": eval_metadata.get("data_source", ""),
+        "prepared_store": eval_metadata.get("prepared_store", ""),
+        "eval_start": eval_metadata.get("eval_start", ""),
+        "eval_end": eval_metadata.get("eval_end", ""),
+        "eval_year": eval_metadata.get("eval_year", np.nan),
+    }
     for day in lead_days:
         if "weighted_allvars" in metrics:
             rows.append(
@@ -642,6 +1134,7 @@ def _append_metric_rows(
                     "ckpt_path": str(entry.ckpt_path),
                     "warmup_steps": warmup_steps if eval_mode == "warm" else np.nan,
                     "trunk_steps": trunk_steps if eval_mode == "warm" else np.nan,
+                    **metadata,
                 }
             )
         if "per_variable" in metrics:
@@ -663,11 +1156,14 @@ def _append_metric_rows(
                         "ckpt_path": str(entry.ckpt_path),
                         "warmup_steps": warmup_steps if eval_mode == "warm" else np.nan,
                         "trunk_steps": trunk_steps if eval_mode == "warm" else np.nan,
+                        **metadata,
                     }
                 )
 
 
 def _write_rows_csv(rows: list[dict], csv_path: Path) -> Path:
+    if not rows:
+        raise ValueError("No metric rows to write.")
     df = pd.DataFrame(rows).sort_values(CSV_SORT_COLUMNS).reset_index(drop=True)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = csv_path.with_name(f"{csv_path.name}.tmp")
@@ -676,26 +1172,59 @@ def _write_rows_csv(rows: list[dict], csv_path: Path) -> Path:
     return csv_path
 
 
+def _filter_entries_with_prepared_stores(entries: list[ModelEntry], prepared_data_root: Path) -> list[ModelEntry]:
+    out: list[ModelEntry] = []
+    warned_resolutions: set[int] = set()
+    for entry in entries:
+        store_path = prepared_store_path_from_root(prepared_data_root, entry.res)
+        if store_path.exists():
+            out.append(entry)
+            continue
+        if entry.res not in warned_resolutions:
+            _warn_skip(f"skipping res{entry.res}: prepared array store not found at {store_path}")
+            warned_resolutions.add(entry.res)
+    return out
+
+
 def main() -> None:
     args = parse_args()
     if args.warmup_steps < 0:
         raise ValueError("--warmup-steps must be non-negative.")
     if args.trunk_steps <= 0:
         raise ValueError("--trunk-steps must be positive.")
+    if args.prepared_load_workers <= 0:
+        raise ValueError("--prepared-load-workers must be positive.")
+    if args.prepared_stream_block_steps <= 0:
+        raise ValueError("--prepared-stream-block-steps must be positive.")
+    if (args.eval_start is None) != (args.eval_end is None):
+        raise ValueError("Provide both --eval-start and --eval-end, or neither.")
 
     if args.print_shards:
-        for shard in discover_shards(args.families, args.resolutions, args.checkpoint_roots):
-            print(shard)
+        entries = discover_model_entries(args.families, args.resolutions, args.checkpoint_roots)
+        if args.data_source == "prepared_array":
+            entries = _filter_entries_with_prepared_stores(entries, args.prepared_data_root)
+        for family, res in sorted({(entry.family, entry.res) for entry in entries}):
+            print(f"{family}:{res}")
         return
 
     entries = discover_model_entries(args.families, args.resolutions, args.checkpoint_roots)
+    if args.data_source == "prepared_array":
+        entries = _filter_entries_with_prepared_stores(entries, args.prepared_data_root)
     if not entries:
         raise RuntimeError("No checkpoints found for the requested family/resolution filters.")
 
     lead_steps = [int((24 * day) // HOURS_PER_STEP) for day in args.lead_days]
-    ds_base, start_target_idx, n_steps = _prepare_dataset(max(lead_steps), args.n_eval_days)
     stats = _load_stats(ROOT / STATS_DIR)
-    target_indices = _target_indices(start_target_idx, n_steps, max(lead_steps))
+    ds_base = None
+    start_target_idx = 0
+    n_steps = 0
+    target_indices: list[int] = []
+    prepared_metric_grid: tuple[xarray.DataArray, xarray.DataArray] | None = None
+    if args.data_source == "raw":
+        ds_base, start_target_idx, n_steps = _prepare_dataset(max(lead_steps), args.n_eval_days)
+        target_indices = _target_indices(start_target_idx, n_steps, max(lead_steps))
+    else:
+        prepared_metric_grid = load_prepared_metric_grid(args.prepared_data_root, resolution=RES_GRID_STRIDE)
     cache = EvalShardCache(
         ds_res_by_stride={},
         metric_grid_by_stride={},
@@ -704,69 +1233,143 @@ def main() -> None:
         warm_batches={},
     )
 
-    print(f"Evaluating {len(entries)} checkpoints across families={args.families} resolutions={args.resolutions}")
+    print(
+        f"Evaluating {len(entries)} checkpoints across families={args.families} "
+        f"resolutions={args.resolutions} data_source={args.data_source}"
+    )
     rows: list[dict] = []
     csv_path = args.output_data_dir / args.output_csv_name
     for index, entry in enumerate(entries, start=1):
         print(f"\n[{index}/{len(entries)}] {entry.family} res={entry.res} {entry.run_name}")
+        row_count_before = len(rows)
         if "cold" in args.eval_modes:
-            cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day = _evaluate_checkpoint(
-                entry.ckpt_path,
-                stats,
-                ds_base,
-                start_target_idx,
-                n_steps,
-                args.lead_days,
-                lead_steps,
-                seed_base=100000 * index,
-                window_batch_size=args.window_batch_size,
-                target_indices=target_indices,
-                cache=cache,
-            )
-            _append_metric_rows(
-                rows,
-                entry,
-                args.lead_days,
-                args.metrics,
-                "cold",
-                cold_weighted_by_day,
-                cold_per_variable_by_day,
-                cold_n_by_day,
-                warmup_steps=args.warmup_steps,
-                trunk_steps=args.trunk_steps,
-            )
+            try:
+                if args.data_source == "raw":
+                    assert ds_base is not None
+                    cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day = _evaluate_checkpoint(
+                        entry.ckpt_path,
+                        stats,
+                        ds_base,
+                        start_target_idx,
+                        n_steps,
+                        args.lead_days,
+                        lead_steps,
+                        seed_base=100000 * index,
+                        window_batch_size=args.window_batch_size,
+                        target_indices=target_indices,
+                        cache=cache,
+                    )
+                    cold_metadata = {"data_source": "raw"}
+                else:
+                    assert prepared_metric_grid is not None
+                    cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day, cold_metadata = (
+                        _evaluate_checkpoint_prepared(
+                            entry.ckpt_path,
+                            stats,
+                            args.prepared_data_root,
+                            entry.res,
+                            args.lead_days,
+                            lead_steps,
+                            seed_base=100000 * index,
+                            window_batch_size=args.window_batch_size,
+                            prepared_load_workers=args.prepared_load_workers,
+                            prepared_stream_block_steps=args.prepared_stream_block_steps,
+                            use_device_eval=not args.disable_prepared_device_eval,
+                            cache=cache,
+                            res_grid_lats=prepared_metric_grid[0],
+                            res_grid_lons=prepared_metric_grid[1],
+                            eval_start=args.eval_start,
+                            eval_end=args.eval_end,
+                            eval_year=args.eval_year,
+                        )
+                    )
+                _append_metric_rows(
+                    rows,
+                    entry,
+                    args.lead_days,
+                    args.metrics,
+                    "cold",
+                    cold_weighted_by_day,
+                    cold_per_variable_by_day,
+                    cold_n_by_day,
+                    warmup_steps=args.warmup_steps,
+                    trunk_steps=args.trunk_steps,
+                    eval_metadata=cold_metadata,
+                )
+            except (FileNotFoundError, PreparedDataError) as exc:
+                if args.data_source != "prepared_array":
+                    raise
+                _warn_skip(f"skipping cold eval for {entry.run_name}: {exc}")
 
         if "warm" in args.eval_modes:
-            warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day = _evaluate_checkpoint_truth_anchored(
-                entry.ckpt_path,
-                stats,
-                ds_base,
-                start_target_idx,
-                n_steps,
-                args.lead_days,
-                lead_steps,
-                seed_base=200000 * index,
-                warmup_steps=args.warmup_steps,
-                trunk_steps=args.trunk_steps,
-                window_batch_size=args.window_batch_size,
-                cache=cache,
-            )
-            _append_metric_rows(
-                rows,
-                entry,
-                args.lead_days,
-                args.metrics,
-                "warm",
-                warm_weighted_by_day,
-                warm_per_variable_by_day,
-                warm_n_by_day,
-                warmup_steps=args.warmup_steps,
-                trunk_steps=args.trunk_steps,
-            )
+            try:
+                if args.data_source == "raw":
+                    assert ds_base is not None
+                    warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day = (
+                        _evaluate_checkpoint_truth_anchored(
+                            entry.ckpt_path,
+                            stats,
+                            ds_base,
+                            start_target_idx,
+                            n_steps,
+                            args.lead_days,
+                            lead_steps,
+                            seed_base=200000 * index,
+                            warmup_steps=args.warmup_steps,
+                            trunk_steps=args.trunk_steps,
+                            window_batch_size=args.window_batch_size,
+                            cache=cache,
+                        )
+                    )
+                    warm_metadata = {"data_source": "raw"}
+                else:
+                    assert prepared_metric_grid is not None
+                    warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day, warm_metadata = (
+                        _evaluate_checkpoint_truth_anchored_prepared(
+                            entry.ckpt_path,
+                            stats,
+                            args.prepared_data_root,
+                            entry.res,
+                            args.lead_days,
+                            lead_steps,
+                            seed_base=200000 * index,
+                            warmup_steps=args.warmup_steps,
+                            trunk_steps=args.trunk_steps,
+                            window_batch_size=args.window_batch_size,
+                            prepared_load_workers=args.prepared_load_workers,
+                            use_device_eval=not args.disable_prepared_device_eval,
+                            cache=cache,
+                            res_grid_lats=prepared_metric_grid[0],
+                            res_grid_lons=prepared_metric_grid[1],
+                            eval_start=args.eval_start,
+                            eval_end=args.eval_end,
+                            eval_year=args.eval_year,
+                        )
+                    )
+                _append_metric_rows(
+                    rows,
+                    entry,
+                    args.lead_days,
+                    args.metrics,
+                    "warm",
+                    warm_weighted_by_day,
+                    warm_per_variable_by_day,
+                    warm_n_by_day,
+                    warmup_steps=args.warmup_steps,
+                    trunk_steps=args.trunk_steps,
+                    eval_metadata=warm_metadata,
+                )
+            except (FileNotFoundError, PreparedDataError) as exc:
+                if args.data_source != "prepared_array":
+                    raise
+                _warn_skip(f"skipping warm eval for {entry.run_name}: {exc}")
 
-        _write_rows_csv(rows, csv_path)
-        print(f"Updated CSV after {index}/{len(entries)} checkpoints: {csv_path}")
+        if len(rows) > row_count_before:
+            _write_rows_csv(rows, csv_path)
+            print(f"Updated CSV after {index}/{len(entries)} checkpoints: {csv_path}")
 
+    if not rows:
+        raise RuntimeError("No checkpoints were evaluated successfully.")
     _write_rows_csv(rows, csv_path)
     print(f"\nSaved CSV: {csv_path}")
     print(

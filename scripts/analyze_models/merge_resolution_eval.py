@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 DEFAULT_OUTPUT_DATA_DIR = ROOT / "plots/analyze_models/data/resolution_eval"
 DEFAULT_OUTPUT_IMAGE_DIR = ROOT / "plots/analyze_models/images/resolution_eval"
+DEFAULT_RESOLUTIONS = [1, 2, 3, 4, 6, 9, 18]
 RES_MESH_TOKEN_RE = re.compile(r"_res\d+_m\d+(?=_)")
 
 
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-image-dir", type=Path, default=DEFAULT_OUTPUT_IMAGE_DIR)
     parser.add_argument("--output-csv-name", type=str, default="resolution_eval.csv")
     parser.add_argument("--lead-days", type=int, nargs="+", default=[1, 2, 4])
+    parser.add_argument("--resolutions", type=int, nargs="+", default=DEFAULT_RESOLUTIONS)
     parser.add_argument("--expected-shards", nargs="*", default=None)
     parser.add_argument("--shard-glob", type=str, default="resolution_eval_*.csv")
     parser.add_argument("--plot-prefix", type=str, default="resolution_eval")
@@ -153,6 +155,10 @@ def main() -> None:
 
     frames = [pd.read_csv(path) for path in csv_paths]
     df = pd.concat(frames, ignore_index=True)
+    if args.resolutions is not None:
+        df = df[df["res"].astype(int).isin(set(args.resolutions))]
+        if df.empty:
+            raise ValueError("No rows left after applying --resolutions filter.")
     df = df.sort_values(["family", "variant", "res", "lead_days", "eval_mode", "metric_kind", "variable"]).reset_index(drop=True)
 
     found_shards = sorted({f"{row.family}:{int(row.res)}" for row in df[["family", "res"]].drop_duplicates().itertuples(index=False)})
