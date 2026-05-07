@@ -84,6 +84,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
+    parser.add_argument("--temporal-insert-count", type=int, default=None)
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
     parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="numpy")
@@ -133,6 +134,10 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer")
     if args.temporal_layers <= 0:
         raise ValueError("--temporal-layers must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count <= 0:
+        raise ValueError("--temporal-insert-count must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count > args.processor_msg_steps:
+        raise ValueError("--temporal-insert-count must be <= --processor-msg-steps")
     if not (0.0 <= args.temporal_dropout < 1.0):
         raise ValueError("--temporal-dropout must be in [0, 1)")
     if args.data_cache_max_gib <= 0:
@@ -178,6 +183,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
+        temporal_insert_count=args.temporal_insert_count,
         target_steps=args.target_steps,
         sequential_segment_steps=None,
         data_cache_mode=args.data_cache_mode,

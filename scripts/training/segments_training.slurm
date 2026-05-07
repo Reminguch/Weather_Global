@@ -71,6 +71,7 @@ TEMPORAL_DT_RANK=${TEMPORAL_DT_RANK:-auto}
 TEMPORAL_LAYERS=${TEMPORAL_LAYERS:-1}
 TEMPORAL_DROPOUT=${TEMPORAL_DROPOUT:-0.0}
 TEMPORAL_STATEFUL=${TEMPORAL_STATEFUL:-1}
+TEMPORAL_INSERT_COUNT=${TEMPORAL_INSERT_COUNT:-}
 
 if [[ "${MODEL}" == "gc_mamba" ]]; then
   RUN_NAME=${RUN_NAME:-gc_mamba_res${RESOLUTION%.*}_m${MESH_SIZE}_w${WIDTH}_mp${MSG}_ls${LEN_SEGMENT}_bptt${BPTT_STEPS}}
@@ -120,6 +121,10 @@ CMD=(
   --temporal-layers "${TEMPORAL_LAYERS}"
   --temporal-dropout "${TEMPORAL_DROPOUT}"
 )
+
+if [[ -n "${TEMPORAL_INSERT_COUNT}" ]]; then
+  CMD+=(--temporal-insert-count "${TEMPORAL_INSERT_COUNT}")
+fi
 
 if [[ "${TEMPORAL_STATEFUL}" == "1" ]]; then
   CMD+=(--temporal-stateful)

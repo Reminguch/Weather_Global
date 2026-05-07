@@ -125,6 +125,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
+    parser.add_argument("--temporal-insert-count", type=int, default=None)
     parser.add_argument(
         "--init-from-graphcast-ckpt",
         default=None,
@@ -183,6 +184,10 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer")
     if args.temporal_layers <= 0:
         raise ValueError("--temporal-layers must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count <= 0:
+        raise ValueError("--temporal-insert-count must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count > args.processor_msg_steps:
+        raise ValueError("--temporal-insert-count must be <= --processor-msg-steps")
     if not (0.0 <= args.temporal_dropout < 1.0):
         raise ValueError("--temporal-dropout must be in [0, 1)")
     if args.data_cache_max_gib <= 0:
@@ -232,6 +237,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
+        temporal_insert_count=args.temporal_insert_count,
         target_steps=args.target_steps,
         sequential_segment_steps=None,
         data_cache_mode=args.data_cache_mode,
@@ -464,6 +470,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
         )
         return predictor.loss(inputs, targets, forcings)

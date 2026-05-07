@@ -358,6 +358,7 @@ def _write_run_config(
             "conv_bias": cfg.temporal_conv_bias,
             "layers": cfg.temporal_layers,
             "dropout": cfg.temporal_dropout,
+            "insert_count": cfg.temporal_insert_count,
             "zero_init_output": cfg.zero_init_temporal_out,
         },
         "model_config": dataclasses.asdict(model_cfg),

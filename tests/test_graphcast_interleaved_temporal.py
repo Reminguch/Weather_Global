@@ -19,6 +19,12 @@ if str(GRAPHCAST_LOCAL) not in sys.path:
 from graphcast import graphcast as gc  # noqa: E402
 
 
+def test_temporal_processor_group_sizes_for_mp6_sweep() -> None:
+    assert gc._temporal_processor_group_sizes(6, 2) == [3, 3]
+    assert gc._temporal_processor_group_sizes(6, 3) == [2, 2, 2]
+    assert gc._temporal_processor_group_sizes(6, 6) == [1, 1, 1, 1, 1, 1]
+
+
 def test_mamba_call_uses_vanilla_stacked_input_encoder() -> None:
     calls: list[str] = []
     predictor = object.__new__(gc.GraphCast)

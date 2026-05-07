@@ -115,6 +115,20 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         self._residual_scales = diffs_stddev_by_level
         self._residual_locations = None
 
+    def _normalize_inputs(self, inputs: xr.Dataset) -> xr.Dataset:
+        residual_vars = [name for name in inputs.data_vars if name in self._residual_scales.data_vars]
+        normal_vars = [name for name in inputs.data_vars if name not in residual_vars]
+        normalized_parts = []
+        if normal_vars:
+            normalized_parts.append(normalization.normalize(inputs[normal_vars], self._scales, self._locations))
+        if residual_vars:
+            normalized_parts.append(
+                normalization.normalize(inputs[residual_vars], self._residual_scales, self._residual_locations)
+            )
+        if not normalized_parts:
+            return xr.Dataset(coords=inputs.coords)
+        return xr.merge(normalized_parts)
+
     def __call__(
         self,
         inputs: xr.Dataset,
@@ -122,7 +136,7 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         forcings: xr.Dataset,
         **kwargs,
     ) -> xr.Dataset:
-        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
+        norm_inputs = self._normalize_inputs(inputs)
         norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
         norm_predictions = self._predictor(
             norm_inputs,
@@ -142,7 +156,7 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         forcings: xr.Dataset,
         **kwargs,
     ) -> predictor_base.LossAndDiagnostics:
-        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
+        norm_inputs = self._normalize_inputs(inputs)
         norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
         norm_targets = normalization.normalize(targets, self._residual_scales, self._residual_locations)
         return self._predictor.loss(norm_inputs, norm_targets, forcings=norm_forcings, **kwargs)
@@ -154,7 +168,7 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         forcings: xr.Dataset,
         **kwargs,
     ) -> predictor_base.LossAndDiagnostics:
-        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
+        norm_inputs = self._normalize_inputs(inputs)
         norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
         norm_targets = normalization.normalize(targets, self._residual_scales, self._residual_locations)
         (loss, scalars), norm_predictions = self._predictor.loss_and_predictions(
@@ -168,6 +182,51 @@ class DirectResidualNormalizer(predictor_base.Predictor):
             norm_predictions,
         )
         return (loss, scalars), predictions
+
+
+def build_zero_residual_inputs(inputs: xr.Dataset, targets_template: xr.Dataset) -> xr.Dataset:
+    """Return an input-shaped dataset whose prognostic variables are residual-valued zeros."""
+    residual_vars = [name for name in inputs.data_vars if name in targets_template.data_vars]
+    constant_vars = [name for name in inputs.data_vars if name not in residual_vars]
+    pieces = []
+    if constant_vars:
+        pieces.append(inputs[constant_vars])
+    if residual_vars:
+        pieces.append(xr.Dataset({name: xr.zeros_like(inputs[name]) for name in residual_vars}))
+    return xr.merge(pieces) if pieces else xr.Dataset(coords=inputs.coords)
+
+
+def reset_residual_input_lanes(
+    residual_inputs: xr.Dataset,
+    targets_template: xr.Dataset,
+    reset_mask: jax.Array,
+) -> xr.Dataset:
+    """Zero residual input history for lanes that start a new segment."""
+    residual_vars = [name for name in residual_inputs.data_vars if name in targets_template.data_vars]
+    if not residual_vars:
+        return residual_inputs
+    reset_by_batch = xr.DataArray(
+        reset_mask.astype(bool),
+        dims=("batch",),
+        coords={"batch": residual_inputs.coords["batch"]},
+    )
+    pieces = [residual_inputs.drop_vars(residual_vars)]
+    pieces.append(xr.Dataset({name: residual_inputs[name].where(~reset_by_batch, 0) for name in residual_vars}))
+    return xr.merge(pieces)
+
+
+def advance_residual_inputs(residual_inputs: xr.Dataset, residual_targets: xr.Dataset) -> xr.Dataset:
+    """Shift residual target predictions into the next input window."""
+    residual_vars = [name for name in residual_inputs.data_vars if name in residual_targets.data_vars]
+    if not residual_vars:
+        return residual_inputs
+    num_input_times = residual_inputs.sizes["time"]
+    updated = (
+        xr.concat([residual_inputs[residual_vars], residual_targets[residual_vars]], dim="time")
+        .tail(time=num_input_times)
+        .assign_coords(time=residual_inputs.coords["time"])
+    )
+    return xr.merge([residual_inputs.drop_vars(residual_vars), updated])
 
 
 def build_predictor(
@@ -188,6 +247,7 @@ def build_predictor(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
+    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
@@ -203,6 +263,7 @@ def build_predictor(
         predictor._temporal_conv_bias = temporal_conv_bias
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
+        predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
@@ -234,6 +295,7 @@ def build_residual_correction_predictor(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
+    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
@@ -249,6 +311,7 @@ def build_residual_correction_predictor(
         predictor._temporal_conv_bias = temporal_conv_bias
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
+        predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
@@ -280,6 +343,7 @@ def build_loss_transform(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
+    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
@@ -301,6 +365,7 @@ def build_loss_transform(
             temporal_layers=temporal_layers,
             temporal_dropout=temporal_dropout,
             temporal_stateful=temporal_stateful,
+            temporal_insert_count=temporal_insert_count,
             zero_init_temporal_out=zero_init_temporal_out,
         )
         return predictor.loss(inputs, targets, forcings)
@@ -326,6 +391,7 @@ def build_prediction_transform(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
+    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
@@ -347,6 +413,7 @@ def build_prediction_transform(
             temporal_layers=temporal_layers,
             temporal_dropout=temporal_dropout,
             temporal_stateful=temporal_stateful,
+            temporal_insert_count=temporal_insert_count,
             zero_init_temporal_out=zero_init_temporal_out,
         )
         return predictor(inputs, targets, forcings)

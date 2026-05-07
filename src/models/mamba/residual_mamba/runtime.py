@@ -20,7 +20,11 @@ from src.models.graphcast.runtime import (
 )
 
 from graphcast import casting, checkpoint, graphcast as gc, normalization  # noqa: E402
-from src.models.graphcast.training.core.model import DirectResidualNormalizer  # noqa: E402
+from src.models.graphcast.training.core.model import (  # noqa: E402
+    DirectResidualNormalizer,
+    advance_residual_inputs,
+    build_zero_residual_inputs,
+)
 
 MODEL_NAME = "residual_mamba"
 
@@ -53,6 +57,7 @@ def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
         "temporal_layers": temporal_cfg.get("layers", 1),
         "temporal_dropout": temporal_cfg.get("dropout", 0.0),
         "temporal_stateful": bool(temporal_cfg.get("stateful", False)),
+        "temporal_insert_count": temporal_cfg.get("insert_count", None),
         "zero_init_temporal_out": bool(residual_cfg.get("temporal_zero_init_out", False)),
     }
 
@@ -70,6 +75,7 @@ def _apply_temporal_config(predictor: gc.GraphCast, temporal_kwargs: dict) -> gc
         predictor._temporal_layers = temporal_kwargs["temporal_layers"]
         predictor._temporal_dropout = temporal_kwargs["temporal_dropout"]
         predictor._temporal_stateful = temporal_kwargs["temporal_stateful"]
+        predictor._temporal_insert_count = temporal_kwargs["temporal_insert_count"]
         predictor._temporal_zero_init_out = temporal_kwargs["zero_init_temporal_out"]
     return predictor
 
@@ -169,6 +175,7 @@ def build_run_jitted(ckpt_obj, stats, ckpt_path: Path):
         residual_state = None
         baseline_state = None
         preds = []
+        residual_inputs = build_zero_residual_inputs(inputs, targets_template.isel(time=slice(0, 1)))
         step_keys = jax.random.split(rng, targets_template.sizes["time"] * 2)
         for step_i in range(targets_template.sizes["time"]):
             target_step = targets_template.isel(time=slice(step_i, step_i + 1))
@@ -183,13 +190,14 @@ def build_run_jitted(ckpt_obj, stats, ckpt_path: Path):
             )
             residual_pred, residual_state = residual_bundle["step"](
                 rng=step_keys[2 * step_i + 1],
-                inputs=all_inputs,
+                inputs=residual_inputs,
                 targets_template=target_step,
                 forcings=forcings_step,
                 state=residual_state,
             )
             full_pred = baseline_pred + residual_pred
             preds.append(full_pred.assign_coords(time=target_step.coords["time"]))
+            residual_inputs = advance_residual_inputs(residual_inputs, residual_pred)
             rolling_inputs = _update_inputs(rolling_inputs, xarray.merge([full_pred, forcings_step]))
         return xarray.concat(preds, dim=target_times)
 
@@ -212,6 +220,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
         return {
             "constant_inputs": constant_inputs,
             "rolling_inputs": rolling_inputs,
+            "residual_inputs": build_zero_residual_inputs(inputs, targets_template.isel(time=slice(0, 1))),
             "baseline_state": None,
             "residual_state": None,
         }
@@ -227,7 +236,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
         )
         residual_pred, residual_state = residual_bundle["step"](
             rng=rng[1],
-            inputs=all_inputs,
+            inputs=context["residual_inputs"],
             targets_template=target_step,
             forcings=forcings_step,
             state=context["residual_state"],
@@ -236,6 +245,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
         next_context = {
             "constant_inputs": context["constant_inputs"],
             "rolling_inputs": context["rolling_inputs"],
+            "residual_inputs": advance_residual_inputs(context["residual_inputs"], residual_pred),
             "baseline_state": baseline_state,
             "residual_state": residual_state,
         }
@@ -258,6 +268,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
         branch_context = {
             "constant_inputs": context["constant_inputs"],
             "rolling_inputs": context["rolling_inputs"].copy(deep=False),
+            "residual_inputs": context["residual_inputs"].copy(deep=False),
             "baseline_state": _clone_state(context["baseline_state"]),
             "residual_state": _clone_state(context["residual_state"]),
         }

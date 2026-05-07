@@ -58,6 +58,16 @@ from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
 def _get_temporal_block_cls(stateful: bool):
     return _StatefulTemporalBlock if stateful else _StatelessTemporalBlock
 
+def _temporal_processor_group_sizes(num_processor_steps: int, insert_count: int) -> list[int]:
+    if insert_count <= 0:
+      raise ValueError("temporal insert count must be > 0")
+    if insert_count > num_processor_steps:
+      raise ValueError("temporal insert count must be <= processor steps")
+    base = num_processor_steps // insert_count
+    remainder = num_processor_steps % insert_count
+    return [base + (1 if group_i < remainder else 0)
+            for group_i in range(insert_count)]
+
 Kwargs = Mapping[str, Any]
 
 GNN = Callable[[jraph.GraphsTuple], jraph.GraphsTuple]
@@ -270,6 +280,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_layers = 1
     self._temporal_dropout = 0.0
     self._temporal_stateful = False
+    self._temporal_insert_count = None
     self._temporal_zero_init_out = False
 
     self._spatial_features_kwargs = dict(
@@ -790,10 +801,7 @@ class GraphCast(predictor_base.Predictor):
     latent_graph = self._mesh_gnn._embed(
         build_graph(latent_mesh_nodes), embedder_network)
 
-    for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
-      for step_i, processor_network in enumerate(processor_networks):
-        latent_graph = self._mesh_gnn._process_step(
-            processor_network, latent_graph)
+    def run_temporal_block(latent_graph, repetition_i: int, block_i: int):
         node_features = latent_graph.nodes["mesh_nodes"].features
         expected_prefix = (n_mesh, batch_size)
         if node_features.shape[:2] != expected_prefix:
@@ -801,7 +809,7 @@ class GraphCast(predictor_base.Predictor):
               "Unexpected interleaved mesh node shape before temporal "
               f"block: expected prefix {expected_prefix}, got "
               f"{node_features.shape}.")
-        temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}"
+        temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{block_i}"
         temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
@@ -844,6 +852,26 @@ class GraphCast(predictor_base.Predictor):
         latent_graph = latent_graph._replace(
             nodes={"mesh_nodes": latent_graph.nodes["mesh_nodes"]._replace(
                 features=node_features)})
+        return latent_graph
+
+    insert_count = getattr(self, "_temporal_insert_count", None)
+    if insert_count is None:
+      for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
+        for step_i, processor_network in enumerate(processor_networks):
+          latent_graph = self._mesh_gnn._process_step(
+              processor_network, latent_graph)
+          latent_graph = run_temporal_block(latent_graph, repetition_i, step_i)
+    else:
+      group_sizes = _temporal_processor_group_sizes(
+          len(processor_networks), int(insert_count))
+      for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
+        step_i = 0
+        for block_i, group_size in enumerate(group_sizes):
+          latent_graph = run_temporal_block(latent_graph, repetition_i, block_i)
+          for _ in range(group_size):
+            latent_graph = self._mesh_gnn._process_step(
+                processor_networks[step_i], latent_graph)
+            step_i += 1
 
     return latent_graph.nodes["mesh_nodes"].features
 

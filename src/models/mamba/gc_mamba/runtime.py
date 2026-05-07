@@ -45,6 +45,7 @@ def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
         "temporal_layers": temporal_cfg.get("layers", 1),
         "temporal_dropout": temporal_cfg.get("dropout", 0.0),
         "temporal_stateful": bool(temporal_cfg.get("stateful", False)),
+        "temporal_insert_count": temporal_cfg.get("insert_count", None),
         "zero_init_temporal_out": bool(temporal_cfg.get("zero_init_output", False)),
     }
 
@@ -62,6 +63,7 @@ def _apply_temporal_config(predictor: gc.GraphCast, temporal_kwargs: dict) -> gc
         predictor._temporal_layers = temporal_kwargs["temporal_layers"]
         predictor._temporal_dropout = temporal_kwargs["temporal_dropout"]
         predictor._temporal_stateful = temporal_kwargs["temporal_stateful"]
+        predictor._temporal_insert_count = temporal_kwargs["temporal_insert_count"]
         predictor._temporal_zero_init_out = temporal_kwargs["zero_init_temporal_out"]
     return predictor
 

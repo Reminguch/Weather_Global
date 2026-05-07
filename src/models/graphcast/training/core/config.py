@@ -71,6 +71,7 @@ class RunConfig:
     temporal_layers: int
     temporal_dropout: float
     temporal_stateful: bool
+    temporal_insert_count: int | None
     target_steps: int
     sequential_segment_steps: int | None
     data_cache_mode: str
@@ -182,6 +183,9 @@ def parse_args() -> RunConfig:
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False,
                         help="Use stateful Mamba (preserves SSM state across autoregressive steps).")
+    parser.add_argument("--temporal-insert-count", type=int, default=None,
+                        help="Number of temporal blocks to insert across mesh processor steps. "
+                             "Default inserts after every processor step for compatibility.")
     parser.add_argument("--target-steps", type=int, default=1,
                         help="Number of autoregressive target steps (default 1 = 6h single step).")
     parser.add_argument("--sequential-segment-steps", type=int, default=None,
@@ -237,6 +241,10 @@ def parse_args() -> RunConfig:
             raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer")
     if args.temporal_layers <= 0:
         raise ValueError("--temporal-layers must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count <= 0:
+        raise ValueError("--temporal-insert-count must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count > args.processor_msg_steps:
+        raise ValueError("--temporal-insert-count must be <= --processor-msg-steps")
     if not (0.0 <= args.temporal_dropout < 1.0):
         raise ValueError("--temporal-dropout must be in [0, 1)")
     if args.data_cache_max_gib <= 0:
@@ -297,6 +305,7 @@ def parse_args() -> RunConfig:
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
+        temporal_insert_count=args.temporal_insert_count,
         target_steps=args.target_steps,
         sequential_segment_steps=args.sequential_segment_steps,
         data_cache_mode=args.data_cache_mode,

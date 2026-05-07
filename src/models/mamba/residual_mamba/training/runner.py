@@ -41,8 +41,11 @@ from src.models.graphcast.training.core.logging import (
     save_logs,
 )
 from src.models.graphcast.training.core.model import (
+    advance_residual_inputs,
+    build_zero_residual_inputs,
     load_graphcast_checkpoint,
     load_stats,
+    reset_residual_input_lanes,
     scalarize_loss,
     validate_stats_coverage,
 )
@@ -217,7 +220,8 @@ def run_training(
         task_cfg=task_cfg,
         dt=dt_train,
     )
-    params, state = residual_loss_transform.init(rng, sample_inputs, sample_targets, sample_forcings, True)
+    residual_inputs_state = build_zero_residual_inputs(sample_inputs, sample_targets)
+    params, state = residual_loss_transform.init(rng, residual_inputs_state, sample_targets, sample_forcings, True)
     if cfg.resume_step is not None:
         assert resume_ckpt is not None
         params = resume_ckpt.params
@@ -263,12 +267,15 @@ def run_training(
         chunk_inputs: tuple[xr.Dataset, ...],
         chunk_targets: tuple[xr.Dataset, ...],
         chunk_forcings: tuple[xr.Dataset, ...],
+        residual_inputs: xr.Dataset,
         reset_mask: jax.Array,
     ):
         state = _reset_temporal_state_lanes(state, reset_mask)
+        residual_inputs = reset_residual_input_lanes(residual_inputs, chunk_targets[0], reset_mask)
 
         def loss_fn(p, s, key):
             current_state = s
+            current_residual_inputs = residual_inputs
             losses = []
             keys = jax.random.split(key, segment_cfg.bptt_steps)
             for bptt_i in range(segment_cfg.bptt_steps):
@@ -287,18 +294,25 @@ def run_training(
                     p,
                     current_state,
                     residual_key,
-                    chunk_inputs[bptt_i],
+                    current_residual_inputs,
                     residual_targets,
                     chunk_forcings[bptt_i],
                     True,
                 )
                 losses.append(scalarize_loss(loss_and_diag[0]))
-            return jnp.mean(jnp.stack(losses)), current_state
+                current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_targets)
+            return jnp.mean(jnp.stack(losses)), (current_state, current_residual_inputs)
 
-        (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
+        (loss, (new_state, new_residual_inputs)), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
         updates, new_opt_state = opt.update(grads, opt_state, params)
         new_params = optax.apply_updates(params, updates)
-        return new_params, _stop_gradient_temporal_state(new_state), new_opt_state, loss
+        return (
+            new_params,
+            _stop_gradient_temporal_state(new_state),
+            new_opt_state,
+            jax.tree_util.tree_map(jax.lax.stop_gradient, new_residual_inputs),
+            loss,
+        )
 
     step = cfg.resume_step if cfg.resume_step is not None else 0
     train_losses: list[tuple[int, float]] = []
@@ -402,7 +416,7 @@ def run_training(
     ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], np.ndarray, int, SegmentLoadStats]:
         t_load = time.time()
         if train_segment_loader is not None:
-            chunk_inputs, chunk_targets, chunk_forcings, load_stats = train_segment_loader.load_chunk(chunk)
+            chunk_inputs, chunk_targets, chunk_forcings, load_info = train_segment_loader.load_chunk(chunk)
         else:
             chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
                 train_ds,
@@ -415,8 +429,8 @@ def run_training(
                 chunk_load_workers=segment_cfg.chunk_load_workers,
                 load_executor=load_executor,
             )
-            load_stats = SegmentLoadStats(load_s=time.time() - t_load)
-        return chunk_inputs, chunk_targets, chunk_forcings, chunk.reset_mask, chunk.epoch, load_stats
+            load_info = SegmentLoadStats(load_s=time.time() - t_load)
+        return chunk_inputs, chunk_targets, chunk_forcings, chunk.reset_mask, chunk.epoch, load_info
 
     def submit_next_chunk() -> concurrent.futures.Future:
         return prefetch_executor.submit(load_chunk_payload, scheduler.next_chunk())
@@ -427,7 +441,7 @@ def run_training(
         while step < cfg.max_steps:
             iteration_t0 = time.time()
             t_data = time.time()
-            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch, load_stats = pending_chunk.result()
+            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch, load_info = pending_chunk.result()
             data_wait_s = time.time() - t_data
 
             if observed_epoch is None:
@@ -453,7 +467,7 @@ def run_training(
             rng, step_key = jax.random.split(rng)
             next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
             t0 = time.time()
-            params, state, opt_state, loss = train_chunk(
+            params, state, opt_state, residual_inputs_state, loss = train_chunk(
                 params,
                 state,
                 opt_state,
@@ -461,6 +475,7 @@ def run_training(
                 chunk_inputs,
                 chunk_targets,
                 chunk_forcings,
+                residual_inputs_state,
                 jnp.asarray(reset_mask_np),
             )
 
@@ -481,11 +496,11 @@ def run_training(
                     "batch_size": cfg.batch_size,
                     "bptt_steps": segment_cfg.bptt_steps,
                     "chunk_load_workers": segment_cfg.chunk_load_workers,
-                    "loader": load_stats.loader,
-                    "load_s": load_stats.load_s,
-                    "cache_hits": load_stats.cache_hits,
-                    "cache_misses": load_stats.cache_misses,
-                    "loaded_gib": load_stats.loaded_gib,
+                    "loader": load_info.loader,
+                    "load_s": load_info.load_s,
+                    "cache_hits": load_info.cache_hits,
+                    "cache_misses": load_info.cache_misses,
+                    "loaded_gib": load_info.loaded_gib,
                 }
             )
 
@@ -498,9 +513,9 @@ def run_training(
                 print(
                     f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
                     f"segment_epoch {chunk_epoch} reset_lanes {int(reset_mask_np.sum())} "
-                    f"load={load_stats.load_s:.3f}s data_wait={data_wait_s:.3f}s "
+                    f"load={load_info.load_s:.3f}s data_wait={data_wait_s:.3f}s "
                     f"gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s "
-                    f"cache={load_stats.cache_hits}/{load_stats.cache_misses}"
+                    f"cache={load_info.cache_hits}/{load_info.cache_misses}"
                 )
 
             if step % cfg.eval_every == 0:

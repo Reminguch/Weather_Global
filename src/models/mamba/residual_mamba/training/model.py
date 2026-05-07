@@ -15,9 +15,12 @@ import xarray as xr
 from src.models.graphcast.training.core.batching import BatchBuilder, build_batch_from_indices_vectorized
 from src.models.graphcast.training.core.logging import _write_run_config
 from src.models.graphcast.training.core.model import (
+    advance_residual_inputs,
+    build_zero_residual_inputs,
     build_predictor,
     build_residual_correction_predictor,
     gc,
+    reset_residual_input_lanes,
     scalarize_loss,
 )
 from src.models.graphcast.training.core.segments import (
@@ -56,6 +59,7 @@ def build_loss_transform(
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, cfg.temporal_backbone),
         )
         return predictor.loss(inputs, targets, forcings)
@@ -100,6 +104,7 @@ def build_predict_transform(
             temporal_layers=temporal_layers,
             temporal_dropout=temporal_dropout,
             temporal_stateful=temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, temporal_backbone),
         )
         return predictor(inputs, targets_template=targets, forcings=forcings)
@@ -144,6 +149,7 @@ def build_eval_loss_transform(
             temporal_layers=temporal_layers,
             temporal_dropout=temporal_dropout,
             temporal_stateful=temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, temporal_backbone),
         )
         return predictor.loss(inputs, targets, forcings)
@@ -252,6 +258,7 @@ def run_residual_eval(
         print(f"[{progress_label}] using first {len(eval_segments)}/{available_segments} validation segments")
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
+    residual_inputs_by_batch_size: dict[int, xr.Dataset] = {}
     eval_fn_by_batch_size: dict[int, callable] = {}
     total_weighted_loss = 0.0
     total_windows = 0
@@ -291,9 +298,13 @@ def run_residual_eval(
                 chunk_forcings[0],
                 False,
             )
+            residual_inputs_by_batch_size[batch_size] = build_zero_residual_inputs(
+                chunk_inputs[0],
+                chunk_targets[0],
+            )
             _, residual_state_by_batch_size[batch_size] = residual_eval_transform.init(
                 residual_init_key,
-                chunk_inputs[0],
+                residual_inputs_by_batch_size[batch_size],
                 chunk_targets[0],
                 chunk_forcings[0],
                 False,
@@ -312,9 +323,15 @@ def run_residual_eval(
                 chunk_inputs,
                 chunk_targets,
                 chunk_forcings,
+                residual_inputs,
                 reset_mask,
             ):
                 current_state = _reset_temporal_state_lanes(residual_state, reset_mask)
+                current_residual_inputs = reset_residual_input_lanes(
+                    residual_inputs,
+                    chunk_targets[0],
+                    reset_mask,
+                )
                 base_keys = jax.random.split(base_key, len(chunk_inputs))
                 eval_keys = jax.random.split(eval_key, len(chunk_inputs))
                 losses = []
@@ -333,18 +350,19 @@ def run_residual_eval(
                         params,
                         current_state,
                         eval_keys[bptt_i],
-                        chunk_inputs[bptt_i],
+                        current_residual_inputs,
                         residual_targets,
                         chunk_forcings[bptt_i],
                         False,
                     )
                     losses.append(scalarize_loss(loss_and_diag[0]))
-                return current_state, jnp.stack(losses)
+                    current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_targets)
+                return current_state, current_residual_inputs, jnp.stack(losses)
 
             eval_fn_by_batch_size[batch_size] = eval_chunk
 
         rng, base_key, eval_key = jax.random.split(rng, 3)
-        next_state, chunk_losses = eval_fn_by_batch_size[batch_size](
+        next_state, next_residual_inputs, chunk_losses = eval_fn_by_batch_size[batch_size](
             params,
             baseline_params,
             residual_state_by_batch_size[batch_size],
@@ -353,9 +371,11 @@ def run_residual_eval(
             chunk_inputs,
             chunk_targets,
             chunk_forcings,
+            residual_inputs_by_batch_size[batch_size],
             jnp.asarray(reset_mask_np),
         )
         residual_state_by_batch_size[batch_size] = next_state
+        residual_inputs_by_batch_size[batch_size] = next_residual_inputs
 
         chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
         total_weighted_loss += float(chunk_losses_np.sum()) * batch_size
