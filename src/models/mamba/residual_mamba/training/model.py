@@ -13,6 +13,10 @@ import pandas as pd
 import xarray as xr
 
 from src.models.graphcast.training.core.batching import BatchBuilder, build_batch_from_indices_vectorized
+from src.models.graphcast.training.core.eval_selection import (
+    EVAL_SUBSET_STRATIFIED_FIXED,
+    select_eval_subset,
+)
 from src.models.graphcast.training.core.logging import _write_run_config
 from src.models.graphcast.training.core.model import (
     advance_residual_inputs,
@@ -21,13 +25,14 @@ from src.models.graphcast.training.core.model import (
     build_residual_correction_predictor,
     gc,
     reset_residual_input_lanes,
-    scalarize_loss,
+    xarray_jax,
 )
 from src.models.graphcast.training.core.segments import (
     _build_chunk_batches,
     _reset_temporal_state_lanes,
     build_full_segments,
     iter_eval_segment_chunks,
+    segment_midpoint_times,
 )
 
 def _use_zero_init_temporal_out(cfg, temporal_backbone: str | None = None) -> bool:
@@ -199,6 +204,8 @@ def augment_run_config(
         "prefetch_chunks": 1,
         "eval_num_segments": segment_cfg.eval_num_segments,
         "final_eval_num_segments": segment_cfg.final_eval_num_segments,
+        "eval_subset_policy": segment_cfg.eval_subset_policy,
+        "eval_rotating_diagnostics": segment_cfg.eval_rotating_diagnostics,
         "shuffle_segments": True,
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
@@ -240,6 +247,9 @@ def run_residual_eval(
     chunk_load_workers: int = 1,
     load_executor=None,
     max_segments: int | None = None,
+    subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
+    subset_role: str = "fixed_checkpoint",
+    subset_fold: int | None = None,
 ) -> dict[str, float]:
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
@@ -248,14 +258,23 @@ def run_residual_eval(
             f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
         )
     available_segments = len(eval_segments)
-    if max_segments is not None:
-        if max_segments <= 0:
-            raise ValueError("max_segments must be positive or None.")
-        eval_segments = eval_segments[:max_segments]
+    selection = select_eval_subset(
+        np.arange(available_segments, dtype=np.int64),
+        max_segments,
+        times=segment_midpoint_times(eval_ds, eval_segments),
+        policy=subset_policy,
+        role=subset_role,
+        fold=subset_fold,
+    )
+    eval_segments = [eval_segments[int(position)] for position in selection.positions.tolist()]
     if not eval_segments:
         raise ValueError("No eval segments selected.")
-    if max_segments is not None and len(eval_segments) < available_segments:
-        print(f"[{progress_label}] using first {len(eval_segments)}/{available_segments} validation segments")
+    if selection.capped:
+        readable_policy = selection.policy.replace("_", " ")
+        print(
+            f"[{progress_label}] using {readable_policy} "
+            f"{len(eval_segments)}/{available_segments} validation segments"
+        )
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
     residual_inputs_by_batch_size: dict[int, xr.Dataset] = {}
@@ -273,6 +292,7 @@ def run_residual_eval(
             eval_segments,
             batch_size=eval_batch_size,
             bptt_steps=bptt_steps,
+            segment_ids=selection.item_ids,
         ),
         start=1,
     ):
@@ -355,14 +375,23 @@ def run_residual_eval(
                         chunk_forcings[bptt_i],
                         False,
                     )
-                    losses.append(scalarize_loss(loss_and_diag[0]))
+                    loss_by_lane = xarray_jax.unwrap_data(loss_and_diag[0])
+                    valid_lanes = ~reset_mask if bptt_i == 0 else jnp.ones_like(reset_mask, dtype=bool)
+                    valid_weight = valid_lanes.astype(loss_by_lane.dtype)
+                    losses.append((jnp.sum(loss_by_lane * valid_weight), jnp.sum(valid_weight)))
                     current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_targets)
-                return current_state, current_residual_inputs, jnp.stack(losses)
+                loss_sums, valid_counts = zip(*losses, strict=True)
+                return (
+                    current_state,
+                    current_residual_inputs,
+                    jnp.sum(jnp.stack(loss_sums)),
+                    jnp.sum(jnp.stack(valid_counts)),
+                )
 
             eval_fn_by_batch_size[batch_size] = eval_chunk
 
         rng, base_key, eval_key = jax.random.split(rng, 3)
-        next_state, next_residual_inputs, chunk_losses = eval_fn_by_batch_size[batch_size](
+        next_state, next_residual_inputs, chunk_loss_sum, chunk_valid_count = eval_fn_by_batch_size[batch_size](
             params,
             baseline_params,
             residual_state_by_batch_size[batch_size],
@@ -377,19 +406,25 @@ def run_residual_eval(
         residual_state_by_batch_size[batch_size] = next_state
         residual_inputs_by_batch_size[batch_size] = next_residual_inputs
 
-        chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
-        total_weighted_loss += float(chunk_losses_np.sum()) * batch_size
-        total_windows += batch_size * len(chunk_inputs)
+        chunk_loss_sum_f = float(jax.device_get(chunk_loss_sum))
+        chunk_valid_count_f = float(jax.device_get(chunk_valid_count))
+        total_weighted_loss += chunk_loss_sum_f
+        total_windows += int(chunk_valid_count_f)
 
         if chunk_i == 1 or chunk_i % 10 == 0 or chunk_i == n_chunks:
             elapsed = time.time() - t_eval0
+            current_loss = chunk_loss_sum_f / max(chunk_valid_count_f, 1.0)
             print(
                 f"[{progress_label}] chunk {chunk_i}/{n_chunks} "
-                f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
+                f"elapsed {elapsed:.1f}s current_loss {current_loss:.6f}"
             )
+
+    if total_windows <= 0:
+        raise ValueError("No residual eval windows remained after excluding zero-history reset steps.")
 
     return {
         "total": float(total_weighted_loss / total_windows),
         "segments": float(len(eval_segments)),
         "chunks": float(n_chunks),
+        **selection.metadata(item_name="segments"),
     }

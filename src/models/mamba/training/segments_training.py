@@ -21,6 +21,8 @@ class SegmentRunConfig:
     filter_nan_segments: bool = True
     eval_num_segments: int | None = 16
     final_eval_num_segments: int | None = None
+    eval_subset_policy: str = "stratified_fixed"
+    eval_rotating_diagnostics: bool = True
 
 
 def _positive_int_or_all(value: str) -> int | None:
@@ -73,6 +75,19 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         type=_positive_int_or_all,
         default=None,
         help="Number of validation segments for final eval, or 'all' (default).",
+    )
+    parser.add_argument(
+        "--eval-subset-policy",
+        choices=["first", "stratified_fixed"],
+        default="stratified_fixed",
+        help="Policy for capped regular validation evals. Default selects a fixed full-year stratified subset.",
+    )
+    parser.add_argument(
+        "--no-eval-rotating-diagnostics",
+        dest="eval_rotating_diagnostics",
+        action="store_false",
+        default=True,
+        help="Disable the second rotating stratified diagnostic eval for capped regular validation evals.",
     )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -262,6 +277,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         filter_nan_segments=args.filter_nan_segments,
         eval_num_segments=args.eval_num_segments,
         final_eval_num_segments=args.final_eval_num_segments,
+        eval_subset_policy=args.eval_subset_policy,
+        eval_rotating_diagnostics=args.eval_rotating_diagnostics,
     )
 
 
@@ -302,6 +319,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         save_checkpoint,
         save_logs,
     )
+    from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
     from src.models.graphcast.training.core.model import (
         build_predictor,
         gc,
@@ -813,11 +831,40 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     load_executor=load_executor,
                     segment_loader=eval_segment_loader,
                     max_segments=segment_cfg.eval_num_segments,
+                    subset_policy=segment_cfg.eval_subset_policy,
+                    subset_role="fixed_checkpoint",
+                    subset_fold=0,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
                 eval_details.append({"step": step, **eval_metrics, **batch_builder_metadata})
                 print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+                if segment_cfg.eval_rotating_diagnostics and segment_cfg.eval_num_segments is not None:
+                    rotating_eval = run_eval_segments(
+                        transformed,
+                        params,
+                        rng,
+                        eval_ds,
+                        eval_final_indices,
+                        eval_batch_size=cfg.eval_batch_size,
+                        input_steps=input_steps,
+                        target_steps=target_steps,
+                        task_cfg=task_cfg,
+                        dt=dt_train,
+                        len_segment=segment_cfg.len_segment,
+                        bptt_steps=segment_cfg.bptt_steps,
+                        progress_label=f"eval_rotating@step{step}",
+                        batch_builder=eval_batch_builder,
+                        chunk_load_workers=segment_cfg.chunk_load_workers,
+                        load_executor=load_executor,
+                        segment_loader=eval_segment_loader,
+                        max_segments=segment_cfg.eval_num_segments,
+                        subset_policy=EVAL_SUBSET_STRATIFIED_ROTATING,
+                        subset_role="rotating_diagnostic",
+                        subset_fold=step // cfg.eval_every,
+                    )
+                    eval_details.append({"step": step, **rotating_eval, **batch_builder_metadata})
+                    print(f"[eval_rotating] step {step} total {rotating_eval['total']:.6f}")
                 plot_loss_curves(out_dir, train_losses, eval_losses)
                 save_all_logs()
 
@@ -865,6 +912,9 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         chunk_load_workers=segment_cfg.chunk_load_workers,
         segment_loader=eval_segment_loader,
         max_segments=segment_cfg.final_eval_num_segments,
+        subset_policy=segment_cfg.eval_subset_policy,
+        subset_role="final",
+        subset_fold=None,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

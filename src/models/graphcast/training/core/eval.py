@@ -11,7 +11,21 @@ import pandas as pd
 import xarray as xr
 
 from .batching import BatchBuilder, build_batch_from_indices_vectorized
+from .eval_selection import (
+    EVAL_SUBSET_STRATIFIED_FIXED,
+    select_eval_subset,
+)
 from .model import gc, scalarize_loss
+
+
+def _times_for_indices(eval_ds: xr.Dataset, indices: np.ndarray) -> pd.DatetimeIndex | None:
+    if not hasattr(eval_ds, "time"):
+        return None
+    try:
+        time_index = pd.DatetimeIndex(pd.to_datetime(eval_ds.time.values))
+        return pd.DatetimeIndex(time_index[np.asarray(indices, dtype=np.int64)])
+    except (IndexError, TypeError, ValueError):
+        return None
 
 
 def _map_temporal_state_leaves(state: hk.State, fn) -> hk.State:
@@ -47,25 +61,39 @@ def run_eval(
     prefetch_workers: int = 4,
     prefetch_depth: int = 4,
     max_batches: int | None = None,
+    subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
+    subset_role: str = "fixed_checkpoint",
+    subset_fold: int | None = None,
 ) -> dict[str, float]:
     del state
 
     losses: list[float] = []
 
+    max_windows = None if max_batches is None else max_batches * eval_batch_size
+    selection = select_eval_subset(
+        np.asarray(eval_indices, dtype=np.int64),
+        max_windows,
+        times=_times_for_indices(eval_ds, eval_indices),
+        policy=subset_policy,
+        role=subset_role,
+        fold=subset_fold,
+    )
+    selected_indices = selection.item_ids
     index_batches = [
-        eval_indices[i : i + eval_batch_size]
-        for i in range(0, len(eval_indices), eval_batch_size)
+        selected_indices[i : i + eval_batch_size]
+        for i in range(0, len(selected_indices), eval_batch_size)
     ]
-    available_batches = len(index_batches)
-    if max_batches is not None:
-        if max_batches <= 0:
-            raise ValueError("max_batches must be positive or None.")
-        index_batches = index_batches[:max_batches]
+    available_batches = (len(eval_indices) + eval_batch_size - 1) // eval_batch_size
     n_batches = len(index_batches)
     if n_batches == 0:
         raise ValueError("No eval batches selected.")
-    if max_batches is not None and n_batches < available_batches:
-        print(f"[{progress_label}] using first {n_batches}/{available_batches} validation batches")
+    if selection.capped:
+        readable_policy = selection.policy.replace("_", " ")
+        print(
+            f"[{progress_label}] using {readable_policy} "
+            f"{len(selected_indices)}/{len(eval_indices)} validation windows "
+            f"({n_batches}/{available_batches} batches)"
+        )
 
     def _build(idx):
         return batch_builder(
@@ -136,4 +164,8 @@ def run_eval(
             )
 
     executor.shutdown(wait=False)
-    return {"total": float(np.mean(losses)), "batches": float(n_batches)}
+    return {
+        "total": float(np.mean(losses)),
+        "batches": float(n_batches),
+        **selection.metadata(item_name="windows"),
+    }

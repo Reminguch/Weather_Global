@@ -51,7 +51,7 @@ def normalized_per_variable_mse(
     use_latitude_weights: bool,
     diffs_stddev_by_level: xarray.Dataset | None = None,
 ) -> dict[str, xarray.DataArray]:
-    """Return one normalized loss tensor per variable, reduced to batch-only."""
+    """Return GraphCast-style normalized per-variable losses, reduced to batch-only."""
     losses: dict[str, xarray.DataArray] = {}
     for name, target in targets.data_vars.items():
         if name not in predictions:
@@ -63,11 +63,10 @@ def normalized_per_variable_mse(
             loss = loss / (scale ** 2)
         if use_latitude_weights and "lat" in loss.dims:
             lat_w = latitude_weights_with_fallback(target).astype(loss.dtype)
-            loss = loss.weighted(lat_w).mean("lat", skipna=False)
-        if "lon" in loss.dims:
-            loss = loss.mean("lon", skipna=False)
+            loss = loss * lat_w
         if "level" in loss.dims:
-            loss = loss.mean("level", skipna=False)
+            level_w = (target.coords["level"] / target.coords["level"].mean(skipna=False)).astype(loss.dtype)
+            loss = loss * level_w
         reduce_dims = [dim for dim in loss.dims if dim not in ("batch",)]
         if reduce_dims:
             loss = loss.mean(reduce_dims, skipna=False)
@@ -96,9 +95,5 @@ def normalized_weighted_mse_allvars(
         name: float(per_variable_weights.get(name, 1.0))
         for name in per_var_losses
     }
-    total_var_weight = float(np.sum(list(per_var_weights.values())))
-    if total_var_weight <= 0.0:
-        raise ValueError("Total variable weight must be positive.")
-
     weighted_losses = [loss * per_var_weights[name] for name, loss in per_var_losses.items()]
-    return xarray.concat(weighted_losses, dim="variable", join="exact").sum("variable", skipna=False) / total_var_weight
+    return xarray.concat(weighted_losses, dim="variable", join="exact").sum("variable", skipna=False)

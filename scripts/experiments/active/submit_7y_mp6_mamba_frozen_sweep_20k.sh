@@ -1,7 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT="scripts/experiments/7y_mp6_mamba_frozen_sweep_20k.slurm"
+if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+  PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
+else
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+fi
+cd "${PROJECT_ROOT}"
+
+SCRIPT="scripts/experiments/active/7y_mp6_mamba_frozen_sweep_20k.slurm"
 COMBOS_PER_BASE=18
 START_BASE=${START_BASE:-0}
 END_BASE=${END_BASE:-8}

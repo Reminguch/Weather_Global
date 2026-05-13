@@ -13,7 +13,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 

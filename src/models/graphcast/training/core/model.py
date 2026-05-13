@@ -205,13 +205,27 @@ def reset_residual_input_lanes(
     residual_vars = [name for name in residual_inputs.data_vars if name in targets_template.data_vars]
     if not residual_vars:
         return residual_inputs
-    reset_by_batch = xr.DataArray(
-        reset_mask.astype(bool),
-        dims=("batch",),
-        coords={"batch": residual_inputs.coords["batch"]},
-    )
     pieces = [residual_inputs.drop_vars(residual_vars)]
-    pieces.append(xr.Dataset({name: residual_inputs[name].where(~reset_by_batch, 0) for name in residual_vars}))
+    reset_mask = jnp.asarray(reset_mask, dtype=bool)
+    reset_vars = {}
+    for name in residual_vars:
+        data_array = residual_inputs[name]
+        if "batch" not in data_array.dims:
+            raise ValueError(f"Residual input variable {name!r} must have a 'batch' dimension.")
+        batch_axis = data_array.dims.index("batch")
+        data = xarray_jax.unwrap_data(data_array)
+        mask_shape = [1] * data.ndim
+        mask_shape[batch_axis] = reset_mask.shape[0]
+        reset_by_batch = jnp.reshape(reset_mask, mask_shape)
+        reset_data = jnp.where(reset_by_batch, jnp.zeros_like(data), data)
+        reset_vars[name] = xr.DataArray(
+            xarray_jax.wrap(reset_data),
+            dims=data_array.dims,
+            coords=data_array.coords,
+            attrs=data_array.attrs,
+            name=data_array.name,
+        )
+    pieces.append(xr.Dataset(reset_vars))
     return xr.merge(pieces)
 
 

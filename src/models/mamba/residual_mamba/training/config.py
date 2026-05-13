@@ -22,6 +22,8 @@ class ResidualSegmentRunConfig:
     training_target: str
     eval_num_segments: int | None = 16
     final_eval_num_segments: int | None = None
+    eval_subset_policy: str = "stratified_fixed"
+    eval_rotating_diagnostics: bool = True
 
 
 def _positive_int_or_all(value: str) -> int | None:
@@ -58,6 +60,19 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--eval-batch-size", type=int, default=4)
     parser.add_argument("--eval-num-segments", type=_positive_int_or_all, default=16)
     parser.add_argument("--final-eval-num-segments", type=_positive_int_or_all, default=None)
+    parser.add_argument(
+        "--eval-subset-policy",
+        choices=["first", "stratified_fixed"],
+        default="stratified_fixed",
+        help="Policy for capped regular validation evals. Default selects a fixed full-year stratified subset.",
+    )
+    parser.add_argument(
+        "--no-eval-rotating-diagnostics",
+        dest="eval_rotating_diagnostics",
+        action="store_false",
+        default=True,
+        help="Disable the second rotating stratified diagnostic eval for capped regular validation evals.",
+    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -205,4 +220,6 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         training_target=args.training_target,
         eval_num_segments=args.eval_num_segments,
         final_eval_num_segments=args.final_eval_num_segments,
+        eval_subset_policy=args.eval_subset_policy,
+        eval_rotating_diagnostics=args.eval_rotating_diagnostics,
     )

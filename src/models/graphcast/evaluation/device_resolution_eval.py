@@ -25,6 +25,7 @@ from src.models.graphcast.runtime import (
     load_run_config,
 )
 from src.models.graphcast.runtime import _build_one_step_bundle as build_graphcast_bundle
+from src.models.graphcast.training.core.model import advance_residual_inputs, build_zero_residual_inputs
 from src.models.mamba.gc_mamba.legacy_runtime import (
     _build_one_step_bundle as build_legacy_gc_mamba_bundle,
     is_legacy_gc_mamba_checkpoint,
@@ -52,13 +53,16 @@ class DeviceRolloutBundle:
 @dataclasses.dataclass(frozen=True)
 class _VariableMetricSpec:
     name: str
+    output_name: str
     dims: tuple[str, ...]
     lat_indices: jax.Array | None
     lon_indices: jax.Array | None
     lat_weights: jax.Array | None
+    level_weights: jax.Array | None
     scale: jax.Array | None
     scale_dims: tuple[str, ...]
     variable_weight: float
+    include_in_weighted: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,6 +124,9 @@ def build_metric_spec(
     res_grid_lons: xr.DataArray,
     per_variable_weights: dict[str, float],
     max_lead_steps: int,
+    nyc_lat: float | None = None,
+    nyc_lon: float | None = None,
+    nyc_output_name: str | None = None,
 ) -> DeviceMetricSpec:
     variables: list[_VariableMetricSpec] = []
     target_names = tuple(targets.data_vars)
@@ -133,12 +140,16 @@ def build_metric_spec(
         lat_indices_np: np.ndarray | None = None
         lon_indices_np: np.ndarray | None = None
         lat_weights_np: np.ndarray | None = None
+        level_weights_np: np.ndarray | None = None
         if "lat" in dims:
             lat_indices_np = _nearest_indices(np.asarray(target.coords["lat"].values), np.asarray(res_grid_lats.values))
             selected_lats = np.asarray(target.coords["lat"].values)[lat_indices_np]
             lat_weights_np = _latitude_weights(selected_lats)
         if "lon" in dims:
             lon_indices_np = _nearest_indices(np.asarray(target.coords["lon"].values), np.asarray(res_grid_lons.values))
+        if "level" in dims:
+            levels_np = np.asarray(target.coords["level"].values, dtype=np.float32)
+            level_weights_np = levels_np / np.mean(levels_np)
 
         scale = None
         scale_dims: tuple[str, ...] = ()
@@ -161,15 +172,53 @@ def build_metric_spec(
         variables.append(
             _VariableMetricSpec(
                 name=name,
+                output_name=name,
                 dims=dims,
                 lat_indices=None if lat_indices_np is None else jnp.asarray(lat_indices_np, dtype=jnp.int32),
                 lon_indices=None if lon_indices_np is None else jnp.asarray(lon_indices_np, dtype=jnp.int32),
                 lat_weights=None if lat_weights_np is None else jnp.asarray(lat_weights_np, dtype=jnp.float32),
+                level_weights=None if level_weights_np is None else jnp.asarray(level_weights_np, dtype=jnp.float32),
                 scale=scale,
                 scale_dims=scale_dims,
                 variable_weight=float(per_variable_weights.get(name, 1.0)),
             )
         )
+
+    if nyc_lat is not None and nyc_lon is not None and nyc_output_name and "2m_temperature" in targets:
+        target = targets["2m_temperature"]
+        dims = tuple(target.dims)
+        if "lat" in dims and "lon" in dims:
+            metric_lats = np.asarray(res_grid_lats.values, dtype=np.float64)
+            metric_lons = np.asarray(res_grid_lons.values, dtype=np.float64)
+            point_lat = metric_lats[np.abs(metric_lats - float(nyc_lat)).argmin()]
+            point_lon = metric_lons[np.abs(metric_lons - float(nyc_lon)).argmin()]
+            lat_indices_np = _nearest_indices(np.asarray(target.coords["lat"].values), np.asarray([point_lat]))
+            lon_indices_np = _nearest_indices(np.asarray(target.coords["lon"].values), np.asarray([point_lon]))
+            scale = None
+            scale_dims: tuple[str, ...] = ()
+            if "2m_temperature" in stats["diffs_stddev_by_level"]:
+                scale_np, scale_dims = _select_scale_grid(
+                    stats["diffs_stddev_by_level"]["2m_temperature"],
+                    lat_indices=lat_indices_np,
+                    lon_indices=lon_indices_np,
+                    level_indices=None,
+                )
+                scale = jnp.asarray(scale_np, dtype=jnp.float32)
+            variables.append(
+                _VariableMetricSpec(
+                    name="2m_temperature",
+                    output_name=nyc_output_name,
+                    dims=dims,
+                    lat_indices=jnp.asarray(lat_indices_np, dtype=jnp.int32),
+                    lon_indices=jnp.asarray(lon_indices_np, dtype=jnp.int32),
+                    lat_weights=None,
+                    level_weights=None,
+                    scale=scale,
+                    scale_dims=scale_dims,
+                    variable_weight=0.0,
+                    include_in_weighted=False,
+                )
+            )
 
     return DeviceMetricSpec(
         variables=tuple(variables),
@@ -209,18 +258,14 @@ def _per_variable_loss(pred: xr.Dataset, target: xr.Dataset, spec: _VariableMetr
         weight_shape = [1] * loss.ndim
         weight_shape[axis] = int(spec.lat_weights.shape[0])
         weights = jnp.reshape(spec.lat_weights, tuple(weight_shape))
-        loss = jnp.sum(loss * weights, axis=axis) / jnp.sum(spec.lat_weights)
-        dims.pop(axis)
+        loss = loss * weights
 
-    if "lon" in dims:
-        axis = dims.index("lon")
-        loss = jnp.mean(loss, axis=axis)
-        dims.pop(axis)
-
-    if "level" in dims:
+    if spec.level_weights is not None and "level" in dims:
         axis = dims.index("level")
-        loss = jnp.mean(loss, axis=axis)
-        dims.pop(axis)
+        weight_shape = [1] * loss.ndim
+        weight_shape[axis] = int(spec.level_weights.shape[0])
+        weights = jnp.reshape(spec.level_weights, tuple(weight_shape))
+        loss = loss * weights
 
     for dim in tuple(dims):
         if dim not in ("batch", "time"):
@@ -259,7 +304,8 @@ def _accumulate_step(
     weighted_batch = jnp.zeros_like(_per_variable_loss(pred_step, target_step, metric_spec.variables[0]))
     for var_i, var_spec in enumerate(metric_spec.variables):
         loss_bt = _per_variable_loss(pred_step, target_step, var_spec)
-        weighted_batch = weighted_batch + loss_bt * (var_spec.variable_weight / metric_spec.total_variable_weight)
+        if var_spec.include_in_weighted:
+            weighted_batch = weighted_batch + loss_bt * var_spec.variable_weight
         per_var_sum = per_var_sum.at[var_i, lead_i].add(jnp.sum(loss_bt))
         per_var_count = per_var_count.at[var_i, lead_i].add(jnp.asarray(loss_bt.size, dtype=jnp.int32))
 
@@ -294,9 +340,11 @@ def _model_step_residual(
     rng: tuple[jax.Array, jax.Array],
     rolling_inputs: xr.Dataset,
     constant_inputs: xr.Dataset,
+    residual_inputs: xr.Dataset,
     target_step: xr.Dataset,
     forcings_step: xr.Dataset,
-) -> tuple[xr.Dataset, hk.State, hk.State]:
+    teacher_forced: bool = True,
+) -> tuple[xr.Dataset, hk.State, hk.State, xr.Dataset]:
     all_inputs = xr.merge([constant_inputs, rolling_inputs])
     baseline_pred, baseline_next = baseline.transformed.apply(
         baseline_params,
@@ -310,11 +358,17 @@ def _model_step_residual(
         residual_params,
         residual_state,
         rng[1],
-        all_inputs,
+        residual_inputs,
         target_step,
         forcings_step,
     )
-    return baseline_pred + residual_pred, residual_next, baseline_next
+    residual_feedback = target_step - baseline_pred if teacher_forced else residual_pred
+    return (
+        baseline_pred + residual_pred,
+        residual_next,
+        baseline_next,
+        advance_residual_inputs(residual_inputs, residual_feedback),
+    )
 
 
 def _build_bundle_from_checkpoint(ckpt_obj: gc.CheckPoint, stats: dict[str, xr.Dataset], ckpt_path: Path) -> DeviceRolloutBundle:
@@ -363,6 +417,10 @@ class PreparedDeviceResolutionEvaluator:
         res_grid_lons: xr.DataArray,
         per_variable_weights: dict[str, float],
         max_lead_steps: int,
+        nyc_lat: float | None = None,
+        nyc_lon: float | None = None,
+        nyc_output_name: str | None = None,
+        residual_eval_semantics: str = "teacher_forced_training_equivalent",
     ) -> None:
         self.bundle = _build_bundle_from_checkpoint(ckpt_obj, stats, ckpt_path)
         self._stats = stats
@@ -370,6 +428,10 @@ class PreparedDeviceResolutionEvaluator:
         self._res_grid_lons = res_grid_lons
         self._per_variable_weights = per_variable_weights
         self._max_lead_steps = int(max_lead_steps)
+        self._nyc_lat = nyc_lat
+        self._nyc_lon = nyc_lon
+        self._nyc_output_name = nyc_output_name
+        self._residual_teacher_forced = residual_eval_semantics == "teacher_forced_training_equivalent"
         self._metric_spec: DeviceMetricSpec | None = None
         self._state_cache: dict[tuple[str, int], Any] = {}
         self._cold_fn = None
@@ -388,7 +450,7 @@ class PreparedDeviceResolutionEvaluator:
     def metric_variable_names(self) -> tuple[str, ...]:
         if self._metric_spec is None:
             raise RuntimeError("Metric spec has not been initialized yet.")
-        return tuple(var.name for var in self._metric_spec.variables)
+        return tuple(var.output_name for var in self._metric_spec.variables)
 
     def _ensure_metric_spec(self, targets: xr.Dataset) -> DeviceMetricSpec:
         if self._metric_spec is None:
@@ -399,6 +461,9 @@ class PreparedDeviceResolutionEvaluator:
                 res_grid_lons=self._res_grid_lons,
                 per_variable_weights=self._per_variable_weights,
                 max_lead_steps=self._max_lead_steps,
+                nyc_lat=self._nyc_lat,
+                nyc_lon=self._nyc_lon,
+                nyc_output_name=self._nyc_output_name,
             )
             self._cold_fn = self._build_cold_fn(self._metric_spec)
             self._truth_step_fn = self._build_truth_step_fn()
@@ -417,7 +482,10 @@ class PreparedDeviceResolutionEvaluator:
             self._state_cache[key] = state
             return state
         residual_key, baseline_key = jax.random.split(rng)
-        _params, residual_state = self.bundle.primary.transformed.init(residual_key, inputs, target_step, forcings_step)
+        residual_inputs = build_zero_residual_inputs(inputs, target_step)
+        _params, residual_state = self.bundle.primary.transformed.init(
+            residual_key, residual_inputs, target_step, forcings_step
+        )
         _params, baseline_state = self.bundle.baseline.transformed.init(baseline_key, inputs, target_step, forcings_step)
         self._state_cache[key] = (residual_state, baseline_state)
         return self._state_cache[key]
@@ -451,12 +519,13 @@ class PreparedDeviceResolutionEvaluator:
                 return acc
 
             residual_state, baseline_state = initial_states
+            residual_inputs = build_zero_residual_inputs(inputs, targets.isel(time=slice(0, 1)))
             step_keys = jax.random.split(rng, metric_spec.max_lead_steps * 2)
             assert bundle.baseline is not None
             for lead_i in range(metric_spec.max_lead_steps):
                 target_step = targets.isel(time=slice(lead_i, lead_i + 1))
                 forcings_step = forcings.isel(time=slice(lead_i, lead_i + 1))
-                pred_step, residual_state, baseline_state = _model_step_residual(
+                pred_step, residual_state, baseline_state, residual_inputs = _model_step_residual(
                     bundle.primary,
                     bundle.baseline,
                     residual_params=bundle.primary.params,
@@ -466,11 +535,14 @@ class PreparedDeviceResolutionEvaluator:
                     rng=(step_keys[2 * lead_i], step_keys[2 * lead_i + 1]),
                     rolling_inputs=rolling_inputs,
                     constant_inputs=constant_inputs,
+                    residual_inputs=residual_inputs,
                     target_step=target_step,
                     forcings_step=forcings_step,
+                    teacher_forced=self._residual_teacher_forced,
                 )
                 acc = _accumulate_step(acc, pred_step, target_step, lead_i=lead_i, metric_spec=metric_spec)
-                rolling_inputs = _update_inputs(rolling_inputs, xr.merge([pred_step, forcings_step]))
+                feedback_step = target_step if self._residual_teacher_forced else pred_step
+                rolling_inputs = _update_inputs(rolling_inputs, xr.merge([feedback_step, forcings_step]))
             return acc
 
         return cold_fn
@@ -479,7 +551,7 @@ class PreparedDeviceResolutionEvaluator:
         bundle = self.bundle
 
         @jax.jit
-        def truth_step_fn(rng, rolling_inputs, constant_inputs, target_step, forcings_step, states):
+        def truth_step_fn(rng, rolling_inputs, residual_inputs, constant_inputs, target_step, forcings_step, states):
             if bundle.baseline is None:
                 _pred_step, state = _model_step_single(
                     bundle.primary,
@@ -491,11 +563,11 @@ class PreparedDeviceResolutionEvaluator:
                     target_step=target_step,
                     forcings_step=forcings_step,
                 )
-                return _update_inputs(rolling_inputs, xr.merge([target_step, forcings_step])), state
+                return _update_inputs(rolling_inputs, xr.merge([target_step, forcings_step])), residual_inputs, state
 
             assert bundle.baseline is not None
             residual_state, baseline_state = states
-            _pred_step, residual_state, baseline_state = _model_step_residual(
+            _pred_step, residual_state, baseline_state, residual_inputs = _model_step_residual(
                 bundle.primary,
                 bundle.baseline,
                 residual_params=bundle.primary.params,
@@ -505,10 +577,12 @@ class PreparedDeviceResolutionEvaluator:
                 rng=rng,
                 rolling_inputs=rolling_inputs,
                 constant_inputs=constant_inputs,
+                residual_inputs=residual_inputs,
                 target_step=target_step,
                 forcings_step=forcings_step,
+                teacher_forced=self._residual_teacher_forced,
             )
-            return _update_inputs(rolling_inputs, xr.merge([target_step, forcings_step])), (
+            return _update_inputs(rolling_inputs, xr.merge([target_step, forcings_step])), residual_inputs, (
                 residual_state,
                 baseline_state,
             )
@@ -519,7 +593,7 @@ class PreparedDeviceResolutionEvaluator:
         bundle = self.bundle
 
         @jax.jit
-        def branch_metric_fn(rng, rolling_inputs, constant_inputs, branch_targets, branch_forcings, states):
+        def branch_metric_fn(rng, rolling_inputs, residual_inputs, constant_inputs, branch_targets, branch_forcings, states):
             acc = _empty_device_accumulator(metric_spec)
             if bundle.baseline is None:
                 branch_rolling = rolling_inputs.copy(deep=False)
@@ -545,13 +619,14 @@ class PreparedDeviceResolutionEvaluator:
             assert bundle.baseline is not None
             residual_state, baseline_state = states
             branch_rolling = rolling_inputs.copy(deep=False)
+            branch_residual_inputs = residual_inputs.copy(deep=False)
             branch_residual_state = jax.tree_util.tree_map(lambda x: x, residual_state)
             branch_baseline_state = jax.tree_util.tree_map(lambda x: x, baseline_state)
             branch_keys = jax.random.split(rng, metric_spec.max_lead_steps * 2)
             for lead_i in range(metric_spec.max_lead_steps):
                 target_step = branch_targets.isel(time=slice(lead_i, lead_i + 1))
                 forcings_step = branch_forcings.isel(time=slice(lead_i, lead_i + 1))
-                pred_step, branch_residual_state, branch_baseline_state = _model_step_residual(
+                pred_step, branch_residual_state, branch_baseline_state, branch_residual_inputs = _model_step_residual(
                     bundle.primary,
                     bundle.baseline,
                     residual_params=bundle.primary.params,
@@ -561,11 +636,14 @@ class PreparedDeviceResolutionEvaluator:
                     rng=(branch_keys[2 * lead_i], branch_keys[2 * lead_i + 1]),
                     rolling_inputs=branch_rolling,
                     constant_inputs=constant_inputs,
+                    residual_inputs=branch_residual_inputs,
                     target_step=target_step,
                     forcings_step=forcings_step,
+                    teacher_forced=self._residual_teacher_forced,
                 )
                 acc = _accumulate_step(acc, pred_step, target_step, lead_i=lead_i, metric_spec=metric_spec)
-                branch_rolling = _update_inputs(branch_rolling, xr.merge([pred_step, forcings_step]))
+                feedback_step = target_step if self._residual_teacher_forced else pred_step
+                branch_rolling = _update_inputs(branch_rolling, xr.merge([feedback_step, forcings_step]))
             return acc
 
         return branch_metric_fn
@@ -591,6 +669,11 @@ class PreparedDeviceResolutionEvaluator:
         states = self._initial_states(rng, inputs, targets_by_anchor[0], forcings_by_anchor[0])
         constant_inputs = _constant_inputs(inputs, targets_by_anchor[0], forcings_by_anchor[0])
         rolling_inputs = inputs.drop_vars(constant_inputs.keys())
+        residual_inputs = (
+            build_zero_residual_inputs(inputs, targets_by_anchor[0].isel(time=slice(0, 1)))
+            if self.bundle.baseline is not None
+            else None
+        )
         acc = _empty_device_accumulator(metric_spec)
         assert self._truth_step_fn is not None
         assert self._branch_metric_fn is not None
@@ -606,9 +689,10 @@ class PreparedDeviceResolutionEvaluator:
             truth_rng = step_keys[key_i]
             if self.bundle.baseline is not None:
                 truth_rng = (step_keys[key_i], step_keys[key_i + 1])
-            rolling_inputs, states = self._truth_step_fn(
+            rolling_inputs, residual_inputs, states = self._truth_step_fn(
                 truth_rng,
                 rolling_inputs,
+                residual_inputs,
                 constant_inputs,
                 target_step,
                 forcings_step,
@@ -622,6 +706,7 @@ class PreparedDeviceResolutionEvaluator:
             branch_acc = self._branch_metric_fn(
                 step_keys[key_i],
                 rolling_inputs,
+                residual_inputs,
                 constant_inputs,
                 branch_targets,
                 branch_forcings,
@@ -635,9 +720,10 @@ class PreparedDeviceResolutionEvaluator:
             truth_rng = step_keys[key_i]
             if self.bundle.baseline is not None:
                 truth_rng = (step_keys[key_i], step_keys[key_i + 1])
-            rolling_inputs, states = self._truth_step_fn(
+            rolling_inputs, residual_inputs, states = self._truth_step_fn(
                 truth_rng,
                 rolling_inputs,
+                residual_inputs,
                 constant_inputs,
                 truth_target,
                 truth_forcings,

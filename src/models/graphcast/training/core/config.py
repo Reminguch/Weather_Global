@@ -85,6 +85,8 @@ class RunConfig:
     init_from_graphcast_ckpt: str | None = None
     trainable_part: str = "all"
     zero_init_temporal_out: bool = False
+    eval_subset_policy: str = "stratified_fixed"
+    eval_rotating_diagnostics: bool = True
 
 
 def _positive_int_or_all(value: str) -> int | None:
@@ -208,6 +210,19 @@ def parse_args() -> RunConfig:
                         help="Sample process/GPU memory every N steps. Set 0 to disable periodic sampling.")
     parser.add_argument("--eval-only", action="store_true", default=False,
                         help="Skip training, only run eval on the loaded checkpoint.")
+    parser.add_argument(
+        "--eval-subset-policy",
+        choices=["first", "stratified_fixed"],
+        default="stratified_fixed",
+        help="Policy for capped regular validation evals. Default selects a fixed full-year stratified subset.",
+    )
+    parser.add_argument(
+        "--no-eval-rotating-diagnostics",
+        dest="eval_rotating_diagnostics",
+        action="store_false",
+        default=True,
+        help="Disable the second rotating stratified diagnostic eval for capped regular validation evals.",
+    )
     args = parser.parse_args()
 
     if not args.eval_only and args.max_steps <= 0:
@@ -316,4 +331,6 @@ def parse_args() -> RunConfig:
         prefetch_device_depth=args.prefetch_device_depth,
         usage_every=args.usage_every,
         eval_only=args.eval_only,
+        eval_subset_policy=args.eval_subset_policy,
+        eval_rotating_diagnostics=args.eval_rotating_diagnostics,
     )

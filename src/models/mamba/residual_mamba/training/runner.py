@@ -40,14 +40,15 @@ from src.models.graphcast.training.core.logging import (
     save_checkpoint,
     save_logs,
 )
+from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
 from src.models.graphcast.training.core.model import (
     advance_residual_inputs,
     build_zero_residual_inputs,
     load_graphcast_checkpoint,
     load_stats,
     reset_residual_input_lanes,
-    scalarize_loss,
     validate_stats_coverage,
+    xarray_jax,
 )
 from src.models.graphcast.training.core.segments import (
     SegmentBatchScheduler,
@@ -276,7 +277,8 @@ def run_training(
         def loss_fn(p, s, key):
             current_state = s
             current_residual_inputs = residual_inputs
-            losses = []
+            weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+            valid_count = jnp.asarray(0.0, dtype=jnp.float32)
             keys = jax.random.split(key, segment_cfg.bptt_steps)
             for bptt_i in range(segment_cfg.bptt_steps):
                 baseline_key, residual_key = jax.random.split(keys[bptt_i])
@@ -299,9 +301,14 @@ def run_training(
                     chunk_forcings[bptt_i],
                     True,
                 )
-                losses.append(scalarize_loss(loss_and_diag[0]))
+                loss_by_lane = xarray_jax.unwrap_data(loss_and_diag[0])
+                valid_lanes = ~reset_mask if bptt_i == 0 else jnp.ones_like(reset_mask, dtype=bool)
+                valid_weight = valid_lanes.astype(loss_by_lane.dtype)
+                weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
+                valid_count = valid_count + jnp.sum(valid_weight)
                 current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_targets)
-            return jnp.mean(jnp.stack(losses)), (current_state, current_residual_inputs)
+            loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
+            return loss, (current_state, current_residual_inputs)
 
         (loss, (new_state, new_residual_inputs)), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
         updates, new_opt_state = opt.update(grads, opt_state, params)
@@ -539,11 +546,41 @@ def run_training(
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
                     max_segments=segment_cfg.eval_num_segments,
+                    subset_policy=segment_cfg.eval_subset_policy,
+                    subset_role="fixed_checkpoint",
+                    subset_fold=0,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
                 eval_details.append({"step": step, **eval_metrics, **batch_builder_metadata})
                 print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+                if segment_cfg.eval_rotating_diagnostics and segment_cfg.eval_num_segments is not None:
+                    rotating_eval = run_residual_eval(
+                        residual_eval_transform,
+                        baseline_predict_transform,
+                        params,
+                        baseline_ckpt.params,
+                        rng,
+                        eval_ds,
+                        eval_final_indices,
+                        eval_batch_size=cfg.eval_batch_size,
+                        input_steps=input_steps,
+                        target_steps=target_steps,
+                        task_cfg=task_cfg,
+                        dt=dt_train,
+                        len_segment=segment_cfg.len_segment,
+                        bptt_steps=segment_cfg.bptt_steps,
+                        progress_label=f"eval_rotating@step{step}",
+                        batch_builder=eval_batch_builder,
+                        chunk_load_workers=segment_cfg.chunk_load_workers,
+                        load_executor=load_executor,
+                        max_segments=segment_cfg.eval_num_segments,
+                        subset_policy=EVAL_SUBSET_STRATIFIED_ROTATING,
+                        subset_role="rotating_diagnostic",
+                        subset_fold=step // cfg.eval_every,
+                    )
+                    eval_details.append({"step": step, **rotating_eval, **batch_builder_metadata})
+                    print(f"[eval_rotating] step {step} total {rotating_eval['total']:.6f}")
                 plot_loss_curves(out_dir, train_losses, eval_losses)
                 save_all_logs()
 
@@ -596,6 +633,9 @@ def run_training(
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
         max_segments=segment_cfg.final_eval_num_segments,
+        subset_policy=segment_cfg.eval_subset_policy,
+        subset_role="final",
+        subset_fold=None,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

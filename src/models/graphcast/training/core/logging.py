@@ -319,6 +319,8 @@ def _write_run_config(
         "eval_batch_size": cfg.eval_batch_size,
         "eval_num_batches": cfg.eval_num_batches,
         "final_eval_num_batches": cfg.final_eval_num_batches,
+        "eval_subset_policy": cfg.eval_subset_policy,
+        "eval_rotating_diagnostics": cfg.eval_rotating_diagnostics,
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,

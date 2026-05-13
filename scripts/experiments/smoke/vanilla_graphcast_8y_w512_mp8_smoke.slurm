@@ -13,7 +13,7 @@ set -euo pipefail
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
 else
-  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 fi
 cd "${PROJECT_ROOT}"
 
@@ -36,4 +36,4 @@ export RUN_NAME=${RUN_NAME:-vanilla_gc_8y_res${RESOLUTION%.*}_m${MESH_SIZE}_w512
 
 SLURM_ARRAY_TASK_ID=$((TASK_ID * 3)) \
   MPS_OVERRIDE=8 \
-  bash scripts/experiments/vanilla_graphcast_8y_w512_mp124.slurm
+  bash scripts/experiments/archive/2026-05_8y_w512_pilots/vanilla_graphcast_8y_w512_mp124.slurm

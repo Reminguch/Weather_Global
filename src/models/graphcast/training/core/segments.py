@@ -17,6 +17,10 @@ import xarray as xr
 
 from .batching import BatchBuilder, build_batch_from_indices_vectorized, valid_final_input_indices
 from .config import RunConfig
+from .eval_selection import (
+    EVAL_SUBSET_STRATIFIED_FIXED,
+    select_eval_subset,
+)
 from .logging import _write_run_config
 from .model import gc, scalarize_loss
 from .prepared_array import PreparedArrayStore, is_prepared_array_store
@@ -34,6 +38,8 @@ class SegmentRunConfig:
     filter_nan_segments: bool = True
     eval_num_segments: int | None = 16
     final_eval_num_segments: int | None = None
+    eval_subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED
+    eval_rotating_diagnostics: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,11 +174,22 @@ def build_full_segments(indices: np.ndarray, len_segment: int) -> list[np.ndarra
     return segments
 
 
+def segment_midpoint_times(ds: xr.Dataset, segments: list[np.ndarray]) -> pd.DatetimeIndex | None:
+    if not hasattr(ds, "time"):
+        return None
+    try:
+        time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
+        return pd.DatetimeIndex([time_index[int(segment[len(segment) // 2])] for segment in segments])
+    except (IndexError, TypeError, ValueError):
+        return None
+
+
 def iter_eval_segment_chunks(
     segments: list[np.ndarray],
     *,
     batch_size: int,
     bptt_steps: int,
+    segment_ids: np.ndarray | None = None,
 ) -> Iterable[tuple[tuple[np.ndarray, ...], np.ndarray]]:
     """Yield deterministic eval chunks over full segments without wraparound.
 
@@ -203,6 +220,7 @@ def iter_eval_segment_chunks(
         segments,
         batch_size=batch_size,
         bptt_steps=bptt_steps,
+        segment_ids=segment_ids,
     ):
         yield chunk.chunk_indices, chunk.reset_mask
 
@@ -212,6 +230,7 @@ def iter_eval_segment_chunk_infos(
     *,
     batch_size: int,
     bptt_steps: int,
+    segment_ids: np.ndarray | None = None,
 ) -> Iterable[SegmentChunk]:
     """Yield deterministic eval chunks with lane segment metadata."""
     if batch_size <= 0:
@@ -230,9 +249,16 @@ def iter_eval_segment_chunk_infos(
         )
     if any(len(segment) != segment_len for segment in segments):
         raise ValueError("All eval segments must have the same full length.")
+    if segment_ids is None:
+        segment_ids = np.arange(len(segments), dtype=np.int64)
+    else:
+        segment_ids = np.asarray(segment_ids, dtype=np.int64)
+        if segment_ids.shape != (len(segments),):
+            raise ValueError("segment_ids must have one entry per eval segment.")
 
     for start in range(0, len(segments), batch_size):
         segment_group = segments[start : start + batch_size]
+        segment_id_group = segment_ids[start : start + len(segment_group)]
         lane_count = len(segment_group)
         for offset in range(0, segment_len, bptt_steps):
             reset_mask = np.zeros(lane_count, dtype=np.bool_)
@@ -248,7 +274,7 @@ def iter_eval_segment_chunk_infos(
             yield SegmentChunk(
                 chunk_indices=chunk_indices,
                 reset_mask=reset_mask,
-                lane_segment_ids=np.arange(start, start + lane_count, dtype=np.int64),
+                lane_segment_ids=np.asarray(segment_id_group, dtype=np.int64),
                 lane_offsets=np.full(lane_count, offset, dtype=np.int64),
                 epoch=0,
             )
@@ -315,6 +341,8 @@ def _write_segment_run_config(
         "filter_nan_segments": segment_cfg.filter_nan_segments,
         "eval_num_segments": segment_cfg.eval_num_segments,
         "final_eval_num_segments": segment_cfg.final_eval_num_segments,
+        "eval_subset_policy": segment_cfg.eval_subset_policy,
+        "eval_rotating_diagnostics": segment_cfg.eval_rotating_diagnostics,
         "shuffle_segments": True,
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
@@ -861,6 +889,9 @@ def run_eval_segments(
     load_executor: concurrent.futures.Executor | None = None,
     segment_loader: SegmentBlockBatchLoader | None = None,
     max_segments: int | None = None,
+    subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
+    subset_role: str = "fixed_checkpoint",
+    subset_fold: int | None = None,
 ) -> dict[str, float]:
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
@@ -869,14 +900,23 @@ def run_eval_segments(
             f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
         )
     available_segments = len(eval_segments)
-    if max_segments is not None:
-        if max_segments <= 0:
-            raise ValueError("max_segments must be positive or None.")
-        eval_segments = eval_segments[:max_segments]
+    selection = select_eval_subset(
+        np.arange(available_segments, dtype=np.int64),
+        max_segments,
+        times=segment_midpoint_times(eval_ds, eval_segments),
+        policy=subset_policy,
+        role=subset_role,
+        fold=subset_fold,
+    )
+    eval_segments = [eval_segments[int(position)] for position in selection.positions.tolist()]
     if not eval_segments:
         raise ValueError("No eval segments selected.")
-    if max_segments is not None and len(eval_segments) < available_segments:
-        print(f"[{progress_label}] using first {len(eval_segments)}/{available_segments} validation segments")
+    if selection.capped:
+        readable_policy = selection.policy.replace("_", " ")
+        print(
+            f"[{progress_label}] using {readable_policy} "
+            f"{len(eval_segments)}/{available_segments} validation segments"
+        )
 
     state_by_lane_count: dict[int, hk.State] = {}
     eval_chunk_fn_by_lane_count: dict[int, callable] = {}
@@ -893,6 +933,7 @@ def run_eval_segments(
             eval_segments,
             batch_size=eval_batch_size,
             bptt_steps=bptt_steps,
+            segment_ids=selection.item_ids,
         ),
         start=1,
     ):
@@ -969,6 +1010,7 @@ def run_eval_segments(
         "total": float(total_weighted_loss / total_windows),
         "segments": float(len(eval_segments)),
         "chunks": float(n_chunks),
+        **selection.metadata(item_name="segments"),
     }
 
 
