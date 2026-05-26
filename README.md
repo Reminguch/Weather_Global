@@ -999,6 +999,103 @@ Both rows will be filled in once the JSONs land.
 
 ---
 
+## v15 → v20 → v22 — Long-AR Curriculum + K\* Crossover (May 2026)
+
+The K-curriculum continued from the v3 setup into a deeper exploration of how long the
+autoregressive (AR) training rollout needs to be before persistent SSM memory shows
+material gains at multi-day lead times. The setup is one architecture (full S6 Mamba
+inside the residual GraphCast head, `d_conv=4`, `d_state=16`, `hidden_size=128`,
+`layers=2`) trained at progressively longer AR tail lengths K, anchored to a common
+K=1 (single-step) pretrain.
+
+See per-version writeups in `docs/experiments/`:
+- [v15_K1_baseline.md](docs/experiments/v15_K1_baseline.md) — single-step pretrain (20k steps)
+- [v20_K14_production.md](docs/experiments/v20_K14_production.md) — K=14 production
+- [v22_K22_production.md](docs/experiments/v22_K22_production.md) — K=22 production + K-scan
+
+### Naming convention (important)
+
+**`K` in run names** is the *training AR horizon* (the production K). The corresponding
+CLI argument is `--ar-tail-K` with one quirky off-by-one: `K=1` (single-step, no AR
+rollout) corresponds to `--ar-tail-K 0`; `K=N` for `N ≥ 2` corresponds to `--ar-tail-K N`.
+
+### Training chain
+
+```
+DeepMind GraphCast-small ckpt (frozen, ~36M params)
+            │ overlay 94 matching GC params
+            ▼
+v15 K=1 fresh init  ──────────────►  20,000 steps  (teacher forcing only, --ar-tail-K 0)
+            │ resume_from v15 step20000
+            ├────────────────────►  v18, v19 (intermediate K=4–K=10 experiments)
+            ├────────────────────►  v20 K=14  (+3k K=1 spinup → +3k at ar-tail-K=14)
+            └────────────────────►  v22 K=22  (+3k K=1 spinup → +3k at ar-tail-K=22)
+```
+
+Each downstream run is a small (3000-step) AR-tail finetune on top of the same shared
+K=1 foundation. Total Mamba training: **23,000 K=1 steps + 3,000 K-production steps =
+26,000 steps** for v20 and v22 alike — the only difference between them is the K used
+in the production finetune.
+
+### Headline result — long-AR helps long-lead
+
+Eval setup: 240 sample anchors × 40 forecast lead steps (6h → 240h), lat-weighted RMSE,
+vs frozen GraphCast-small baseline on identical anchors.
+
+| Run | K | Total MSE-imp @ 240h | Notes |
+|---|---|---|---|
+| v20 | 14 | **+3.56%** | sits below K\* |
+| v22 | 22 | **+12.69%** | sits above K\* — long-horizon stabilization regime |
+| Δ | +8 | +9.13 pp | same architecture, only K differs |
+
+Per-variable peak RMSE-improvement (v22 K=22): 2m_T +3.8% @ 48h, MSL +4.2%, Z500 +2.5%,
+Z850 +3.4%. All 83 channels improve at short leads (1-24h); ~24-30 channels remain
+better than baseline through 240h.
+
+### K-scan and the K\* transition
+
+A K-scan (12 production runs at K=1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22) reveals
+a **transition between K=16 and K=18** above which 240h MSE-improvement jumps
+dramatically. Runs at K ≤ 16 cluster near +2-4% improvement; runs at K ≥ 18 jump to
++8-13%. We interpret this as the model's effective AR-rollout receptive field crossing
+a threshold where Mamba's persistent SSM state begins meaningfully tracking
+multi-day-evolving patterns rather than just short-range corrections.
+
+Launchers for the K-scan live in `slurm_pilots/v20_kscan/` (K=4..14) and
+`slurm_pilots/v22_kscan/` (K=2..22).
+
+### Why this works — what's frozen vs trained
+
+Only the residual head (10.2M GraphCast + 851k Mamba) trains. The frozen GraphCast-small
+backbone gives a strong baseline forecast; the residual head learns a correction. The
+S6 Mamba block inside the residual processor maintains per-`(batch, mesh_node)`
+persistent state across both:
+
+- **chunks within a training segment** (via `hk.scan` over time axis), and
+- **autoregressive rollout steps within the K-tail** (via `hk.get_state` /
+  `hk.set_state`, averaged over batch).
+
+At inference, this state threads across all 40 forecast lead steps. The combination of
+long-AR training + persistent state is what produces the K\* crossover: short AR-tail
+training (K ≤ 16) leaves the state untrained at long lead times, so improvement decays
+with lead; long AR-tail training (K ≥ 18) trains the state to be informative across
+the full forecast horizon.
+
+### Source code (this commit adds)
+
+- `scripts/training/full_mamba_v20/train_mz_v20.py` — the production training entry-point
+  shared by v20 and v22 (only CLI args differ between the two).
+- Launchers: `slurm_pilots/v22_K1.slurm`, `slurm_pilots/v20_kscan/*.slurm`,
+  `slurm_pilots/v22_kscan/*.slurm`.
+
+The frozen-GraphCast + trainable-residual + Mamba S6 architecture itself lives in
+`src/models/mamba/` (Mamba block in `mamba/modules/temporal_mesh_mamba_Ilya.py`) and the
+patched `third_party/graphcast/graphcast/graphcast.py` integrating the temporal block
+inside the mesh processor.
+
+
+---
+
 ## Repository Structure
 
 ```
