@@ -177,8 +177,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--segment-prefetch-depth must be > 0")
     if args.len_segment % args.bptt_steps != 0:
         raise ValueError("--bptt-steps must divide --len-segment")
-    if args.target_steps != 1:
-        raise ValueError("Segment BPTT training currently requires --target-steps 1.")
+    if args.target_steps <= 0:
+        raise ValueError("--target-steps must be > 0")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -333,9 +333,13 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         SegmentBlockBatchLoader,
         SegmentChunk,
         SegmentLoadStats,
+        _advance_autoregressive_inputs,
         _build_chunk_batches,
+        _loss_by_lane,
         _reset_temporal_state_lanes,
+        _reset_dataset_lanes,
         _save_chunk_timing_logs,
+        _stop_gradient_dataset,
         _stop_gradient_temporal_state,
         _write_segment_run_config,
         build_full_segments,
@@ -378,6 +382,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     if input_steps < 2:
         raise ValueError("Segment training expects at least two input frames.")
     target_steps = cfg.target_steps
+    rolling_ar = target_steps > 1
+    target_load_steps = 1 if rolling_ar else target_steps
 
     train_final_indices = valid_contiguous_final_input_indices(
         train_ds,
@@ -408,7 +414,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         f"train_windows={len(train_final_indices)}, eval_windows={len(eval_final_indices)}, "
         f"train_segments={len(segments)}, eval_segments={len(eval_segments)}, "
         f"len_segment={segment_cfg.len_segment}, "
-        f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, target_steps={target_steps}"
+        f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, "
+        f"target_steps={target_steps}, target_load_steps={target_load_steps}"
     )
 
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
@@ -470,7 +477,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         effective_train_batch_builder = "segment_block"
         effective_eval_batch_builder = "segment_block"
 
-    def forward_fn(inputs, targets, forcings, is_training):
+    def loss_forward_fn(inputs, targets, forcings, is_training):
+        del is_training
         predictor = build_predictor(
             model_cfg,
             task_cfg,
@@ -493,7 +501,31 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         )
         return predictor.loss(inputs, targets, forcings)
 
-    transformed = hk.transform_with_state(forward_fn)
+    def loss_prediction_forward_fn(inputs, targets, forcings, is_training):
+        predictor = build_predictor(
+            model_cfg,
+            task_cfg,
+            norm_stats,
+            use_bf16=(cfg.precision == "bf16"),
+            gradient_checkpointing=bool(is_training),
+            temporal_backbone=cfg.temporal_backbone,
+            temporal_location=cfg.temporal_location,
+            temporal_d_inner=cfg.temporal_d_inner,
+            temporal_d_state=cfg.temporal_d_state,
+            temporal_d_conv=cfg.temporal_d_conv,
+            temporal_dt_rank=cfg.temporal_dt_rank,
+            temporal_bias=cfg.temporal_bias,
+            temporal_conv_bias=cfg.temporal_conv_bias,
+            temporal_layers=cfg.temporal_layers,
+            temporal_dropout=cfg.temporal_dropout,
+            temporal_stateful=cfg.temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
+            zero_init_temporal_out=cfg.zero_init_temporal_out,
+            autoregressive_loss_mode="none",
+        )
+        return predictor.loss_and_predictions(inputs, targets, forcings)
+
+    transformed = hk.transform_with_state(loss_prediction_forward_fn if rolling_ar else loss_forward_fn)
     rng = jax.random.PRNGKey(cfg.seed)
 
     init_indices = [int(segments[lane % len(segments)][0]) for lane in range(cfg.batch_size)]
@@ -501,7 +533,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         train_ds,
         indices=init_indices,
         input_steps=input_steps,
-        target_steps=target_steps,
+        target_steps=target_load_steps,
         task_cfg=task_cfg,
         dt=dt_train,
     )
@@ -547,40 +579,107 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         numpy_cache_active=numpy_cache_active,
     )
 
-    @functools.partial(jax.jit)
-    def train_chunk(
-        params: hk.Params,
-        state: hk.State,
-        opt_state: optax.OptState,
-        rng_key: jax.Array,
-        chunk_inputs: tuple[xr.Dataset, ...],
-        chunk_targets: tuple[xr.Dataset, ...],
-        chunk_forcings: tuple[xr.Dataset, ...],
-        reset_mask: jax.Array,
-    ):
-        state = _reset_temporal_state_lanes(state, reset_mask)
+    rolling_inputs_state = sample_inputs if rolling_ar else None
+    rollout_age_state = jnp.zeros((cfg.batch_size,), dtype=jnp.int32) if rolling_ar else None
 
-        def loss_fn(p, s, key):
-            current_state = s
-            losses = []
-            keys = jax.random.split(key, segment_cfg.bptt_steps)
-            for bptt_i in range(segment_cfg.bptt_steps):
-                (loss_and_diag, current_state) = transformed.apply(
-                    p,
-                    current_state,
-                    keys[bptt_i],
-                    chunk_inputs[bptt_i],
-                    chunk_targets[bptt_i],
-                    chunk_forcings[bptt_i],
-                    True,
-                )
-                losses.append(scalarize_loss(loss_and_diag[0]))
-            return jnp.mean(jnp.stack(losses)), current_state
+    if rolling_ar:
+        @functools.partial(jax.jit)
+        def train_chunk(
+            params: hk.Params,
+            state: hk.State,
+            opt_state: optax.OptState,
+            rng_key: jax.Array,
+            chunk_inputs: tuple[xr.Dataset, ...],
+            chunk_targets: tuple[xr.Dataset, ...],
+            chunk_forcings: tuple[xr.Dataset, ...],
+            rolling_inputs: xr.Dataset,
+            rollout_age: jax.Array,
+            reset_mask: jax.Array,
+        ):
+            state = _reset_temporal_state_lanes(state, reset_mask)
+            rolling_inputs = _reset_dataset_lanes(rolling_inputs, chunk_inputs[0], reset_mask)
+            rollout_age = jnp.where(reset_mask, jnp.zeros_like(rollout_age), rollout_age)
 
-        (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
-        updates, new_opt_state = opt.update(grads, opt_state, params)
-        new_params = optax.apply_updates(params, updates)
-        return new_params, _stop_gradient_temporal_state(new_state), new_opt_state, loss
+            def loss_fn(p, s, key):
+                current_state = s
+                current_inputs = rolling_inputs
+                current_age = rollout_age
+                weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                keys = jax.random.split(key, segment_cfg.bptt_steps)
+                for bptt_i in range(segment_cfg.bptt_steps):
+                    (loss_and_diag, predictions), current_state = transformed.apply(
+                        p,
+                        current_state,
+                        keys[bptt_i],
+                        current_inputs,
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        True,
+                    )
+                    next_age = current_age + 1
+                    loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                    valid_weight = (next_age >= target_steps).astype(loss_by_lane.dtype)
+                    weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
+                    valid_count = valid_count + jnp.sum(valid_weight)
+                    current_inputs = _advance_autoregressive_inputs(
+                        current_inputs,
+                        predictions,
+                        chunk_forcings[bptt_i],
+                    )
+                    current_age = next_age
+                loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
+                return loss, (current_state, current_inputs, current_age)
+
+            (loss, (new_state, new_rolling_inputs, new_rollout_age)), grads = jax.value_and_grad(
+                loss_fn,
+                has_aux=True,
+            )(params, state, rng_key)
+            updates, new_opt_state = opt.update(grads, opt_state, params)
+            new_params = optax.apply_updates(params, updates)
+            return (
+                new_params,
+                _stop_gradient_temporal_state(new_state),
+                new_opt_state,
+                _stop_gradient_dataset(new_rolling_inputs),
+                jax.lax.stop_gradient(new_rollout_age),
+                loss,
+            )
+    else:
+        @functools.partial(jax.jit)
+        def train_chunk(
+            params: hk.Params,
+            state: hk.State,
+            opt_state: optax.OptState,
+            rng_key: jax.Array,
+            chunk_inputs: tuple[xr.Dataset, ...],
+            chunk_targets: tuple[xr.Dataset, ...],
+            chunk_forcings: tuple[xr.Dataset, ...],
+            reset_mask: jax.Array,
+        ):
+            state = _reset_temporal_state_lanes(state, reset_mask)
+
+            def loss_fn(p, s, key):
+                current_state = s
+                losses = []
+                keys = jax.random.split(key, segment_cfg.bptt_steps)
+                for bptt_i in range(segment_cfg.bptt_steps):
+                    (loss_and_diag, current_state) = transformed.apply(
+                        p,
+                        current_state,
+                        keys[bptt_i],
+                        chunk_inputs[bptt_i],
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        True,
+                    )
+                    losses.append(scalarize_loss(loss_and_diag[0]))
+                return jnp.mean(jnp.stack(losses)), current_state
+
+            (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
+            updates, new_opt_state = opt.update(grads, opt_state, params)
+            new_params = optax.apply_updates(params, updates)
+            return new_params, _stop_gradient_temporal_state(new_state), new_opt_state, loss
 
     step = cfg.resume_step if cfg.resume_step is not None else 0
     train_losses: list[tuple[int, float]] = []
@@ -668,7 +767,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             train_ds,
             segments,
             input_steps=input_steps,
-            target_steps=target_steps,
+            target_steps=target_load_steps,
             task_cfg=task_cfg,
             dt=dt_train,
             load_executor=load_executor,
@@ -683,7 +782,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             eval_ds,
             eval_segments,
             input_steps=input_steps,
-            target_steps=target_steps,
+            target_steps=target_load_steps,
             task_cfg=task_cfg,
             dt=dt_train,
             load_executor=load_executor,
@@ -712,7 +811,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 train_ds,
                 chunk.chunk_indices,
                 input_steps=input_steps,
-                target_steps=target_steps,
+                target_steps=target_load_steps,
                 task_cfg=task_cfg,
                 dt=dt_train,
                 batch_builder=train_batch_builder,
@@ -759,16 +858,32 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
             rng, step_key = jax.random.split(rng)
             t0 = time.time()
-            params, state, opt_state, loss = train_chunk(
-                params,
-                state,
-                opt_state,
-                step_key,
-                chunk_inputs,
-                chunk_targets,
-                chunk_forcings,
-                jnp.asarray(reset_mask_np),
-            )
+            if rolling_ar:
+                assert rolling_inputs_state is not None
+                assert rollout_age_state is not None
+                params, state, opt_state, rolling_inputs_state, rollout_age_state, loss = train_chunk(
+                    params,
+                    state,
+                    opt_state,
+                    step_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    rolling_inputs_state,
+                    rollout_age_state,
+                    jnp.asarray(reset_mask_np),
+                )
+            else:
+                params, state, opt_state, loss = train_chunk(
+                    params,
+                    state,
+                    opt_state,
+                    step_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    jnp.asarray(reset_mask_np),
+                )
 
             if step + 1 + len(pending_chunks) < cfg.max_steps:
                 pending_chunks.append(submit_next_chunk())
@@ -830,6 +945,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
                     segment_loader=eval_segment_loader,
+                    rolling_ar=rolling_ar,
+                    load_target_steps=target_load_steps,
                     max_segments=segment_cfg.eval_num_segments,
                     subset_policy=segment_cfg.eval_subset_policy,
                     subset_role="fixed_checkpoint",
@@ -858,6 +975,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                         chunk_load_workers=segment_cfg.chunk_load_workers,
                         load_executor=load_executor,
                         segment_loader=eval_segment_loader,
+                        rolling_ar=rolling_ar,
+                        load_target_steps=target_load_steps,
                         max_segments=segment_cfg.eval_num_segments,
                         subset_policy=EVAL_SUBSET_STRATIFIED_ROTATING,
                         subset_role="rotating_diagnostic",
@@ -911,6 +1030,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
         segment_loader=eval_segment_loader,
+        rolling_ar=rolling_ar,
+        load_target_steps=target_load_steps,
         max_segments=segment_cfg.final_eval_num_segments,
         subset_policy=segment_cfg.eval_subset_policy,
         subset_role="final",

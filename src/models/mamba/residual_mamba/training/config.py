@@ -123,8 +123,8 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         raise ValueError("--chunk-load-workers must be > 0")
     if args.len_segment % args.bptt_steps != 0:
         raise ValueError("--bptt-steps must divide --len-segment")
-    if args.target_steps != 1:
-        raise ValueError("Residual segment training currently requires --target-steps 1.")
+    if args.target_steps <= 0:
+        raise ValueError("--target-steps must be > 0")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:

@@ -24,14 +24,23 @@ from src.models.graphcast.training.core.eval_selection import (  # noqa: E402
     select_eval_subset,
 )
 from src.models.graphcast.training.core.segments import iter_eval_segment_chunks, run_eval_segments  # noqa: E402
-from src.models.graphcast.training.core.model import reset_residual_input_lanes  # noqa: E402
+from src.models.graphcast.training.core import model as core_model  # noqa: E402
+from src.models.graphcast.training.core.model import (  # noqa: E402
+    FinalStepLossAutoregressivePredictor,
+    build_zero_residual_inputs,
+    reset_residual_input_lanes,
+)
 from src.models.graphcast.evaluation.device_resolution_eval import (  # noqa: E402
     _accumulate_step as accumulate_device_step,
     _empty_device_accumulator,
     add_device_accumulator_to_host,
     build_metric_spec,
 )
-from src.models.mamba.residual_mamba.training.model import run_residual_eval  # noqa: E402
+from src.models.mamba.residual_mamba.training.model import (  # noqa: E402
+    build_loss_prediction_transform as build_residual_loss_prediction_transform,
+    residual_autoregressive_final_horizon,
+    run_residual_eval,
+)
 from scripts.analyze_models.unified_resolution_eval import (  # noqa: E402
     _accumulate_metrics,
     _empty_metric_accumulator,
@@ -87,6 +96,47 @@ def _stateful_loss_transform() -> hk.TransformedWithState:
     return hk.transform_with_state(forward)
 
 
+def _target_length_stateful_loss_transform() -> hk.TransformedWithState:
+    def forward(inputs, targets, forcings, is_training):
+        del inputs, forcings, is_training
+        batch_size = targets.sizes["batch"]
+        prev = hk.get_state("toy_ssm_state", shape=(batch_size,), dtype=jnp.float32, init=jnp.zeros)
+        hk.set_state("toy_ssm_state", prev + jnp.asarray(targets.sizes["time"], dtype=jnp.float32))
+        loss = xr.DataArray(xarray_jax.wrap(prev), dims=("batch",), coords={"batch": targets.coords["batch"]})
+        return (loss, {})
+
+    return hk.transform_with_state(forward)
+
+
+def _stateful_loss_prediction_transform() -> hk.TransformedWithState:
+    def forward(inputs, targets, forcings, is_training):
+        del inputs, forcings, is_training
+        x = xarray_jax.unwrap_data(targets["x"])
+        target_signal = jnp.mean(x, axis=tuple(range(1, x.ndim))) if x.ndim > 1 else x
+        prev = hk.get_state("toy_ssm_state", shape=(target_signal.shape[0],), dtype=jnp.float32, init=jnp.zeros)
+        hk.set_state("toy_ssm_state", prev + target_signal)
+        loss = xr.DataArray(xarray_jax.wrap(prev), dims=("batch",), coords={"batch": targets.coords["batch"]})
+        predictions = xr.Dataset({"x": xr.zeros_like(targets["x"])})
+        return (loss, {}), predictions
+
+    return hk.transform_with_state(forward)
+
+
+def _counting_loss_prediction_transform() -> hk.TransformedWithState:
+    def forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        batch_size = targets.sizes["batch"]
+        prev = hk.get_state("toy_ssm_state", shape=(batch_size,), dtype=jnp.float32, init=jnp.zeros)
+        hk.set_state("toy_ssm_state", prev + 1.0)
+        loss = xr.DataArray(xarray_jax.wrap(prev), dims=("batch",), coords={"batch": targets.coords["batch"]})
+        pred = (inputs["x"].isel(time=-1, drop=True) + 1.0).expand_dims(
+            time=targets.coords["time"]
+        ).transpose(*targets["x"].dims)
+        return (loss, xr.Dataset()), xr.Dataset({"x": pred})
+
+    return hk.transform_with_state(forward)
+
+
 def _baseline_predict_transform() -> hk.TransformedWithState:
     def forward(inputs, targets, forcings, is_training):
         del forcings, is_training
@@ -95,6 +145,105 @@ def _baseline_predict_transform() -> hk.TransformedWithState:
         return xr.Dataset({"x": pred})
 
     return hk.transform_with_state(forward)
+
+
+class _IncrementPredictor:
+    def __call__(self, inputs, targets_template, forcings):
+        del forcings
+        last = inputs["x"].isel(time=-1, drop=True)
+        pred = (last + 1.0).expand_dims(time=targets_template.coords["time"]).transpose(*targets_template["x"].dims)
+        return xr.Dataset({"x": pred})
+
+    def loss(self, inputs, targets, forcings):
+        (loss_and_diag, _predictions) = self.loss_and_predictions(inputs, targets, forcings)
+        return loss_and_diag
+
+    def loss_and_predictions(self, inputs, targets, forcings):
+        predictions = self(inputs, targets, forcings)
+        loss = ((predictions["x"] - targets["x"]) ** 2).mean("time", skipna=False)
+        return (loss, xr.Dataset()), predictions
+
+
+def _multi_step_batch_builder(target_values: np.ndarray):
+    def build_batch(
+        _ds,
+        *,
+        indices,
+        input_steps: int,
+        target_steps: int,
+        task_cfg,
+        dt: pd.Timedelta,
+    ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+        del input_steps, task_cfg, dt
+        arr = np.asarray(indices, dtype=np.float32)
+        batch = np.arange(arr.size, dtype=np.int64)
+        input_time = np.arange(2, dtype=np.int64)
+        target_time = np.arange(2, 2 + target_steps, dtype=np.int64)
+        values = np.asarray(target_values[:target_steps], dtype=np.float32)
+        inputs = xr.Dataset(
+            {"x": (("batch", "time"), np.repeat(arr[:, None], input_time.size, axis=1))},
+            coords={"batch": batch, "time": input_time},
+        )
+        targets = xr.Dataset(
+            {"x": (("batch", "time"), np.repeat(values[None, :], arr.size, axis=0))},
+            coords={"batch": batch, "time": target_time},
+        )
+        forcings = xr.Dataset(coords={"batch": batch, "time": target_time})
+        return inputs, targets, forcings
+
+    return build_batch
+
+
+def _constant_target_batch_builder(target_value: float):
+    def build_batch(
+        _ds,
+        *,
+        indices,
+        input_steps: int,
+        target_steps: int,
+        task_cfg,
+        dt: pd.Timedelta,
+    ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
+        del task_cfg, dt
+        arr = np.asarray(indices, dtype=np.float32)
+        batch = np.arange(arr.size, dtype=np.int64)
+        input_time = np.arange(input_steps, dtype=np.int64)
+        target_time = np.arange(input_steps, input_steps + target_steps, dtype=np.int64)
+        inputs = xr.Dataset(
+            {"x": (("batch", "time"), np.repeat(arr[:, None], input_steps, axis=1))},
+            coords={"batch": batch, "time": input_time},
+        )
+        targets = xr.Dataset(
+            {"x": (("batch", "time"), np.full((arr.size, target_steps), target_value, dtype=np.float32))},
+            coords={"batch": batch, "time": target_time},
+        )
+        forcings = xr.Dataset(coords={"batch": batch, "time": target_time})
+        return inputs, targets, forcings
+
+    return build_batch
+
+
+def test_final_step_autoregressive_loss_ignores_intermediate_losses() -> None:
+    def forward(inputs, targets, forcings):
+        predictor = FinalStepLossAutoregressivePredictor(_IncrementPredictor())
+        return predictor.loss(inputs, targets, forcings)
+
+    transformed = hk.transform_with_state(forward)
+    inputs = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[0.0, 0.0]], dtype=np.float32))},
+        coords={"batch": np.asarray([0]), "time": np.asarray([0, 1])},
+    )
+    targets = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[1.0, 99.0, 3.0]], dtype=np.float32))},
+        coords={"batch": np.asarray([0]), "time": np.asarray([2, 3, 4])},
+    )
+    forcings = xr.Dataset(coords={"batch": np.asarray([0]), "time": np.asarray([2, 3, 4])})
+    rng = jax.random.PRNGKey(0)
+    params, state = transformed.init(rng, inputs, targets, forcings)
+
+    loss_and_diag, _state = transformed.apply(params, state, rng, inputs, targets, forcings)
+
+    np.testing.assert_allclose(np.asarray(xarray_jax.unwrap_data(loss_and_diag[0])), np.asarray([0.0]))
 
 
 def test_iter_eval_segment_chunks_keeps_order_and_underfilled_final_group() -> None:
@@ -243,6 +392,210 @@ def test_reset_residual_input_lanes_handles_jax_wrapped_inputs_inside_jit() -> N
     np.testing.assert_allclose(np.asarray(xarray_jax.unwrap_data(reset["constant"])), np.asarray([10.0, 11.0]))
 
 
+def test_residual_autoregressive_rollout_uses_predicted_full_feedback_and_teacher_carry() -> None:
+    def baseline_forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        pred = (inputs["x"].isel(time=-1, drop=True) + 10.0).expand_dims(
+            time=targets.coords["time"]
+        ).transpose(*targets["x"].dims)
+        return xr.Dataset({"x": pred})
+
+    def residual_forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        pred = (inputs["x"].isel(time=-1, drop=True) + 1.0).expand_dims(
+            time=targets.coords["time"]
+        ).transpose(*targets["x"].dims)
+        predictions = xr.Dataset({"x": pred})
+        loss = ((predictions["x"] - targets["x"]) ** 2).mean("time", skipna=False)
+        return (loss, xr.Dataset()), predictions
+
+    baseline_transform = hk.transform_with_state(baseline_forward)
+    residual_transform = hk.transform_with_state(residual_forward)
+    batch = np.asarray([0], dtype=np.int64)
+    inputs = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[5.0, 9.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": np.asarray([0, 1])},
+    )
+    targets = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[20.0, 40.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": np.asarray([2, 3])},
+    )
+    forcings = xr.Dataset(coords={"batch": batch, "time": targets.coords["time"]})
+    residual_inputs = build_zero_residual_inputs(inputs, targets)
+    rng = jax.random.PRNGKey(0)
+    baseline_params, baseline_state = baseline_transform.init(
+        rng,
+        inputs,
+        targets.isel(time=slice(0, 1)),
+        forcings.isel(time=slice(0, 1)),
+        False,
+    )
+    residual_params, residual_state = residual_transform.init(
+        rng,
+        residual_inputs,
+        targets.isel(time=slice(0, 1)),
+        forcings.isel(time=slice(0, 1)),
+        True,
+    )
+
+    loss_by_lane, _carry_state, teacher_carry = residual_autoregressive_final_horizon(
+        residual_transform,
+        baseline_transform,
+        residual_params=residual_params,
+        baseline_params=baseline_params,
+        residual_state=residual_state,
+        baseline_state=baseline_state,
+        rng_key=rng,
+        inputs=inputs,
+        targets=targets,
+        forcings=forcings,
+        residual_inputs=residual_inputs,
+        is_training=True,
+    )
+
+    np.testing.assert_allclose(np.asarray(jax.device_get(loss_by_lane)), np.asarray([64.0]))
+    np.testing.assert_allclose(
+        np.asarray(xarray_jax.unwrap_data(teacher_carry["x"])),
+        np.asarray([[0.0, 1.0]], dtype=np.float32),
+    )
+
+
+def test_residual_loss_prediction_transform_uses_one_step_predictor(monkeypatch) -> None:
+    class FakeGraphCast:
+        def __init__(self, model_cfg, task_cfg):
+            del model_cfg, task_cfg
+
+        def loss_and_predictions(self, inputs, targets, forcings):
+            del inputs, forcings
+            predictions = xr.zeros_like(targets)
+            loss = ((predictions["x"] - targets["x"]) ** 2).mean("time", skipna=False)
+            return (loss, xr.Dataset()), predictions
+
+    monkeypatch.setattr(core_model.gc, "GraphCast", FakeGraphCast)
+    cfg = SimpleNamespace(
+        precision="fp32",
+        temporal_backbone="mamba",
+        temporal_location="mesh_processor_interleaved",
+        temporal_d_inner=4,
+        temporal_d_state=2,
+        temporal_d_conv=4,
+        temporal_dt_rank="auto",
+        temporal_bias=False,
+        temporal_conv_bias=True,
+        temporal_layers=1,
+        temporal_dropout=0.0,
+        temporal_stateful=True,
+        temporal_insert_count=1,
+    )
+    stats = {
+        "stddev_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(1.0, dtype=np.float32))}),
+        "mean_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(0.0, dtype=np.float32))}),
+        "diffs_stddev_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(1.0, dtype=np.float32))}),
+    }
+    transform = build_residual_loss_prediction_transform(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        stats,
+        cfg,
+        gradient_checkpointing=True,
+    )
+    batch = np.asarray([0], dtype=np.int64)
+    inputs = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[0.0, 0.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": np.asarray([0, 1])},
+    )
+    targets = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[2.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": np.asarray([2])},
+    )
+    forcings = xr.Dataset(coords={"batch": batch, "time": targets.coords["time"]})
+    residual_inputs = build_zero_residual_inputs(inputs, targets)
+
+    rng = jax.random.PRNGKey(0)
+    params, state = transform.init(rng, residual_inputs, targets, forcings, True)
+    (loss_and_diag, predictions), _ = transform.apply(
+        params,
+        state,
+        rng,
+        residual_inputs,
+        targets,
+        forcings,
+        True,
+    )
+
+    np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(loss_and_diag[0]))), [4.0])
+    np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(predictions["x"]))), [[0.0]])
+
+
+def test_residual_loss_prediction_transform_init_uses_one_step_template(monkeypatch) -> None:
+    class OneStepOnlyGraphCast:
+        def __init__(self, model_cfg, task_cfg):
+            del model_cfg, task_cfg
+
+        def loss_and_predictions(self, inputs, targets, forcings):
+            del inputs, forcings
+            if targets.sizes["time"] != 1:
+                raise ValueError(f"expected one target step, got {targets.sizes['time']}")
+            predictions = xr.zeros_like(targets)
+            loss = ((predictions["x"] - targets["x"]) ** 2).mean("time", skipna=False)
+            return (loss, xr.Dataset()), predictions
+
+    monkeypatch.setattr(core_model.gc, "GraphCast", OneStepOnlyGraphCast)
+    cfg = SimpleNamespace(
+        precision="fp32",
+        temporal_backbone="mamba",
+        temporal_location="mesh_processor_interleaved",
+        temporal_d_inner=4,
+        temporal_d_state=2,
+        temporal_d_conv=4,
+        temporal_dt_rank="auto",
+        temporal_bias=False,
+        temporal_conv_bias=True,
+        temporal_layers=1,
+        temporal_dropout=0.0,
+        temporal_stateful=True,
+        temporal_insert_count=1,
+    )
+    stats = {
+        "stddev_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(1.0, dtype=np.float32))}),
+        "mean_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(0.0, dtype=np.float32))}),
+        "diffs_stddev_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(1.0, dtype=np.float32))}),
+    }
+    transform = build_residual_loss_prediction_transform(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        stats,
+        cfg,
+        gradient_checkpointing=True,
+    )
+    inputs, targets, forcings = _multi_step_batch_builder(np.asarray([2.0, 3.0, 4.0, 5.0]))(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=4,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    init_targets = targets.isel(time=slice(0, 1))
+    init_forcings = forcings.isel(time=slice(0, 1))
+    residual_inputs = build_zero_residual_inputs(inputs, init_targets)
+
+    rng = jax.random.PRNGKey(0)
+    params, state = transform.init(rng, residual_inputs, init_targets, init_forcings, True)
+    (loss_and_diag, predictions), _ = transform.apply(
+        params,
+        state,
+        rng,
+        residual_inputs,
+        init_targets,
+        init_forcings,
+        True,
+    )
+
+    np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(loss_and_diag[0]))), [4.0])
+    np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(predictions["x"]))), [[0.0]])
+
+
 def test_run_eval_segments_preserves_state_within_segment_and_resets_between_segments() -> None:
     transformed = _stateful_loss_transform()
 
@@ -277,6 +630,110 @@ def test_run_eval_segments_preserves_state_within_segment_and_resets_between_seg
 
     assert "total" in metrics
     np.testing.assert_allclose(metrics["total"], 4.0)
+
+
+def test_run_eval_segments_carries_one_step_state_for_multi_step_targets() -> None:
+    transformed = _target_length_stateful_loss_transform()
+    sample_inputs, sample_targets, sample_forcings = _multi_step_batch_builder(np.asarray([1.0, 2.0, 3.0]))(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=3,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    rng = jax.random.PRNGKey(0)
+    params, _ = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, False)
+
+    metrics = run_eval_segments(
+        transformed,
+        params,
+        rng,
+        eval_ds=xr.Dataset(),
+        eval_indices=np.arange(8, dtype=np.int64),
+        eval_batch_size=1,
+        input_steps=2,
+        target_steps=3,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+        len_segment=4,
+        bptt_steps=2,
+        progress_label="test",
+        batch_builder=_multi_step_batch_builder(np.asarray([1.0, 2.0, 3.0])),
+        chunk_load_workers=1,
+    )
+
+    np.testing.assert_allclose(metrics["total"], 1.5)
+
+
+def test_run_eval_segments_rolling_ar_delays_loss_without_k_inner_rollouts() -> None:
+    transformed = _counting_loss_prediction_transform()
+    sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(0.0)(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    rng = jax.random.PRNGKey(0)
+    params, _ = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, False)
+
+    metrics = run_eval_segments(
+        transformed,
+        params,
+        rng,
+        eval_ds=xr.Dataset(),
+        eval_indices=np.arange(6, dtype=np.int64),
+        eval_batch_size=1,
+        input_steps=2,
+        target_steps=4,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+        len_segment=6,
+        bptt_steps=6,
+        progress_label="test",
+        batch_builder=_constant_target_batch_builder(0.0),
+        chunk_load_workers=1,
+        rolling_ar=True,
+    )
+
+    np.testing.assert_allclose(metrics["total"], 4.0)
+
+
+def test_run_eval_segments_rolling_ar_resets_rollout_age_between_segments() -> None:
+    transformed = _counting_loss_prediction_transform()
+    sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(0.0)(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    rng = jax.random.PRNGKey(0)
+    params, _ = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, False)
+
+    metrics = run_eval_segments(
+        transformed,
+        params,
+        rng,
+        eval_ds=xr.Dataset(),
+        eval_indices=np.arange(8, dtype=np.int64),
+        eval_batch_size=1,
+        input_steps=2,
+        target_steps=3,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+        len_segment=4,
+        bptt_steps=2,
+        progress_label="test",
+        batch_builder=_constant_target_batch_builder(0.0),
+        chunk_load_workers=1,
+        rolling_ar=True,
+    )
+
+    np.testing.assert_allclose(metrics["total"], 2.5)
 
 
 def test_run_eval_segments_uses_stratified_subset_metadata() -> None:
@@ -358,7 +815,7 @@ def test_batch_eval_uses_stratified_windows_when_capped() -> None:
 
 
 def test_run_residual_eval_preserves_residual_state_within_segment() -> None:
-    residual_transform = _stateful_loss_transform()
+    residual_transform = _stateful_loss_prediction_transform()
     baseline_transform = _baseline_predict_transform()
 
     sample_inputs, sample_targets, sample_forcings = _batch_builder(2.0)(
@@ -395,6 +852,61 @@ def test_run_residual_eval_preserves_residual_state_within_segment() -> None:
 
     assert "total" in metrics
     np.testing.assert_allclose(metrics["total"], 32.0 / 6.0)
+
+
+def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> None:
+    def baseline_forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        pred = (inputs["x"].isel(time=-1, drop=True) + 10.0).expand_dims(
+            time=targets.coords["time"]
+        ).transpose(*targets["x"].dims)
+        return xr.Dataset({"x": pred})
+
+    def residual_forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        pred = (inputs["x"].isel(time=-1, drop=True) + 1.0).expand_dims(
+            time=targets.coords["time"]
+        ).transpose(*targets["x"].dims)
+        predictions = xr.Dataset({"x": pred})
+        loss = ((predictions["x"] - targets["x"]) ** 2).mean("time", skipna=False)
+        return (loss, xr.Dataset()), predictions
+
+    residual_transform = hk.transform_with_state(residual_forward)
+    baseline_transform = hk.transform_with_state(baseline_forward)
+    sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(100.0)(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    rng = jax.random.PRNGKey(0)
+    residual_inputs = build_zero_residual_inputs(sample_inputs, sample_targets)
+    residual_params, _ = residual_transform.init(rng, residual_inputs, sample_targets, sample_forcings, False)
+    baseline_params, _ = baseline_transform.init(rng, sample_inputs, sample_targets, sample_forcings, False)
+
+    metrics = run_residual_eval(
+        residual_transform,
+        baseline_transform,
+        residual_params,
+        baseline_params,
+        rng,
+        eval_ds=xr.Dataset(),
+        eval_indices=np.arange(3, dtype=np.int64),
+        eval_batch_size=1,
+        input_steps=2,
+        target_steps=3,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+        len_segment=3,
+        bptt_steps=3,
+        progress_label="test",
+        batch_builder=_constant_target_batch_builder(100.0),
+        chunk_load_workers=1,
+    )
+
+    np.testing.assert_allclose(metrics["total"], 4096.0)
 
 
 def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:

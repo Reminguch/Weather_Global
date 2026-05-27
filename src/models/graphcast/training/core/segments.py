@@ -22,7 +22,7 @@ from .eval_selection import (
     select_eval_subset,
 )
 from .logging import _write_run_config
-from .model import gc, scalarize_loss
+from .model import gc, scalarize_loss, xarray_jax
 from .prepared_array import PreparedArrayStore, is_prepared_array_store
 from .prepared_block_batches import PreparedBlockBatchLoader
 
@@ -307,6 +307,88 @@ def _stop_gradient_temporal_state(state: hk.State) -> hk.State:
     return _map_temporal_state_leaves(state, jax.lax.stop_gradient)
 
 
+def _loss_by_lane(loss_da: xr.DataArray) -> jax.Array:
+    loss = xarray_jax.unwrap_data(loss_da)
+    if "batch" not in loss_da.dims:
+        return loss[None]
+    batch_axis = loss_da.dims.index("batch")
+    if batch_axis != 0:
+        loss = jnp.moveaxis(loss, batch_axis, 0)
+    reduce_axes = tuple(range(1, loss.ndim))
+    if reduce_axes:
+        loss = jnp.mean(loss, axis=reduce_axes)
+    return loss
+
+
+def _reset_dataset_lanes(current: xr.Dataset, reset_values: xr.Dataset, reset_mask: jax.Array) -> xr.Dataset:
+    reset_mask = jnp.asarray(reset_mask, dtype=bool)
+    data_vars = {}
+    for name, current_da in current.data_vars.items():
+        if name not in reset_values:
+            data_vars[name] = current_da
+            continue
+        if "batch" not in current_da.dims:
+            data_vars[name] = current_da
+            continue
+        batch_axis = current_da.dims.index("batch")
+        current_data = xarray_jax.unwrap_data(current_da)
+        reset_data = xarray_jax.unwrap_data(reset_values[name])
+        mask_shape = [1] * current_data.ndim
+        mask_shape[batch_axis] = reset_mask.shape[0]
+        data = jnp.where(jnp.reshape(reset_mask, mask_shape), reset_data, current_data)
+        data_vars[name] = xr.DataArray(
+            xarray_jax.wrap(data),
+            dims=current_da.dims,
+            coords=current_da.coords,
+            attrs=current_da.attrs,
+            name=current_da.name,
+        )
+    return xr.Dataset(data_vars, coords=current.coords)
+
+
+def _stop_gradient_dataset(dataset: xr.Dataset) -> xr.Dataset:
+    data_vars = {}
+    for name, data_array in dataset.data_vars.items():
+        data = jax.lax.stop_gradient(xarray_jax.unwrap_data(data_array))
+        data_vars[name] = xr.DataArray(
+            xarray_jax.wrap(data),
+            dims=data_array.dims,
+            coords=data_array.coords,
+            attrs=data_array.attrs,
+            name=data_array.name,
+        )
+    return xr.Dataset(data_vars, coords=dataset.coords)
+
+
+def _constant_inputs(inputs: xr.Dataset, targets_template: xr.Dataset, forcings: xr.Dataset) -> xr.Dataset:
+    constant_inputs = inputs.drop_vars(targets_template.keys(), errors="ignore")
+    constant_inputs = constant_inputs.drop_vars(forcings.keys(), errors="ignore")
+    for name, var in constant_inputs.items():
+        if "time" in var.dims:
+            raise ValueError(
+                f"Time-dependent input variable {name} must either be a forcing variable or target variable."
+            )
+    return constant_inputs
+
+
+def _advance_autoregressive_inputs(
+    inputs: xr.Dataset,
+    predictions: xr.Dataset,
+    forcings: xr.Dataset,
+) -> xr.Dataset:
+    constant_inputs = _constant_inputs(inputs, predictions, forcings)
+    rolling_inputs = inputs.drop_vars(constant_inputs.keys())
+    num_inputs = rolling_inputs.sizes["time"]
+    next_frame = xr.merge([predictions, forcings])
+    predicted_or_forced_inputs = next_frame[list(rolling_inputs.keys())]
+    updated = (
+        xr.concat([rolling_inputs, predicted_or_forced_inputs], dim="time")
+        .tail(time=num_inputs)
+        .assign_coords(time=rolling_inputs.coords["time"])
+    )
+    return xr.merge([constant_inputs, updated])
+
+
 def _write_segment_run_config(
     out_dir: Path,
     *,
@@ -347,6 +429,13 @@ def _write_segment_run_config(
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
     }
+    if segment_cfg.base_cfg.target_steps > 1:
+        payload["autoregressive_training"] = {
+            "enabled": True,
+            "loss_mode": "rolling_delayed_horizon",
+            "target_steps": int(segment_cfg.base_cfg.target_steps),
+            "state_carry_steps": "rolling_stream_stop_gradient_chunks",
+        }
     if finite_segment_filter_stats is not None:
         payload["segment_training"]["finite_segment_filter"] = finite_segment_filter_stats
     with path.open("w", encoding="utf-8") as f:
@@ -888,11 +977,14 @@ def run_eval_segments(
     chunk_load_workers: int = 1,
     load_executor: concurrent.futures.Executor | None = None,
     segment_loader: SegmentBlockBatchLoader | None = None,
+    rolling_ar: bool = False,
+    load_target_steps: int | None = None,
     max_segments: int | None = None,
     subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
     subset_role: str = "fixed_checkpoint",
     subset_fold: int | None = None,
 ) -> dict[str, float]:
+    target_load_steps = load_target_steps if load_target_steps is not None else (1 if rolling_ar else target_steps)
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
         raise ValueError(
@@ -919,6 +1011,8 @@ def run_eval_segments(
         )
 
     state_by_lane_count: dict[int, hk.State] = {}
+    rolling_inputs_by_lane_count: dict[int, xr.Dataset] = {}
+    rollout_age_by_lane_count: dict[int, jax.Array] = {}
     eval_chunk_fn_by_lane_count: dict[int, callable] = {}
     total_weighted_loss = 0.0
     total_windows = 0
@@ -944,7 +1038,7 @@ def run_eval_segments(
                 eval_ds,
                 chunk.chunk_indices,
                 input_steps=input_steps,
-                target_steps=target_steps,
+                target_steps=target_load_steps,
                 task_cfg=task_cfg,
                 dt=dt,
                 batch_builder=batch_builder,
@@ -962,49 +1056,148 @@ def run_eval_segments(
                 chunk_forcings[0],
                 False,
             )
+            if rolling_ar:
+                rolling_inputs_by_lane_count[lane_count] = chunk_inputs[0]
+                rollout_age_by_lane_count[lane_count] = jnp.zeros((lane_count,), dtype=jnp.int32)
 
         if lane_count not in eval_chunk_fn_by_lane_count:
-            @jax.jit
-            def eval_chunk(params, state, key, chunk_inputs, chunk_targets, chunk_forcings, reset_mask):
-                current_state = _reset_temporal_state_lanes(state, reset_mask)
-                losses = []
-                keys = jax.random.split(key, len(chunk_inputs))
-                for bptt_i in range(len(chunk_inputs)):
-                    (loss_and_diag, current_state) = transformed.apply(
-                        params,
+            if rolling_ar:
+                @jax.jit
+                def eval_chunk(
+                    params,
+                    state,
+                    key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    rolling_inputs,
+                    rollout_age,
+                    reset_mask,
+                ):
+                    current_state = _reset_temporal_state_lanes(state, reset_mask)
+                    current_inputs = _reset_dataset_lanes(rolling_inputs, chunk_inputs[0], reset_mask)
+                    current_age = jnp.where(reset_mask, jnp.zeros_like(rollout_age), rollout_age)
+                    weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                    valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                    keys = jax.random.split(key, len(chunk_inputs))
+                    for bptt_i in range(len(chunk_inputs)):
+                        (loss_and_diag, predictions), current_state = transformed.apply(
+                            params,
+                            current_state,
+                            keys[bptt_i],
+                            current_inputs,
+                            chunk_targets[bptt_i],
+                            chunk_forcings[bptt_i],
+                            False,
+                        )
+                        next_age = current_age + 1
+                        loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                        valid_weight = (next_age >= target_steps).astype(loss_by_lane.dtype)
+                        weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
+                        valid_count = valid_count + jnp.sum(valid_weight)
+                        current_inputs = _advance_autoregressive_inputs(
+                            current_inputs,
+                            predictions,
+                            chunk_forcings[bptt_i],
+                        )
+                        current_age = next_age
+                    return (
                         current_state,
-                        keys[bptt_i],
-                        chunk_inputs[bptt_i],
-                        chunk_targets[bptt_i],
-                        chunk_forcings[bptt_i],
-                        False,
+                        _stop_gradient_dataset(current_inputs),
+                        jax.lax.stop_gradient(current_age),
+                        weighted_loss_sum,
+                        valid_count,
                     )
-                    losses.append(scalarize_loss(loss_and_diag[0]))
-                return current_state, jnp.stack(losses)
+            else:
+                @jax.jit
+                def eval_chunk(params, state, key, chunk_inputs, chunk_targets, chunk_forcings, reset_mask):
+                    current_state = _reset_temporal_state_lanes(state, reset_mask)
+                    losses = []
+                    keys = jax.random.split(key, len(chunk_inputs) * 2)
+                    for bptt_i in range(len(chunk_inputs)):
+                        loss_key = keys[2 * bptt_i]
+                        carry_key = keys[2 * bptt_i + 1]
+                        state_before_rollout = current_state
+                        (loss_and_diag, rollout_state) = transformed.apply(
+                            params,
+                            state_before_rollout,
+                            loss_key,
+                            chunk_inputs[bptt_i],
+                            chunk_targets[bptt_i],
+                            chunk_forcings[bptt_i],
+                            False,
+                        )
+                        losses.append(scalarize_loss(loss_and_diag[0]))
+                        if chunk_targets[bptt_i].sizes["time"] > 1:
+                            first_targets = chunk_targets[bptt_i].isel(time=slice(0, 1))
+                            first_forcings = chunk_forcings[bptt_i].isel(time=slice(0, 1))
+                            (_carry_loss_and_diag, current_state) = transformed.apply(
+                                params,
+                                state_before_rollout,
+                                carry_key,
+                                chunk_inputs[bptt_i],
+                                first_targets,
+                                first_forcings,
+                                False,
+                            )
+                        else:
+                            current_state = rollout_state
+                    return current_state, jnp.stack(losses)
 
             eval_chunk_fn_by_lane_count[lane_count] = eval_chunk
 
-        next_state, chunk_losses = eval_chunk_fn_by_lane_count[lane_count](
-            params,
-            state_by_lane_count[lane_count],
-            apply_key,
-            chunk_inputs,
-            chunk_targets,
-            chunk_forcings,
-            jnp.asarray(chunk.reset_mask),
-        )
-        state_by_lane_count[lane_count] = next_state
+        if rolling_ar:
+            (
+                next_state,
+                next_rolling_inputs,
+                next_rollout_age,
+                chunk_loss_sum,
+                chunk_valid_count,
+            ) = eval_chunk_fn_by_lane_count[lane_count](
+                params,
+                state_by_lane_count[lane_count],
+                apply_key,
+                chunk_inputs,
+                chunk_targets,
+                chunk_forcings,
+                rolling_inputs_by_lane_count[lane_count],
+                rollout_age_by_lane_count[lane_count],
+                jnp.asarray(chunk.reset_mask),
+            )
+            state_by_lane_count[lane_count] = next_state
+            rolling_inputs_by_lane_count[lane_count] = next_rolling_inputs
+            rollout_age_by_lane_count[lane_count] = next_rollout_age
+            chunk_loss_sum_f = float(jax.device_get(chunk_loss_sum))
+            chunk_valid_count_f = float(jax.device_get(chunk_valid_count))
+            total_weighted_loss += chunk_loss_sum_f
+            total_windows += int(chunk_valid_count_f)
+            current_loss = chunk_loss_sum_f / max(chunk_valid_count_f, 1.0)
+        else:
+            next_state, chunk_losses = eval_chunk_fn_by_lane_count[lane_count](
+                params,
+                state_by_lane_count[lane_count],
+                apply_key,
+                chunk_inputs,
+                chunk_targets,
+                chunk_forcings,
+                jnp.asarray(chunk.reset_mask),
+            )
+            state_by_lane_count[lane_count] = next_state
 
-        chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
-        total_weighted_loss += float(chunk_losses_np.sum()) * lane_count
-        total_windows += lane_count * len(chunk_inputs)
+            chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
+            total_weighted_loss += float(chunk_losses_np.sum()) * lane_count
+            total_windows += lane_count * len(chunk_inputs)
+            current_loss = float(chunk_losses_np.mean())
 
         if chunk_i == 1 or chunk_i % 10 == 0 or chunk_i == n_chunks:
             elapsed = time.time() - t_eval0
             print(
                 f"[{progress_label}] chunk {chunk_i}/{n_chunks} "
-                f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
+                f"elapsed {elapsed:.1f}s current_loss {current_loss:.6f}"
             )
+
+    if total_windows <= 0:
+        raise ValueError("No eval windows had enough rolling autoregressive history for loss.")
 
     return {
         "total": float(total_weighted_loss / total_windows),

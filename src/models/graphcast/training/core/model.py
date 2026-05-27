@@ -50,6 +50,72 @@ warnings.filterwarnings(
 _ORIG_NORMALIZED_LATITUDE_WEIGHTS = gc_losses.normalized_latitude_weights
 
 
+class FinalStepLossAutoregressivePredictor(autoregressive.Predictor):
+    """Autoregressive predictor whose multi-step loss uses only the final step."""
+
+    def loss(
+        self,
+        inputs: xr.Dataset,
+        targets: xr.Dataset,
+        forcings: xr.Dataset,
+        **kwargs,
+    ) -> predictor_base.LossAndDiagnostics:
+        if targets.sizes["time"] == 1:
+            return self._predictor.loss(inputs, targets, forcings, **kwargs)
+
+        constant_inputs = self._get_and_validate_constant_inputs(inputs, targets, forcings)
+        self._validate_targets_and_forcings(targets, forcings)
+        inputs = inputs.drop_vars(constant_inputs.keys())
+
+        if self._noise_level:
+            def add_noise(x):
+                return x + self._noise_level * jax.random.normal(hk.next_rng_key(), shape=x.shape)
+
+            inputs = jax.tree.map(add_noise, inputs)
+
+        flat_targets, target_treedef = autoregressive._get_flat_arrays_and_single_timestep_treedef(targets)
+        flat_forcings, forcings_treedef = autoregressive._get_flat_arrays_and_single_timestep_treedef(forcings)
+        scan_variables = (flat_targets, flat_forcings)
+
+        def one_step_loss(current_inputs, scan_step_variables):
+            flat_target, flat_step_forcings = scan_step_variables
+            step_forcings = autoregressive._unflatten_and_expand_time(
+                flat_step_forcings,
+                forcings_treedef,
+                targets.coords["time"][:1],
+            )
+            target = autoregressive._unflatten_and_expand_time(
+                flat_target,
+                target_treedef,
+                targets.coords["time"][:1],
+            )
+            all_inputs = xr.merge([constant_inputs, current_inputs])
+            (loss, diagnostics), predictions = self._predictor.loss_and_predictions(
+                all_inputs,
+                target,
+                forcings=step_forcings,
+                **kwargs,
+            )
+            loss, diagnostics = xarray_tree.map_structure(xarray_jax.unwrap_data, (loss, diagnostics))
+            next_frame = xr.merge([predictions, step_forcings])
+            next_inputs = self._update_inputs(current_inputs, next_frame)
+            return next_inputs, (loss, diagnostics)
+
+        if self._gradient_checkpointing:
+            one_step_loss = hk.remat(one_step_loss)
+
+        _, (per_timestep_losses, per_timestep_diagnostics) = hk.scan(
+            one_step_loss,
+            inputs,
+            scan_variables,
+        )
+
+        return jax.tree_util.tree_map(
+            lambda x: xarray_jax.DataArray(x, dims=("time", "batch")).isel(time=-1, drop=True),
+            (per_timestep_losses, per_timestep_diagnostics),
+        )
+
+
 def _fallback_normalized_latitude_weights(data: xr.DataArray) -> xr.DataArray:
     """Area weights for any uniformly spaced latitude vector (with or without poles)."""
     latitude = data.coords["lat"]
@@ -263,6 +329,7 @@ def build_predictor(
     temporal_stateful: bool = False,
     temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
+    autoregressive_loss_mode: str = "mean",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
     if hasattr(predictor, "_temporal_backbone"):
@@ -287,7 +354,17 @@ def build_predictor(
         mean_by_level=stats["mean_by_level"],
         diffs_stddev_by_level=stats["diffs_stddev_by_level"],
     )
-    predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
+    if autoregressive_loss_mode == "none":
+        pass
+    elif autoregressive_loss_mode == "mean":
+        predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
+    elif autoregressive_loss_mode == "final":
+        predictor = FinalStepLossAutoregressivePredictor(
+            predictor,
+            gradient_checkpointing=gradient_checkpointing,
+        )
+    else:
+        raise ValueError(f"Unknown autoregressive_loss_mode={autoregressive_loss_mode!r}")
     return predictor
 
 
@@ -311,6 +388,7 @@ def build_residual_correction_predictor(
     temporal_stateful: bool = False,
     temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
+    autoregressive_loss_mode: str = "mean",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
     if hasattr(predictor, "_temporal_backbone"):
@@ -335,7 +413,17 @@ def build_residual_correction_predictor(
         mean_by_level=stats["mean_by_level"],
         diffs_stddev_by_level=stats["diffs_stddev_by_level"],
     )
-    predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
+    if autoregressive_loss_mode == "none":
+        pass
+    elif autoregressive_loss_mode == "mean":
+        predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
+    elif autoregressive_loss_mode == "final":
+        predictor = FinalStepLossAutoregressivePredictor(
+            predictor,
+            gradient_checkpointing=gradient_checkpointing,
+        )
+    else:
+        raise ValueError(f"Unknown autoregressive_loss_mode={autoregressive_loss_mode!r}")
     return predictor
 
 
