@@ -80,6 +80,63 @@ def test_mamba_call_uses_vanilla_stacked_input_encoder() -> None:
     ]
 
 
+def test_residual_output_head_zero_initializes_grid_outputs() -> None:
+    def forward(enabled: bool):
+        predictor = object.__new__(gc.GraphCast)
+        predictor._temporal_backbone = "none"
+        predictor._temporal_location = "mesh_post_encoder"
+        predictor._residual_output_head_enabled = enabled
+        predictor._maybe_init = lambda inputs: None
+        predictor._inputs_to_grid_node_features = lambda inputs, forcings: jnp.ones((3, 2, 4))
+        predictor._run_grid2mesh_gnn = lambda grid_features: ("latent_mesh", "latent_grid")
+        predictor._run_mesh_gnn = lambda latent_mesh, *, is_training: "updated_mesh"
+        predictor._run_mesh2grid_gnn = lambda updated_mesh, latent_grid: jnp.ones((3, 2, 4))
+        predictor._grid_node_outputs_to_prediction = lambda grid_output, targets_template: grid_output
+        return gc.GraphCast.__call__(
+            predictor,
+            inputs=None,
+            targets_template=None,
+            forcings=None,
+            is_training=True,
+        )
+
+    transformed = hk.transform(forward)
+    rng = jax.random.PRNGKey(0)
+    params = transformed.init(rng, True)
+    output = transformed.apply(params, rng, True)
+
+    np.testing.assert_allclose(np.asarray(output), np.zeros((3, 2, 4), dtype=np.float32))
+    assert "residual_output_head" in hk.data_structures.to_mutable_dict(params)
+
+
+def test_residual_output_head_is_absent_when_disabled() -> None:
+    def forward():
+        predictor = object.__new__(gc.GraphCast)
+        predictor._temporal_backbone = "none"
+        predictor._temporal_location = "mesh_post_encoder"
+        predictor._maybe_init = lambda inputs: None
+        predictor._inputs_to_grid_node_features = lambda inputs, forcings: jnp.ones((3, 2, 4))
+        predictor._run_grid2mesh_gnn = lambda grid_features: ("latent_mesh", "latent_grid")
+        predictor._run_mesh_gnn = lambda latent_mesh, *, is_training: "updated_mesh"
+        predictor._run_mesh2grid_gnn = lambda updated_mesh, latent_grid: jnp.ones((3, 2, 4))
+        predictor._grid_node_outputs_to_prediction = lambda grid_output, targets_template: grid_output
+        return gc.GraphCast.__call__(
+            predictor,
+            inputs=None,
+            targets_template=None,
+            forcings=None,
+            is_training=True,
+        )
+
+    transformed = hk.transform(forward)
+    rng = jax.random.PRNGKey(0)
+    params = transformed.init(rng)
+    output = transformed.apply(params, rng)
+
+    np.testing.assert_allclose(np.asarray(output), np.ones((3, 2, 4), dtype=np.float32))
+    assert "residual_output_head" not in hk.data_structures.to_mutable_dict(params)
+
+
 class _NodeSet(NamedTuple):
     features: jax.Array
 

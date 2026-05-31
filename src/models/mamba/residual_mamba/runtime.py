@@ -29,6 +29,11 @@ from src.models.graphcast.training.core.model import (  # noqa: E402
 MODEL_NAME = "residual_mamba"
 
 
+def _residual_output_head_enabled(run_cfg: dict) -> bool:
+    output_head = run_cfg.get("residual_training", {}).get("output_head", {})
+    return bool(output_head.get("enabled", False))
+
+
 def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
     del model_cfg
     temporal_cfg = run_cfg.get("temporal_config", {})
@@ -59,6 +64,7 @@ def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
         "temporal_stateful": bool(temporal_cfg.get("stateful", False)),
         "temporal_insert_count": temporal_cfg.get("insert_count", None),
         "zero_init_temporal_out": bool(residual_cfg.get("temporal_zero_init_out", False)),
+        "residual_output_head": _residual_output_head_enabled(run_cfg),
     }
 
 
@@ -77,6 +83,7 @@ def _apply_temporal_config(predictor: gc.GraphCast, temporal_kwargs: dict) -> gc
         predictor._temporal_stateful = temporal_kwargs["temporal_stateful"]
         predictor._temporal_insert_count = temporal_kwargs["temporal_insert_count"]
         predictor._temporal_zero_init_out = temporal_kwargs["zero_init_temporal_out"]
+    predictor._residual_output_head_enabled = temporal_kwargs["residual_output_head"]
     return predictor
 
 

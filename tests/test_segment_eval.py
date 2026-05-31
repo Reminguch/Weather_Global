@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,11 +38,16 @@ from src.models.graphcast.evaluation.device_resolution_eval import (  # noqa: E4
     build_metric_spec,
 )
 from src.models.mamba.residual_mamba.training.model import (  # noqa: E402
+    augment_run_config,
     build_loss_prediction_transform as build_residual_loss_prediction_transform,
     residual_autoregressive_final_horizon,
     run_residual_eval,
 )
+from src.models.mamba.residual_mamba.runtime import _residual_output_head_enabled  # noqa: E402
 from scripts.analyze_models.unified_resolution_eval import (  # noqa: E402
+    NYC_LAT,
+    NYC_LON,
+    NYC_POINT_VARIABLE,
     _accumulate_metrics,
     _empty_metric_accumulator,
 )
@@ -132,6 +138,21 @@ def _counting_loss_prediction_transform() -> hk.TransformedWithState:
         pred = (inputs["x"].isel(time=-1, drop=True) + 1.0).expand_dims(
             time=targets.coords["time"]
         ).transpose(*targets["x"].dims)
+        return (loss, xr.Dataset()), xr.Dataset({"x": pred})
+
+    return hk.transform_with_state(forward)
+
+
+def _input_feedback_loss_prediction_transform(increment: float = 10.0) -> hk.TransformedWithState:
+    def forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        last = inputs["x"].isel(time=-1, drop=True)
+        loss = xr.DataArray(
+            xarray_jax.wrap(xarray_jax.unwrap_data(last)),
+            dims=("batch",),
+            coords={"batch": targets.coords["batch"]},
+        )
+        pred = (last + increment).expand_dims(time=targets.coords["time"]).transpose(*targets["x"].dims)
         return (loss, xr.Dataset()), xr.Dataset({"x": pred})
 
     return hk.transform_with_state(forward)
@@ -527,6 +548,134 @@ def test_residual_loss_prediction_transform_uses_one_step_predictor(monkeypatch)
     np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(predictions["x"]))), [[0.0]])
 
 
+def test_residual_loss_prediction_transform_enables_output_head(monkeypatch) -> None:
+    class FakeGraphCast:
+        def __init__(self, model_cfg, task_cfg):
+            del model_cfg, task_cfg
+            self._residual_output_head_enabled = False
+
+        def loss_and_predictions(self, inputs, targets, forcings):
+            del inputs, forcings
+            upstream_predictions = xr.ones_like(targets) * 7.0
+            predictions = xr.zeros_like(upstream_predictions) if self._residual_output_head_enabled else upstream_predictions
+            loss = ((predictions["x"] - targets["x"]) ** 2).mean("time", skipna=False)
+            return (loss, xr.Dataset()), predictions
+
+    monkeypatch.setattr(core_model.gc, "GraphCast", FakeGraphCast)
+    cfg = SimpleNamespace(
+        precision="fp32",
+        temporal_backbone="mamba",
+        temporal_location="mesh_processor_interleaved",
+        temporal_d_inner=4,
+        temporal_d_state=2,
+        temporal_d_conv=4,
+        temporal_dt_rank="auto",
+        temporal_bias=False,
+        temporal_conv_bias=True,
+        temporal_layers=1,
+        temporal_dropout=0.0,
+        temporal_stateful=True,
+        temporal_insert_count=1,
+        residual_output_head=True,
+    )
+    stats = {
+        "stddev_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(1.0, dtype=np.float32))}),
+        "mean_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(0.0, dtype=np.float32))}),
+        "diffs_stddev_by_level": xr.Dataset({"x": xr.DataArray(np.asarray(1.0, dtype=np.float32))}),
+    }
+    transform = build_residual_loss_prediction_transform(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        stats,
+        cfg,
+        gradient_checkpointing=True,
+    )
+    batch = np.asarray([0], dtype=np.int64)
+    inputs = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[0.0, 0.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": np.asarray([0, 1])},
+    )
+    targets = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[2.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": np.asarray([2])},
+    )
+    forcings = xr.Dataset(coords={"batch": batch, "time": targets.coords["time"]})
+    residual_inputs = build_zero_residual_inputs(inputs, targets)
+
+    rng = jax.random.PRNGKey(0)
+    params, state = transform.init(rng, residual_inputs, targets, forcings, True)
+    (loss_and_diag, predictions), _ = transform.apply(
+        params,
+        state,
+        rng,
+        residual_inputs,
+        targets,
+        forcings,
+        True,
+    )
+
+    np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(loss_and_diag[0]))), [4.0])
+    np.testing.assert_allclose(np.asarray(jax.device_get(xarray_jax.unwrap_data(predictions["x"]))), [[0.0]])
+
+
+def test_residual_output_head_run_config_defaults_to_disabled_for_old_checkpoints() -> None:
+    assert not _residual_output_head_enabled({})
+    assert not _residual_output_head_enabled({"residual_training": {"enabled": True}})
+    assert _residual_output_head_enabled(
+        {"residual_training": {"output_head": {"enabled": True}}}
+    )
+
+
+def test_residual_augment_run_config_records_output_head(tmp_path, monkeypatch) -> None:
+    def fake_write_run_config(out_dir, *args, **kwargs):
+        del args, kwargs
+        (out_dir / "run_config.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "src.models.mamba.residual_mamba.training.model._write_run_config",
+        fake_write_run_config,
+    )
+    base_cfg = SimpleNamespace(
+        target_steps=1,
+        temporal_backbone="mamba",
+        residual_output_head=True,
+    )
+    segment_cfg = SimpleNamespace(
+        base_cfg=base_cfg,
+        len_segment=30,
+        bptt_steps=6,
+        chunk_load_workers=2,
+        eval_num_segments=16,
+        final_eval_num_segments=None,
+        eval_subset_policy="stratified_fixed",
+        eval_rotating_diagnostics=True,
+        training_target="residual",
+        baseline_ckpt="baseline.npz",
+        resume_ckpt=None,
+        residual_output_head_mode="auto",
+    )
+
+    augment_run_config(
+        tmp_path,
+        segment_cfg=segment_cfg,
+        model_cfg=SimpleNamespace(),
+        task_cfg=SimpleNamespace(),
+        numpy_cache_active=False,
+        train_cache_estimate_gib=None,
+        effective_train_batch_builder="direct",
+        effective_eval_batch_builder="direct",
+    )
+
+    payload = json.loads((tmp_path / "run_config.json").read_text(encoding="utf-8"))
+    assert payload["residual_training"]["output_head"] == {
+        "enabled": True,
+        "kind": "linear_channels",
+        "position": "after_mesh2grid_before_residual_unnormalize",
+        "init": "zero",
+        "mode": "auto",
+    }
+
+
 def test_residual_loss_prediction_transform_init_uses_one_step_template(monkeypatch) -> None:
     class OneStepOnlyGraphCast:
         def __init__(self, model_cfg, task_cfg):
@@ -666,7 +815,7 @@ def test_run_eval_segments_carries_one_step_state_for_multi_step_targets() -> No
     np.testing.assert_allclose(metrics["total"], 1.5)
 
 
-def test_run_eval_segments_rolling_ar_delays_loss_without_k_inner_rollouts() -> None:
+def test_run_eval_segments_rolling_ar_scores_uniform_chunk_tail() -> None:
     transformed = _counting_loss_prediction_transform()
     sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(0.0)(
         None,
@@ -698,11 +847,57 @@ def test_run_eval_segments_rolling_ar_delays_loss_without_k_inner_rollouts() -> 
         rolling_ar=True,
     )
 
-    np.testing.assert_allclose(metrics["total"], 4.0)
+    np.testing.assert_allclose(metrics["total"], 3.5)
 
 
-def test_run_eval_segments_rolling_ar_resets_rollout_age_between_segments() -> None:
-    transformed = _counting_loss_prediction_transform()
+def test_run_eval_segments_rolling_ar_first_tail_input_uses_previous_prediction() -> None:
+    transformed = _input_feedback_loss_prediction_transform(increment=10.0)
+    sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(0.0)(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    rng = jax.random.PRNGKey(0)
+    params, _ = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, False)
+
+    metrics = run_eval_segments(
+        transformed,
+        params,
+        rng,
+        eval_ds=xr.Dataset(),
+        eval_indices=np.arange(4, dtype=np.int64),
+        eval_batch_size=1,
+        input_steps=2,
+        target_steps=2,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+        len_segment=4,
+        bptt_steps=4,
+        progress_label="test",
+        batch_builder=_constant_target_batch_builder(0.0),
+        chunk_load_workers=1,
+        rolling_ar=True,
+    )
+
+    np.testing.assert_allclose(metrics["total"], 16.0)
+
+
+def test_run_eval_segments_rolling_ar_resets_physical_inputs_each_chunk_but_carries_state() -> None:
+    def forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        batch_size = targets.sizes["batch"]
+        last = inputs["x"].isel(time=-1, drop=True)
+        prev = hk.get_state("toy_ssm_state", shape=(batch_size,), dtype=jnp.float32, init=jnp.zeros)
+        hk.set_state("toy_ssm_state", prev + 100.0)
+        loss_data = xarray_jax.unwrap_data(last) + prev
+        loss = xr.DataArray(xarray_jax.wrap(loss_data), dims=("batch",), coords={"batch": targets.coords["batch"]})
+        pred = (last + 10.0).expand_dims(time=targets.coords["time"]).transpose(*targets["x"].dims)
+        return (loss, xr.Dataset()), xr.Dataset({"x": pred})
+
+    transformed = hk.transform_with_state(forward)
     sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(0.0)(
         None,
         indices=np.asarray([0], dtype=np.int64),
@@ -722,18 +917,18 @@ def test_run_eval_segments_rolling_ar_resets_rollout_age_between_segments() -> N
         eval_indices=np.arange(8, dtype=np.int64),
         eval_batch_size=1,
         input_steps=2,
-        target_steps=3,
+        target_steps=2,
         task_cfg=_task_cfg(),
         dt=pd.Timedelta("6h"),
-        len_segment=4,
-        bptt_steps=2,
+        len_segment=8,
+        bptt_steps=4,
         progress_label="test",
         batch_builder=_constant_target_batch_builder(0.0),
         chunk_load_workers=1,
         rolling_ar=True,
     )
 
-    np.testing.assert_allclose(metrics["total"], 2.5)
+    np.testing.assert_allclose(metrics["total"], 468.0)
 
 
 def test_run_eval_segments_uses_stratified_subset_metadata() -> None:
@@ -893,20 +1088,20 @@ def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> 
         baseline_params,
         rng,
         eval_ds=xr.Dataset(),
-        eval_indices=np.arange(3, dtype=np.int64),
+        eval_indices=np.arange(4, dtype=np.int64),
         eval_batch_size=1,
         input_steps=2,
-        target_steps=3,
+        target_steps=2,
         task_cfg=_task_cfg(),
         dt=pd.Timedelta("6h"),
-        len_segment=3,
-        bptt_steps=3,
+        len_segment=4,
+        bptt_steps=4,
         progress_label="test",
         batch_builder=_constant_target_batch_builder(100.0),
         chunk_load_workers=1,
     )
 
-    np.testing.assert_allclose(metrics["total"], 4096.0)
+    np.testing.assert_allclose(metrics["total"], 25806.5)
 
 
 def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:
@@ -969,6 +1164,9 @@ def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:
         res_grid_lons=res_grid_lons,
         per_variable_weights={"2m_temperature": 1.0, "temperature": 1.0},
         max_lead_steps=2,
+        nyc_lat=NYC_LAT,
+        nyc_lon=NYC_LON,
+        nyc_output_name=NYC_POINT_VARIABLE,
     )
     device_acc = _empty_device_accumulator(metric_spec)
     for lead_i in range(2):
@@ -983,7 +1181,7 @@ def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:
     add_device_accumulator_to_host(
         device_host_acc,
         device_acc,
-        variable_names=tuple(var.name for var in metric_spec.variables),
+        variable_names=tuple(var.output_name for var in metric_spec.variables),
     )
 
     np.testing.assert_allclose(device_host_acc["weighted_sum"], host_acc["weighted_sum"], rtol=1e-6)

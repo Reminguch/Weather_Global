@@ -12,6 +12,7 @@ if ROOT_STR not in sys.path:
 
 from src.models.graphcast.training.core.config import parse_args
 from src.models.mamba.training.segments_training import parse_gc_mamba_args
+from src.models.mamba.residual_mamba.training.config import parse_args as parse_residual_mamba_args
 
 
 def test_vanilla_config_accepts_grad_accum_and_mp8(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -44,6 +45,8 @@ def test_grad_accum_rejects_temporal_backbone(monkeypatch: pytest.MonkeyPatch) -
             "2",
             "--temporal-backbone",
             "mamba",
+            "--temporal-d-inner",
+            "4",
         ],
     )
 
@@ -71,3 +74,30 @@ def test_segment_config_accepts_mp8() -> None:
     cfg = parse_gc_mamba_args(["--processor-msg-steps", "8"])
 
     assert cfg.base_cfg.processor_msg_steps == 8
+
+
+def test_gc_mamba_segment_ar_requires_target_steps_less_than_bptt() -> None:
+    with pytest.raises(ValueError, match="target-steps.*bptt-steps"):
+        parse_gc_mamba_args(["--target-steps", "4", "--bptt-steps", "4", "--len-segment", "8"])
+
+
+def test_gc_mamba_segment_one_step_can_equal_bptt_boundary_case() -> None:
+    cfg = parse_gc_mamba_args(["--target-steps", "1", "--bptt-steps", "1"])
+
+    assert cfg.base_cfg.target_steps == 1
+
+
+def test_residual_mamba_segment_ar_requires_target_steps_less_than_bptt() -> None:
+    with pytest.raises(ValueError, match="target-steps.*bptt-steps"):
+        parse_residual_mamba_args(
+            [
+                "--baseline-ckpt",
+                "baseline.npz",
+                "--target-steps",
+                "4",
+                "--bptt-steps",
+                "4",
+                "--len-segment",
+                "8",
+            ]
+        )

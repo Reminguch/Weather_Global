@@ -56,8 +56,8 @@ from src.models.graphcast.training.core.segments import (
     SegmentLoadStats,
     _advance_autoregressive_inputs,
     _build_chunk_batches,
+    _chunk_ar_truth_prefix,
     _loss_by_lane,
-    _reset_dataset_lanes,
     _reset_temporal_state_lanes,
     _save_chunk_timing_logs,
     _stop_gradient_dataset,
@@ -65,6 +65,7 @@ from src.models.graphcast.training.core.segments import (
     build_full_segments,
     valid_contiguous_final_input_indices,
 )
+from src.models.mamba.training.param_utils import overlay_matching_params
 from .config import ResidualSegmentRunConfig, parse_args
 from .model import (
     augment_run_config,
@@ -73,6 +74,29 @@ from .model import (
     residual_autoregressive_final_horizon,
     run_residual_eval,
 )
+
+
+def _read_existing_output_head_enabled(out_dir: Path) -> bool:
+    run_config_path = out_dir / "run_config.json"
+    if not run_config_path.exists():
+        return False
+    with run_config_path.open("r", encoding="utf-8") as f:
+        run_config = json.load(f)
+    output_head = run_config.get("residual_training", {}).get("output_head", {})
+    return bool(output_head.get("enabled", False))
+
+
+def _resolve_residual_output_head(segment_cfg: ResidualSegmentRunConfig, out_dir: Path) -> bool:
+    mode = segment_cfg.residual_output_head_mode
+    if mode == "enabled":
+        return True
+    if mode == "disabled":
+        return False
+    if mode != "auto":
+        raise ValueError(f"Unknown residual output head mode: {mode!r}")
+    if segment_cfg.resume_ckpt:
+        return _read_existing_output_head_enabled(out_dir)
+    return True
 
 
 def run_training(
@@ -85,6 +109,12 @@ def run_training(
     cfg = segment_cfg.base_cfg
     out_dir = Path(cfg.out_dir) / cfg.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
+    cfg.residual_output_head = _resolve_residual_output_head(segment_cfg, out_dir)
+    print(
+        "Residual output head "
+        f"{'enabled' if cfg.residual_output_head else 'disabled'} "
+        f"(mode={segment_cfg.residual_output_head_mode})"
+    )
 
     baseline_ckpt = load_graphcast_checkpoint(Path(segment_cfg.baseline_ckpt))
     resume_ckpt = load_graphcast_checkpoint(Path(segment_cfg.resume_ckpt)) if segment_cfg.resume_ckpt else None
@@ -235,12 +265,20 @@ def run_training(
     )
     if cfg.resume_step is not None:
         assert resume_ckpt is not None
-        params = resume_ckpt.params
+        params, overlay_stats = overlay_matching_params(params, resume_ckpt.params)
         print(f"Resuming residual model from step {cfg.resume_step} ({segment_cfg.resume_ckpt})")
+        if overlay_stats.initialized:
+            print(
+                "Initialized "
+                f"{overlay_stats.initialized} new residual output head parameter(s) "
+                "while overlaying resume checkpoint."
+            )
     else:
         print("Residual model uses fresh initialization; frozen baseline is used only for residual targets.")
         if cfg.temporal_backbone == "mamba":
-            print("Residual Mamba fresh init uses zero-initialized temporal out_proj, so step-0 residual output is zero.")
+            print("Residual Mamba fresh init uses zero-initialized temporal out_proj, so inserted Mamba starts as a no-op.")
+        if cfg.residual_output_head:
+            print("Residual output head is zero-initialized, so step-0 full forecast equals the frozen baseline.")
 
     opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     opt_state = opt.init(params)
@@ -269,10 +307,9 @@ def run_training(
         False,
     )
 
-    rolling_inputs_state = sample_inputs if rolling_ar else None
-    rollout_age_state = jnp.zeros((cfg.batch_size,), dtype=jnp.int32) if rolling_ar else None
-
     if rolling_ar:
+        truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, segment_cfg.bptt_steps)
+
         @functools.partial(jax.jit)
         def train_chunk(
             params: hk.Params,
@@ -283,25 +320,26 @@ def run_training(
             chunk_targets: tuple[xr.Dataset, ...],
             chunk_forcings: tuple[xr.Dataset, ...],
             residual_inputs: xr.Dataset,
-            rolling_inputs: xr.Dataset,
-            rollout_age: jax.Array,
             reset_mask: jax.Array,
         ):
             state = _reset_temporal_state_lanes(state, reset_mask)
-            residual_inputs = reset_residual_input_lanes(residual_inputs, chunk_targets[0], reset_mask)
-            rolling_inputs = _reset_dataset_lanes(rolling_inputs, chunk_inputs[0], reset_mask)
-            rollout_age = jnp.where(reset_mask, jnp.zeros_like(rollout_age), rollout_age)
+            residual_inputs = reset_residual_input_lanes(
+                residual_inputs,
+                chunk_targets[0],
+                jnp.ones_like(reset_mask, dtype=bool),
+            )
 
             def loss_fn(p, s, key):
                 current_state = s
                 current_residual_inputs = residual_inputs
-                current_rolling_inputs = rolling_inputs
-                current_age = rollout_age
+                current_rolling_inputs = chunk_inputs[0]
                 current_baseline_state = baseline_train_state
                 weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
                 valid_count = jnp.asarray(0.0, dtype=jnp.float32)
                 keys = jax.random.split(key, segment_cfg.bptt_steps * 2)
                 for bptt_i in range(segment_cfg.bptt_steps):
+                    if bptt_i < truth_prefix_steps:
+                        current_rolling_inputs = chunk_inputs[bptt_i]
                     baseline_preds, current_baseline_state = baseline_predict_transform.apply(
                         baseline_ckpt.params,
                         current_baseline_state,
@@ -311,7 +349,6 @@ def run_training(
                         chunk_forcings[bptt_i],
                         False,
                     )
-                    baseline_preds = _stop_gradient_dataset(baseline_preds)
                     residual_targets = chunk_targets[bptt_i] - baseline_preds
                     (loss_and_diag, residual_preds), current_state = residual_loss_transform.apply(
                         p,
@@ -322,22 +359,28 @@ def run_training(
                         chunk_forcings[bptt_i],
                         True,
                     )
-                    next_age = current_age + 1
-                    loss_by_lane = _loss_by_lane(loss_and_diag[0])
-                    valid_weight = (next_age >= target_steps).astype(loss_by_lane.dtype)
-                    weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
-                    valid_count = valid_count + jnp.sum(valid_weight)
-                    current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_preds)
-                    current_rolling_inputs = _advance_autoregressive_inputs(
-                        current_rolling_inputs,
-                        baseline_preds + residual_preds,
-                        chunk_forcings[bptt_i],
-                    )
-                    current_age = next_age
+                    if bptt_i >= truth_prefix_steps:
+                        loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                        weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                        valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                    if bptt_i < segment_cfg.bptt_steps - 1:
+                        residual_feedback = residual_targets if bptt_i < truth_prefix_steps else residual_preds
+                        current_residual_inputs = advance_residual_inputs(
+                            current_residual_inputs,
+                            residual_feedback,
+                        )
+                        if bptt_i + 1 < truth_prefix_steps:
+                            current_rolling_inputs = chunk_inputs[bptt_i + 1]
+                        else:
+                            current_rolling_inputs = _advance_autoregressive_inputs(
+                                current_rolling_inputs,
+                                baseline_preds + residual_preds,
+                                chunk_forcings[bptt_i],
+                            )
                 loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
-                return loss, (current_state, current_residual_inputs, current_rolling_inputs, current_age)
+                return loss, current_state
 
-            (loss, (new_state, new_residual_inputs, new_rolling_inputs, new_rollout_age)), grads = (
+            (loss, new_state), grads = (
                 jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
             )
             updates, new_opt_state = opt.update(grads, opt_state, params)
@@ -346,9 +389,6 @@ def run_training(
                 new_params,
                 _stop_gradient_temporal_state(new_state),
                 new_opt_state,
-                _stop_gradient_dataset(new_residual_inputs),
-                _stop_gradient_dataset(new_rolling_inputs),
-                jax.lax.stop_gradient(new_rollout_age),
                 loss,
             )
     else:
@@ -564,17 +604,7 @@ def run_training(
             next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
             t0 = time.time()
             if rolling_ar:
-                assert rolling_inputs_state is not None
-                assert rollout_age_state is not None
-                (
-                    params,
-                    state,
-                    opt_state,
-                    residual_inputs_state,
-                    rolling_inputs_state,
-                    rollout_age_state,
-                    loss,
-                ) = train_chunk(
+                params, state, opt_state, loss = train_chunk(
                     params,
                     state,
                     opt_state,
@@ -583,8 +613,6 @@ def run_training(
                     chunk_targets,
                     chunk_forcings,
                     residual_inputs_state,
-                    rolling_inputs_state,
-                    rollout_age_state,
                     jnp.asarray(reset_mask_np),
                 )
             else:

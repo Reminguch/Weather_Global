@@ -28,6 +28,7 @@ a 2D mesh over latitudes and longitudes.
 from typing import Any, Callable, Mapping, Optional
 
 import chex
+import haiku as hk
 from graphcast import deep_typed_graph_net
 from graphcast import grid_mesh_connectivity
 from graphcast import icosahedral_mesh
@@ -282,6 +283,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_stateful = False
     self._temporal_insert_count = None
     self._temporal_zero_init_out = False
+    self._residual_output_head_enabled = False
 
     self._spatial_features_kwargs = dict(
         add_node_positions=False,
@@ -435,6 +437,13 @@ class GraphCast(predictor_base.Predictor):
     # [num_grid_nodes, batch, output_size]
     output_grid_nodes = self._run_mesh2grid_gnn(
         updated_latent_mesh_nodes, latent_grid_nodes)
+    if getattr(self, "_residual_output_head_enabled", False):
+      output_grid_nodes = hk.Linear(
+          output_grid_nodes.shape[-1],
+          w_init=hk.initializers.Constant(0.0),
+          b_init=hk.initializers.Constant(0.0),
+          name="residual_output_head")(
+              output_grid_nodes).astype(output_grid_nodes.dtype)
 
     # Conver output flat vectors for the grid nodes to the format of the output.
     # [num_grid_nodes, batch, output_size] ->

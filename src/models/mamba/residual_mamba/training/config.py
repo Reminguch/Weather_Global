@@ -20,6 +20,7 @@ class ResidualSegmentRunConfig:
     baseline_ckpt: str
     resume_ckpt: str | None
     training_target: str
+    residual_output_head_mode: str = "auto"
     eval_num_segments: int | None = 16
     final_eval_num_segments: int | None = None
     eval_subset_policy: str = "stratified_fixed"
@@ -100,6 +101,15 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
     parser.add_argument("--temporal-insert-count", type=int, default=None)
+    parser.add_argument(
+        "--residual-output-head",
+        choices=["auto", "enabled", "disabled"],
+        default="auto",
+        help=(
+            "Final zero-init residual head policy. auto enables it for fresh runs "
+            "and preserves the existing run_config setting when resuming."
+        ),
+    )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
     parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="numpy")
@@ -125,6 +135,8 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         raise ValueError("--bptt-steps must divide --len-segment")
     if args.target_steps <= 0:
         raise ValueError("--target-steps must be > 0")
+    if args.target_steps > 1 and args.target_steps >= args.bptt_steps:
+        raise ValueError("--target-steps must be < --bptt-steps for chunk-local AR tail training")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -209,6 +221,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         prefetch_device_depth=0,
         usage_every=1,
         eval_only=False,
+        residual_output_head=False,
     )
     return ResidualSegmentRunConfig(
         base_cfg=base_cfg,
@@ -218,6 +231,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         baseline_ckpt=args.baseline_ckpt,
         resume_ckpt=args.resume_ckpt,
         training_target=args.training_target,
+        residual_output_head_mode=args.residual_output_head,
         eval_num_segments=args.eval_num_segments,
         final_eval_num_segments=args.final_eval_num_segments,
         eval_subset_policy=args.eval_subset_policy,

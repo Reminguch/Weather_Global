@@ -389,6 +389,19 @@ def _advance_autoregressive_inputs(
     return xr.merge([constant_inputs, updated])
 
 
+def _chunk_ar_truth_prefix(target_steps: int, bptt_steps: int) -> int:
+    """Return truth-fed prefix length for chunk-local corrected AR training."""
+    if target_steps <= 1:
+        return bptt_steps
+    if target_steps >= bptt_steps:
+        raise ValueError(
+            "Chunk-local autoregressive segment training requires "
+            f"--target-steps < --bptt-steps, got target_steps={target_steps}, "
+            f"bptt_steps={bptt_steps}."
+        )
+    return bptt_steps - target_steps
+
+
 def _write_segment_run_config(
     out_dir: Path,
     *,
@@ -430,11 +443,20 @@ def _write_segment_run_config(
         "max_steps_unit": "optimizer_updates",
     }
     if segment_cfg.base_cfg.target_steps > 1:
+        truth_prefix_steps = _chunk_ar_truth_prefix(
+            int(segment_cfg.base_cfg.target_steps),
+            int(segment_cfg.bptt_steps),
+        )
         payload["autoregressive_training"] = {
             "enabled": True,
-            "loss_mode": "rolling_delayed_horizon",
+            "mode": "chunk_local_corrected_ar_tail",
+            "loss_mode": "tail_uniform",
             "target_steps": int(segment_cfg.base_cfg.target_steps),
-            "state_carry_steps": "rolling_stream_stop_gradient_chunks",
+            "truth_prefix_steps": int(truth_prefix_steps),
+            "ar_tail_steps": int(segment_cfg.base_cfg.target_steps),
+            "feedback_gradient": "full_bptt_chunk_detached",
+            "state_carry_steps": "temporal_state_stop_gradient_chunks",
+            "physical_state_carry": "truth_reset_each_chunk",
         }
     if finite_segment_filter_stats is not None:
         payload["segment_training"]["finite_segment_filter"] = finite_segment_filter_stats
@@ -1003,6 +1025,7 @@ def run_eval_segments(
     eval_segments = [eval_segments[int(position)] for position in selection.positions.tolist()]
     if not eval_segments:
         raise ValueError("No eval segments selected.")
+    truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, bptt_steps) if rolling_ar else bptt_steps
     if selection.capped:
         readable_policy = selection.policy.replace("_", " ")
         print(
@@ -1011,8 +1034,6 @@ def run_eval_segments(
         )
 
     state_by_lane_count: dict[int, hk.State] = {}
-    rolling_inputs_by_lane_count: dict[int, xr.Dataset] = {}
-    rollout_age_by_lane_count: dict[int, jax.Array] = {}
     eval_chunk_fn_by_lane_count: dict[int, callable] = {}
     total_weighted_loss = 0.0
     total_windows = 0
@@ -1056,9 +1077,6 @@ def run_eval_segments(
                 chunk_forcings[0],
                 False,
             )
-            if rolling_ar:
-                rolling_inputs_by_lane_count[lane_count] = chunk_inputs[0]
-                rollout_age_by_lane_count[lane_count] = jnp.zeros((lane_count,), dtype=jnp.int32)
 
         if lane_count not in eval_chunk_fn_by_lane_count:
             if rolling_ar:
@@ -1070,17 +1088,16 @@ def run_eval_segments(
                     chunk_inputs,
                     chunk_targets,
                     chunk_forcings,
-                    rolling_inputs,
-                    rollout_age,
                     reset_mask,
                 ):
                     current_state = _reset_temporal_state_lanes(state, reset_mask)
-                    current_inputs = _reset_dataset_lanes(rolling_inputs, chunk_inputs[0], reset_mask)
-                    current_age = jnp.where(reset_mask, jnp.zeros_like(rollout_age), rollout_age)
+                    current_inputs = chunk_inputs[0]
                     weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
                     valid_count = jnp.asarray(0.0, dtype=jnp.float32)
                     keys = jax.random.split(key, len(chunk_inputs))
                     for bptt_i in range(len(chunk_inputs)):
+                        if bptt_i < truth_prefix_steps:
+                            current_inputs = chunk_inputs[bptt_i]
                         (loss_and_diag, predictions), current_state = transformed.apply(
                             params,
                             current_state,
@@ -1090,21 +1107,21 @@ def run_eval_segments(
                             chunk_forcings[bptt_i],
                             False,
                         )
-                        next_age = current_age + 1
-                        loss_by_lane = _loss_by_lane(loss_and_diag[0])
-                        valid_weight = (next_age >= target_steps).astype(loss_by_lane.dtype)
-                        weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
-                        valid_count = valid_count + jnp.sum(valid_weight)
-                        current_inputs = _advance_autoregressive_inputs(
-                            current_inputs,
-                            predictions,
-                            chunk_forcings[bptt_i],
-                        )
-                        current_age = next_age
+                        if bptt_i >= truth_prefix_steps:
+                            loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                            weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                            valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                        if bptt_i < len(chunk_inputs) - 1:
+                            if bptt_i + 1 < truth_prefix_steps:
+                                current_inputs = chunk_inputs[bptt_i + 1]
+                            else:
+                                current_inputs = _advance_autoregressive_inputs(
+                                    current_inputs,
+                                    predictions,
+                                    chunk_forcings[bptt_i],
+                                )
                     return (
                         current_state,
-                        _stop_gradient_dataset(current_inputs),
-                        jax.lax.stop_gradient(current_age),
                         weighted_loss_sum,
                         valid_count,
                     )
@@ -1149,8 +1166,6 @@ def run_eval_segments(
         if rolling_ar:
             (
                 next_state,
-                next_rolling_inputs,
-                next_rollout_age,
                 chunk_loss_sum,
                 chunk_valid_count,
             ) = eval_chunk_fn_by_lane_count[lane_count](
@@ -1160,13 +1175,9 @@ def run_eval_segments(
                 chunk_inputs,
                 chunk_targets,
                 chunk_forcings,
-                rolling_inputs_by_lane_count[lane_count],
-                rollout_age_by_lane_count[lane_count],
                 jnp.asarray(chunk.reset_mask),
             )
             state_by_lane_count[lane_count] = next_state
-            rolling_inputs_by_lane_count[lane_count] = next_rolling_inputs
-            rollout_age_by_lane_count[lane_count] = next_rollout_age
             chunk_loss_sum_f = float(jax.device_get(chunk_loss_sum))
             chunk_valid_count_f = float(jax.device_get(chunk_valid_count))
             total_weighted_loss += chunk_loss_sum_f
@@ -1197,7 +1208,7 @@ def run_eval_segments(
             )
 
     if total_windows <= 0:
-        raise ValueError("No eval windows had enough rolling autoregressive history for loss.")
+        raise ValueError("No eval windows were available for the chunk-local autoregressive tail loss.")
 
     return {
         "total": float(total_weighted_loss / total_windows),

@@ -179,6 +179,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--bptt-steps must divide --len-segment")
     if args.target_steps <= 0:
         raise ValueError("--target-steps must be > 0")
+    if args.target_steps > 1 and args.target_steps >= args.bptt_steps:
+        raise ValueError("--target-steps must be < --bptt-steps for chunk-local AR tail training")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -335,11 +337,10 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         SegmentLoadStats,
         _advance_autoregressive_inputs,
         _build_chunk_batches,
+        _chunk_ar_truth_prefix,
         _loss_by_lane,
         _reset_temporal_state_lanes,
-        _reset_dataset_lanes,
         _save_chunk_timing_logs,
-        _stop_gradient_dataset,
         _stop_gradient_temporal_state,
         _write_segment_run_config,
         build_full_segments,
@@ -579,10 +580,9 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         numpy_cache_active=numpy_cache_active,
     )
 
-    rolling_inputs_state = sample_inputs if rolling_ar else None
-    rollout_age_state = jnp.zeros((cfg.batch_size,), dtype=jnp.int32) if rolling_ar else None
-
     if rolling_ar:
+        truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, segment_cfg.bptt_steps)
+
         @functools.partial(jax.jit)
         def train_chunk(
             params: hk.Params,
@@ -592,22 +592,19 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             chunk_inputs: tuple[xr.Dataset, ...],
             chunk_targets: tuple[xr.Dataset, ...],
             chunk_forcings: tuple[xr.Dataset, ...],
-            rolling_inputs: xr.Dataset,
-            rollout_age: jax.Array,
             reset_mask: jax.Array,
         ):
             state = _reset_temporal_state_lanes(state, reset_mask)
-            rolling_inputs = _reset_dataset_lanes(rolling_inputs, chunk_inputs[0], reset_mask)
-            rollout_age = jnp.where(reset_mask, jnp.zeros_like(rollout_age), rollout_age)
 
             def loss_fn(p, s, key):
                 current_state = s
-                current_inputs = rolling_inputs
-                current_age = rollout_age
+                current_inputs = chunk_inputs[0]
                 weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
                 valid_count = jnp.asarray(0.0, dtype=jnp.float32)
                 keys = jax.random.split(key, segment_cfg.bptt_steps)
                 for bptt_i in range(segment_cfg.bptt_steps):
+                    if bptt_i < truth_prefix_steps:
+                        current_inputs = chunk_inputs[bptt_i]
                     (loss_and_diag, predictions), current_state = transformed.apply(
                         p,
                         current_state,
@@ -617,21 +614,23 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                         chunk_forcings[bptt_i],
                         True,
                     )
-                    next_age = current_age + 1
-                    loss_by_lane = _loss_by_lane(loss_and_diag[0])
-                    valid_weight = (next_age >= target_steps).astype(loss_by_lane.dtype)
-                    weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
-                    valid_count = valid_count + jnp.sum(valid_weight)
-                    current_inputs = _advance_autoregressive_inputs(
-                        current_inputs,
-                        predictions,
-                        chunk_forcings[bptt_i],
-                    )
-                    current_age = next_age
+                    if bptt_i >= truth_prefix_steps:
+                        loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                        weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                        valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                    if bptt_i < segment_cfg.bptt_steps - 1:
+                        if bptt_i + 1 < truth_prefix_steps:
+                            current_inputs = chunk_inputs[bptt_i + 1]
+                        else:
+                            current_inputs = _advance_autoregressive_inputs(
+                                current_inputs,
+                                predictions,
+                                chunk_forcings[bptt_i],
+                            )
                 loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
-                return loss, (current_state, current_inputs, current_age)
+                return loss, current_state
 
-            (loss, (new_state, new_rolling_inputs, new_rollout_age)), grads = jax.value_and_grad(
+            (loss, new_state), grads = jax.value_and_grad(
                 loss_fn,
                 has_aux=True,
             )(params, state, rng_key)
@@ -641,8 +640,6 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 new_params,
                 _stop_gradient_temporal_state(new_state),
                 new_opt_state,
-                _stop_gradient_dataset(new_rolling_inputs),
-                jax.lax.stop_gradient(new_rollout_age),
                 loss,
             )
     else:
@@ -859,9 +856,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             rng, step_key = jax.random.split(rng)
             t0 = time.time()
             if rolling_ar:
-                assert rolling_inputs_state is not None
-                assert rollout_age_state is not None
-                params, state, opt_state, rolling_inputs_state, rollout_age_state, loss = train_chunk(
+                params, state, opt_state, loss = train_chunk(
                     params,
                     state,
                     opt_state,
@@ -869,8 +864,6 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     chunk_inputs,
                     chunk_targets,
                     chunk_forcings,
-                    rolling_inputs_state,
-                    rollout_age_state,
                     jnp.asarray(reset_mask_np),
                 )
             else:

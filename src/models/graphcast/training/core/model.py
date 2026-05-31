@@ -329,6 +329,7 @@ def build_predictor(
     temporal_stateful: bool = False,
     temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
+    residual_output_head: bool = False,
     autoregressive_loss_mode: str = "mean",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
@@ -346,6 +347,7 @@ def build_predictor(
         predictor._temporal_dropout = temporal_dropout
         predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
+    predictor._residual_output_head_enabled = residual_output_head
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
     predictor = normalization.InputsAndResiduals(
@@ -388,6 +390,7 @@ def build_residual_correction_predictor(
     temporal_stateful: bool = False,
     temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
+    residual_output_head: bool = False,
     autoregressive_loss_mode: str = "mean",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
@@ -405,6 +408,7 @@ def build_residual_correction_predictor(
         predictor._temporal_dropout = temporal_dropout
         predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
+    predictor._residual_output_head_enabled = residual_output_head
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
     predictor = DirectResidualNormalizer(

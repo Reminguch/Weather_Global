@@ -30,10 +30,9 @@ from src.models.graphcast.training.core.model import (
 from src.models.graphcast.training.core.segments import (
     _advance_autoregressive_inputs,
     _build_chunk_batches,
+    _chunk_ar_truth_prefix,
     _loss_by_lane,
-    _reset_dataset_lanes,
     _reset_temporal_state_lanes,
-    _stop_gradient_dataset,
     build_full_segments,
     iter_eval_segment_chunks,
     segment_midpoint_times,
@@ -70,6 +69,7 @@ def build_loss_transform(
             temporal_stateful=cfg.temporal_stateful,
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, cfg.temporal_backbone),
+            residual_output_head=getattr(cfg, "residual_output_head", False),
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -104,6 +104,7 @@ def build_loss_prediction_transform(
             temporal_stateful=cfg.temporal_stateful,
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, cfg.temporal_backbone),
+            residual_output_head=getattr(cfg, "residual_output_head", False),
             autoregressive_loss_mode="none",
         )
         return predictor.loss_and_predictions(inputs, targets, forcings)
@@ -195,6 +196,7 @@ def build_eval_loss_transform(
             temporal_stateful=temporal_stateful,
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, temporal_backbone),
+            residual_output_head=getattr(cfg, "residual_output_head", False),
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -321,6 +323,12 @@ def augment_run_config(
     path = out_dir / "run_config.json"
     with path.open("r", encoding="utf-8") as f:
         payload = json.load(f)
+    truth_prefix_steps = None
+    if segment_cfg.base_cfg.target_steps > 1:
+        truth_prefix_steps = _chunk_ar_truth_prefix(
+            int(segment_cfg.base_cfg.target_steps),
+            int(segment_cfg.bptt_steps),
+        )
     payload["segment_training"] = {
         "len_segment": segment_cfg.len_segment,
         "bptt_steps": segment_cfg.bptt_steps,
@@ -337,9 +345,14 @@ def augment_run_config(
     if segment_cfg.base_cfg.target_steps > 1:
         payload["autoregressive_training"] = {
             "enabled": True,
-            "loss_mode": "rolling_delayed_horizon",
+            "mode": "chunk_local_corrected_ar_tail",
+            "loss_mode": "tail_uniform",
             "target_steps": int(segment_cfg.base_cfg.target_steps),
-            "state_carry_steps": "rolling_stream_stop_gradient_chunks",
+            "truth_prefix_steps": int(truth_prefix_steps),
+            "ar_tail_steps": int(segment_cfg.base_cfg.target_steps),
+            "feedback_gradient": "full_bptt_chunk_detached",
+            "state_carry_steps": "temporal_state_stop_gradient_chunks",
+            "physical_state_carry": "truth_reset_each_chunk",
         }
     payload["residual_training"] = {
         "enabled": True,
@@ -347,11 +360,11 @@ def augment_run_config(
         "residual_definition": "target_minus_frozen_baseline",
         "baseline_checkpoint": segment_cfg.baseline_ckpt,
         "baseline_rollout_mode": (
-            "rolling_full_feedback_autoregressive" if segment_cfg.base_cfg.target_steps > 1 else "per_window_one_step"
+            "chunk_local_corrected_ar_tail" if segment_cfg.base_cfg.target_steps > 1 else "per_window_one_step"
         ),
         "autoregressive_feedback": "baseline_plus_predicted_residual",
         "bptt_residual_carry": (
-            "predicted_residual_stream_stop_gradient_chunks"
+            "truth_prefix_teacher_then_tail_predicted_residual"
             if segment_cfg.base_cfg.target_steps > 1
             else "teacher_forced_truth_minus_baseline"
         ),
@@ -359,6 +372,13 @@ def augment_run_config(
         "eval_loss_equivalence": "loss(residual_pred, target-baseline) == loss(baseline+residual_pred, target)",
         "trainable_init": "fresh" if segment_cfg.resume_ckpt is None else "resume_checkpoint",
         "temporal_zero_init_out": _use_zero_init_temporal_out(segment_cfg.base_cfg),
+        "output_head": {
+            "enabled": bool(getattr(segment_cfg.base_cfg, "residual_output_head", False)),
+            "kind": "linear_channels",
+            "position": "after_mesh2grid_before_residual_unnormalize",
+            "init": "zero",
+            "mode": segment_cfg.residual_output_head_mode,
+        },
         "resume_checkpoint": segment_cfg.resume_ckpt,
     }
     with path.open("w", encoding="utf-8") as f:
@@ -410,6 +430,7 @@ def run_residual_eval(
     eval_segments = [eval_segments[int(position)] for position in selection.positions.tolist()]
     if not eval_segments:
         raise ValueError("No eval segments selected.")
+    truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, bptt_steps) if rolling_ar else bptt_steps
     if selection.capped:
         readable_policy = selection.policy.replace("_", " ")
         print(
@@ -419,8 +440,6 @@ def run_residual_eval(
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
     residual_inputs_by_batch_size: dict[int, xr.Dataset] = {}
-    rolling_inputs_by_batch_size: dict[int, xr.Dataset] = {}
-    rollout_age_by_batch_size: dict[int, jax.Array] = {}
     eval_fn_by_batch_size: dict[int, callable] = {}
     total_weighted_loss = 0.0
     total_windows = 0
@@ -474,9 +493,6 @@ def run_residual_eval(
                 init_forcings,
                 False,
             )
-            if rolling_ar:
-                rolling_inputs_by_batch_size[batch_size] = chunk_inputs[0]
-                rollout_age_by_batch_size[batch_size] = jnp.zeros((batch_size,), dtype=jnp.int32)
         if batch_size not in eval_fn_by_batch_size:
             residual_eval_state = residual_state_by_batch_size[batch_size]
             baseline_eval_state = baseline_state_by_batch_size[batch_size]
@@ -493,8 +509,6 @@ def run_residual_eval(
                     chunk_targets,
                     chunk_forcings,
                     residual_inputs,
-                    rolling_inputs,
-                    rollout_age,
                     reset_mask,
                 ):
                     del base_key
@@ -502,15 +516,16 @@ def run_residual_eval(
                     current_residual_inputs = reset_residual_input_lanes(
                         residual_inputs,
                         chunk_targets[0],
-                        reset_mask,
+                        jnp.ones_like(reset_mask, dtype=bool),
                     )
-                    current_rolling_inputs = _reset_dataset_lanes(rolling_inputs, chunk_inputs[0], reset_mask)
-                    current_age = jnp.where(reset_mask, jnp.zeros_like(rollout_age), rollout_age)
+                    current_rolling_inputs = chunk_inputs[0]
                     current_baseline_state = baseline_eval_state
                     weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
                     valid_count = jnp.asarray(0.0, dtype=jnp.float32)
                     eval_keys = jax.random.split(eval_key, len(chunk_inputs) * 2)
                     for bptt_i in range(len(chunk_inputs)):
+                        if bptt_i < truth_prefix_steps:
+                            current_rolling_inputs = chunk_inputs[bptt_i]
                         baseline_preds, current_baseline_state = baseline_predict_transform.apply(
                             baseline_params,
                             current_baseline_state,
@@ -520,7 +535,6 @@ def run_residual_eval(
                             chunk_forcings[bptt_i],
                             False,
                         )
-                        baseline_preds = _stop_gradient_dataset(baseline_preds)
                         residual_targets = chunk_targets[bptt_i] - baseline_preds
                         (loss_and_diag, residual_preds), current_state = residual_eval_transform.apply(
                             params,
@@ -531,23 +545,26 @@ def run_residual_eval(
                             chunk_forcings[bptt_i],
                             False,
                         )
-                        next_age = current_age + 1
-                        loss_by_lane = _loss_by_lane(loss_and_diag[0])
-                        valid_weight = (next_age >= target_steps).astype(loss_by_lane.dtype)
-                        weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
-                        valid_count = valid_count + jnp.sum(valid_weight)
-                        current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_preds)
-                        current_rolling_inputs = _advance_autoregressive_inputs(
-                            current_rolling_inputs,
-                            baseline_preds + residual_preds,
-                            chunk_forcings[bptt_i],
-                        )
-                        current_age = next_age
+                        if bptt_i >= truth_prefix_steps:
+                            loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                            weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                            valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                        if bptt_i < len(chunk_inputs) - 1:
+                            residual_feedback = residual_targets if bptt_i < truth_prefix_steps else residual_preds
+                            current_residual_inputs = advance_residual_inputs(
+                                current_residual_inputs,
+                                residual_feedback,
+                            )
+                            if bptt_i + 1 < truth_prefix_steps:
+                                current_rolling_inputs = chunk_inputs[bptt_i + 1]
+                            else:
+                                current_rolling_inputs = _advance_autoregressive_inputs(
+                                    current_rolling_inputs,
+                                    baseline_preds + residual_preds,
+                                    chunk_forcings[bptt_i],
+                                )
                     return (
                         current_state,
-                        _stop_gradient_dataset(current_residual_inputs),
-                        _stop_gradient_dataset(current_rolling_inputs),
-                        jax.lax.stop_gradient(current_age),
                         weighted_loss_sum,
                         valid_count,
                     )
@@ -606,9 +623,6 @@ def run_residual_eval(
         if rolling_ar:
             (
                 next_state,
-                next_residual_inputs,
-                next_rolling_inputs,
-                next_rollout_age,
                 chunk_loss_sum,
                 chunk_valid_count,
             ) = eval_fn_by_batch_size[batch_size](
@@ -621,14 +635,9 @@ def run_residual_eval(
                 chunk_targets,
                 chunk_forcings,
                 residual_inputs_by_batch_size[batch_size],
-                rolling_inputs_by_batch_size[batch_size],
-                rollout_age_by_batch_size[batch_size],
                 jnp.asarray(reset_mask_np),
             )
             residual_state_by_batch_size[batch_size] = next_state
-            residual_inputs_by_batch_size[batch_size] = next_residual_inputs
-            rolling_inputs_by_batch_size[batch_size] = next_rolling_inputs
-            rollout_age_by_batch_size[batch_size] = next_rollout_age
         else:
             next_state, next_residual_inputs, chunk_loss_sum, chunk_valid_count = eval_fn_by_batch_size[batch_size](
                 params,
@@ -659,7 +668,7 @@ def run_residual_eval(
             )
 
     if total_windows <= 0:
-        raise ValueError("No residual eval windows remained after excluding zero-history reset steps.")
+        raise ValueError("No residual eval windows were available for the chunk-local autoregressive tail loss.")
 
     return {
         "total": float(total_weighted_loss / total_windows),

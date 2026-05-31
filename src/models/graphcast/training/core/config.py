@@ -87,6 +87,7 @@ class RunConfig:
     zero_init_temporal_out: bool = False
     eval_subset_policy: str = "stratified_fixed"
     eval_rotating_diagnostics: bool = True
+    residual_output_head: bool = False
 
 
 def _positive_int_or_all(value: str) -> int | None:

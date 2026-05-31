@@ -142,6 +142,31 @@ python -u -m src.models.mamba.training.segments_training \
 Residual Mamba needs a baseline checkpoint. The baseline is frozen and used to
 build residual targets: `target - baseline_prediction`.
 
+The residual branch is a fresh GraphCast-shaped correction model:
+
+```text
+frozen baseline -> baseline_prediction
+
+residual inputs
+  -> grid2mesh
+  -> mesh processor + Mamba
+  -> mesh2grid
+  -> zero-init residual output head
+  -> residual_prediction
+
+forecast = baseline_prediction + residual_prediction
+```
+
+For GC-Mamba, zero-initializing the Mamba output projection makes the inserted
+Mamba block initially behave like a no-op on top of a GraphCast forecast. For
+residual Mamba, the Mamba no-op alone is not enough because the residual branch
+is freshly initialized. The final residual output head is therefore also
+zero-initialized, so a fresh residual run starts from `baseline_prediction + 0`.
+
+Residual targets are computed online from the frozen baseline during training.
+When `--temporal-stateful` is enabled, Mamba carries both SSM state and its
+`d_conv - 1` causal convolution cache across BPTT steps.
+
 ```bash
 python -u -m src.models.mamba.training.segments_training \
   --model residual_mamba \
@@ -171,8 +196,18 @@ python -u -m src.models.mamba.training.segments_training \
   --temporal-location "${TEMPORAL_LOCATION:-mesh_processor_interleaved}" \
   --temporal-d-inner "${TEMPORAL_D_INNER:-16}" \
   --temporal-d-state "${TEMPORAL_D_STATE:-16}" \
+  --temporal-d-conv "${TEMPORAL_D_CONV:-4}" \
   --temporal-stateful
 ```
+
+Fresh residual-Mamba runs enable the final residual output head by default. When
+resuming, `--residual-output-head auto` preserves the existing run's
+`run_config.json` setting so old checkpoints stay compatible. Use
+`--residual-output-head enabled` only when intentionally migrating an old run to
+the new head.
+
+See `src/models/mamba/residual_mamba/residual_mamba.md` for the current
+architecture notes.
 
 SLURM wrapper:
 
@@ -195,7 +230,11 @@ Segment training runs validation inside the training job. The important controls
 
 For `gc_mamba`, validation uses the same segment/BPTT semantics as training. Validation
 segments are chronological, Mamba state is reset at the start of each segment, and state
-is carried through the BPTT chunks inside that segment. The implementation path is:
+is carried through the BPTT chunks inside that segment. When `--target-steps K > 1`,
+each BPTT chunk uses the first `bptt_steps - K` anchors as a truth-fed prefix, then
+feeds model predictions back for the final `K` anchors and averages loss only over that
+corrected autoregressive tail. The physical input stream restarts from truth at the next
+chunk; only Mamba/temporal state carries across chunks.
 
 ```text
 src.models.mamba.training.segments_training.run_gc_mamba_training
@@ -204,7 +243,7 @@ src.models.mamba.training.segments_training.run_gc_mamba_training
 ```
 
 For `res_mamba`, validation uses a frozen baseline checkpoint and scores the residual
-model in training-equivalent form:
+model in training-equivalent form for one-step training:
 
 ```text
 baseline_prediction = frozen_graphcast(inputs)
@@ -219,10 +258,11 @@ loss(residual_pred, target - baseline_prediction)
   == loss(baseline_prediction + residual_pred, target)
 ```
 
-Residual validation also carries residual input history through the segment. At segment
-starts, residual input history and Mamba state are reset. The first zero-history step in
-a reset lane is excluded from the residual eval average, so the reported validation loss
-reflects windows after residual context exists. The implementation path is:
+With `--target-steps K > 1`, residual validation mirrors chunk-local corrected AR:
+truth-prefix residual history is advanced with `target - baseline_prediction`, tail
+residual history is advanced with the model residual prediction, and full GraphCast
+inputs are advanced with `baseline_prediction + residual_prediction`. At the next chunk,
+full inputs restart from truth while Mamba state carries detached.
 
 ```text
 src.models.mamba.residual_mamba.training.runner.run_training
@@ -302,13 +342,13 @@ Residual Mamba has two standalone eval semantics:
 --residual-eval-semantics rollout
 ```
 
-`teacher_forced_training_equivalent` matches residual segment training/eval: residual
-history is advanced with `target - baseline_prediction`, and full GraphCast inputs are
-advanced with truth in the teacher-forced parts. `rollout` advances residual history with
-the model's residual prediction and advances full inputs with the combined forecast
-`baseline_prediction + residual_prediction`. Use `rollout` when measuring true long
-autoregressive behavior; use `teacher_forced_training_equivalent` when comparing against
-the training objective.
+`teacher_forced_training_equivalent` matches one-step residual segment training/eval:
+residual history is advanced with `target - baseline_prediction`, and full GraphCast
+inputs are advanced with truth in the teacher-forced parts. `rollout` advances residual
+history with the model's residual prediction and advances full inputs with the combined
+forecast `baseline_prediction + residual_prediction`. Use `rollout` when measuring true
+long autoregressive behavior; use `teacher_forced_training_equivalent` when comparing
+against one-step teacher-forced objectives.
 
 SLURM array eval discovers available `family:res` shards and then launches one array task
 per shard:
@@ -359,7 +399,7 @@ plots.
 | Model shape | `WIDTH`, `--width` | GraphCast latent width. |
 | Model shape | `MSG`, `--processor-msg-steps` | Number of GraphCast processor message-passing steps. |
 | Segment training | `INPUT_DURATION`, `--input-duration` | Input history window, for example `12h`. |
-| Segment training | `TARGET_STEPS`, `--target-steps` | Autoregressive target steps; segmented Mamba training currently uses `1`. |
+| Segment training | `TARGET_STEPS`, `--target-steps` | Exact corrected AR tail length inside each BPTT chunk. `1` keeps one-step training; values `>1` must be less than `BPTT_STEPS`. |
 | Segment training | `LEN_SEGMENT`, `--len-segment` | Chronological segment length. |
 | Segment training | `BPTT_STEPS`, `--bptt-steps` | Truncated BPTT chunk length; must divide `LEN_SEGMENT`. |
 | Eval in training | `EVAL_EVERY`, `--eval-every` | Optimizer-step interval for validation. |
