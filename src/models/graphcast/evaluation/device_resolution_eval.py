@@ -281,7 +281,43 @@ def _per_variable_loss(pred: xr.Dataset, target: xr.Dataset, spec: _VariableMetr
     return loss
 
 
-def _empty_device_accumulator(metric_spec: DeviceMetricSpec) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+def _per_variable_physical_mse(pred: xr.Dataset, target: xr.Dataset, spec: _VariableMetricSpec) -> jax.Array:
+    pred_values = jnp.asarray(xarray_jax.unwrap(pred[spec.name].data), dtype=jnp.float32)
+    target_values = jnp.asarray(xarray_jax.unwrap(target[spec.name].data), dtype=jnp.float32)
+    loss = (pred_values - target_values) ** 2
+    dims = list(spec.dims)
+
+    if spec.lat_indices is not None and "lat" in dims:
+        axis = dims.index("lat")
+        loss = jnp.take(loss, spec.lat_indices, axis=axis)
+    if spec.lon_indices is not None and "lon" in dims:
+        axis = dims.index("lon")
+        loss = jnp.take(loss, spec.lon_indices, axis=axis)
+
+    if spec.lat_weights is not None and "lat" in dims:
+        axis = dims.index("lat")
+        weight_shape = [1] * loss.ndim
+        weight_shape[axis] = int(spec.lat_weights.shape[0])
+        weights = jnp.reshape(spec.lat_weights, tuple(weight_shape))
+        loss = loss * weights
+
+    for dim in tuple(dims):
+        if dim not in ("batch", "time"):
+            axis = dims.index(dim)
+            loss = jnp.mean(loss, axis=axis)
+            dims.pop(axis)
+
+    if dims == ["time", "batch"]:
+        loss = jnp.swapaxes(loss, 0, 1)
+        dims = ["batch", "time"]
+    if dims != ["batch", "time"]:
+        raise ValueError(f"Physical MSE for {spec.name} reduced to unexpected dims {dims}.")
+    return loss
+
+
+def _empty_device_accumulator(
+    metric_spec: DeviceMetricSpec,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
     n_vars = len(metric_spec.variables)
     max_lead_steps = metric_spec.max_lead_steps
     return (
@@ -289,29 +325,36 @@ def _empty_device_accumulator(metric_spec: DeviceMetricSpec) -> tuple[jax.Array,
         jnp.zeros((max_lead_steps,), dtype=jnp.int32),
         jnp.zeros((n_vars, max_lead_steps), dtype=jnp.float32),
         jnp.zeros((n_vars, max_lead_steps), dtype=jnp.int32),
+        jnp.zeros((n_vars, max_lead_steps), dtype=jnp.float32),
+        jnp.zeros((n_vars, max_lead_steps), dtype=jnp.int32),
     )
 
 
 def _accumulate_step(
-    acc: tuple[jax.Array, jax.Array, jax.Array, jax.Array],
+    acc: tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array],
     pred_step: xr.Dataset,
     target_step: xr.Dataset,
     *,
     lead_i: int,
     metric_spec: DeviceMetricSpec,
-) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-    weighted_sum, weighted_count, per_var_sum, per_var_count = acc
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
+    weighted_sum, weighted_count, per_var_sum, per_var_count, physical_mse_sum, physical_mse_count = acc
     weighted_batch = jnp.zeros_like(_per_variable_loss(pred_step, target_step, metric_spec.variables[0]))
     for var_i, var_spec in enumerate(metric_spec.variables):
         loss_bt = _per_variable_loss(pred_step, target_step, var_spec)
+        physical_mse_bt = _per_variable_physical_mse(pred_step, target_step, var_spec)
         if var_spec.include_in_weighted:
             weighted_batch = weighted_batch + loss_bt * var_spec.variable_weight
         per_var_sum = per_var_sum.at[var_i, lead_i].add(jnp.sum(loss_bt))
         per_var_count = per_var_count.at[var_i, lead_i].add(jnp.asarray(loss_bt.size, dtype=jnp.int32))
+        physical_mse_sum = physical_mse_sum.at[var_i, lead_i].add(jnp.sum(physical_mse_bt))
+        physical_mse_count = physical_mse_count.at[var_i, lead_i].add(
+            jnp.asarray(physical_mse_bt.size, dtype=jnp.int32)
+        )
 
     weighted_sum = weighted_sum.at[lead_i].add(jnp.sum(weighted_batch))
     weighted_count = weighted_count.at[lead_i].add(jnp.asarray(weighted_batch.size, dtype=jnp.int32))
-    return weighted_sum, weighted_count, per_var_sum, per_var_count
+    return weighted_sum, weighted_count, per_var_sum, per_var_count, physical_mse_sum, physical_mse_count
 
 
 def _model_step_single(
@@ -431,7 +474,7 @@ class PreparedDeviceResolutionEvaluator:
         self._nyc_lat = nyc_lat
         self._nyc_lon = nyc_lon
         self._nyc_output_name = nyc_output_name
-        self._residual_teacher_forced = residual_eval_semantics == "teacher_forced_training_equivalent"
+        self._residual_branch_teacher_forced = residual_eval_semantics == "teacher_forced_training_equivalent"
         self._metric_spec: DeviceMetricSpec | None = None
         self._state_cache: dict[tuple[str, int], Any] = {}
         self._cold_fn = None
@@ -538,10 +581,10 @@ class PreparedDeviceResolutionEvaluator:
                     residual_inputs=residual_inputs,
                     target_step=target_step,
                     forcings_step=forcings_step,
-                    teacher_forced=self._residual_teacher_forced,
+                    teacher_forced=self._residual_branch_teacher_forced,
                 )
                 acc = _accumulate_step(acc, pred_step, target_step, lead_i=lead_i, metric_spec=metric_spec)
-                feedback_step = target_step if self._residual_teacher_forced else pred_step
+                feedback_step = target_step if self._residual_branch_teacher_forced else pred_step
                 rolling_inputs = _update_inputs(rolling_inputs, xr.merge([feedback_step, forcings_step]))
             return acc
 
@@ -580,7 +623,9 @@ class PreparedDeviceResolutionEvaluator:
                 residual_inputs=residual_inputs,
                 target_step=target_step,
                 forcings_step=forcings_step,
-                teacher_forced=self._residual_teacher_forced,
+                # Warm truth/context steps should always feed the true residual history.
+                # The residual eval semantic only controls the scored branch below.
+                teacher_forced=True,
             )
             return _update_inputs(rolling_inputs, xr.merge([target_step, forcings_step])), residual_inputs, (
                 residual_state,
@@ -639,10 +684,10 @@ class PreparedDeviceResolutionEvaluator:
                     residual_inputs=branch_residual_inputs,
                     target_step=target_step,
                     forcings_step=forcings_step,
-                    teacher_forced=self._residual_teacher_forced,
+                    teacher_forced=self._residual_branch_teacher_forced,
                 )
                 acc = _accumulate_step(acc, pred_step, target_step, lead_i=lead_i, metric_spec=metric_spec)
-                feedback_step = target_step if self._residual_teacher_forced else pred_step
+                feedback_step = target_step if self._residual_branch_teacher_forced else pred_step
                 branch_rolling = _update_inputs(branch_rolling, xr.merge([feedback_step, forcings_step]))
             return acc
 
@@ -739,16 +784,24 @@ def add_device_accumulator_to_host(
     *,
     variable_names: tuple[str, ...],
 ) -> None:
-    weighted_sum, weighted_count, per_var_sum, per_var_count = jax.device_get(device_acc)
+    weighted_sum, weighted_count, per_var_sum, per_var_count, physical_mse_sum, physical_mse_count = jax.device_get(
+        device_acc
+    )
     host_acc["weighted_sum"] += np.asarray(weighted_sum, dtype=float)
     host_acc["weighted_count"] += np.asarray(weighted_count, dtype=int)
     per_variable_sum = host_acc["per_variable_sum"]
     per_variable_count = host_acc["per_variable_count"]
+    physical_sum = host_acc["physical_mse_sum"]
+    physical_count = host_acc["physical_mse_count"]
     for var_i, name in enumerate(variable_names):
         per_variable_sum.setdefault(name, np.zeros_like(host_acc["weighted_sum"]))
         per_variable_count.setdefault(name, np.zeros_like(host_acc["weighted_count"]))
         per_variable_sum[name] += np.asarray(per_var_sum[var_i], dtype=float)
         per_variable_count[name] += np.asarray(per_var_count[var_i], dtype=int)
+        physical_sum.setdefault(name, np.zeros_like(host_acc["weighted_sum"]))
+        physical_count.setdefault(name, np.zeros_like(host_acc["weighted_count"]))
+        physical_sum[name] += np.asarray(physical_mse_sum[var_i], dtype=float)
+        physical_count[name] += np.asarray(physical_mse_count[var_i], dtype=int)
 
 
 __all__ = [

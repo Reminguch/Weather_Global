@@ -56,6 +56,7 @@ from graphcast import checkpoint, data_utils, graphcast
 
 from scripts.analyze_models.legacy.analysis_metrics import (
     GRAPHCAST_PER_VARIABLE_WEIGHTS,
+    latitude_weights_with_fallback,
     normalized_per_variable_mse,
     normalized_weighted_mse_allvars,
 )
@@ -80,7 +81,7 @@ DEFAULT_OUTPUT_IMAGE_DIR = "plots/analyze_models/images/resolution_eval"
 DEFAULT_PREPARED_DATA_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
 
 FAMILIES = ["graphcast", "gc_mamba", "legacy_gc_mamba", "residual_mamba"]
-METRICS = ["weighted_allvars", "per_variable"]
+METRICS = ["weighted_allvars", "per_variable", "rmse_k"]
 EVAL_MODES = ["cold", "warm"]
 DATA_SOURCES = ["prepared_array", "raw"]
 LEAD_DAYS = [1, 2, 4]
@@ -100,6 +101,9 @@ RESIDUAL_EVAL_SEMANTICS_ROLLOUT = "rollout"
 RESIDUAL_EVAL_SEMANTICS = RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED
 RESIDUAL_EVAL_SEMANTICS_CHOICES = [RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED, RESIDUAL_EVAL_SEMANTICS_ROLLOUT]
 METRIC_SEMANTICS = "graphcast_weighted_mse_per_level_projected_grid"
+LEAD_AGGREGATION_ENDPOINT = "endpoint"
+LEAD_AGGREGATION_MEAN_TO_LEAD = "mean_to_lead"
+LEAD_AGGREGATION_CHOICES = [LEAD_AGGREGATION_ENDPOINT, LEAD_AGGREGATION_MEAN_TO_LEAD]
 NYC_LAT = 40.7
 NYC_LON = 286.0
 NYC_POINT_VARIABLE = "2m_temperature_nyc"
@@ -161,6 +165,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Evaluate explicit autoregressive lead steps. Overrides --lead-days when set.",
     )
+    parser.add_argument(
+        "--lead-aggregation",
+        choices=LEAD_AGGREGATION_CHOICES,
+        default=LEAD_AGGREGATION_ENDPOINT,
+        help=(
+            "How to reduce per-step rollout metrics at requested leads. "
+            "'endpoint' reports the loss exactly at k; 'mean_to_lead' reports "
+            "the mean loss over rollout steps 1..k."
+        ),
+    )
     parser.add_argument("--metrics", nargs="+", choices=METRICS, default=METRICS)
     parser.add_argument("--eval-modes", nargs="+", choices=EVAL_MODES, default=EVAL_MODES)
     parser.add_argument(
@@ -169,7 +183,8 @@ def parse_args() -> argparse.Namespace:
         default=RESIDUAL_EVAL_SEMANTICS,
         help=(
             "Residual Mamba eval behavior. The default preserves old training-equivalent "
-            "teacher forcing; rollout feeds residual/full predictions back during scored branches."
+            "teacher forcing. Rollout truth-feeds warm context, then feeds residual/full "
+            "predictions back during scored branches."
         ),
     )
     parser.add_argument("--n-eval-days", type=int, default=N_EVAL_DAYS)
@@ -178,6 +193,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trunk-steps", type=int, default=TRUNK_STEPS)
     parser.add_argument("--prepared-load-workers", type=int, default=1)
     parser.add_argument("--prepared-stream-block-steps", type=int, default=PREPARED_STREAM_BLOCK_STEPS)
+    parser.add_argument(
+        "--metric-grid-resolution",
+        type=int,
+        default=RES_GRID_STRIDE,
+        help=(
+            "Prepared-store resolution used for metric sampling. "
+            f"Default {RES_GRID_STRIDE} preserves common-grid resolution eval; "
+            "use 2 to score on the native res2 grid."
+        ),
+    )
     parser.add_argument(
         "--disable-prepared-device-eval",
         action="store_true",
@@ -471,6 +496,8 @@ def _empty_metric_accumulator(max_lead_steps: int) -> dict[str, object]:
         "weighted_count": np.zeros(max_lead_steps, dtype=int),
         "per_variable_sum": {},
         "per_variable_count": {},
+        "physical_mse_sum": {},
+        "physical_mse_count": {},
     }
 
 
@@ -491,6 +518,8 @@ def _accumulate_metrics(
     weighted_count = acc["weighted_count"]
     per_variable_sum = acc["per_variable_sum"]
     per_variable_count = acc["per_variable_count"]
+    physical_mse_sum = acc["physical_mse_sum"]
+    physical_mse_count = acc["physical_mse_count"]
 
     for step_i in range(n_steps):
         pred_step = pred_b.isel(time=step_i)
@@ -522,11 +551,35 @@ def _accumulate_metrics(
             per_variable_sum[name][step_i] += float(values.sum())
             per_variable_count[name][step_i] += int(values.size)
 
+        if "2m_temperature" in grid_pred and "2m_temperature" in grid_target:
+            physical_loss = (grid_pred["2m_temperature"] - grid_target["2m_temperature"]) ** 2
+            if "lat" in physical_loss.dims:
+                lat_w = latitude_weights_with_fallback(grid_target["2m_temperature"]).astype(physical_loss.dtype)
+                physical_loss = physical_loss * lat_w
+            reduce_dims = [dim for dim in physical_loss.dims if dim not in ("batch",)]
+            if reduce_dims:
+                physical_loss = physical_loss.mean(reduce_dims, skipna=False)
+            values = np.asarray(physical_loss.values)
+            physical_mse_sum.setdefault("2m_temperature", np.zeros_like(weighted_sum))
+            physical_mse_count.setdefault("2m_temperature", np.zeros_like(weighted_count))
+            physical_mse_sum["2m_temperature"][step_i] += float(values.sum())
+            physical_mse_count["2m_temperature"][step_i] += int(values.size)
+
         if "2m_temperature" in pred_step and "2m_temperature" in target_step:
             metric_lat = float(res_grid_lats.values[np.abs(np.asarray(res_grid_lats.values) - NYC_LAT).argmin()])
             metric_lon = float(res_grid_lons.values[np.abs(np.asarray(res_grid_lons.values) - NYC_LON).argmin()])
             point_pred = pred_step["2m_temperature"].sel(lat=metric_lat, lon=metric_lon, method="nearest")
             point_target = target_step["2m_temperature"].sel(lat=metric_lat, lon=metric_lon, method="nearest")
+            physical_point_loss = (point_pred - point_target) ** 2
+            reduce_dims = [dim for dim in physical_point_loss.dims if dim not in ("batch",)]
+            if reduce_dims:
+                physical_point_loss = physical_point_loss.mean(reduce_dims, skipna=False)
+            values = np.asarray(physical_point_loss.values)
+            physical_mse_sum.setdefault(NYC_POINT_VARIABLE, np.zeros_like(weighted_sum))
+            physical_mse_count.setdefault(NYC_POINT_VARIABLE, np.zeros_like(weighted_count))
+            physical_mse_sum[NYC_POINT_VARIABLE][step_i] += float(values.sum())
+            physical_mse_count[NYC_POINT_VARIABLE][step_i] += int(values.size)
+
             point_loss = (point_pred - point_target) ** 2
             if "2m_temperature" in stats["diffs_stddev_by_level"]:
                 scale = stats["diffs_stddev_by_level"]["2m_temperature"]
@@ -547,26 +600,55 @@ def _finalize_metrics(
     acc: dict[str, object],
     lead_days: list[float],
     lead_steps: list[int],
-) -> tuple[dict[float, float], dict[str, dict[float, float]], dict[float, int]]:
+    *,
+    lead_aggregation: str = LEAD_AGGREGATION_ENDPOINT,
+) -> tuple[
+    dict[float, float],
+    dict[str, dict[float, float]],
+    dict[str, dict[float, float]],
+    dict[float, int],
+]:
+    if lead_aggregation == LEAD_AGGREGATION_ENDPOINT:
+        weighted_sum = acc["weighted_sum"]
+        weighted_count = acc["weighted_count"]
+    elif lead_aggregation == LEAD_AGGREGATION_MEAN_TO_LEAD:
+        weighted_sum = np.cumsum(acc["weighted_sum"])
+        weighted_count = np.cumsum(acc["weighted_count"])
+    else:
+        raise ValueError(f"Unknown lead aggregation: {lead_aggregation!r}")
+
     weighted_curve = np.divide(
-        acc["weighted_sum"],
-        acc["weighted_count"],
-        out=np.full(len(acc["weighted_sum"]), np.nan),
-        where=acc["weighted_count"] > 0,
+        weighted_sum,
+        weighted_count,
+        out=np.full(len(weighted_sum), np.nan),
+        where=weighted_count > 0,
     )
 
     weighted_by_day: dict[float, float] = {}
     n_by_day: dict[float, int] = {}
     for day, step in zip(lead_days, lead_steps):
         weighted_by_day[day] = float(weighted_curve[step - 1])
-        n_by_day[day] = int(acc["weighted_count"][step - 1])
+        n_by_day[day] = int(weighted_count[step - 1])
 
     per_variable_by_day: dict[str, dict[float, float]] = {}
     for name, sums in sorted(acc["per_variable_sum"].items()):
         counts = acc["per_variable_count"][name]
+        if lead_aggregation == LEAD_AGGREGATION_MEAN_TO_LEAD:
+            sums = np.cumsum(sums)
+            counts = np.cumsum(counts)
         curve = np.divide(sums, counts, out=np.full(len(sums), np.nan), where=counts > 0)
         per_variable_by_day[name] = {day: float(curve[step - 1]) for day, step in zip(lead_days, lead_steps)}
-    return weighted_by_day, per_variable_by_day, n_by_day
+
+    rmse_by_day: dict[str, dict[float, float]] = {}
+    for name, sums in sorted(acc["physical_mse_sum"].items()):
+        counts = acc["physical_mse_count"][name]
+        if lead_aggregation == LEAD_AGGREGATION_MEAN_TO_LEAD:
+            sums = np.cumsum(sums)
+            counts = np.cumsum(counts)
+        mse_curve = np.divide(sums, counts, out=np.full(len(sums), np.nan), where=counts > 0)
+        rmse_curve = np.sqrt(mse_curve)
+        rmse_by_day[name] = {day: float(rmse_curve[step - 1]) for day, step in zip(lead_days, lead_steps)}
+    return weighted_by_day, per_variable_by_day, rmse_by_day, n_by_day
 
 
 def _evaluate_checkpoint(
@@ -582,8 +664,14 @@ def _evaluate_checkpoint(
     window_batch_size: int,
     target_indices: list[int],
     residual_eval_semantics: str,
+    lead_aggregation: str,
     cache: EvalShardCache,
-) -> tuple[dict[int, float], dict[str, dict[int, float]], dict[int, int]]:
+) -> tuple[
+    dict[float, float],
+    dict[str, dict[float, float]],
+    dict[str, dict[float, float]],
+    dict[float, int],
+]:
     max_lead_steps = max(lead_steps)
     with ckpt_path.open("rb") as f:
         ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
@@ -643,7 +731,7 @@ def _evaluate_checkpoint(
             stats=stats,
         )
 
-    return _finalize_metrics(acc, lead_days, lead_steps)
+    return _finalize_metrics(acc, lead_days, lead_steps, lead_aggregation=lead_aggregation)
 
 
 def _evaluate_checkpoint_truth_anchored(
@@ -660,8 +748,14 @@ def _evaluate_checkpoint_truth_anchored(
     trunk_steps: int,
     window_batch_size: int,
     residual_eval_semantics: str,
+    lead_aggregation: str,
     cache: EvalShardCache,
-) -> tuple[dict[int, float], dict[str, dict[int, float]], dict[int, int]]:
+) -> tuple[
+    dict[float, float],
+    dict[str, dict[float, float]],
+    dict[str, dict[float, float]],
+    dict[float, int],
+]:
     max_lead_steps = max(lead_steps)
     total_horizon_steps = warmup_steps + trunk_steps + max_lead_steps
     with ckpt_path.open("rb") as f:
@@ -763,7 +857,7 @@ def _evaluate_checkpoint_truth_anchored(
                 )
                 key_i += 2
 
-    return _finalize_metrics(acc, lead_days, lead_steps)
+    return _finalize_metrics(acc, lead_days, lead_steps, lead_aggregation=lead_aggregation)
 
 
 def _open_prepared_eval_store_for_checkpoint(
@@ -817,7 +911,14 @@ def _evaluate_checkpoint_prepared(
     eval_end: str | None,
     eval_year: int | None,
     residual_eval_semantics: str,
-) -> tuple[dict[int, float], dict[str, dict[int, float]], dict[int, int], dict[str, object]]:
+    lead_aggregation: str,
+) -> tuple[
+    dict[float, float],
+    dict[str, dict[float, float]],
+    dict[str, dict[float, float]],
+    dict[float, int],
+    dict[str, object],
+]:
     max_lead_steps = max(lead_steps)
     with ckpt_path.open("rb") as f:
         ckpt_obj = checkpoint.load(f, graphcast.CheckPoint)
@@ -862,6 +963,7 @@ def _evaluate_checkpoint_prepared(
         eval_year=eval_year,
     )
     eval_metadata = _add_residual_eval_semantics(eval_metadata, run_cfg, residual_eval_semantics)
+    eval_metadata["lead_aggregation"] = lead_aggregation
     target_indices = _prepared_target_indices(store.sizes["time"], max_lead_steps)
     acc = _empty_metric_accumulator(max_lead_steps)
 
@@ -943,8 +1045,13 @@ def _evaluate_checkpoint_prepared(
                     flush=True,
                 )
 
-    weighted_by_day, per_variable_by_day, n_by_day = _finalize_metrics(acc, lead_days, lead_steps)
-    return weighted_by_day, per_variable_by_day, n_by_day, eval_metadata
+    weighted_by_day, per_variable_by_day, rmse_by_day, n_by_day = _finalize_metrics(
+        acc,
+        lead_days,
+        lead_steps,
+        lead_aggregation=lead_aggregation,
+    )
+    return weighted_by_day, per_variable_by_day, rmse_by_day, n_by_day, eval_metadata
 
 
 def _evaluate_checkpoint_truth_anchored_prepared(
@@ -968,7 +1075,14 @@ def _evaluate_checkpoint_truth_anchored_prepared(
     eval_end: str | None,
     eval_year: int | None,
     residual_eval_semantics: str,
-) -> tuple[dict[int, float], dict[str, dict[int, float]], dict[int, int], dict[str, object]]:
+    lead_aggregation: str,
+) -> tuple[
+    dict[float, float],
+    dict[str, dict[float, float]],
+    dict[str, dict[float, float]],
+    dict[float, int],
+    dict[str, object],
+]:
     max_lead_steps = max(lead_steps)
     total_horizon_steps = warmup_steps + trunk_steps + max_lead_steps
     with ckpt_path.open("rb") as f:
@@ -1017,6 +1131,7 @@ def _evaluate_checkpoint_truth_anchored_prepared(
         eval_year=eval_year,
     )
     eval_metadata = _add_residual_eval_semantics(eval_metadata, run_cfg, residual_eval_semantics)
+    eval_metadata["lead_aggregation"] = lead_aggregation
     chunk_start_indices = _prepared_chunk_start_indices(
         store.sizes["time"],
         trunk_steps=trunk_steps,
@@ -1163,8 +1278,13 @@ def _evaluate_checkpoint_truth_anchored_prepared(
                 while next_progress <= current:
                     next_progress *= 2
 
-    weighted_by_day, per_variable_by_day, n_by_day = _finalize_metrics(acc, lead_days, lead_steps)
-    return weighted_by_day, per_variable_by_day, n_by_day, eval_metadata
+    weighted_by_day, per_variable_by_day, rmse_by_day, n_by_day = _finalize_metrics(
+        acc,
+        lead_days,
+        lead_steps,
+        lead_aggregation=lead_aggregation,
+    )
+    return weighted_by_day, per_variable_by_day, rmse_by_day, n_by_day, eval_metadata
 
 
 def _parse_res_from_path(ckpt_path: Path, run_cfg: dict) -> int | None:
@@ -1295,6 +1415,7 @@ def _append_metric_rows(
     eval_mode: str,
     weighted_by_day: dict[float, float],
     per_variable_by_day: dict[str, dict[float, float]],
+    rmse_by_day: dict[str, dict[float, float]],
     n_by_day: dict[float, int],
     *,
     warmup_steps: int,
@@ -1308,6 +1429,7 @@ def _append_metric_rows(
         "eval_end": eval_metadata.get("eval_end", ""),
         "eval_year": eval_metadata.get("eval_year", np.nan),
         "metric_semantics": eval_metadata.get("metric_semantics", METRIC_SEMANTICS),
+        "lead_aggregation": eval_metadata.get("lead_aggregation", LEAD_AGGREGATION_ENDPOINT),
         "residual_eval_semantics": eval_metadata.get("residual_eval_semantics", ""),
     }
     for day, step in zip(lead_days, lead_steps):
@@ -1346,6 +1468,29 @@ def _append_metric_rows(
                         "lead_steps": step,
                         "eval_mode": eval_mode,
                         "metric_kind": "per_variable",
+                        "variable": variable,
+                        "value": by_day.get(day, np.nan),
+                        "n_points": n_by_day.get(day, 0),
+                        "run_name": entry.run_name,
+                        "ckpt_path": str(entry.ckpt_path),
+                        "warmup_steps": warmup_steps if eval_mode == "warm" else np.nan,
+                        "trunk_steps": trunk_steps if eval_mode == "warm" else np.nan,
+                        **metadata,
+                    }
+                )
+        if "rmse_k" in metrics:
+            for variable, by_day in sorted(rmse_by_day.items()):
+                rows.append(
+                    {
+                        "family": entry.family,
+                        "variant": entry.variant,
+                        "model_type": entry.model_type,
+                        "di": entry.di,
+                        "res": entry.res,
+                        "lead_days": day,
+                        "lead_steps": step,
+                        "eval_mode": eval_mode,
+                        "metric_kind": "rmse_k",
                         "variable": variable,
                         "value": by_day.get(day, np.nan),
                         "n_points": n_by_day.get(day, 0),
@@ -1430,7 +1575,10 @@ def main() -> None:
         ds_base, start_target_idx, n_steps = _prepare_dataset(max(lead_steps), args.n_eval_days)
         target_indices = _target_indices(start_target_idx, n_steps, max(lead_steps))
     else:
-        prepared_metric_grid = load_prepared_metric_grid(args.prepared_data_root, resolution=RES_GRID_STRIDE)
+        prepared_metric_grid = load_prepared_metric_grid(
+            args.prepared_data_root,
+            resolution=args.metric_grid_resolution,
+        )
     cache = EvalShardCache(
         ds_res_by_stride={},
         metric_grid_by_stride={},
@@ -1441,7 +1589,8 @@ def main() -> None:
 
     print(
         f"Evaluating {len(entries)} checkpoints across families={args.families} "
-        f"resolutions={args.resolutions} data_source={args.data_source}"
+        f"resolutions={args.resolutions} data_source={args.data_source} "
+        f"lead_aggregation={args.lead_aggregation} metric_grid_resolution={args.metric_grid_resolution}"
     )
     rows: list[dict] = []
     csv_path = args.output_data_dir / args.output_csv_name
@@ -1452,7 +1601,7 @@ def main() -> None:
             try:
                 if args.data_source == "raw":
                     assert ds_base is not None
-                    cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day = _evaluate_checkpoint(
+                    cold_weighted_by_day, cold_per_variable_by_day, cold_rmse_by_day, cold_n_by_day = _evaluate_checkpoint(
                         entry.ckpt_path,
                         stats,
                         ds_base,
@@ -1464,14 +1613,15 @@ def main() -> None:
                         window_batch_size=args.window_batch_size,
                         target_indices=target_indices,
                         residual_eval_semantics=args.residual_eval_semantics,
+                        lead_aggregation=args.lead_aggregation,
                         cache=cache,
                     )
-                    cold_metadata = {"data_source": "raw"}
+                    cold_metadata = {"data_source": "raw", "lead_aggregation": args.lead_aggregation}
                     if entry.family == "residual_mamba":
                         cold_metadata["residual_eval_semantics"] = args.residual_eval_semantics
                 else:
                     assert prepared_metric_grid is not None
-                    cold_weighted_by_day, cold_per_variable_by_day, cold_n_by_day, cold_metadata = (
+                    cold_weighted_by_day, cold_per_variable_by_day, cold_rmse_by_day, cold_n_by_day, cold_metadata = (
                         _evaluate_checkpoint_prepared(
                             entry.ckpt_path,
                             stats,
@@ -1491,6 +1641,7 @@ def main() -> None:
                             eval_end=args.eval_end,
                             eval_year=args.eval_year,
                             residual_eval_semantics=args.residual_eval_semantics,
+                            lead_aggregation=args.lead_aggregation,
                         )
                     )
                 _append_metric_rows(
@@ -1502,6 +1653,7 @@ def main() -> None:
                     "cold",
                     cold_weighted_by_day,
                     cold_per_variable_by_day,
+                    cold_rmse_by_day,
                     cold_n_by_day,
                     warmup_steps=args.warmup_steps,
                     trunk_steps=args.trunk_steps,
@@ -1516,7 +1668,7 @@ def main() -> None:
             try:
                 if args.data_source == "raw":
                     assert ds_base is not None
-                    warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day = (
+                    warm_weighted_by_day, warm_per_variable_by_day, warm_rmse_by_day, warm_n_by_day = (
                         _evaluate_checkpoint_truth_anchored(
                             entry.ckpt_path,
                             stats,
@@ -1530,15 +1682,16 @@ def main() -> None:
                             trunk_steps=args.trunk_steps,
                             window_batch_size=args.window_batch_size,
                             residual_eval_semantics=args.residual_eval_semantics,
+                            lead_aggregation=args.lead_aggregation,
                             cache=cache,
                         )
                     )
-                    warm_metadata = {"data_source": "raw"}
+                    warm_metadata = {"data_source": "raw", "lead_aggregation": args.lead_aggregation}
                     if entry.family == "residual_mamba":
                         warm_metadata["residual_eval_semantics"] = args.residual_eval_semantics
                 else:
                     assert prepared_metric_grid is not None
-                    warm_weighted_by_day, warm_per_variable_by_day, warm_n_by_day, warm_metadata = (
+                    warm_weighted_by_day, warm_per_variable_by_day, warm_rmse_by_day, warm_n_by_day, warm_metadata = (
                         _evaluate_checkpoint_truth_anchored_prepared(
                             entry.ckpt_path,
                             stats,
@@ -1559,6 +1712,7 @@ def main() -> None:
                             eval_end=args.eval_end,
                             eval_year=args.eval_year,
                             residual_eval_semantics=args.residual_eval_semantics,
+                            lead_aggregation=args.lead_aggregation,
                         )
                     )
                 _append_metric_rows(
@@ -1570,6 +1724,7 @@ def main() -> None:
                     "warm",
                     warm_weighted_by_day,
                     warm_per_variable_by_day,
+                    warm_rmse_by_day,
                     warm_n_by_day,
                     warmup_steps=args.warmup_steps,
                     trunk_steps=args.trunk_steps,

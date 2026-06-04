@@ -287,7 +287,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
             "residual_state": None,
         }
 
-    def _model_step(*, rng, context, target_step, forcings_step):
+    def _model_step(*, rng, context, target_step, forcings_step, teacher_forced_residual: bool):
         all_inputs = xarray.merge([context["constant_inputs"], context["rolling_inputs"]])
         baseline_pred, baseline_state = baseline_bundle["step"](
             rng=rng[0],
@@ -304,10 +304,11 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
             state=context["residual_state"],
         )
         full_pred = baseline_pred + residual_pred
+        residual_feedback = target_step - baseline_pred if teacher_forced_residual else residual_pred
         next_context = {
             "constant_inputs": context["constant_inputs"],
             "rolling_inputs": context["rolling_inputs"],
-            "residual_inputs": advance_residual_inputs(context["residual_inputs"], residual_pred),
+            "residual_inputs": advance_residual_inputs(context["residual_inputs"], residual_feedback),
             "baseline_state": baseline_state,
             "residual_state": residual_state,
         }
@@ -319,6 +320,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
             context=context,
             target_step=target_step,
             forcings_step=forcings_step,
+            teacher_forced_residual=True,
         )
         next_context["rolling_inputs"] = _update_inputs(
             next_context["rolling_inputs"],
@@ -344,6 +346,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
                 context=branch_context,
                 target_step=target_step,
                 forcings_step=forcings_step,
+                teacher_forced_residual=False,
             )
             preds.append(full_pred.assign_coords(time=target_step.coords["time"]))
             branch_context["rolling_inputs"] = _update_inputs(
