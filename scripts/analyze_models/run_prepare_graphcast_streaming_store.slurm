@@ -23,6 +23,8 @@ DATA_PATH="${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train
 CKPT_IN="${CKPT_IN:-data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz}"
 OUT_ROOT="${OUT_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}"
 RESOLUTIONS="${RESOLUTIONS:-1}"
+TIME_START="${TIME_START:-}"
+TIME_END="${TIME_END:-}"
 OVERWRITE="${OVERWRITE:-0}"
 
 CMD=(
@@ -32,6 +34,9 @@ CMD=(
   --out-root "${OUT_ROOT}"
   --resolutions ${RESOLUTIONS}
 )
+if [[ -n "${TIME_START}" || -n "${TIME_END}" ]]; then
+  CMD+=(--time-start "${TIME_START}" --time-end "${TIME_END}")
+fi
 if [[ "${OVERWRITE}" == "1" ]]; then
   CMD+=(--overwrite)
 fi

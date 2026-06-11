@@ -33,14 +33,25 @@ from src.models.graphcast.training.core.segments import (
     _chunk_ar_truth_prefix,
     _loss_by_lane,
     _reset_temporal_state_lanes,
+    _stop_gradient_dataset,
     build_full_segments,
     iter_eval_segment_chunks,
     segment_midpoint_times,
+)
+from src.models.mamba.residual_mamba.feedback import (
+    RESIDUAL_AR_FEEDBACK,
+    RESIDUAL_AR_FEEDBACK_BASELINE,
+    residual_physical_feedback,
+    validate_residual_ar_feedback,
 )
 
 def _use_zero_init_temporal_out(cfg, temporal_backbone: str | None = None) -> bool:
     backbone = cfg.temporal_backbone if temporal_backbone is None else temporal_backbone
     return backbone == "mamba"
+
+
+def should_checkpoint_residual_ar_step(memory_mode: str) -> bool:
+    return memory_mode in ("conservative", "optimal")
 
 
 def build_loss_transform(
@@ -50,6 +61,7 @@ def build_loss_transform(
     cfg,
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
+        training_memory_mode = getattr(cfg, "memory_mode", "standard") if bool(is_training) else "standard"
         predictor = build_residual_correction_predictor(
             model_cfg,
             task_cfg,
@@ -70,6 +82,7 @@ def build_loss_transform(
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, cfg.temporal_backbone),
             residual_output_head=getattr(cfg, "residual_output_head", False),
+            memory_mode=training_memory_mode,
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -85,6 +98,7 @@ def build_loss_prediction_transform(
     gradient_checkpointing: bool,
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
+        training_memory_mode = getattr(cfg, "memory_mode", "standard") if bool(is_training) else "standard"
         predictor = build_residual_correction_predictor(
             model_cfg,
             task_cfg,
@@ -106,6 +120,7 @@ def build_loss_prediction_transform(
             zero_init_temporal_out=_use_zero_init_temporal_out(cfg, cfg.temporal_backbone),
             residual_output_head=getattr(cfg, "residual_output_head", False),
             autoregressive_loss_mode="none",
+            memory_mode=training_memory_mode,
         )
         return predictor.loss_and_predictions(inputs, targets, forcings)
 
@@ -249,8 +264,12 @@ def residual_autoregressive_final_horizon(
     forcings: xr.Dataset,
     residual_inputs: xr.Dataset,
     is_training: bool,
+    residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK,
+    stop_baseline_gradient: bool = False,
+    checkpoint_step: bool = False,
 ) -> tuple[jax.Array, hk.State, xr.Dataset]:
     """Run residual AR training loss and return one-step teacher-forced carry state."""
+    residual_ar_feedback = validate_residual_ar_feedback(residual_ar_feedback)
     constant_inputs = _constant_inputs(inputs, targets, forcings)
     rolling_inputs = inputs.drop_vars(constant_inputs.keys())
     current_residual_inputs = residual_inputs
@@ -261,38 +280,87 @@ def residual_autoregressive_final_horizon(
     carry_state = None
     teacher_carry_residual_inputs = None
 
-    for step_i in range(targets.sizes["time"]):
-        target_step = targets.isel(time=slice(step_i, step_i + 1))
-        forcings_step = forcings.isel(time=slice(step_i, step_i + 1))
-        full_inputs = xr.merge([constant_inputs, rolling_inputs])
-        baseline_preds, current_baseline_state = baseline_predict_transform.apply(
+    def one_ar_step(
+        current_residual_inputs_step,
+        current_residual_state_step,
+        current_baseline_state_step,
+        rolling_inputs_step,
+        baseline_key,
+        residual_key,
+        target_step,
+        forcings_step,
+    ):
+        full_inputs = xr.merge([constant_inputs, rolling_inputs_step])
+        baseline_preds, next_baseline_state = baseline_predict_transform.apply(
             baseline_params,
-            current_baseline_state,
-            step_keys[2 * step_i],
+            current_baseline_state_step,
+            baseline_key,
             full_inputs,
             target_step,
             forcings_step,
             False,
         )
+        if stop_baseline_gradient:
+            baseline_preds = _stop_gradient_dataset(baseline_preds)
+            next_baseline_state = jax.tree_util.tree_map(
+                jax.lax.stop_gradient,
+                next_baseline_state,
+            )
         residual_targets = compute_residual_targets(target_step, baseline_preds)
-        (loss_and_diag, residual_preds), current_residual_state = residual_loss_prediction_transform.apply(
+        (loss_and_diag, residual_preds), next_residual_state = residual_loss_prediction_transform.apply(
             residual_params,
-            current_residual_state,
-            step_keys[2 * step_i + 1],
-            current_residual_inputs,
+            current_residual_state_step,
+            residual_key,
+            current_residual_inputs_step,
             residual_targets,
             forcings_step,
             is_training,
         )
+        next_residual_inputs = advance_residual_inputs(current_residual_inputs_step, residual_preds)
+        teacher_next_residual_inputs = advance_residual_inputs(current_residual_inputs_step, residual_targets)
+        full_preds = reconstruct_full_predictions(baseline_preds, residual_preds)
+        feedback_preds = residual_physical_feedback(
+            baseline_pred=baseline_preds,
+            full_pred=full_preds,
+            mode=residual_ar_feedback,
+        )
+        next_rolling_inputs = _update_inputs(rolling_inputs_step, xr.merge([feedback_preds, forcings_step]))
+        return (
+            xarray_jax.unwrap_data(loss_and_diag[0]),
+            next_residual_state,
+            next_baseline_state,
+            next_residual_inputs,
+            teacher_next_residual_inputs,
+            next_rolling_inputs,
+        )
+
+    one_ar_step_fn = jax.checkpoint(one_ar_step) if checkpoint_step else one_ar_step
+
+    for step_i in range(targets.sizes["time"]):
+        target_step = targets.isel(time=slice(step_i, step_i + 1))
+        forcings_step = forcings.isel(time=slice(step_i, step_i + 1))
+        (
+            loss_by_lane,
+            current_residual_state,
+            current_baseline_state,
+            current_residual_inputs,
+            teacher_next_residual_inputs,
+            rolling_inputs,
+        ) = one_ar_step_fn(
+            current_residual_inputs,
+            current_residual_state,
+            current_baseline_state,
+            rolling_inputs,
+            step_keys[2 * step_i],
+            step_keys[2 * step_i + 1],
+            target_step,
+            forcings_step,
+        )
         if step_i == 0:
             carry_state = current_residual_state
-            teacher_carry_residual_inputs = advance_residual_inputs(residual_inputs, residual_targets)
+            teacher_carry_residual_inputs = teacher_next_residual_inputs
         if step_i == targets.sizes["time"] - 1:
-            final_loss_by_lane = xarray_jax.unwrap_data(loss_and_diag[0])
-
-        current_residual_inputs = advance_residual_inputs(current_residual_inputs, residual_preds)
-        full_preds = reconstruct_full_predictions(baseline_preds, residual_preds)
-        rolling_inputs = _update_inputs(rolling_inputs, xr.merge([full_preds, forcings_step]))
+            final_loss_by_lane = loss_by_lane
 
     if final_loss_by_lane is None or carry_state is None or teacher_carry_residual_inputs is None:
         raise ValueError("Residual autoregressive rollout requires at least one target step.")
@@ -329,6 +397,10 @@ def augment_run_config(
             int(segment_cfg.base_cfg.target_steps),
             int(segment_cfg.bptt_steps),
         )
+    memory_mode = getattr(segment_cfg.base_cfg, "memory_mode", "standard")
+    residual_ar_feedback = validate_residual_ar_feedback(
+        getattr(segment_cfg, "residual_ar_feedback", RESIDUAL_AR_FEEDBACK)
+    )
     payload["segment_training"] = {
         "len_segment": segment_cfg.len_segment,
         "bptt_steps": segment_cfg.bptt_steps,
@@ -351,6 +423,7 @@ def augment_run_config(
             "truth_prefix_steps": int(truth_prefix_steps),
             "ar_tail_steps": int(segment_cfg.base_cfg.target_steps),
             "feedback_gradient": "full_bptt_chunk_detached",
+            "physical_feedback": residual_ar_feedback,
             "state_carry_steps": "temporal_state_stop_gradient_chunks",
             "physical_state_carry": "truth_reset_each_chunk",
         }
@@ -362,7 +435,10 @@ def augment_run_config(
         "baseline_rollout_mode": (
             "chunk_local_corrected_ar_tail" if segment_cfg.base_cfg.target_steps > 1 else "per_window_one_step"
         ),
-        "autoregressive_feedback": "baseline_plus_predicted_residual",
+        "autoregressive_feedback": (
+            "baseline" if residual_ar_feedback == RESIDUAL_AR_FEEDBACK_BASELINE else "baseline_plus_predicted_residual"
+        ),
+        "autoregressive_feedback_mode": residual_ar_feedback,
         "bptt_residual_carry": (
             "truth_prefix_teacher_then_tail_predicted_residual"
             if segment_cfg.base_cfg.target_steps > 1
@@ -371,6 +447,8 @@ def augment_run_config(
         "eval_metric": "full_forecast_against_truth",
         "eval_loss_equivalence": "loss(residual_pred, target-baseline) == loss(baseline+residual_pred, target)",
         "trainable_init": "fresh" if segment_cfg.resume_ckpt is None else "resume_checkpoint",
+        "baseline_stop_gradient": memory_mode in ("conservative", "optimal"),
+        "residual_step_checkpoint": should_checkpoint_residual_ar_step(memory_mode),
         "temporal_zero_init_out": _use_zero_init_temporal_out(segment_cfg.base_cfg),
         "output_head": {
             "enabled": bool(getattr(segment_cfg.base_cfg, "residual_output_head", False)),
@@ -409,7 +487,9 @@ def run_residual_eval(
     subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
     subset_role: str = "fixed_checkpoint",
     subset_fold: int | None = None,
+    residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK,
 ) -> dict[str, float]:
+    residual_ar_feedback = validate_residual_ar_feedback(residual_ar_feedback)
     rolling_ar = target_steps > 1
     target_load_steps = 1 if rolling_ar else target_steps
     eval_segments = build_full_segments(eval_indices, len_segment)
@@ -558,9 +638,15 @@ def run_residual_eval(
                             if bptt_i + 1 < truth_prefix_steps:
                                 current_rolling_inputs = chunk_inputs[bptt_i + 1]
                             else:
+                                full_preds = reconstruct_full_predictions(baseline_preds, residual_preds)
+                                feedback_preds = residual_physical_feedback(
+                                    baseline_pred=baseline_preds,
+                                    full_pred=full_preds,
+                                    mode=residual_ar_feedback,
+                                )
                                 current_rolling_inputs = _advance_autoregressive_inputs(
                                     current_rolling_inputs,
-                                    baseline_preds + residual_preds,
+                                    feedback_preds,
                                     chunk_forcings[bptt_i],
                                 )
                     return (
@@ -605,6 +691,7 @@ def run_residual_eval(
                             forcings=chunk_forcings[bptt_i],
                             residual_inputs=current_residual_inputs,
                             is_training=False,
+                            residual_ar_feedback=residual_ar_feedback,
                         )
                         valid_lanes = ~reset_mask if bptt_i == 0 else jnp.ones_like(reset_mask, dtype=bool)
                         valid_weight = valid_lanes.astype(loss_by_lane.dtype)

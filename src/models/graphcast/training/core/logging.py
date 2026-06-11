@@ -298,6 +298,7 @@ def _write_run_config(
     effective_train_batch_builder: str | None = None,
     effective_eval_batch_builder: str | None = None,
 ) -> None:
+    memory_mode = getattr(cfg, "memory_mode", "standard")
     builder_metadata = build_batch_builder_metadata(
         requested_batch_builder=cfg.batch_builder,
         effective_train_batch_builder=effective_train_batch_builder,
@@ -328,6 +329,7 @@ def _write_run_config(
         "precision": cfg.precision,
         "init_from_graphcast_ckpt": cfg.init_from_graphcast_ckpt,
         "trainable_part": cfg.trainable_part,
+        "memory_mode": memory_mode,
         "data_pipeline": {
             "data_source": cfg.data_source,
             "prepared_data_root": cfg.prepared_data_root,
@@ -347,6 +349,14 @@ def _write_run_config(
             "microbatch_size": cfg.batch_size,
             "grad_accum_steps": cfg.grad_accum_steps,
             "effective_batch_size": cfg.batch_size * cfg.grad_accum_steps,
+        },
+        "memory_optimization": {
+            "mode": memory_mode,
+            "trainable_param_partition": (
+                memory_mode in ("conservative", "optimal") and cfg.trainable_part == "mamba"
+            ),
+            "processor_step_remat": memory_mode == "optimal",
+            "mesh2grid_remat": memory_mode == "optimal",
         },
         "temporal_config": {
             "backbone": cfg.temporal_backbone,

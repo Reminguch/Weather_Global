@@ -39,6 +39,36 @@ def build_trainable_labels(params: Mapping[str, Mapping[str, Any]], trainable_pa
     }
 
 
+def partition_params_by_trainable_part(
+    params: Mapping[str, Mapping[str, Any]],
+    trainable_part: str,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    trainable: dict[str, dict[str, Any]] = {}
+    frozen: dict[str, dict[str, Any]] = {}
+    for module_name, module_params in params.items():
+        for param_name, leaf in module_params.items():
+            target = (
+                trainable
+                if trainable_label(module_name, param_name, trainable_part) == "train"
+                else frozen
+            )
+            target.setdefault(module_name, {})[param_name] = leaf
+    return trainable, frozen
+
+
+def merge_param_partitions(
+    trainable_params: Mapping[str, Mapping[str, Any]],
+    frozen_params: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    merged = {
+        module_name: dict(module_params)
+        for module_name, module_params in frozen_params.items()
+    }
+    for module_name, module_params in trainable_params.items():
+        merged.setdefault(module_name, {}).update(module_params)
+    return merged
+
+
 def overlay_matching_params(
     initial_params: Mapping[str, Mapping[str, Any]],
     source_params: Mapping[str, Mapping[str, Any]],

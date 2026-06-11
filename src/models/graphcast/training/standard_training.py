@@ -60,6 +60,7 @@ def main() -> None:
     from .core.model import (
         build_loss_transform,
         build_predictor,
+        derive_model_config_from_checkpoint,
         gc,
         load_graphcast_checkpoint,
         load_stats,
@@ -78,14 +79,13 @@ def main() -> None:
     if cfg.input_duration is not None:
         task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
 
-    model_cfg = dataclasses.replace(
+    model_cfg = derive_model_config_from_checkpoint(
         base_model_cfg,
         resolution=cfg.resolution,
         mesh_size=cfg.mesh_size,
         latent_size=cfg.width,
         gnn_msg_steps=cfg.processor_msg_steps,
         hidden_layers=1,
-        mesh2grid_edge_normalization_factor=None,
     )
 
     norm_stats = load_stats(Path(cfg.stats_dir))

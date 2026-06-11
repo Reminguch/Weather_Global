@@ -42,9 +42,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-prefix", default="res2_target_steps_bptt16_warm_rollout")
     parser.add_argument("--merged-csv-name", default="resolution_eval.csv")
     parser.add_argument("--title-prefix", default="Res2 warm rolling")
-    parser.add_argument("--temperature-metric-kind", default="per_variable")
+    parser.add_argument("--temperature-metric-kind", default="rmse_k")
     parser.add_argument("--temperature-variable", default="2m_temperature")
-    parser.add_argument("--temperature-ylabel", default="2m temperature normalized MSE")
+    parser.add_argument("--temperature-ylabel", default="2m temperature RMSE (K)")
     return parser.parse_args()
 
 
@@ -134,22 +134,17 @@ def _metric_rows(df: pd.DataFrame, *, metric_kind: str, variable: str | None) ->
     rows["parsed_di"] = rows["parsed_di"].astype(int)
     rows["parsed_ds"] = rows["parsed_ds"].astype(int)
 
-    missing = []
     want_leads = set(LEAD_STEPS)
-    for family in FAMILIES:
-        for target_step in TARGET_STEPS:
-            for di, ds in PARAM_SPECS:
-                got = set(
-                    rows[
-                        (rows["parsed_model"] == family)
-                        & (rows["target_step"] == target_step)
-                        & (rows["parsed_di"] == di)
-                        & (rows["parsed_ds"] == ds)
-                    ]["lead_steps"].astype(int)
-                )
-                if got != want_leads:
-                    label = f"{family} target_step={target_step} di{di}/ds{ds}"
-                    missing.append(f"{label}: missing {sorted(want_leads - got)}")
+    missing = []
+    for (family, target_step, di, ds), group in rows.groupby(
+        ["parsed_model", "target_step", "parsed_di", "parsed_ds"],
+        dropna=True,
+        sort=True,
+    ):
+        got = set(group["lead_steps"].astype(int))
+        if got != want_leads:
+            label = f"{family} target_step={int(target_step)} di{int(di)}/ds{int(ds)}"
+            missing.append(f"{label}: missing {sorted(want_leads - got)}")
     if missing:
         raise ValueError("; ".join(missing))
     return rows
@@ -198,6 +193,8 @@ def _plot_family_metric(
                 & (family_rows["parsed_di"].astype(int) == di)
                 & (family_rows["parsed_ds"].astype(int) == ds)
             ].sort_values("lead_steps")
+            if sub.empty:
+                continue
             style = PARAM_STYLES[(di, ds)]
             ax.plot(
                 sub["lead_steps"].astype(int),
@@ -231,20 +228,25 @@ def main() -> None:
     rows.to_csv(merged_csv, index=False)
     print(f"Saved merged CSV: {merged_csv}")
 
-    weighted = _metric_rows(rows, metric_kind="weighted_allvars", variable=None)
-    weighted_baseline = _baseline_metric_rows(rows, metric_kind="weighted_allvars", variable=None)
-    weighted.to_csv(args.output_data_dir / "plotted_rows_weighted_allvars.csv", index=False)
-    weighted_baseline.to_csv(args.output_data_dir / "plotted_rows_vanilla_gc_weighted_allvars.csv", index=False)
-    for family in FAMILIES:
-        _plot_family_metric(
-            weighted,
-            baseline_rows=weighted_baseline,
-            family=family,
-            title=f"{args.title_prefix} eval loss vs k",
-            ylabel="Normalized weighted MSE",
-            out_path=args.output_image_dir
-            / f"{args.output_prefix}_{family}_weighted_allvars_vs_k.png",
-        )
+    has_weighted = (
+        (rows["metric_kind"].astype(str) == "weighted_allvars")
+        & (rows["variable"].fillna("").astype(str) == "")
+    ).any()
+    if has_weighted:
+        weighted = _metric_rows(rows, metric_kind="weighted_allvars", variable=None)
+        weighted_baseline = _baseline_metric_rows(rows, metric_kind="weighted_allvars", variable=None)
+        weighted.to_csv(args.output_data_dir / "plotted_rows_weighted_allvars.csv", index=False)
+        weighted_baseline.to_csv(args.output_data_dir / "plotted_rows_vanilla_gc_weighted_allvars.csv", index=False)
+        for family in FAMILIES:
+            _plot_family_metric(
+                weighted,
+                baseline_rows=weighted_baseline,
+                family=family,
+                title=f"{args.title_prefix} eval loss vs k",
+                ylabel="Normalized weighted MSE",
+                out_path=args.output_image_dir
+                / f"{args.output_prefix}_{family}_weighted_allvars_vs_k.png",
+            )
 
     temp2m = _metric_rows(rows, metric_kind=args.temperature_metric_kind, variable=args.temperature_variable)
     temp2m_baseline = _baseline_metric_rows(
@@ -252,11 +254,12 @@ def main() -> None:
         metric_kind=args.temperature_metric_kind,
         variable=args.temperature_variable,
     )
-    temp_suffix = (
-        "2m_temperature"
-        if args.temperature_metric_kind == "per_variable" and args.temperature_variable == "2m_temperature"
-        else f"{args.temperature_variable}_{args.temperature_metric_kind}"
-    )
+    if args.temperature_metric_kind == "per_variable" and args.temperature_variable == "2m_temperature":
+        temp_suffix = "2m_temperature"
+    elif args.temperature_metric_kind == "rmse_k" and args.temperature_variable == "2m_temperature":
+        temp_suffix = "2m_temperature_rmse_k"
+    else:
+        temp_suffix = f"{args.temperature_variable}_{args.temperature_metric_kind}"
     temp2m.to_csv(args.output_data_dir / f"plotted_rows_{temp_suffix}.csv", index=False)
     temp2m_baseline.to_csv(args.output_data_dir / f"plotted_rows_vanilla_gc_{temp_suffix}.csv", index=False)
     for family in FAMILIES:
@@ -267,7 +270,7 @@ def main() -> None:
             title=f"{args.title_prefix} 2m temperature loss vs k",
             ylabel=args.temperature_ylabel,
             out_path=args.output_image_dir
-            / f"{args.output_prefix}_{family}_2m_temperature_vs_k.png",
+            / f"{args.output_prefix}_{family}_{temp_suffix}_vs_k.png",
         )
 
 

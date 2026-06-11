@@ -11,6 +11,7 @@ DEFAULT_CKPT = (
 DEFAULT_STATS_DIR = "data/graphcast/graphcast/stats"
 DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_res2_stream"
 DEFAULT_PREPARED_DATA_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
+MEMORY_MODE_CHOICES = ("standard", "conservative", "optimal")
 
 GRAPHCAST_VARS = [
     "2m_temperature",
@@ -88,6 +89,7 @@ class RunConfig:
     eval_subset_policy: str = "stratified_fixed"
     eval_rotating_diagnostics: bool = True
     residual_output_head: bool = False
+    memory_mode: str = "standard"
 
 
 def _positive_int_or_all(value: str) -> int | None:

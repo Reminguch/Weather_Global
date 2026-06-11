@@ -7,8 +7,10 @@ from src.models.graphcast.training.core.config import (
     DEFAULT_DATA_PATH,
     DEFAULT_PREPARED_DATA_ROOT,
     DEFAULT_STATS_DIR,
+    MEMORY_MODE_CHOICES,
     RunConfig,
 )
+from src.models.mamba.residual_mamba.feedback import RESIDUAL_AR_FEEDBACK, RESIDUAL_AR_FEEDBACK_CHOICES
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,6 +27,7 @@ class ResidualSegmentRunConfig:
     final_eval_num_segments: int | None = None
     eval_subset_policy: str = "stratified_fixed"
     eval_rotating_diagnostics: bool = True
+    residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK
 
 
 def _positive_int_or_all(value: str) -> int | None:
@@ -102,6 +105,17 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
     parser.add_argument("--temporal-insert-count", type=int, default=None)
     parser.add_argument(
+        "--memory-mode",
+        choices=MEMORY_MODE_CHOICES,
+        default="standard",
+        help=(
+            "Training memory behavior: standard preserves current behavior, "
+            "conservative stops gradients through frozen baseline outputs and "
+            "checkpoints each residual AR step, and optimal also rematerializes "
+            "processor steps plus mesh2grid."
+        ),
+    )
+    parser.add_argument(
         "--residual-output-head",
         choices=["auto", "enabled", "disabled"],
         default="auto",
@@ -118,6 +132,16 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         choices=["residual"],
         default="residual",
         help="Residual target definition. 'residual' means y_true - y_base.",
+    )
+    parser.add_argument(
+        "--residual-ar-feedback",
+        choices=RESIDUAL_AR_FEEDBACK_CHOICES,
+        default=RESIDUAL_AR_FEEDBACK,
+        help=(
+            "Physical autoregressive feedback during residual AR tail training/eval. "
+            "'baseline_plus_residual' feeds the corrected forecast back; 'baseline' "
+            "scores baseline+residual output but feeds only the frozen baseline forecast."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -222,6 +246,7 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         usage_every=1,
         eval_only=False,
         residual_output_head=False,
+        memory_mode=args.memory_mode,
     )
     return ResidualSegmentRunConfig(
         base_cfg=base_cfg,
@@ -236,4 +261,5 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         final_eval_num_segments=args.final_eval_num_segments,
         eval_subset_policy=args.eval_subset_policy,
         eval_rotating_diagnostics=args.eval_rotating_diagnostics,
+        residual_ar_feedback=args.residual_ar_feedback,
     )

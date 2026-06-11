@@ -8,6 +8,7 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 GRAPHCAST_LOCAL = ROOT / "third_party" / "graphcast"
@@ -223,3 +224,141 @@ def test_stateful_interleaved_temporal_uses_3d_mesh_latents() -> None:
     assert ssm_states[0].shape == (batch_size, n_mesh, 4, 3)
     assert np.isfinite(np.asarray(y)).all()
     assert np.isfinite(np.asarray(ssm_states[0])).all()
+
+
+def test_zero_init_stateful_interleaved_temporal_starts_as_identity() -> None:
+    n_mesh = 5
+    batch_size = 2
+    channels = 8
+
+    graph = _TinyGraph(
+        nodes={"mesh_nodes": _NodeSet(features=jnp.zeros((n_mesh, 1), dtype=jnp.float32))},
+        edges={"mesh": _EdgeSet(features=jnp.zeros((4, 1), dtype=jnp.float32))},
+    )
+
+    def forward(x):
+        predictor = object.__new__(gc.GraphCast)
+        predictor._mesh_graph_structure = graph
+        predictor._mesh_gnn = _TinyMeshGNN()
+        predictor._temporal_backbone = "mamba"
+        predictor._temporal_location = "mesh_processor_interleaved"
+        predictor._temporal_stateful = True
+        predictor._temporal_d_inner = 4
+        predictor._temporal_d_state = 3
+        predictor._temporal_d_conv = 1
+        predictor._temporal_dt_rank = "auto"
+        predictor._temporal_bias = False
+        predictor._temporal_conv_bias = True
+        predictor._temporal_layers = 1
+        predictor._temporal_dropout = 0.0
+        predictor._temporal_zero_init_out = True
+        predictor._temporal_insert_count = None
+        return gc.GraphCast._run_mesh_gnn_interleaved(predictor, x)
+
+    transformed = hk.transform_with_state(forward)
+    rng = jax.random.PRNGKey(0)
+    x = jnp.ones((n_mesh, batch_size, channels), dtype=jnp.float32)
+
+    params, state = transformed.init(rng, x)
+    y, _ = transformed.apply(params, state, rng, x)
+
+    np.testing.assert_allclose(
+        np.asarray(y),
+        np.asarray(x + jnp.asarray(0.1, x.dtype)),
+        rtol=1e-6,
+        atol=1e-6,
+    )
+    zero_out_proj = [
+        value
+        for module_name, param_name, value in hk.data_structures.traverse(params)
+        if "mamba_block_0/out_proj" in module_name and param_name == "w"
+    ]
+    assert zero_out_proj
+    for value in zero_out_proj:
+        np.testing.assert_allclose(np.asarray(value), 0.0, rtol=0.0, atol=0.0)
+
+
+def test_interleaved_processor_remat_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    remat_calls = 0
+
+    def fake_remat(fn):
+        nonlocal remat_calls
+        remat_calls += 1
+        return fn
+
+    class _NoopTemporalBlock:
+        def __init__(self, cfg, name=None):
+            del name
+            self.cfg = cfg
+
+        def __call__(self, node_features, **kwargs):
+            del kwargs
+            return node_features
+
+    monkeypatch.setattr(gc.hk, "remat", fake_remat)
+    monkeypatch.setattr(gc, "_get_temporal_block_cls", lambda _stateful: _NoopTemporalBlock)
+
+    def run(enabled: bool) -> None:
+        graph = _TinyGraph(
+            nodes={"mesh_nodes": _NodeSet(features=jnp.zeros((5, 1), dtype=jnp.float32))},
+            edges={"mesh": _EdgeSet(features=jnp.zeros((4, 1), dtype=jnp.float32))},
+        )
+        predictor = object.__new__(gc.GraphCast)
+        predictor._mesh_graph_structure = graph
+        predictor._mesh_gnn = _TinyMeshGNN()
+        predictor._temporal_backbone = "none"
+        predictor._temporal_location = "mesh_processor_interleaved"
+        predictor._temporal_stateful = False
+        predictor._temporal_d_inner = None
+        predictor._temporal_d_state = 16
+        predictor._temporal_d_conv = 4
+        predictor._temporal_dt_rank = "auto"
+        predictor._temporal_bias = False
+        predictor._temporal_conv_bias = True
+        predictor._temporal_layers = 1
+        predictor._temporal_dropout = 0.0
+        predictor._temporal_zero_init_out = False
+        predictor._temporal_insert_count = None
+        predictor._remat_processor_steps = enabled
+        x = jnp.ones((5, 2, 8), dtype=jnp.float32)
+        gc.GraphCast._run_mesh_gnn_interleaved(predictor, x, is_training=True)
+
+    run(False)
+    assert remat_calls == 0
+    run(True)
+    assert remat_calls == 1
+
+
+def test_mesh2grid_remat_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    remat_calls = 0
+
+    def fake_remat(fn):
+        nonlocal remat_calls
+        remat_calls += 1
+        return fn
+
+    monkeypatch.setattr(gc.hk, "remat", fake_remat)
+    graph = _TinyGraph(
+        nodes={
+            "mesh_nodes": _NodeSet(features=jnp.zeros((2, 1), dtype=jnp.float32)),
+            "grid_nodes": _NodeSet(features=jnp.zeros((3, 1), dtype=jnp.float32)),
+        },
+        edges={"mesh2grid": _EdgeSet(features=jnp.zeros((4, 1), dtype=jnp.float32))},
+    )
+
+    def run(enabled: bool):
+        predictor = object.__new__(gc.GraphCast)
+        predictor._mesh2grid_graph_structure = graph
+        predictor._mesh2grid_gnn = lambda input_graph: input_graph
+        predictor._remat_mesh2grid = enabled
+        return gc.GraphCast._run_mesh2grid_gnn(
+            predictor,
+            jnp.ones((2, 2, 4), dtype=jnp.float32),
+            jnp.ones((3, 2, 4), dtype=jnp.float32),
+        )
+
+    run(False)
+    assert remat_calls == 0
+    out = run(True)
+    assert remat_calls == 1
+    assert out.shape == (3, 2, 4)

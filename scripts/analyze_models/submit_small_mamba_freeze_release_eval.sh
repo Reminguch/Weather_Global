@@ -19,9 +19,10 @@ PLOT_IMAGE_DIR="${IMAGE_BASE}/small_mamba_freeze_release_warm"
 RESOLUTIONS="${RESOLUTIONS:-2 3 6}"
 WARMUP_STEPS="${WARMUP_STEPS:-24}"
 TRUNK_STEPS="${TRUNK_STEPS:-32}"
-METRICS="${METRICS:-weighted_allvars per_variable}"
+METRICS="${METRICS:-rmse_k}"
 EVAL_MODES="${EVAL_MODES:-warm}"
-RESIDUAL_EVAL_SEMANTICS="${RESIDUAL_EVAL_SEMANTICS:-teacher_forced_training_equivalent}"
+RESIDUAL_EVAL_SEMANTICS="${RESIDUAL_EVAL_SEMANTICS:-rollout}"
+RESIDUAL_AR_FEEDBACK="${RESIDUAL_AR_FEEDBACK:-baseline_plus_residual}"
 LEAD_STEPS="${LEAD_STEPS:-}"
 PLOT_LEAD_STEPS="${PLOT_LEAD_STEPS:-}"
 OUTPUT_CSV_SUFFIX="${OUTPUT_CSV_SUFFIX:-}"
@@ -101,7 +102,7 @@ submit_array_group() {
   read -r -a spec_array <<< "${specs}"
   array_max=$((${#spec_array[@]} - 1))
   if [[ "${DRY_RUN}" == "1" ]]; then
-    echo "DRY RUN: sbatch --parsable --mem=${mem} --time=${time_limit} --array=0-${array_max} --export=ALL,SHARD_SPECS='${specs}',SHARD_DATA_DIR='${shard_data_dir}',WARMUP_STEPS='${WARMUP_STEPS}',TRUNK_STEPS='${TRUNK_STEPS}',METRICS='${METRICS}',EVAL_MODES='${EVAL_MODES}',RESIDUAL_EVAL_SEMANTICS='${RESIDUAL_EVAL_SEMANTICS}',LEAD_STEPS='${LEAD_STEPS}',OUTPUT_CSV_SUFFIX='${OUTPUT_CSV_SUFFIX}',CHECKPOINT_ROOTS='<${#checkpoint_roots} chars>' scripts/analyze_models/run_resolution_eval_array.slurm" >&2
+    echo "DRY RUN: sbatch --parsable --mem=${mem} --time=${time_limit} --array=0-${array_max} --export=ALL,SHARD_SPECS='${specs}',SHARD_DATA_DIR='${shard_data_dir}',WARMUP_STEPS='${WARMUP_STEPS}',TRUNK_STEPS='${TRUNK_STEPS}',METRICS='${METRICS}',EVAL_MODES='${EVAL_MODES}',RESIDUAL_EVAL_SEMANTICS='${RESIDUAL_EVAL_SEMANTICS}',RESIDUAL_AR_FEEDBACK='${RESIDUAL_AR_FEEDBACK}',LEAD_STEPS='${LEAD_STEPS}',OUTPUT_CSV_SUFFIX='${OUTPUT_CSV_SUFFIX}',CHECKPOINT_ROOTS='<${#checkpoint_roots} chars>' scripts/analyze_models/run_resolution_eval_array.slurm" >&2
     echo "dry-array-${RANDOM}"
     return
   fi
@@ -111,7 +112,7 @@ submit_array_group() {
       --mem="${mem}" \
       --time="${time_limit}" \
       --array="0-${array_max}" \
-      --export=ALL,SHARD_SPECS="${specs}",SHARD_DATA_DIR="${shard_data_dir}",WARMUP_STEPS="${WARMUP_STEPS}",TRUNK_STEPS="${TRUNK_STEPS}",METRICS="${METRICS}",EVAL_MODES="${EVAL_MODES}",RESIDUAL_EVAL_SEMANTICS="${RESIDUAL_EVAL_SEMANTICS}",LEAD_STEPS="${LEAD_STEPS}",OUTPUT_CSV_SUFFIX="${OUTPUT_CSV_SUFFIX}",CHECKPOINT_ROOTS="${checkpoint_roots}" \
+      --export=ALL,SHARD_SPECS="${specs}",SHARD_DATA_DIR="${shard_data_dir}",WARMUP_STEPS="${WARMUP_STEPS}",TRUNK_STEPS="${TRUNK_STEPS}",METRICS="${METRICS}",EVAL_MODES="${EVAL_MODES}",RESIDUAL_EVAL_SEMANTICS="${RESIDUAL_EVAL_SEMANTICS}",RESIDUAL_AR_FEEDBACK="${RESIDUAL_AR_FEEDBACK}",LEAD_STEPS="${LEAD_STEPS}",OUTPUT_CSV_SUFFIX="${OUTPUT_CSV_SUFFIX}",CHECKPOINT_ROOTS="${checkpoint_roots}" \
       scripts/analyze_models/run_resolution_eval_array.slurm
   )
   echo "${job_id}"

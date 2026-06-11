@@ -24,7 +24,11 @@ from src.models.graphcast.training.core.eval_selection import (  # noqa: E402
     EVAL_SUBSET_STRATIFIED_ROTATING,
     select_eval_subset,
 )
-from src.models.graphcast.training.core.segments import iter_eval_segment_chunks, run_eval_segments  # noqa: E402
+from src.models.graphcast.training.core.segments import (  # noqa: E402
+    _stop_gradient_dataset,
+    iter_eval_segment_chunks,
+    run_eval_segments,
+)
 from src.models.graphcast.training.core import model as core_model  # noqa: E402
 from src.models.graphcast.training.core.model import (  # noqa: E402
     FinalStepLossAutoregressivePredictor,
@@ -37,11 +41,13 @@ from src.models.graphcast.evaluation.device_resolution_eval import (  # noqa: E4
     add_device_accumulator_to_host,
     build_metric_spec,
 )
+from src.models.mamba.residual_mamba.training import model as residual_training_model  # noqa: E402
 from src.models.mamba.residual_mamba.training.model import (  # noqa: E402
     augment_run_config,
     build_loss_prediction_transform as build_residual_loss_prediction_transform,
     residual_autoregressive_final_horizon,
     run_residual_eval,
+    should_checkpoint_residual_ar_step,
 )
 from src.models.mamba.residual_mamba.runtime import _residual_output_head_enabled  # noqa: E402
 from scripts.analyze_models.unified_resolution_eval import (  # noqa: E402
@@ -166,6 +172,47 @@ def _baseline_predict_transform() -> hk.TransformedWithState:
         return xr.Dataset({"x": pred})
 
     return hk.transform_with_state(forward)
+
+
+def test_stopped_baseline_predictions_cut_only_baseline_gradient() -> None:
+    coords = {"batch": np.asarray([0]), "time": np.asarray([0])}
+
+    def dataset_from(data):
+        return xr.Dataset(
+            {
+                "x": xr.DataArray(
+                    xarray_jax.wrap(data),
+                    dims=("batch", "time"),
+                    coords=coords,
+                )
+            }
+        )
+
+    def loss_fn(baseline_scale, residual_weight, *, stop_baseline: bool):
+        target = dataset_from(jnp.ones((1, 1), dtype=jnp.float32))
+        baseline = dataset_from(jnp.ones((1, 1), dtype=jnp.float32) * baseline_scale)
+        if stop_baseline:
+            baseline = _stop_gradient_dataset(baseline)
+        residual_target = target - baseline
+        residual_pred = dataset_from(xarray_jax.unwrap_data(residual_target["x"]) * residual_weight)
+        error = xarray_jax.unwrap_data(residual_pred["x"] - residual_target["x"])
+        return jnp.sum(error**2)
+
+    grad_baseline_live, grad_residual_live = jax.grad(loss_fn, argnums=(0, 1))(
+        jnp.asarray(2.0),
+        jnp.asarray(0.0),
+        stop_baseline=False,
+    )
+    grad_baseline_stopped, grad_residual_stopped = jax.grad(loss_fn, argnums=(0, 1))(
+        jnp.asarray(2.0),
+        jnp.asarray(0.0),
+        stop_baseline=True,
+    )
+
+    assert not np.isclose(float(grad_baseline_live), 0.0)
+    np.testing.assert_allclose(float(grad_baseline_stopped), 0.0)
+    np.testing.assert_allclose(float(grad_residual_stopped), float(grad_residual_live))
+    assert not np.isclose(float(grad_residual_stopped), 0.0)
 
 
 class _IncrementPredictor:
@@ -413,7 +460,7 @@ def test_reset_residual_input_lanes_handles_jax_wrapped_inputs_inside_jit() -> N
     np.testing.assert_allclose(np.asarray(xarray_jax.unwrap_data(reset["constant"])), np.asarray([10.0, 11.0]))
 
 
-def test_residual_autoregressive_rollout_uses_predicted_full_feedback_and_teacher_carry() -> None:
+def _tiny_residual_rollout_case():
     def baseline_forward(inputs, targets, forcings, is_training):
         del forcings, is_training
         pred = (inputs["x"].isel(time=-1, drop=True) + 10.0).expand_dims(
@@ -458,20 +505,37 @@ def test_residual_autoregressive_rollout_uses_predicted_full_feedback_and_teache
         forcings.isel(time=slice(0, 1)),
         True,
     )
+    return {
+        "baseline_transform": baseline_transform,
+        "residual_transform": residual_transform,
+        "baseline_params": baseline_params,
+        "baseline_state": baseline_state,
+        "residual_params": residual_params,
+        "residual_state": residual_state,
+        "rng": rng,
+        "inputs": inputs,
+        "targets": targets,
+        "forcings": forcings,
+        "residual_inputs": residual_inputs,
+    }
 
+
+def test_residual_autoregressive_rollout_uses_predicted_full_feedback_and_teacher_carry() -> None:
+    case = _tiny_residual_rollout_case()
     loss_by_lane, _carry_state, teacher_carry = residual_autoregressive_final_horizon(
-        residual_transform,
-        baseline_transform,
-        residual_params=residual_params,
-        baseline_params=baseline_params,
-        residual_state=residual_state,
-        baseline_state=baseline_state,
-        rng_key=rng,
-        inputs=inputs,
-        targets=targets,
-        forcings=forcings,
-        residual_inputs=residual_inputs,
+        case["residual_transform"],
+        case["baseline_transform"],
+        residual_params=case["residual_params"],
+        baseline_params=case["baseline_params"],
+        residual_state=case["residual_state"],
+        baseline_state=case["baseline_state"],
+        rng_key=case["rng"],
+        inputs=case["inputs"],
+        targets=case["targets"],
+        forcings=case["forcings"],
+        residual_inputs=case["residual_inputs"],
         is_training=True,
+        residual_ar_feedback="baseline_plus_residual",
     )
 
     np.testing.assert_allclose(np.asarray(jax.device_get(loss_by_lane)), np.asarray([64.0]))
@@ -479,6 +543,77 @@ def test_residual_autoregressive_rollout_uses_predicted_full_feedback_and_teache
         np.asarray(xarray_jax.unwrap_data(teacher_carry["x"])),
         np.asarray([[0.0, 1.0]], dtype=np.float32),
     )
+
+
+def test_residual_autoregressive_checkpoint_step_equivalence() -> None:
+    case = _tiny_residual_rollout_case()
+
+    def run(checkpoint_step: bool):
+        return residual_autoregressive_final_horizon(
+            case["residual_transform"],
+            case["baseline_transform"],
+            residual_params=case["residual_params"],
+            baseline_params=case["baseline_params"],
+            residual_state=case["residual_state"],
+            baseline_state=case["baseline_state"],
+            rng_key=case["rng"],
+            inputs=case["inputs"],
+            targets=case["targets"],
+            forcings=case["forcings"],
+            residual_inputs=case["residual_inputs"],
+            is_training=True,
+            checkpoint_step=checkpoint_step,
+        )
+
+    loss_plain, state_plain, teacher_plain = run(False)
+    loss_ckpt, state_ckpt, teacher_ckpt = run(True)
+
+    np.testing.assert_allclose(np.asarray(jax.device_get(loss_ckpt)), np.asarray(jax.device_get(loss_plain)))
+    leaves_plain = jax.tree_util.tree_leaves(state_plain)
+    leaves_ckpt = jax.tree_util.tree_leaves(state_ckpt)
+    assert len(leaves_ckpt) == len(leaves_plain)
+    for ckpt_leaf, plain_leaf in zip(leaves_ckpt, leaves_plain, strict=True):
+        np.testing.assert_allclose(np.asarray(jax.device_get(ckpt_leaf)), np.asarray(jax.device_get(plain_leaf)))
+    np.testing.assert_allclose(
+        np.asarray(xarray_jax.unwrap_data(teacher_ckpt["x"])),
+        np.asarray(xarray_jax.unwrap_data(teacher_plain["x"])),
+    )
+
+
+def test_residual_step_checkpoint_modes_request_checkpoint(monkeypatch) -> None:
+    checkpoint_calls = 0
+
+    def fake_checkpoint(fn, *args, **kwargs):
+        nonlocal checkpoint_calls
+        del args, kwargs
+        checkpoint_calls += 1
+        return fn
+
+    monkeypatch.setattr(residual_training_model.jax, "checkpoint", fake_checkpoint)
+    case = _tiny_residual_rollout_case()
+
+    for mode, expected_calls in (
+        ("standard", 0),
+        ("conservative", 1),
+        ("optimal", 1),
+    ):
+        checkpoint_calls = 0
+        residual_autoregressive_final_horizon(
+            case["residual_transform"],
+            case["baseline_transform"],
+            residual_params=case["residual_params"],
+            baseline_params=case["baseline_params"],
+            residual_state=case["residual_state"],
+            baseline_state=case["baseline_state"],
+            rng_key=case["rng"],
+            inputs=case["inputs"],
+            targets=case["targets"],
+            forcings=case["forcings"],
+            residual_inputs=case["residual_inputs"],
+            is_training=True,
+            checkpoint_step=should_checkpoint_residual_ar_step(mode),
+        )
+        assert checkpoint_calls == expected_calls
 
 
 def test_residual_loss_prediction_transform_uses_one_step_predictor(monkeypatch) -> None:
@@ -1049,7 +1184,7 @@ def test_run_residual_eval_preserves_residual_state_within_segment() -> None:
     np.testing.assert_allclose(metrics["total"], 32.0 / 6.0)
 
 
-def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> None:
+def _run_constant_target_residual_eval(*, residual_ar_feedback: str | None = None) -> dict[str, float]:
     def baseline_forward(inputs, targets, forcings, is_training):
         del forcings, is_training
         pred = (inputs["x"].isel(time=-1, drop=True) + 10.0).expand_dims(
@@ -1081,7 +1216,10 @@ def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> 
     residual_params, _ = residual_transform.init(rng, residual_inputs, sample_targets, sample_forcings, False)
     baseline_params, _ = baseline_transform.init(rng, sample_inputs, sample_targets, sample_forcings, False)
 
-    metrics = run_residual_eval(
+    kwargs = {}
+    if residual_ar_feedback is not None:
+        kwargs["residual_ar_feedback"] = residual_ar_feedback
+    return run_residual_eval(
         residual_transform,
         baseline_transform,
         residual_params,
@@ -1099,9 +1237,18 @@ def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> 
         progress_label="test",
         batch_builder=_constant_target_batch_builder(100.0),
         chunk_load_workers=1,
+        **kwargs,
     )
 
+
+def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> None:
+    metrics = _run_constant_target_residual_eval(residual_ar_feedback="baseline_plus_residual")
     np.testing.assert_allclose(metrics["total"], 25806.5)
+
+
+def test_run_residual_eval_rolling_ar_can_use_baseline_only_feedback() -> None:
+    metrics = _run_constant_target_residual_eval(residual_ar_feedback="baseline")
+    np.testing.assert_allclose(metrics["total"], 302.5)
 
 
 def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:

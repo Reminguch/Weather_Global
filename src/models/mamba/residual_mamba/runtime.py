@@ -25,6 +25,11 @@ from src.models.graphcast.training.core.model import (  # noqa: E402
     advance_residual_inputs,
     build_zero_residual_inputs,
 )
+from src.models.mamba.residual_mamba.feedback import (  # noqa: E402
+    RESIDUAL_AR_FEEDBACK,
+    residual_physical_feedback,
+    validate_residual_ar_feedback,
+)
 
 MODEL_NAME = "residual_mamba"
 
@@ -161,11 +166,18 @@ def _build_residual_rollout_bundle(ckpt_obj, stats, ckpt_path: Path):
     return residual_bundle, baseline_bundle
 
 
-def build_run_jitted(ckpt_obj, stats, ckpt_path: Path):
+def build_run_jitted(
+    ckpt_obj,
+    stats,
+    ckpt_path: Path,
+    *,
+    residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK,
+):
     run_cfg = load_run_config(ckpt_path)
     family = infer_family(run_cfg)
     if family != MODEL_NAME:
         raise ValueError(f"Checkpoint family mismatch: expected {MODEL_NAME}, found {family}")
+    residual_ar_feedback = validate_residual_ar_feedback(residual_ar_feedback)
 
     residual_bundle, baseline_bundle = _build_residual_rollout_bundle(ckpt_obj, stats, ckpt_path)
     task_cfg = residual_bundle["task_cfg"]
@@ -205,7 +217,12 @@ def build_run_jitted(ckpt_obj, stats, ckpt_path: Path):
             full_pred = baseline_pred + residual_pred
             preds.append(full_pred.assign_coords(time=target_step.coords["time"]))
             residual_inputs = advance_residual_inputs(residual_inputs, residual_pred)
-            rolling_inputs = _update_inputs(rolling_inputs, xarray.merge([full_pred, forcings_step]))
+            feedback_step = residual_physical_feedback(
+                baseline_pred=baseline_pred,
+                full_pred=full_pred,
+                mode=residual_ar_feedback,
+            )
+            rolling_inputs = _update_inputs(rolling_inputs, xarray.merge([feedback_step, forcings_step]))
         return xarray.concat(preds, dim=target_times)
 
     return run_jitted, task_cfg, model_cfg, run_cfg
@@ -266,11 +283,18 @@ def build_training_equivalent_run_jitted(ckpt_obj, stats, ckpt_path: Path):
     return run_jitted, task_cfg, model_cfg, run_cfg
 
 
-def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
+def build_truth_anchored_residual_runner(
+    ckpt_obj,
+    stats,
+    ckpt_path: Path,
+    *,
+    residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK,
+):
     run_cfg = load_run_config(ckpt_path)
     family = infer_family(run_cfg)
     if family != MODEL_NAME:
         raise ValueError(f"Warm-start truth-anchored runner requires residual Mamba checkpoint: {ckpt_path}")
+    residual_ar_feedback = validate_residual_ar_feedback(residual_ar_feedback)
 
     residual_bundle, baseline_bundle = _build_residual_rollout_bundle(ckpt_obj, stats, ckpt_path)
     task_cfg = residual_bundle["task_cfg"]
@@ -311,6 +335,7 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
             "residual_inputs": advance_residual_inputs(context["residual_inputs"], residual_feedback),
             "baseline_state": baseline_state,
             "residual_state": residual_state,
+            "baseline_pred": baseline_pred,
         }
         return full_pred, next_context
 
@@ -349,9 +374,14 @@ def build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path: Path):
                 teacher_forced_residual=False,
             )
             preds.append(full_pred.assign_coords(time=target_step.coords["time"]))
+            feedback_step = residual_physical_feedback(
+                baseline_pred=branch_context["baseline_pred"],
+                full_pred=full_pred,
+                mode=residual_ar_feedback,
+            )
             branch_context["rolling_inputs"] = _update_inputs(
                 branch_context["rolling_inputs"],
-                xarray.merge([full_pred, forcings_step]),
+                xarray.merge([feedback_step, forcings_step]),
             )
         return xarray.concat(preds, dim=targets_template.coords["time"])
 

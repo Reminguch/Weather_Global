@@ -13,7 +13,9 @@ if str(ROOT) not in sys.path:
 from src.models.mamba.training.param_utils import (
     build_trainable_labels,
     is_temporal_param,
+    merge_param_partitions,
     overlay_matching_params,
+    partition_params_by_trainable_part,
 )
 
 
@@ -75,6 +77,54 @@ def test_mamba_only_mask_freezes_gc_even_with_weight_decay() -> None:
     assert not np.allclose(
         new_params["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"],
         params["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"],
+    )
+
+
+def test_partition_and_merge_keeps_frozen_params_unchanged() -> None:
+    params = {
+        "graph_cast/encoder": {"w": np.full((2, 2), 3.0)},
+        "graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj": {
+            "w": np.ones((2, 2))
+        },
+    }
+
+    trainable, frozen = partition_params_by_trainable_part(params, "mamba")
+    trainable["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"] = np.full((2, 2), 5.0)
+    merged = merge_param_partitions(trainable, frozen)
+
+    assert "graph_cast/encoder" not in trainable
+    assert "graph_cast/encoder" in frozen
+    np.testing.assert_allclose(merged["graph_cast/encoder"]["w"], params["graph_cast/encoder"]["w"])
+    np.testing.assert_allclose(
+        merged["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"],
+        np.full((2, 2), 5.0),
+    )
+
+
+def test_partitioned_gradients_only_include_trainable_tree() -> None:
+    jax = pytest.importorskip("jax")
+    jnp = pytest.importorskip("jax.numpy")
+
+    params = {
+        "graph_cast/encoder": {"w": jnp.full((2,), 3.0)},
+        "graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj": {
+            "w": jnp.full((2,), 2.0)
+        },
+    }
+    trainable, frozen = partition_params_by_trainable_part(params, "mamba")
+
+    def loss_fn(trainable_params, frozen_params):
+        full_params = merge_param_partitions(trainable_params, frozen_params)
+        frozen_w = full_params["graph_cast/encoder"]["w"]
+        trainable_w = full_params["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"]
+        return jnp.sum(frozen_w * trainable_w)
+
+    grads = jax.grad(loss_fn, argnums=0)(trainable, frozen)
+
+    assert set(grads) == {"graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"}
+    np.testing.assert_allclose(
+        grads["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"],
+        np.full((2,), 3.0),
     )
 
 

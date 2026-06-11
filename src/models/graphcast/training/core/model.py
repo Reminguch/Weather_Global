@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import warnings
 from pathlib import Path
 
@@ -162,6 +163,26 @@ def load_stats(stats_dir: Path) -> dict[str, xr.Dataset]:
 def load_graphcast_checkpoint(path: Path) -> gc.CheckPoint:
     with path.open("rb") as f:
         return checkpoint.load(f, gc.CheckPoint)
+
+
+def derive_model_config_from_checkpoint(
+    base_model_cfg: gc.ModelConfig,
+    *,
+    resolution: float,
+    mesh_size: int,
+    latent_size: int,
+    gnn_msg_steps: int,
+    hidden_layers: int = 1,
+) -> gc.ModelConfig:
+    return dataclasses.replace(
+        base_model_cfg,
+        resolution=resolution,
+        mesh_size=mesh_size,
+        latent_size=latent_size,
+        gnn_msg_steps=gnn_msg_steps,
+        hidden_layers=hidden_layers,
+        mesh2grid_edge_normalization_factor=base_model_cfg.mesh2grid_edge_normalization_factor,
+    )
 
 
 class DirectResidualNormalizer(predictor_base.Predictor):
@@ -331,8 +352,12 @@ def build_predictor(
     zero_init_temporal_out: bool = False,
     residual_output_head: bool = False,
     autoregressive_loss_mode: str = "mean",
+    memory_mode: str = "standard",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
+    if hasattr(predictor, "_remat_processor_steps"):
+        predictor._remat_processor_steps = memory_mode == "optimal"
+        predictor._remat_mesh2grid = memory_mode == "optimal"
     if hasattr(predictor, "_temporal_backbone"):
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location
@@ -392,8 +417,12 @@ def build_residual_correction_predictor(
     zero_init_temporal_out: bool = False,
     residual_output_head: bool = False,
     autoregressive_loss_mode: str = "mean",
+    memory_mode: str = "standard",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
+    if hasattr(predictor, "_remat_processor_steps"):
+        predictor._remat_processor_steps = memory_mode == "optimal"
+        predictor._remat_mesh2grid = memory_mode == "optimal"
     if hasattr(predictor, "_temporal_backbone"):
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location

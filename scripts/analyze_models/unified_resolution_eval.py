@@ -39,6 +39,7 @@ from src.models.graphcast.training.core.prepared_data import (
     open_prepared_store,
     prepared_eval_metadata,
     prepared_store_path_from_root,
+    resolution_tag,
     select_prepared_eval_window,
 )
 from src.models.graphcast.training.core.segments import SegmentChunk
@@ -66,6 +67,7 @@ from scripts.analyze_models.legacy.graphcast_analysis_utils import (
     suppress_graphcast_future_warnings,
 )
 from src.models.mamba.gc_mamba.legacy_runtime import is_legacy_gc_mamba_checkpoint
+from src.models.mamba.residual_mamba.feedback import RESIDUAL_AR_FEEDBACK, RESIDUAL_AR_FEEDBACK_CHOICES
 from src.models.mamba.residual_mamba.runtime import (
     build_run_jitted as build_residual_run_jitted,
     build_training_equivalent_run_jitted as build_residual_training_equivalent_run_jitted,
@@ -82,6 +84,7 @@ DEFAULT_PREPARED_DATA_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
 
 FAMILIES = ["graphcast", "gc_mamba", "legacy_gc_mamba", "residual_mamba"]
 METRICS = ["weighted_allvars", "per_variable", "rmse_k"]
+DEFAULT_METRICS = ["rmse_k"]
 EVAL_MODES = ["cold", "warm"]
 DATA_SOURCES = ["prepared_array", "raw"]
 LEAD_DAYS = [1, 2, 4]
@@ -98,9 +101,10 @@ RES_GRID_STRIDE = 18
 CSV_SORT_COLUMNS = ["family", "variant", "res", "lead_steps", "lead_days", "eval_mode", "metric_kind", "variable"]
 RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED = "teacher_forced_training_equivalent"
 RESIDUAL_EVAL_SEMANTICS_ROLLOUT = "rollout"
-RESIDUAL_EVAL_SEMANTICS = RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED
+RESIDUAL_EVAL_SEMANTICS = RESIDUAL_EVAL_SEMANTICS_ROLLOUT
 RESIDUAL_EVAL_SEMANTICS_CHOICES = [RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED, RESIDUAL_EVAL_SEMANTICS_ROLLOUT]
 METRIC_SEMANTICS = "graphcast_weighted_mse_per_level_projected_grid"
+PHYSICAL_RMSE_METRIC_SEMANTICS = "physical_rmse_projected_grid_no_std"
 LEAD_AGGREGATION_ENDPOINT = "endpoint"
 LEAD_AGGREGATION_MEAN_TO_LEAD = "mean_to_lead"
 LEAD_AGGREGATION_CHOICES = [LEAD_AGGREGATION_ENDPOINT, LEAD_AGGREGATION_MEAN_TO_LEAD]
@@ -115,7 +119,7 @@ class ModelEntry:
     variant: str
     model_type: str
     di: int | None
-    res: int
+    res: float
     ckpt_path: Path
     run_name: str
 
@@ -137,9 +141,10 @@ class EvalShardCache:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Unified resolution evaluation across model families.")
     parser.add_argument("--families", nargs="+", choices=FAMILIES, default=FAMILIES)
-    parser.add_argument("--resolutions", type=int, nargs="+", default=DEFAULT_RESOLUTIONS)
+    parser.add_argument("--resolutions", type=float, nargs="+", default=DEFAULT_RESOLUTIONS)
     parser.add_argument("--data-source", choices=DATA_SOURCES, default="prepared_array")
     parser.add_argument("--prepared-data-root", type=Path, default=ROOT / DEFAULT_PREPARED_DATA_ROOT)
+    parser.add_argument("--stats-dir", type=Path, default=ROOT / STATS_DIR)
     parser.add_argument("--eval-start", type=str, default=None, help="Prepared-array eval start timestamp, inclusive.")
     parser.add_argument("--eval-end", type=str, default=None, help="Prepared-array eval end timestamp, exclusive.")
     parser.add_argument("--eval-year", type=int, default=None, help="Prepared-array eval year override.")
@@ -175,16 +180,38 @@ def parse_args() -> argparse.Namespace:
             "the mean loss over rollout steps 1..k."
         ),
     )
-    parser.add_argument("--metrics", nargs="+", choices=METRICS, default=METRICS)
+    parser.add_argument("--metrics", nargs="+", choices=METRICS, default=DEFAULT_METRICS)
+    parser.add_argument(
+        "--metric-variables",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional variable allow-list for per-variable/rmse metric accumulation. "
+            "Use '2m_temperature' to score only global 2m-temperature rows."
+        ),
+    )
     parser.add_argument("--eval-modes", nargs="+", choices=EVAL_MODES, default=EVAL_MODES)
     parser.add_argument(
         "--residual-eval-semantics",
         choices=RESIDUAL_EVAL_SEMANTICS_CHOICES,
         default=RESIDUAL_EVAL_SEMANTICS,
         help=(
-            "Residual Mamba eval behavior. The default preserves old training-equivalent "
-            "teacher forcing. Rollout truth-feeds warm context, then feeds residual/full "
-            "predictions back during scored branches."
+            "Residual Mamba eval behavior. The default 'rollout' is the proper AR forecast "
+            "eval: warm context is truth-fed, then scored branches feed predictions back. "
+            "'teacher_forced_training_equivalent' is a diagnostic/training-equivalence mode "
+            "and should not be compared as an error-vs-lead rollout."
+        ),
+    )
+    parser.add_argument(
+        "--residual-ar-feedback",
+        choices=RESIDUAL_AR_FEEDBACK_CHOICES,
+        default=RESIDUAL_AR_FEEDBACK,
+        help=(
+            "Physical autoregressive feedback for residual Mamba rollout eval. "
+            "'baseline_plus_residual' feeds the full corrected forecast back; "
+            "'baseline' scores baseline+residual output but feeds only the frozen "
+            "baseline forecast into the next physical input step. No effect for "
+            "teacher-forced residual eval semantics."
         ),
     )
     parser.add_argument("--n-eval-days", type=int, default=N_EVAL_DAYS)
@@ -195,7 +222,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prepared-stream-block-steps", type=int, default=PREPARED_STREAM_BLOCK_STEPS)
     parser.add_argument(
         "--metric-grid-resolution",
-        type=int,
+        type=float,
         default=RES_GRID_STRIDE,
         help=(
             "Prepared-store resolution used for metric sampling. "
@@ -376,11 +403,13 @@ def _add_residual_eval_semantics(
     metadata: dict[str, object],
     run_cfg: dict,
     residual_eval_semantics: str,
+    residual_ar_feedback: str,
 ) -> dict[str, object]:
     if not _is_residual_mamba_run(run_cfg):
         return metadata
     out = dict(metadata)
     out["residual_eval_semantics"] = residual_eval_semantics
+    out["residual_ar_feedback"] = residual_ar_feedback
     return out
 
 
@@ -391,6 +420,13 @@ def _task_cfg_cache_key(task_cfg) -> tuple[Hashable, dict]:
 
 def _lead_days_from_steps(lead_steps: list[int]) -> list[float]:
     return [float(step * HOURS_PER_STEP) / 24.0 for step in lead_steps]
+
+
+def _format_resolution_value(resolution: float) -> str:
+    value = float(resolution)
+    if np.isclose(value, round(value), atol=1e-6):
+        return str(int(round(value)))
+    return f"{value:g}"
 
 
 def _target_indices(start_target_idx: int, n_steps: int, max_lead_steps: int) -> list[int]:
@@ -509,6 +545,7 @@ def _accumulate_metrics(
     res_grid_lats: xarray.DataArray,
     res_grid_lons: xarray.DataArray,
     stats: dict[str, xarray.Dataset],
+    metric_variables: set[str] | None = None,
 ) -> None:
     n_steps = pred_b.sizes.get("time", 0)
     if n_steps == 0:
@@ -526,6 +563,12 @@ def _accumulate_metrics(
         target_step = target_b.isel(time=step_i)
         grid_pred = pred_step.sel(lat=res_grid_lats, lon=res_grid_lons, method="nearest")
         grid_target = target_step.sel(lat=res_grid_lats, lon=res_grid_lons, method="nearest")
+        if metric_variables is not None:
+            keep = [name for name in metric_variables if name in grid_pred and name in grid_target]
+            if not keep:
+                continue
+            grid_pred = grid_pred[keep]
+            grid_target = grid_target[keep]
 
         weighted_loss_batch = normalized_weighted_mse_allvars(
             grid_pred,
@@ -551,7 +594,8 @@ def _accumulate_metrics(
             per_variable_sum[name][step_i] += float(values.sum())
             per_variable_count[name][step_i] += int(values.size)
 
-        if "2m_temperature" in grid_pred and "2m_temperature" in grid_target:
+        include_2m = metric_variables is None or "2m_temperature" in metric_variables
+        if include_2m and "2m_temperature" in grid_pred and "2m_temperature" in grid_target:
             physical_loss = (grid_pred["2m_temperature"] - grid_target["2m_temperature"]) ** 2
             if "lat" in physical_loss.dims:
                 lat_w = latitude_weights_with_fallback(grid_target["2m_temperature"]).astype(physical_loss.dtype)
@@ -565,7 +609,8 @@ def _accumulate_metrics(
             physical_mse_sum["2m_temperature"][step_i] += float(values.sum())
             physical_mse_count["2m_temperature"][step_i] += int(values.size)
 
-        if "2m_temperature" in pred_step and "2m_temperature" in target_step:
+        include_nyc = metric_variables is None or NYC_POINT_VARIABLE in metric_variables
+        if include_nyc and "2m_temperature" in pred_step and "2m_temperature" in target_step:
             metric_lat = float(res_grid_lats.values[np.abs(np.asarray(res_grid_lats.values) - NYC_LAT).argmin()])
             metric_lon = float(res_grid_lons.values[np.abs(np.asarray(res_grid_lons.values) - NYC_LON).argmin()])
             point_pred = pred_step["2m_temperature"].sel(lat=metric_lat, lon=metric_lon, method="nearest")
@@ -664,7 +709,9 @@ def _evaluate_checkpoint(
     window_batch_size: int,
     target_indices: list[int],
     residual_eval_semantics: str,
+    residual_ar_feedback: str,
     lead_aggregation: str,
+    metric_variables: set[str] | None,
     cache: EvalShardCache,
 ) -> tuple[
     dict[float, float],
@@ -682,7 +729,12 @@ def _evaluate_checkpoint(
             ckpt_obj, stats, ckpt_path
         )
     elif is_residual:
-        run_jitted, task_cfg, model_cfg, _run_cfg = build_residual_run_jitted(ckpt_obj, stats, ckpt_path)
+        run_jitted, task_cfg, model_cfg, _run_cfg = build_residual_run_jitted(
+            ckpt_obj,
+            stats,
+            ckpt_path,
+            residual_ar_feedback=residual_ar_feedback,
+        )
     else:
         run_jitted, task_cfg, model_cfg, _run_cfg = build_run_jitted(ckpt_obj, stats, ckpt_path)
     task_key, task_cfg_kwargs = _task_cfg_cache_key(task_cfg)
@@ -729,6 +781,7 @@ def _evaluate_checkpoint(
             res_grid_lats=res_grid_lats,
             res_grid_lons=res_grid_lons,
             stats=stats,
+            metric_variables=metric_variables,
         )
 
     return _finalize_metrics(acc, lead_days, lead_steps, lead_aggregation=lead_aggregation)
@@ -748,7 +801,9 @@ def _evaluate_checkpoint_truth_anchored(
     trunk_steps: int,
     window_batch_size: int,
     residual_eval_semantics: str,
+    residual_ar_feedback: str,
     lead_aggregation: str,
+    metric_variables: set[str] | None,
     cache: EvalShardCache,
 ) -> tuple[
     dict[float, float],
@@ -766,7 +821,12 @@ def _evaluate_checkpoint_truth_anchored(
         (
             build_training_equivalent_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path)
             if residual_eval_semantics == RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED
-            else build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path)
+            else build_truth_anchored_residual_runner(
+                ckpt_obj,
+                stats,
+                ckpt_path,
+                residual_ar_feedback=residual_ar_feedback,
+            )
         )
         if is_residual
         else build_truth_anchored_runner(ckpt_obj, stats, ckpt_path)
@@ -847,6 +907,7 @@ def _evaluate_checkpoint_truth_anchored(
                     res_grid_lats=res_grid_lats,
                     res_grid_lons=res_grid_lons,
                     stats=stats,
+                    metric_variables=metric_variables,
                 )
                 key_i += 1
                 _truth_pred, context = runner["truth_step"](
@@ -863,7 +924,7 @@ def _evaluate_checkpoint_truth_anchored(
 def _open_prepared_eval_store_for_checkpoint(
     prepared_data_root: Path,
     *,
-    resolution: int,
+    resolution: float,
     task_cfg,
     run_cfg: dict,
     eval_start: str | None,
@@ -875,7 +936,7 @@ def _open_prepared_eval_store_for_checkpoint(
         prepared_data_root,
         resolution,
         task_cfg,
-        label=f"prepared-res{int(resolution)}",
+        label=f"prepared-{resolution_tag(resolution)}",
     )
     selected_year = eval_year
     if eval_start is None and eval_end is None and selected_year is None:
@@ -895,7 +956,7 @@ def _evaluate_checkpoint_prepared(
     ckpt_path: Path,
     stats: dict[str, xarray.Dataset],
     prepared_data_root: Path,
-    entry_res: int,
+    entry_res: float,
     lead_days: list[int],
     lead_steps: list[int],
     seed_base: int,
@@ -911,7 +972,9 @@ def _evaluate_checkpoint_prepared(
     eval_end: str | None,
     eval_year: int | None,
     residual_eval_semantics: str,
+    residual_ar_feedback: str,
     lead_aggregation: str,
+    metric_variables: set[str] | None,
 ) -> tuple[
     dict[float, float],
     dict[str, dict[float, float]],
@@ -934,10 +997,12 @@ def _evaluate_checkpoint_prepared(
             res_grid_lons=res_grid_lons,
             per_variable_weights=GRAPHCAST_PER_VARIABLE_WEIGHTS,
             max_lead_steps=max_lead_steps,
-            nyc_lat=NYC_LAT,
-            nyc_lon=NYC_LON,
-            nyc_output_name=NYC_POINT_VARIABLE,
+            metric_variables=None if metric_variables is None else tuple(sorted(metric_variables)),
+            nyc_lat=NYC_LAT if metric_variables is None or NYC_POINT_VARIABLE in metric_variables else None,
+            nyc_lon=NYC_LON if metric_variables is None or NYC_POINT_VARIABLE in metric_variables else None,
+            nyc_output_name=NYC_POINT_VARIABLE if metric_variables is None or NYC_POINT_VARIABLE in metric_variables else None,
             residual_eval_semantics=residual_eval_semantics,
+            residual_ar_feedback=residual_ar_feedback,
         )
         task_cfg = device_evaluator.task_cfg
         run_cfg = device_evaluator.run_cfg
@@ -947,7 +1012,12 @@ def _evaluate_checkpoint_prepared(
                 ckpt_obj, stats, ckpt_path
             )
         elif is_residual:
-            run_jitted, task_cfg, _model_cfg, run_cfg = build_residual_run_jitted(ckpt_obj, stats, ckpt_path)
+            run_jitted, task_cfg, _model_cfg, run_cfg = build_residual_run_jitted(
+                ckpt_obj,
+                stats,
+                ckpt_path,
+                residual_ar_feedback=residual_ar_feedback,
+            )
         else:
             run_jitted, task_cfg, _model_cfg, run_cfg = build_run_jitted(ckpt_obj, stats, ckpt_path)
     task_key, task_cfg_kwargs = _task_cfg_cache_key(task_cfg)
@@ -962,7 +1032,12 @@ def _evaluate_checkpoint_prepared(
         eval_end=eval_end,
         eval_year=eval_year,
     )
-    eval_metadata = _add_residual_eval_semantics(eval_metadata, run_cfg, residual_eval_semantics)
+    eval_metadata = _add_residual_eval_semantics(
+        eval_metadata,
+        run_cfg,
+        residual_eval_semantics,
+        residual_ar_feedback,
+    )
     eval_metadata["lead_aggregation"] = lead_aggregation
     target_indices = _prepared_target_indices(store.sizes["time"], max_lead_steps)
     acc = _empty_metric_accumulator(max_lead_steps)
@@ -979,6 +1054,7 @@ def _evaluate_checkpoint_prepared(
     )
     if is_residual:
         print(f"[{progress_label}] residual_eval_semantics={residual_eval_semantics}", flush=True)
+        print(f"[{progress_label}] residual_ar_feedback={residual_ar_feedback}", flush=True)
     progress_t0 = time.time()
     next_progress = 1
     with _prepared_load_executor(prepared_load_workers) as load_executor:
@@ -1028,6 +1104,7 @@ def _evaluate_checkpoint_prepared(
                         res_grid_lats=res_grid_lats,
                         res_grid_lons=res_grid_lons,
                         stats=stats,
+                        metric_variables=metric_variables,
                     )
                 batch_i += 1
                 if (
@@ -1058,7 +1135,7 @@ def _evaluate_checkpoint_truth_anchored_prepared(
     ckpt_path: Path,
     stats: dict[str, xarray.Dataset],
     prepared_data_root: Path,
-    entry_res: int,
+    entry_res: float,
     lead_days: list[int],
     lead_steps: list[int],
     seed_base: int,
@@ -1075,7 +1152,9 @@ def _evaluate_checkpoint_truth_anchored_prepared(
     eval_end: str | None,
     eval_year: int | None,
     residual_eval_semantics: str,
+    residual_ar_feedback: str,
     lead_aggregation: str,
+    metric_variables: set[str] | None,
 ) -> tuple[
     dict[float, float],
     dict[str, dict[float, float]],
@@ -1099,10 +1178,12 @@ def _evaluate_checkpoint_truth_anchored_prepared(
             res_grid_lons=res_grid_lons,
             per_variable_weights=GRAPHCAST_PER_VARIABLE_WEIGHTS,
             max_lead_steps=max_lead_steps,
-            nyc_lat=NYC_LAT,
-            nyc_lon=NYC_LON,
-            nyc_output_name=NYC_POINT_VARIABLE,
+            metric_variables=None if metric_variables is None else tuple(sorted(metric_variables)),
+            nyc_lat=NYC_LAT if metric_variables is None or NYC_POINT_VARIABLE in metric_variables else None,
+            nyc_lon=NYC_LON if metric_variables is None or NYC_POINT_VARIABLE in metric_variables else None,
+            nyc_output_name=NYC_POINT_VARIABLE if metric_variables is None or NYC_POINT_VARIABLE in metric_variables else None,
             residual_eval_semantics=residual_eval_semantics,
+            residual_ar_feedback=residual_ar_feedback,
         )
         task_cfg = device_evaluator.task_cfg
         run_cfg = device_evaluator.run_cfg
@@ -1111,7 +1192,12 @@ def _evaluate_checkpoint_truth_anchored_prepared(
             (
                 build_training_equivalent_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path)
                 if residual_eval_semantics == RESIDUAL_EVAL_SEMANTICS_TEACHER_FORCED
-                else build_truth_anchored_residual_runner(ckpt_obj, stats, ckpt_path)
+                else build_truth_anchored_residual_runner(
+                    ckpt_obj,
+                    stats,
+                    ckpt_path,
+                    residual_ar_feedback=residual_ar_feedback,
+                )
             )
             if is_residual
             else build_truth_anchored_runner(ckpt_obj, stats, ckpt_path)
@@ -1130,7 +1216,12 @@ def _evaluate_checkpoint_truth_anchored_prepared(
         eval_end=eval_end,
         eval_year=eval_year,
     )
-    eval_metadata = _add_residual_eval_semantics(eval_metadata, run_cfg, residual_eval_semantics)
+    eval_metadata = _add_residual_eval_semantics(
+        eval_metadata,
+        run_cfg,
+        residual_eval_semantics,
+        residual_ar_feedback,
+    )
     eval_metadata["lead_aggregation"] = lead_aggregation
     chunk_start_indices = _prepared_chunk_start_indices(
         store.sizes["time"],
@@ -1158,6 +1249,7 @@ def _evaluate_checkpoint_truth_anchored_prepared(
     )
     if is_residual:
         print(f"[{progress_label}] residual_eval_semantics={residual_eval_semantics}", flush=True)
+        print(f"[{progress_label}] residual_ar_feedback={residual_ar_feedback}", flush=True)
     progress_t0 = time.time()
     next_progress = 1
     with _prepared_load_executor(prepared_load_workers) as load_executor:
@@ -1257,6 +1349,7 @@ def _evaluate_checkpoint_truth_anchored_prepared(
                         res_grid_lats=res_grid_lats,
                         res_grid_lons=res_grid_lons,
                         stats=stats,
+                        metric_variables=metric_variables,
                     )
                     key_i += 1
                     _truth_pred, context = runner["truth_step"](
@@ -1287,20 +1380,21 @@ def _evaluate_checkpoint_truth_anchored_prepared(
     return weighted_by_day, per_variable_by_day, rmse_by_day, n_by_day, eval_metadata
 
 
-def _parse_res_from_path(ckpt_path: Path, run_cfg: dict) -> int | None:
+def _parse_res_from_path(ckpt_path: Path, run_cfg: dict) -> float | None:
     candidates = [ckpt_path.name, ckpt_path.stem, ckpt_path.parent.name, ckpt_path.parent.parent.name]
     baseline_ckpt = run_cfg.get("residual_training", {}).get("baseline_checkpoint")
     if baseline_ckpt:
         candidates.append(str(baseline_ckpt))
     for candidate in candidates:
+        match = re.search(r"(?:^|[_/])res(?P<tag>\d+p\d+)(?:[_.]|$)", candidate)
+        if match:
+            return float(match.group("tag").replace("p", "."))
         match = re.search(r"(?:^|[_/])res(\d+)(?:[_.]|$)", candidate)
         if match:
-            return int(match.group(1))
+            return float(match.group(1))
         match = re.search(r"resolution\s+(\d+(?:\.\d+)?)", candidate)
         if match:
-            resolution = float(match.group(1))
-            if resolution.is_integer():
-                return int(resolution)
+            return float(match.group(1))
     return None
 
 
@@ -1359,7 +1453,7 @@ def _checkpoint_family(ckpt_path: Path, run_cfg: dict) -> str:
 
 def discover_model_entries(
     families: list[str],
-    resolutions: list[int] | None = None,
+    resolutions: list[float] | None = None,
     checkpoint_roots: list[Path] | None = None,
     checkpoint_paths: list[Path] | None = None,
 ) -> list[ModelEntry]:
@@ -1372,7 +1466,7 @@ def discover_model_entries(
         res = _parse_res_from_path(ckpt_path, run_cfg)
         if res is None:
             continue
-        if resolutions is not None and res not in resolutions:
+        if resolutions is not None and not any(np.isclose(res, requested, atol=1e-6) for requested in resolutions):
             continue
         run_name = ckpt_path.parent.name if ckpt_path.name == "ckpt_best.npz" else ckpt_path.stem
         di = _parse_di_from_name(run_name)
@@ -1393,7 +1487,7 @@ def discover_model_entries(
 
 def discover_shards(
     families: list[str],
-    resolutions: list[int] | None = None,
+    resolutions: list[float] | None = None,
     checkpoint_roots: list[Path] | None = None,
     checkpoint_paths: list[Path] | None = None,
 ) -> list[str]:
@@ -1403,7 +1497,7 @@ def discover_shards(
             for entry in discover_model_entries(families, resolutions, checkpoint_roots, checkpoint_paths)
         }
     )
-    return [f"{family}:{res}" for family, res in shard_pairs]
+    return [f"{family}:{_format_resolution_value(res)}" for family, res in shard_pairs]
 
 
 def _append_metric_rows(
@@ -1428,9 +1522,13 @@ def _append_metric_rows(
         "eval_start": eval_metadata.get("eval_start", ""),
         "eval_end": eval_metadata.get("eval_end", ""),
         "eval_year": eval_metadata.get("eval_year", np.nan),
+        "stats_dir": eval_metadata.get("stats_dir", ""),
+        "metric_grid_resolution": eval_metadata.get("metric_grid_resolution", np.nan),
+        "metric_variables": eval_metadata.get("metric_variables", ""),
         "metric_semantics": eval_metadata.get("metric_semantics", METRIC_SEMANTICS),
         "lead_aggregation": eval_metadata.get("lead_aggregation", LEAD_AGGREGATION_ENDPOINT),
         "residual_eval_semantics": eval_metadata.get("residual_eval_semantics", ""),
+        "residual_ar_feedback": eval_metadata.get("residual_ar_feedback", ""),
     }
     for day, step in zip(lead_days, lead_steps):
         if "weighted_allvars" in metrics:
@@ -1499,6 +1597,7 @@ def _append_metric_rows(
                         "warmup_steps": warmup_steps if eval_mode == "warm" else np.nan,
                         "trunk_steps": trunk_steps if eval_mode == "warm" else np.nan,
                         **metadata,
+                        "metric_semantics": PHYSICAL_RMSE_METRIC_SEMANTICS,
                     }
                 )
 
@@ -1514,9 +1613,27 @@ def _write_rows_csv(rows: list[dict], csv_path: Path) -> Path:
     return csv_path
 
 
+def _metric_variable_label(metric_variables: set[str] | None) -> str:
+    return "" if metric_variables is None else " ".join(sorted(metric_variables))
+
+
+def _add_common_eval_metadata(
+    metadata: dict[str, object],
+    *,
+    stats_dir: Path,
+    metric_grid_resolution: float,
+    metric_variables: set[str] | None,
+) -> dict[str, object]:
+    out = dict(metadata)
+    out["stats_dir"] = str(stats_dir)
+    out["metric_grid_resolution"] = float(metric_grid_resolution)
+    out["metric_variables"] = _metric_variable_label(metric_variables)
+    return out
+
+
 def _filter_entries_with_prepared_stores(entries: list[ModelEntry], prepared_data_root: Path) -> list[ModelEntry]:
     out: list[ModelEntry] = []
-    warned_resolutions: set[int] = set()
+    warned_resolutions: set[float] = set()
     for entry in entries:
         store_path = prepared_store_path_from_root(prepared_data_root, entry.res)
         if store_path.exists():
@@ -1540,6 +1657,7 @@ def main() -> None:
         raise ValueError("--prepared-stream-block-steps must be positive.")
     if (args.eval_start is None) != (args.eval_end is None):
         raise ValueError("Provide both --eval-start and --eval-end, or neither.")
+    metric_variables = None if args.metric_variables is None else set(args.metric_variables)
 
     if args.print_shards:
         entries = discover_model_entries(
@@ -1548,7 +1666,7 @@ def main() -> None:
         if args.data_source == "prepared_array":
             entries = _filter_entries_with_prepared_stores(entries, args.prepared_data_root)
         for family, res in sorted({(entry.family, entry.res) for entry in entries}):
-            print(f"{family}:{res}")
+            print(f"{family}:{_format_resolution_value(res)}")
         return
 
     entries = discover_model_entries(args.families, args.resolutions, args.checkpoint_roots, args.checkpoint_paths)
@@ -1565,7 +1683,8 @@ def main() -> None:
     else:
         lead_days = [float(day) for day in args.lead_days]
         lead_steps = [int((24 * day) // HOURS_PER_STEP) for day in args.lead_days]
-    stats = _load_stats(ROOT / STATS_DIR)
+    stats_dir = args.stats_dir if args.stats_dir.is_absolute() else ROOT / args.stats_dir
+    stats = _load_stats(stats_dir)
     ds_base = None
     start_target_idx = 0
     n_steps = 0
@@ -1590,7 +1709,8 @@ def main() -> None:
     print(
         f"Evaluating {len(entries)} checkpoints across families={args.families} "
         f"resolutions={args.resolutions} data_source={args.data_source} "
-        f"lead_aggregation={args.lead_aggregation} metric_grid_resolution={args.metric_grid_resolution}"
+        f"lead_aggregation={args.lead_aggregation} metric_grid_resolution={args.metric_grid_resolution} "
+        f"stats_dir={stats_dir} metric_variables={_metric_variable_label(metric_variables) or '<all>'}"
     )
     rows: list[dict] = []
     csv_path = args.output_data_dir / args.output_csv_name
@@ -1613,12 +1733,15 @@ def main() -> None:
                         window_batch_size=args.window_batch_size,
                         target_indices=target_indices,
                         residual_eval_semantics=args.residual_eval_semantics,
+                        residual_ar_feedback=args.residual_ar_feedback,
                         lead_aggregation=args.lead_aggregation,
+                        metric_variables=metric_variables,
                         cache=cache,
                     )
                     cold_metadata = {"data_source": "raw", "lead_aggregation": args.lead_aggregation}
                     if entry.family == "residual_mamba":
                         cold_metadata["residual_eval_semantics"] = args.residual_eval_semantics
+                        cold_metadata["residual_ar_feedback"] = args.residual_ar_feedback
                 else:
                     assert prepared_metric_grid is not None
                     cold_weighted_by_day, cold_per_variable_by_day, cold_rmse_by_day, cold_n_by_day, cold_metadata = (
@@ -1641,9 +1764,17 @@ def main() -> None:
                             eval_end=args.eval_end,
                             eval_year=args.eval_year,
                             residual_eval_semantics=args.residual_eval_semantics,
+                            residual_ar_feedback=args.residual_ar_feedback,
                             lead_aggregation=args.lead_aggregation,
+                            metric_variables=metric_variables,
                         )
                     )
+                cold_metadata = _add_common_eval_metadata(
+                    cold_metadata,
+                    stats_dir=stats_dir,
+                    metric_grid_resolution=args.metric_grid_resolution,
+                    metric_variables=metric_variables,
+                )
                 _append_metric_rows(
                     rows,
                     entry,
@@ -1682,13 +1813,16 @@ def main() -> None:
                             trunk_steps=args.trunk_steps,
                             window_batch_size=args.window_batch_size,
                             residual_eval_semantics=args.residual_eval_semantics,
+                            residual_ar_feedback=args.residual_ar_feedback,
                             lead_aggregation=args.lead_aggregation,
+                            metric_variables=metric_variables,
                             cache=cache,
                         )
                     )
                     warm_metadata = {"data_source": "raw", "lead_aggregation": args.lead_aggregation}
                     if entry.family == "residual_mamba":
                         warm_metadata["residual_eval_semantics"] = args.residual_eval_semantics
+                        warm_metadata["residual_ar_feedback"] = args.residual_ar_feedback
                 else:
                     assert prepared_metric_grid is not None
                     warm_weighted_by_day, warm_per_variable_by_day, warm_rmse_by_day, warm_n_by_day, warm_metadata = (
@@ -1712,9 +1846,17 @@ def main() -> None:
                             eval_end=args.eval_end,
                             eval_year=args.eval_year,
                             residual_eval_semantics=args.residual_eval_semantics,
+                            residual_ar_feedback=args.residual_ar_feedback,
                             lead_aggregation=args.lead_aggregation,
+                            metric_variables=metric_variables,
                         )
                     )
+                warm_metadata = _add_common_eval_metadata(
+                    warm_metadata,
+                    stats_dir=stats_dir,
+                    metric_grid_resolution=args.metric_grid_resolution,
+                    metric_variables=metric_variables,
+                )
                 _append_metric_rows(
                     rows,
                     entry,

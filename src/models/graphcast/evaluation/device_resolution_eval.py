@@ -31,6 +31,11 @@ from src.models.mamba.gc_mamba.legacy_runtime import (
     is_legacy_gc_mamba_checkpoint,
 )
 from src.models.mamba.gc_mamba.runtime import _build_one_step_bundle as build_gc_mamba_bundle
+from src.models.mamba.residual_mamba.feedback import (
+    RESIDUAL_AR_FEEDBACK,
+    residual_physical_feedback,
+    validate_residual_ar_feedback,
+)
 from src.models.mamba.residual_mamba.runtime import _build_residual_rollout_bundle
 
 
@@ -124,12 +129,18 @@ def build_metric_spec(
     res_grid_lons: xr.DataArray,
     per_variable_weights: dict[str, float],
     max_lead_steps: int,
+    metric_variables: tuple[str, ...] | None = None,
     nyc_lat: float | None = None,
     nyc_lon: float | None = None,
     nyc_output_name: str | None = None,
 ) -> DeviceMetricSpec:
     variables: list[_VariableMetricSpec] = []
-    target_names = tuple(targets.data_vars)
+    metric_variable_set = None if metric_variables is None else set(metric_variables)
+    target_names = tuple(
+        name for name in targets.data_vars if metric_variable_set is None or name in metric_variable_set
+    )
+    if not target_names:
+        raise ValueError(f"No requested metric variables found in targets: {sorted(metric_variable_set or [])}")
     total_variable_weight = float(sum(float(per_variable_weights.get(name, 1.0)) for name in target_names))
     if total_variable_weight <= 0.0:
         raise ValueError("Total variable weight must be positive.")
@@ -184,7 +195,8 @@ def build_metric_spec(
             )
         )
 
-    if nyc_lat is not None and nyc_lon is not None and nyc_output_name and "2m_temperature" in targets:
+    include_nyc = metric_variable_set is None or (nyc_output_name is not None and nyc_output_name in metric_variable_set)
+    if include_nyc and nyc_lat is not None and nyc_lon is not None and nyc_output_name and "2m_temperature" in targets:
         target = targets["2m_temperature"]
         dims = tuple(target.dims)
         if "lat" in dims and "lon" in dims:
@@ -387,7 +399,7 @@ def _model_step_residual(
     target_step: xr.Dataset,
     forcings_step: xr.Dataset,
     teacher_forced: bool = True,
-) -> tuple[xr.Dataset, hk.State, hk.State, xr.Dataset]:
+) -> tuple[xr.Dataset, xr.Dataset, hk.State, hk.State, xr.Dataset]:
     all_inputs = xr.merge([constant_inputs, rolling_inputs])
     baseline_pred, baseline_next = baseline.transformed.apply(
         baseline_params,
@@ -408,6 +420,7 @@ def _model_step_residual(
     residual_feedback = target_step - baseline_pred if teacher_forced else residual_pred
     return (
         baseline_pred + residual_pred,
+        baseline_pred,
         residual_next,
         baseline_next,
         advance_residual_inputs(residual_inputs, residual_feedback),
@@ -460,10 +473,12 @@ class PreparedDeviceResolutionEvaluator:
         res_grid_lons: xr.DataArray,
         per_variable_weights: dict[str, float],
         max_lead_steps: int,
+        metric_variables: tuple[str, ...] | None = None,
         nyc_lat: float | None = None,
         nyc_lon: float | None = None,
         nyc_output_name: str | None = None,
         residual_eval_semantics: str = "teacher_forced_training_equivalent",
+        residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK,
     ) -> None:
         self.bundle = _build_bundle_from_checkpoint(ckpt_obj, stats, ckpt_path)
         self._stats = stats
@@ -471,10 +486,12 @@ class PreparedDeviceResolutionEvaluator:
         self._res_grid_lons = res_grid_lons
         self._per_variable_weights = per_variable_weights
         self._max_lead_steps = int(max_lead_steps)
+        self._metric_variables = metric_variables
         self._nyc_lat = nyc_lat
         self._nyc_lon = nyc_lon
         self._nyc_output_name = nyc_output_name
         self._residual_branch_teacher_forced = residual_eval_semantics == "teacher_forced_training_equivalent"
+        self._residual_ar_feedback = validate_residual_ar_feedback(residual_ar_feedback)
         self._metric_spec: DeviceMetricSpec | None = None
         self._state_cache: dict[tuple[str, int], Any] = {}
         self._cold_fn = None
@@ -504,6 +521,7 @@ class PreparedDeviceResolutionEvaluator:
                 res_grid_lons=self._res_grid_lons,
                 per_variable_weights=self._per_variable_weights,
                 max_lead_steps=self._max_lead_steps,
+                metric_variables=self._metric_variables,
                 nyc_lat=self._nyc_lat,
                 nyc_lon=self._nyc_lon,
                 nyc_output_name=self._nyc_output_name,
@@ -568,7 +586,7 @@ class PreparedDeviceResolutionEvaluator:
             for lead_i in range(metric_spec.max_lead_steps):
                 target_step = targets.isel(time=slice(lead_i, lead_i + 1))
                 forcings_step = forcings.isel(time=slice(lead_i, lead_i + 1))
-                pred_step, residual_state, baseline_state, residual_inputs = _model_step_residual(
+                pred_step, baseline_pred, residual_state, baseline_state, residual_inputs = _model_step_residual(
                     bundle.primary,
                     bundle.baseline,
                     residual_params=bundle.primary.params,
@@ -584,7 +602,15 @@ class PreparedDeviceResolutionEvaluator:
                     teacher_forced=self._residual_branch_teacher_forced,
                 )
                 acc = _accumulate_step(acc, pred_step, target_step, lead_i=lead_i, metric_spec=metric_spec)
-                feedback_step = target_step if self._residual_branch_teacher_forced else pred_step
+                feedback_step = (
+                    target_step
+                    if self._residual_branch_teacher_forced
+                    else residual_physical_feedback(
+                        baseline_pred=baseline_pred,
+                        full_pred=pred_step,
+                        mode=self._residual_ar_feedback,
+                    )
+                )
                 rolling_inputs = _update_inputs(rolling_inputs, xr.merge([feedback_step, forcings_step]))
             return acc
 
@@ -610,7 +636,7 @@ class PreparedDeviceResolutionEvaluator:
 
             assert bundle.baseline is not None
             residual_state, baseline_state = states
-            _pred_step, residual_state, baseline_state, residual_inputs = _model_step_residual(
+            _pred_step, _baseline_pred, residual_state, baseline_state, residual_inputs = _model_step_residual(
                 bundle.primary,
                 bundle.baseline,
                 residual_params=bundle.primary.params,
@@ -671,23 +697,33 @@ class PreparedDeviceResolutionEvaluator:
             for lead_i in range(metric_spec.max_lead_steps):
                 target_step = branch_targets.isel(time=slice(lead_i, lead_i + 1))
                 forcings_step = branch_forcings.isel(time=slice(lead_i, lead_i + 1))
-                pred_step, branch_residual_state, branch_baseline_state, branch_residual_inputs = _model_step_residual(
-                    bundle.primary,
-                    bundle.baseline,
-                    residual_params=bundle.primary.params,
-                    baseline_params=bundle.baseline.params,
-                    residual_state=branch_residual_state,
-                    baseline_state=branch_baseline_state,
-                    rng=(branch_keys[2 * lead_i], branch_keys[2 * lead_i + 1]),
-                    rolling_inputs=branch_rolling,
-                    constant_inputs=constant_inputs,
-                    residual_inputs=branch_residual_inputs,
-                    target_step=target_step,
-                    forcings_step=forcings_step,
-                    teacher_forced=self._residual_branch_teacher_forced,
+                pred_step, baseline_pred, branch_residual_state, branch_baseline_state, branch_residual_inputs = (
+                    _model_step_residual(
+                        bundle.primary,
+                        bundle.baseline,
+                        residual_params=bundle.primary.params,
+                        baseline_params=bundle.baseline.params,
+                        residual_state=branch_residual_state,
+                        baseline_state=branch_baseline_state,
+                        rng=(branch_keys[2 * lead_i], branch_keys[2 * lead_i + 1]),
+                        rolling_inputs=branch_rolling,
+                        constant_inputs=constant_inputs,
+                        residual_inputs=branch_residual_inputs,
+                        target_step=target_step,
+                        forcings_step=forcings_step,
+                        teacher_forced=self._residual_branch_teacher_forced,
+                    )
                 )
                 acc = _accumulate_step(acc, pred_step, target_step, lead_i=lead_i, metric_spec=metric_spec)
-                feedback_step = target_step if self._residual_branch_teacher_forced else pred_step
+                feedback_step = (
+                    target_step
+                    if self._residual_branch_teacher_forced
+                    else residual_physical_feedback(
+                        baseline_pred=baseline_pred,
+                        full_pred=pred_step,
+                        mode=self._residual_ar_feedback,
+                    )
+                )
                 branch_rolling = _update_inputs(branch_rolling, xr.merge([feedback_step, forcings_step]))
             return acc
 

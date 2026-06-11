@@ -131,14 +131,19 @@ EVAL_NUM_SEGMENTS=${EVAL_NUM_SEGMENTS:-16}
 FINAL_EVAL_NUM_SEGMENTS=${FINAL_EVAL_NUM_SEGMENTS:-all}
 BATCH_SIZE=${BATCH_SIZE_OVERRIDE:-${BATCH_SIZE}}
 EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE_OVERRIDE:-${EVAL_BATCH_SIZE}}
+RESIDUAL_AR_FEEDBACK=${RESIDUAL_AR_FEEDBACK:-baseline_plus_residual}
 DRY_RUN=${DRY_RUN:-0}
 
 BASE_NAME="$(basename "${BASE_DIR}")"
-RUN_NAME="${BASE_NAME}_${MODEL}_tc${INSERT_COUNT}_di${D_INNER}_ds${D_STATE}_20k_target_step${TARGET_STEPS}_bptt16"
+RUN_NAME_SUFFIX="${RUN_NAME_SUFFIX:-}"
+RUN_NAME="${BASE_NAME}_${MODEL}_tc${INSERT_COUNT}_di${D_INNER}_ds${D_STATE}_20k_target_step${TARGET_STEPS}_bptt16${RUN_NAME_SUFFIX}"
 RUN_DIR="${OUT_DIR}/${RUN_NAME}"
 
 echo "Task ${TASK_ID}/${EXPECTED_TASKS}: base=${BASE_NAME} model=${MODEL} insert=${INSERT_COUNT} d_inner=${D_INNER} d_state=${D_STATE} target_steps=${TARGET_STEPS} bptt_steps=${BPTT_STEPS}"
 echo "Run directory: ${RUN_DIR}"
+if [[ "${MODEL}" == "residual_mamba" ]]; then
+  echo "Residual AR feedback: ${RESIDUAL_AR_FEEDBACK}"
+fi
 
 CMD=(
   python -u -m src.models.mamba.training.segments_training
@@ -197,7 +202,10 @@ if [[ "${MODEL}" == "gc_mamba" ]]; then
     --zero-init-temporal-out
   )
 else
-  CMD+=(--baseline-ckpt "${CKPT_IN}")
+  CMD+=(
+    --baseline-ckpt "${CKPT_IN}"
+    --residual-ar-feedback "${RESIDUAL_AR_FEEDBACK}"
+  )
 fi
 
 if [[ "${DRY_RUN}" == "1" ]]; then

@@ -112,6 +112,7 @@ class DeepTypedGraphNet(hk.Module):
                temporal_conv_bias: bool = True,
                temporal_layers: int = 1,
                temporal_dropout: float = 0.0,
+               remat_processor_steps: bool = False,
                name: str = "DeepTypedGraphNet"):
     """Inits the model.
 
@@ -168,6 +169,8 @@ class DeepTypedGraphNet(hk.Module):
       temporal_conv_bias: Whether Mamba causal convolution uses bias.
       temporal_layers: Number of temporal layers per interleaved step.
       temporal_dropout: Dropout rate inside the temporal processor.
+      remat_processor_steps: Whether to rematerialize each processor step during
+        backward.
       name: Name of the model.
     """
 
@@ -207,6 +210,7 @@ class DeepTypedGraphNet(hk.Module):
     self._temporal_conv_bias = temporal_conv_bias
     self._temporal_layers = temporal_layers
     self._temporal_dropout = temporal_dropout
+    self._remat_processor_steps = remat_processor_steps
 
     if aggregate_normalization:
       # using aggregate_normalization only makes sense with segment_sum.
@@ -401,7 +405,11 @@ class DeepTypedGraphNet(hk.Module):
     latent_graph = latent_graph_0
     for repetition_i in range(self._num_processor_repetitions):
       for step_i, processor_network in enumerate(processor_networks):
-        latent_graph = self._process_step(processor_network, latent_graph)
+        def process_step(graph):
+          return self._process_step(processor_network, graph)
+        if getattr(self, "_remat_processor_steps", False):
+          process_step = hk.remat(process_step)
+        latent_graph = process_step(latent_graph)
         latent_graph = self._maybe_temporal_process_step(
             latent_graph, repetition_i=repetition_i, step_i=step_i)
 

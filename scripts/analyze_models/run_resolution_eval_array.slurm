@@ -29,6 +29,8 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 
 N_EVAL_DAYS="${N_EVAL_DAYS:-365}"
 DATA_SOURCE="${DATA_SOURCE:-prepared_array}"
+PREPARED_DATA_ROOT="${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}"
+STATS_DIR="${STATS_DIR:-data/graphcast/graphcast/stats}"
 EVAL_START="${EVAL_START:-}"
 EVAL_END="${EVAL_END:-}"
 EVAL_YEAR="${EVAL_YEAR:-}"
@@ -41,9 +43,11 @@ PREPARED_STREAM_BLOCK_STEPS="${PREPARED_STREAM_BLOCK_STEPS:-32}"
 METRIC_GRID_RESOLUTION="${METRIC_GRID_RESOLUTION:-18}"
 DISABLE_PREPARED_DEVICE_EVAL="${DISABLE_PREPARED_DEVICE_EVAL:-0}"
 DISABLE_XLA_CONSTANT_FOLDING="${DISABLE_XLA_CONSTANT_FOLDING:-1}"
-METRICS="${METRICS:-weighted_allvars per_variable rmse_k}"
+METRICS="${METRICS:-rmse_k}"
+METRIC_VARIABLES="${METRIC_VARIABLES:-}"
 EVAL_MODES="${EVAL_MODES:-cold warm}"
-RESIDUAL_EVAL_SEMANTICS="${RESIDUAL_EVAL_SEMANTICS:-teacher_forced_training_equivalent}"
+RESIDUAL_EVAL_SEMANTICS="${RESIDUAL_EVAL_SEMANTICS:-rollout}"
+RESIDUAL_AR_FEEDBACK="${RESIDUAL_AR_FEEDBACK:-baseline_plus_residual}"
 LEAD_AGGREGATION="${LEAD_AGGREGATION:-endpoint}"
 LEAD_STEPS="${LEAD_STEPS:-}"
 OUTPUT_CSV_SUFFIX="${OUTPUT_CSV_SUFFIX:-}"
@@ -64,6 +68,7 @@ TASK_INDEX="${SLURM_ARRAY_TASK_ID:-0}"
 SPEC="${SHARD_ARRAY[$TASK_INDEX]}"
 FAMILY="${SPEC%%:*}"
 RES="${SPEC##*:}"
+RES_TAG="${RES//./p}"
 
 if [[ "${RES}" == "1" ]]; then
   EFFECTIVE_WINDOW_BATCH_SIZE="${RES1_WINDOW_BATCH_SIZE}"
@@ -78,6 +83,8 @@ CMD=(
   --families "${FAMILY}"
   --resolutions "${RES}"
   --data-source "${DATA_SOURCE}"
+  --prepared-data-root "${PREPARED_DATA_ROOT}"
+  --stats-dir "${STATS_DIR}"
   --n-eval-days "${N_EVAL_DAYS}"
   --window-batch-size "${EFFECTIVE_WINDOW_BATCH_SIZE}"
   --warmup-steps "${WARMUP_STEPS}"
@@ -86,14 +93,18 @@ CMD=(
   --prepared-stream-block-steps "${PREPARED_STREAM_BLOCK_STEPS}"
   --metric-grid-resolution "${METRIC_GRID_RESOLUTION}"
   --output-data-dir "${SHARD_DATA_DIR}"
-  --output-csv-name "resolution_eval_${FAMILY}_res${RES}${OUTPUT_CSV_SUFFIX}.csv"
+  --output-csv-name "resolution_eval_${FAMILY}_res${RES_TAG}${OUTPUT_CSV_SUFFIX}.csv"
   --metrics ${METRICS}
   --eval-modes ${EVAL_MODES}
   --residual-eval-semantics "${RESIDUAL_EVAL_SEMANTICS}"
+  --residual-ar-feedback "${RESIDUAL_AR_FEEDBACK}"
   --lead-aggregation "${LEAD_AGGREGATION}"
 )
 if [[ -n "${LEAD_STEPS}" ]]; then
   CMD+=(--lead-steps ${LEAD_STEPS})
+fi
+if [[ -n "${METRIC_VARIABLES}" ]]; then
+  CMD+=(--metric-variables ${METRIC_VARIABLES})
 fi
 if [[ -n "${CHECKPOINT_ROOTS}" ]]; then
   CMD+=(--checkpoint-roots ${CHECKPOINT_ROOTS})
@@ -113,12 +124,16 @@ fi
 
 echo "Effective window batch size: ${EFFECTIVE_WINDOW_BATCH_SIZE}"
 echo "Data source: ${DATA_SOURCE}"
+echo "Prepared data root: ${PREPARED_DATA_ROOT}"
+echo "Stats dir: ${STATS_DIR}"
 echo "Eval year: ${EVAL_YEAR:-<default>}"
 echo "Eval start/end: ${EVAL_START:-<default>} ${EVAL_END:-<default>}"
 echo "Prepared load workers: ${PREPARED_LOAD_WORKERS}"
 echo "Prepared stream block steps: ${PREPARED_STREAM_BLOCK_STEPS}"
 echo "Metric grid resolution: ${METRIC_GRID_RESOLUTION}"
+echo "Metric variables: ${METRIC_VARIABLES:-<all>}"
 echo "Residual eval semantics: ${RESIDUAL_EVAL_SEMANTICS}"
+echo "Residual AR feedback: ${RESIDUAL_AR_FEEDBACK}"
 echo "Lead aggregation: ${LEAD_AGGREGATION}"
 echo "Disable prepared device eval: ${DISABLE_PREPARED_DEVICE_EVAL}"
 echo "Disable XLA constant folding: ${DISABLE_XLA_CONSTANT_FOLDING}"

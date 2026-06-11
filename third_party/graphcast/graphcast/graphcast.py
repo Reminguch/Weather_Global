@@ -284,6 +284,8 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_insert_count = None
     self._temporal_zero_init_out = False
     self._residual_output_head_enabled = False
+    self._remat_processor_steps = False
+    self._remat_mesh2grid = False
 
     self._spatial_features_kwargs = dict(
         add_node_positions=False,
@@ -775,6 +777,8 @@ class GraphCast(predictor_base.Predictor):
         edges={mesh_edges_key: new_edges}, nodes={"mesh_nodes": nodes})
 
     # Run the GNN.
+    self._mesh_gnn._remat_processor_steps = getattr(
+        self, "_remat_processor_steps", False)
     return self._mesh_gnn(input_graph).nodes["mesh_nodes"].features
 
   def _run_mesh_gnn_interleaved(
@@ -863,12 +867,18 @@ class GraphCast(predictor_base.Predictor):
                 features=node_features)})
         return latent_graph
 
+    def run_processor_step(processor_network, latent_graph):
+      def process_step(graph):
+        return self._mesh_gnn._process_step(processor_network, graph)
+      if getattr(self, "_remat_processor_steps", False):
+        process_step = hk.remat(process_step)
+      return process_step(latent_graph)
+
     insert_count = getattr(self, "_temporal_insert_count", None)
     if insert_count is None:
       for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
         for step_i, processor_network in enumerate(processor_networks):
-          latent_graph = self._mesh_gnn._process_step(
-              processor_network, latent_graph)
+          latent_graph = run_processor_step(processor_network, latent_graph)
           latent_graph = run_temporal_block(latent_graph, repetition_i, step_i)
     else:
       group_sizes = _temporal_processor_group_sizes(
@@ -878,7 +888,7 @@ class GraphCast(predictor_base.Predictor):
         for block_i, group_size in enumerate(group_sizes):
           latent_graph = run_temporal_block(latent_graph, repetition_i, block_i)
           for _ in range(group_size):
-            latent_graph = self._mesh_gnn._process_step(
+            latent_graph = run_processor_step(
                 processor_networks[step_i], latent_graph)
             step_i += 1
 
@@ -967,7 +977,11 @@ class GraphCast(predictor_base.Predictor):
         })
 
     # Run the GNN.
-    output_graph = self._mesh2grid_gnn(input_graph)
+    def run_mesh2grid(graph):
+      return self._mesh2grid_gnn(graph)
+    if getattr(self, "_remat_mesh2grid", False):
+      run_mesh2grid = hk.remat(run_mesh2grid)
+    output_graph = run_mesh2grid(input_graph)
     output_grid_nodes = output_graph.nodes["grid_nodes"].features
 
     return output_grid_nodes

@@ -98,7 +98,7 @@ def test_residual_device_step_uses_residual_history_inputs() -> None:
     baseline = _ModelBundle(params={}, transformed=SimpleNamespace(apply=baseline_apply))
     residual = _ModelBundle(params={}, transformed=SimpleNamespace(apply=residual_apply))
 
-    pred_1, residual_state, baseline_state, residual_inputs = _model_step_residual(
+    pred_1, _baseline_pred_1, residual_state, baseline_state, residual_inputs = _model_step_residual(
         residual,
         baseline,
         residual_params={},
@@ -125,7 +125,7 @@ def test_residual_device_step_uses_residual_history_inputs() -> None:
         {"x": (("batch", "time"), np.asarray([[16.0]], dtype=np.float32))},
         coords={"batch": batch, "time": target_time},
     )
-    pred_2, _residual_state, _baseline_state, residual_inputs = _model_step_residual(
+    pred_2, _baseline_pred_2, _residual_state, _baseline_state, residual_inputs = _model_step_residual(
         residual,
         baseline,
         residual_params={},
@@ -237,7 +237,7 @@ def test_residual_training_equivalent_warm_branch_teacher_forces_history(monkeyp
     np.testing.assert_allclose(_array_values(residual_seen[2], "x"), np.asarray([[4.0, 6.0]], dtype=np.float32))
 
 
-def test_residual_rollout_warm_context_truth_then_branch_predictions(monkeypatch, tmp_path) -> None:
+def test_residual_rollout_warm_context_truth_then_branch_corrected_feedback(monkeypatch, tmp_path) -> None:
     baseline_seen: list[xr.Dataset] = []
     residual_seen: list[xr.Dataset] = []
     monkeypatch.setattr(
@@ -260,7 +260,10 @@ def test_residual_rollout_warm_context_truth_then_branch_predictions(monkeypatch
     forcings = xr.Dataset(coords={"batch": batch, "time": target_time})
 
     runner = residual_runtime.build_truth_anchored_residual_runner(
-        SimpleNamespace(), {}, _write_residual_run_config(tmp_path)
+        SimpleNamespace(),
+        {},
+        _write_residual_run_config(tmp_path),
+        residual_ar_feedback="baseline_plus_residual",
     )
     context = runner["initialize_context"](
         inputs=inputs,
@@ -283,5 +286,58 @@ def test_residual_rollout_warm_context_truth_then_branch_predictions(monkeypatch
     np.testing.assert_allclose(_array_values(branch_pred, "x"), np.asarray([[12.0, 13.0]], dtype=np.float32))
     np.testing.assert_allclose(_array_values(baseline_seen[1], "x"), np.asarray([[9.0, 14.0]], dtype=np.float32))
     np.testing.assert_allclose(_array_values(baseline_seen[2], "x"), np.asarray([[14.0, 12.0]], dtype=np.float32))
+    np.testing.assert_allclose(_array_values(residual_seen[1], "x"), np.asarray([[0.0, 4.0]], dtype=np.float32))
+    np.testing.assert_allclose(_array_values(residual_seen[2], "x"), np.asarray([[4.0, 2.0]], dtype=np.float32))
+
+
+def test_residual_rollout_warm_branch_can_feed_baseline_only_physical_state(monkeypatch, tmp_path) -> None:
+    baseline_seen: list[xr.Dataset] = []
+    residual_seen: list[xr.Dataset] = []
+    monkeypatch.setattr(
+        residual_runtime,
+        "_build_residual_rollout_bundle",
+        lambda ckpt_obj, stats, ckpt_path: _fake_residual_bundles(baseline_seen, residual_seen),
+    )
+
+    batch = np.asarray([0], dtype=np.int64)
+    input_time = np.asarray([0, 1], dtype=np.int64)
+    target_time = np.asarray([2, 3, 4], dtype=np.int64)
+    inputs = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[5.0, 9.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": input_time},
+    )
+    targets = xr.Dataset(
+        {"x": (("batch", "time"), np.asarray([[14.0, 16.0, 18.0]], dtype=np.float32))},
+        coords={"batch": batch, "time": target_time},
+    )
+    forcings = xr.Dataset(coords={"batch": batch, "time": target_time})
+
+    runner = residual_runtime.build_truth_anchored_residual_runner(
+        SimpleNamespace(),
+        {},
+        _write_residual_run_config(tmp_path),
+        residual_ar_feedback="baseline",
+    )
+    context = runner["initialize_context"](
+        inputs=inputs,
+        targets_template=targets.isel(time=slice(0, 1)),
+        forcings=forcings.isel(time=slice(0, 1)),
+    )
+    _truth_pred, context = runner["truth_step"](
+        rng=(jax.random.PRNGKey(0), jax.random.PRNGKey(1)),
+        context=context,
+        target_step=targets.isel(time=slice(0, 1)),
+        forcings_step=forcings.isel(time=slice(0, 1)),
+    )
+    branch_pred = runner["branch_rollout"](
+        rng=jax.random.PRNGKey(2),
+        context=context,
+        targets_template=targets.isel(time=slice(1, 3)),
+        forcings=forcings.isel(time=slice(1, 3)),
+    )
+
+    np.testing.assert_allclose(_array_values(branch_pred, "x"), np.asarray([[12.0, 13.0]], dtype=np.float32))
+    np.testing.assert_allclose(_array_values(baseline_seen[1], "x"), np.asarray([[9.0, 14.0]], dtype=np.float32))
+    np.testing.assert_allclose(_array_values(baseline_seen[2], "x"), np.asarray([[14.0, 10.0]], dtype=np.float32))
     np.testing.assert_allclose(_array_values(residual_seen[1], "x"), np.asarray([[0.0, 4.0]], dtype=np.float32))
     np.testing.assert_allclose(_array_values(residual_seen[2], "x"), np.asarray([[4.0, 2.0]], dtype=np.float32))

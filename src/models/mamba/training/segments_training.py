@@ -40,6 +40,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         DEFAULT_DATA_PATH,
         DEFAULT_PREPARED_DATA_ROOT,
         DEFAULT_STATS_DIR,
+        MEMORY_MODE_CHOICES,
         RunConfig,
     )
 
@@ -156,15 +157,30 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         "--zero-init-temporal-out",
         action="store_true",
         default=False,
-        help="Zero initialize temporal output projections so inserted Mamba starts as a no-op.",
+        help=(
+            "Zero initialize temporal output projections so inserted Mamba starts as a no-op. "
+            "Enabled automatically when --temporal-backbone=mamba."
+        ),
+    )
+    parser.add_argument(
+        "--memory-mode",
+        choices=MEMORY_MODE_CHOICES,
+        default="standard",
+        help=(
+            "Training memory behavior: standard preserves current behavior, "
+            "conservative partitions Mamba-only GC-Mamba gradients or, for "
+            "residual_mamba, stops frozen-baseline gradients and checkpoints "
+            "each residual AR step; optimal also rematerializes processor steps "
+            "plus mesh2grid."
+        ),
     )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
     parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default=None)
     args = parser.parse_args(argv)
 
-    if args.max_steps <= 0:
-        raise ValueError("--max-steps must be > 0")
+    if args.max_steps < 0:
+        raise ValueError("--max-steps must be >= 0")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be > 0")
     if args.len_segment <= 0:
@@ -267,7 +283,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         eval_only=False,
         init_from_graphcast_ckpt=args.init_from_graphcast_ckpt,
         trainable_part=args.trainable_part,
-        zero_init_temporal_out=args.zero_init_temporal_out,
+        zero_init_temporal_out=args.zero_init_temporal_out or args.temporal_backbone == "mamba",
+        memory_mode=args.memory_mode,
     )
     return SegmentRunConfig(
         base_cfg=base_cfg,
@@ -324,6 +341,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
     from src.models.graphcast.training.core.model import (
         build_predictor,
+        derive_model_config_from_checkpoint,
         gc,
         load_graphcast_checkpoint,
         load_stats,
@@ -348,7 +366,12 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         run_eval_segments,
         valid_contiguous_final_input_indices,
     )
-    from src.models.mamba.training.param_utils import build_trainable_labels, overlay_matching_params
+    from src.models.mamba.training.param_utils import (
+        build_trainable_labels,
+        merge_param_partitions,
+        overlay_matching_params,
+        partition_params_by_trainable_part,
+    )
 
     cfg = segment_cfg.base_cfg
     out_dir = Path(cfg.out_dir) / cfg.run_name
@@ -360,14 +383,13 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     if cfg.input_duration is not None:
         task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
 
-    model_cfg = dataclasses.replace(
+    model_cfg = derive_model_config_from_checkpoint(
         base_model_cfg,
         resolution=cfg.resolution,
         mesh_size=cfg.mesh_size,
         latent_size=cfg.width,
         gnn_msg_steps=cfg.processor_msg_steps,
         hidden_layers=1,
-        mesh2grid_edge_normalization_factor=None,
     )
 
     norm_stats = load_stats(Path(cfg.stats_dir))
@@ -479,13 +501,13 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         effective_eval_batch_builder = "segment_block"
 
     def loss_forward_fn(inputs, targets, forcings, is_training):
-        del is_training
+        training_memory_mode = cfg.memory_mode if bool(is_training) else "standard"
         predictor = build_predictor(
             model_cfg,
             task_cfg,
             norm_stats,
             use_bf16=(cfg.precision == "bf16"),
-            gradient_checkpointing=True,
+            gradient_checkpointing=bool(is_training),
             temporal_backbone=cfg.temporal_backbone,
             temporal_location=cfg.temporal_location,
             temporal_d_inner=cfg.temporal_d_inner,
@@ -499,10 +521,12 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             temporal_stateful=cfg.temporal_stateful,
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
+            memory_mode=training_memory_mode,
         )
         return predictor.loss(inputs, targets, forcings)
 
     def loss_prediction_forward_fn(inputs, targets, forcings, is_training):
+        training_memory_mode = cfg.memory_mode if bool(is_training) else "standard"
         predictor = build_predictor(
             model_cfg,
             task_cfg,
@@ -523,6 +547,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
             autoregressive_loss_mode="none",
+            memory_mode=training_memory_mode,
         )
         return predictor.loss_and_predictions(inputs, targets, forcings)
 
@@ -551,7 +576,33 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             f"initialized_new={overlay_stats.initialized}"
         )
 
-    if cfg.trainable_part == "all":
+    use_trainable_param_partition = (
+        cfg.memory_mode in ("conservative", "optimal")
+        and cfg.trainable_part == "mamba"
+    )
+    frozen_params = None
+    if use_trainable_param_partition:
+        params, frozen_params = partition_params_by_trainable_part(params, cfg.trainable_part)
+        trainable_leaves = sum(len(module_params) for module_params in params.values())
+        frozen_leaves = sum(len(module_params) for module_params in frozen_params.values())
+        if trainable_leaves == 0:
+            raise ValueError(
+                "Memory-mode param partitioning found no trainable Mamba params. "
+                "Use --temporal-backbone=mamba or --memory-mode=standard."
+            )
+        print(
+            "Using trainable-only GC-Mamba params "
+            f"(memory_mode={cfg.memory_mode}, trainable_leaves={trainable_leaves}, "
+            f"frozen_leaves={frozen_leaves})."
+        )
+
+    def full_params_for(current_params: hk.Params) -> hk.Params:
+        if not use_trainable_param_partition:
+            return current_params
+        assert frozen_params is not None
+        return merge_param_partitions(current_params, frozen_params)
+
+    if cfg.trainable_part == "all" or use_trainable_param_partition:
         opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     else:
         opt = optax.multi_transform(
@@ -606,7 +657,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     if bptt_i < truth_prefix_steps:
                         current_inputs = chunk_inputs[bptt_i]
                     (loss_and_diag, predictions), current_state = transformed.apply(
-                        p,
+                        full_params_for(p),
                         current_state,
                         keys[bptt_i],
                         current_inputs,
@@ -662,7 +713,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 keys = jax.random.split(key, segment_cfg.bptt_steps)
                 for bptt_i in range(segment_cfg.bptt_steps):
                     (loss_and_diag, current_state) = transformed.apply(
-                        p,
+                        full_params_for(p),
                         current_state,
                         keys[bptt_i],
                         chunk_inputs[bptt_i],
@@ -712,7 +763,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         best_eval_loss = float(eval_total)
         save_checkpoint(
             out_dir,
-            params=params,
+            params=full_params_for(params),
             step=eval_step,
             model_cfg=model_cfg,
             task_cfg=task_cfg,
@@ -922,7 +973,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             if step % cfg.eval_every == 0:
                 eval_metrics = run_eval_segments(
                     transformed,
-                    params,
+                    full_params_for(params),
                     rng,
                     eval_ds,
                     eval_final_indices,
@@ -952,7 +1003,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 if segment_cfg.eval_rotating_diagnostics and segment_cfg.eval_num_segments is not None:
                     rotating_eval = run_eval_segments(
                         transformed,
-                        params,
+                        full_params_for(params),
                         rng,
                         eval_ds,
                         eval_final_indices,
@@ -983,7 +1034,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             if step % cfg.checkpoint_every == 0:
                 save_checkpoint(
                     out_dir,
-                    params=params,
+                    params=full_params_for(params),
                     step=step,
                     model_cfg=model_cfg,
                     task_cfg=task_cfg,
@@ -1008,7 +1059,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
     final_eval = run_eval_segments(
         transformed,
-        params,
+        full_params_for(params),
         rng,
         eval_ds,
         eval_final_indices,
@@ -1036,7 +1087,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
     save_checkpoint(
         out_dir,
-        params=params,
+        params=full_params_for(params),
         step=step,
         model_cfg=model_cfg,
         task_cfg=task_cfg,

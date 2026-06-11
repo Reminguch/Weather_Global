@@ -11,6 +11,7 @@ if ROOT_STR not in sys.path:
     sys.path.insert(0, ROOT_STR)
 
 from src.models.graphcast.training.core.config import parse_args
+from src.models.graphcast.training.core.model import derive_model_config_from_checkpoint, gc
 from src.models.mamba.training.segments_training import parse_gc_mamba_args
 from src.models.mamba.residual_mamba.training.config import parse_args as parse_residual_mamba_args
 
@@ -34,6 +35,32 @@ def test_vanilla_config_accepts_grad_accum_and_mp8(monkeypatch: pytest.MonkeyPat
     assert cfg.processor_msg_steps == 8
     assert cfg.batch_size == 8
     assert cfg.grad_accum_steps == 6
+
+
+def test_derived_model_config_preserves_mesh2grid_edge_normalization_factor() -> None:
+    base_cfg = gc.ModelConfig(
+        resolution=1.0,
+        mesh_size=5,
+        latent_size=512,
+        gnn_msg_steps=16,
+        hidden_layers=1,
+        radius_query_fraction_edge_length=0.6,
+        mesh2grid_edge_normalization_factor=0.6180338738074472,
+    )
+
+    model_cfg = derive_model_config_from_checkpoint(
+        base_cfg,
+        resolution=2.0,
+        mesh_size=4,
+        latent_size=128,
+        gnn_msg_steps=6,
+    )
+
+    assert model_cfg.resolution == 2.0
+    assert model_cfg.mesh_size == 4
+    assert model_cfg.latent_size == 128
+    assert model_cfg.gnn_msg_steps == 6
+    assert model_cfg.mesh2grid_edge_normalization_factor == 0.6180338738074472
 
 
 def test_grad_accum_rejects_temporal_backbone(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -74,6 +101,12 @@ def test_segment_config_accepts_mp8() -> None:
     cfg = parse_gc_mamba_args(["--processor-msg-steps", "8"])
 
     assert cfg.base_cfg.processor_msg_steps == 8
+
+
+def test_gc_mamba_zero_initializes_temporal_output_by_default() -> None:
+    cfg = parse_gc_mamba_args(["--temporal-backbone", "mamba", "--temporal-d-inner", "4"])
+
+    assert cfg.base_cfg.zero_init_temporal_out is True
 
 
 def test_gc_mamba_segment_ar_requires_target_steps_less_than_bptt() -> None:

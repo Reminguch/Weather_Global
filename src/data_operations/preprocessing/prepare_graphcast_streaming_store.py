@@ -165,6 +165,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--ckpt-in", default=DEFAULT_CKPT)
     parser.add_argument("--out-root", default=DEFAULT_PREPARED_STREAM_ROOT)
     parser.add_argument("--resolutions", nargs="+", type=float, default=list(DEFAULT_RESOLUTIONS))
+    parser.add_argument("--time-start", default=None, help="Optional inclusive source time bound.")
+    parser.add_argument("--time-end", default=None, help="Optional inclusive source time bound.")
     parser.add_argument("--input-duration", default=None, help="Optional task input duration override.")
     parser.add_argument("--overwrite", action="store_true", default=False)
     return parser.parse_args(argv)
@@ -180,6 +182,12 @@ def main(argv: list[str] | None = None) -> None:
     print(f"[prepare-stream] opening source {args.data_path}")
     source = open_graphcast_era5(args.data_path)
     source = _ensure_datetime_coord(source)
+    if args.time_start is not None or args.time_end is not None:
+        source = source.sel(time=slice(args.time_start, args.time_end))
+        if source.sizes.get("time", 0) == 0:
+            raise ValueError(
+                f"Time window is empty for {args.data_path}: {args.time_start!r} to {args.time_end!r}"
+            )
     available_vars = [name for name in GRAPHCAST_VARS if name in source.data_vars]
     if not available_vars:
         raise ValueError("None of the required GraphCast variables were found in source dataset.")
