@@ -286,6 +286,9 @@ class GraphCast(predictor_base.Predictor):
     self._residual_output_head_enabled = False
     self._remat_processor_steps = False
     self._remat_mesh2grid = False
+    self._lora_rank = 0
+    self._lora_alpha = 1.0
+    self._lora_scope = "none"
 
     self._spatial_features_kwargs = dict(
         add_node_positions=False,
@@ -344,6 +347,9 @@ class GraphCast(predictor_base.Predictor):
         temporal_conv_bias=self._temporal_conv_bias,
         temporal_layers=self._temporal_layers,
         temporal_dropout=self._temporal_dropout,
+        lora_rank=self._lora_rank,
+        lora_alpha=self._lora_alpha,
+        lora_scope=self._lora_scope,
         name="mesh_gnn",
     )
 
@@ -777,9 +783,15 @@ class GraphCast(predictor_base.Predictor):
         edges={mesh_edges_key: new_edges}, nodes={"mesh_nodes": nodes})
 
     # Run the GNN.
+    self._sync_mesh_gnn_runtime_options()
+    return self._mesh_gnn(input_graph).nodes["mesh_nodes"].features
+
+  def _sync_mesh_gnn_runtime_options(self) -> None:
     self._mesh_gnn._remat_processor_steps = getattr(
         self, "_remat_processor_steps", False)
-    return self._mesh_gnn(input_graph).nodes["mesh_nodes"].features
+    self._mesh_gnn._lora_rank = int(getattr(self, "_lora_rank", 0))
+    self._mesh_gnn._lora_alpha = float(getattr(self, "_lora_alpha", 1.0))
+    self._mesh_gnn._lora_scope = getattr(self, "_lora_scope", "none")
 
   def _run_mesh_gnn_interleaved(
       self,
@@ -808,6 +820,7 @@ class GraphCast(predictor_base.Predictor):
               features=node_features)})
 
     input_graph = build_graph(latent_mesh_nodes)
+    self._sync_mesh_gnn_runtime_options()
     embedder_network, processor_networks, _ = self._mesh_gnn._networks_builder(
         input_graph)
 

@@ -32,6 +32,26 @@ def prune_old_step_checkpoints(out_dir: Path, *, keep_step: int) -> None:
         print(f"pruned {removed} old step checkpoint(s), kept {out_dir / keep_name}")
 
 
+def archive_old_step_checkpoints(
+    out_dir: Path,
+    *,
+    keep_step: int,
+    archive_dir_name: str = "intermediate_checkpoints",
+) -> None:
+    keep_name = f"ckpt_step{keep_step}.npz"
+    archive_dir = out_dir / archive_dir_name
+    archived = 0
+    for path in out_dir.glob("ckpt_step*.npz"):
+        match = _STEP_CKPT_RE.match(path.name)
+        if match is None or path.name == keep_name:
+            continue
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        path.replace(archive_dir / path.name)
+        archived += 1
+    if archived:
+        print(f"archived {archived} old step checkpoint(s) under {archive_dir}; kept {out_dir / keep_name}")
+
+
 def save_checkpoint(
     out_dir: Path,
     *,
@@ -42,6 +62,8 @@ def save_checkpoint(
     description: str,
     license_text: str,
     filename: str | None = None,
+    archive_old_steps: bool = False,
+    archive_dir_name: str = "intermediate_checkpoints",
 ) -> None:
     path = out_dir / (filename if filename is not None else f"ckpt_step{step}.npz")
     ckpt_out = gc.CheckPoint(
@@ -55,7 +77,10 @@ def save_checkpoint(
         checkpoint.dump(f, ckpt_out)
     print(f"saved checkpoint: {path}")
     if filename is None:
-        prune_old_step_checkpoints(out_dir, keep_step=step)
+        if archive_old_steps:
+            archive_old_step_checkpoints(out_dir, keep_step=step, archive_dir_name=archive_dir_name)
+        else:
+            prune_old_step_checkpoints(out_dir, keep_step=step)
 
 
 def save_logs(
@@ -299,6 +324,18 @@ def _write_run_config(
     effective_eval_batch_builder: str | None = None,
 ) -> None:
     memory_mode = getattr(cfg, "memory_mode", "standard")
+    graphcast_lr = getattr(cfg, "graphcast_lr", None)
+    mamba_lr = getattr(cfg, "mamba_lr", None)
+    lora_lr = getattr(cfg, "lora_lr", None)
+    resolved_graphcast_lr = graphcast_lr if graphcast_lr is not None else cfg.lr
+    resolved_mamba_lr = mamba_lr if mamba_lr is not None else cfg.lr
+    resolved_lora_lr = lora_lr if lora_lr is not None else resolved_mamba_lr
+    adamw_beta1 = getattr(cfg, "adamw_beta1", 0.9)
+    adamw_beta2 = getattr(cfg, "adamw_beta2", 0.999)
+    max_grad_norm = getattr(cfg, "max_grad_norm", None)
+    lora_rank = int(getattr(cfg, "lora_rank", 0))
+    lora_alpha = float(getattr(cfg, "lora_alpha", 1.0))
+    lora_scope = getattr(cfg, "lora_scope", "processor_mlp")
     builder_metadata = build_batch_builder_metadata(
         requested_batch_builder=cfg.batch_builder,
         effective_train_batch_builder=effective_train_batch_builder,
@@ -325,7 +362,13 @@ def _write_run_config(
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,
+        "graphcast_lr": graphcast_lr,
+        "mamba_lr": mamba_lr,
+        "lora_lr": lora_lr,
         "weight_decay": cfg.weight_decay,
+        "adamw_beta1": adamw_beta1,
+        "adamw_beta2": adamw_beta2,
+        "max_grad_norm": max_grad_norm,
         "precision": cfg.precision,
         "init_from_graphcast_ckpt": cfg.init_from_graphcast_ckpt,
         "trainable_part": cfg.trainable_part,
@@ -349,11 +392,24 @@ def _write_run_config(
             "microbatch_size": cfg.batch_size,
             "grad_accum_steps": cfg.grad_accum_steps,
             "effective_batch_size": cfg.batch_size * cfg.grad_accum_steps,
+            "lr": cfg.lr,
+            "weight_decay": cfg.weight_decay,
+            "graphcast_lr": graphcast_lr,
+            "mamba_lr": mamba_lr,
+            "lora_lr": lora_lr,
+            "resolved_graphcast_lr": resolved_graphcast_lr,
+            "resolved_mamba_lr": resolved_mamba_lr,
+            "resolved_lora_lr": resolved_lora_lr,
+            "grouped_lr": graphcast_lr is not None or mamba_lr is not None or lora_lr is not None,
+            "adamw_beta1": adamw_beta1,
+            "adamw_beta2": adamw_beta2,
+            "max_grad_norm": max_grad_norm,
         },
         "memory_optimization": {
             "mode": memory_mode,
             "trainable_param_partition": (
-                memory_mode in ("conservative", "optimal") and cfg.trainable_part == "mamba"
+                memory_mode in ("conservative", "optimal")
+                and cfg.trainable_part in ("mamba", "mamba_lora")
             ),
             "processor_step_remat": memory_mode == "optimal",
             "mesh2grid_remat": memory_mode == "optimal",
@@ -372,6 +428,13 @@ def _write_run_config(
             "dropout": cfg.temporal_dropout,
             "insert_count": cfg.temporal_insert_count,
             "zero_init_output": cfg.zero_init_temporal_out,
+        },
+        "lora_config": {
+            "enabled": lora_rank > 0,
+            "rank": lora_rank,
+            "alpha": lora_alpha,
+            "scope": lora_scope,
+            "scale": (lora_alpha / lora_rank) if lora_rank > 0 else 0.0,
         },
         "model_config": dataclasses.asdict(model_cfg),
         "task_config": dataclasses.asdict(task_cfg),

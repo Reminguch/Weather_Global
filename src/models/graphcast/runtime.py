@@ -36,11 +36,12 @@ def load_checkpoint_and_stats(ckpt_path: Path, stats_dir: Path):
 
 
 def load_run_config(ckpt_path: Path) -> dict[str, Any]:
-    run_cfg_path = ckpt_path.parent / "run_config.json"
-    if not run_cfg_path.exists():
-        return {}
-    with run_cfg_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    for parent in (ckpt_path.parent, *ckpt_path.parents[1:3]):
+        run_cfg_path = parent / "run_config.json"
+        if run_cfg_path.exists():
+            with run_cfg_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+    return {}
 
 
 def infer_family(run_cfg: dict[str, Any]) -> str:

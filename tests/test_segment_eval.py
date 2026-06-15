@@ -25,6 +25,7 @@ from src.models.graphcast.training.core.eval_selection import (  # noqa: E402
     select_eval_subset,
 )
 from src.models.graphcast.training.core.segments import (  # noqa: E402
+    AR_LOSS_MODE_ALL_BPTT_UNIFORM,
     _stop_gradient_dataset,
     iter_eval_segment_chunks,
     run_eval_segments,
@@ -45,6 +46,7 @@ from src.models.mamba.residual_mamba.training import model as residual_training_
 from src.models.mamba.residual_mamba.training.model import (  # noqa: E402
     augment_run_config,
     build_loss_prediction_transform as build_residual_loss_prediction_transform,
+    prepare_baseline_only_residual_targets,
     residual_autoregressive_final_horizon,
     run_residual_eval,
     should_checkpoint_residual_ar_step,
@@ -811,6 +813,58 @@ def test_residual_augment_run_config_records_output_head(tmp_path, monkeypatch) 
     }
 
 
+def test_residual_augment_run_config_records_split_jit_baseline_bptt(tmp_path, monkeypatch) -> None:
+    def fake_write_run_config(out_dir, *args, **kwargs):
+        del args, kwargs
+        (out_dir / "run_config.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "src.models.mamba.residual_mamba.training.model._write_run_config",
+        fake_write_run_config,
+    )
+    base_cfg = SimpleNamespace(
+        target_steps=2,
+        temporal_backbone="mamba",
+        residual_output_head=False,
+        memory_mode="optimal",
+    )
+    segment_cfg = SimpleNamespace(
+        base_cfg=base_cfg,
+        len_segment=30,
+        bptt_steps=4,
+        chunk_load_workers=2,
+        eval_num_segments=16,
+        final_eval_num_segments=None,
+        eval_subset_policy="stratified_fixed",
+        eval_rotating_diagnostics=True,
+        training_target="residual",
+        baseline_ckpt="baseline.npz",
+        resume_ckpt=None,
+        residual_output_head_mode="auto",
+        residual_ar_feedback="baseline",
+        autoregressive_loss_mode="all_bptt_uniform",
+    )
+
+    augment_run_config(
+        tmp_path,
+        segment_cfg=segment_cfg,
+        model_cfg=SimpleNamespace(),
+        task_cfg=SimpleNamespace(),
+        numpy_cache_active=False,
+        train_cache_estimate_gib=None,
+        effective_train_batch_builder="direct",
+        effective_eval_batch_builder="direct",
+    )
+
+    payload = json.loads((tmp_path / "run_config.json").read_text(encoding="utf-8"))
+    assert payload["residual_training"]["baseline_rollout_placement"] == "split_jit"
+    assert payload["residual_training"]["baseline_outside_bptt"] is True
+    assert payload["autoregressive_training"]["baseline_rollout_placement"] == "split_jit"
+    assert payload["autoregressive_training"]["baseline_outside_bptt"] is True
+    assert payload["autoregressive_training"]["loss_mode"] == "all_bptt_uniform"
+    assert payload["autoregressive_training"]["eval_loss_mode"] == "all_bptt_uniform"
+
+
 def test_residual_loss_prediction_transform_init_uses_one_step_template(monkeypatch) -> None:
     class OneStepOnlyGraphCast:
         def __init__(self, model_cfg, task_cfg):
@@ -983,6 +1037,42 @@ def test_run_eval_segments_rolling_ar_scores_uniform_chunk_tail() -> None:
     )
 
     np.testing.assert_allclose(metrics["total"], 3.5)
+
+
+def test_run_eval_segments_prediction_path_one_step_scores_all_bptt_uniform() -> None:
+    transformed = _counting_loss_prediction_transform()
+    sample_inputs, sample_targets, sample_forcings = _constant_target_batch_builder(0.0)(
+        None,
+        indices=np.asarray([0], dtype=np.int64),
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+    )
+    rng = jax.random.PRNGKey(0)
+    params, _ = transformed.init(rng, sample_inputs, sample_targets, sample_forcings, False)
+
+    metrics = run_eval_segments(
+        transformed,
+        params,
+        rng,
+        eval_ds=xr.Dataset(),
+        eval_indices=np.arange(4, dtype=np.int64),
+        eval_batch_size=1,
+        input_steps=2,
+        target_steps=1,
+        task_cfg=_task_cfg(),
+        dt=pd.Timedelta("6h"),
+        len_segment=4,
+        bptt_steps=4,
+        progress_label="test",
+        batch_builder=_constant_target_batch_builder(0.0),
+        chunk_load_workers=1,
+        rolling_ar=True,
+        rolling_loss_mode=AR_LOSS_MODE_ALL_BPTT_UNIFORM,
+    )
+
+    np.testing.assert_allclose(metrics["total"], 1.5)
 
 
 def test_run_eval_segments_rolling_ar_first_tail_input_uses_previous_prediction() -> None:
@@ -1184,7 +1274,74 @@ def test_run_residual_eval_preserves_residual_state_within_segment() -> None:
     np.testing.assert_allclose(metrics["total"], 32.0 / 6.0)
 
 
-def _run_constant_target_residual_eval(*, residual_ar_feedback: str | None = None) -> dict[str, float]:
+def test_prepare_baseline_only_residual_targets_uses_truth_prefix_then_baseline_tail() -> None:
+    def baseline_forward(inputs, targets, forcings, is_training):
+        del forcings, is_training
+        pred = (inputs["x"].isel(time=-1, drop=True) + 10.0).expand_dims(
+            time=targets.coords["time"]
+        ).transpose(*targets["x"].dims)
+        return xr.Dataset({"x": pred})
+
+    baseline_transform = hk.transform_with_state(baseline_forward)
+    chunk_inputs = []
+    chunk_targets = []
+    chunk_forcings = []
+    for idx in range(4):
+        inputs, targets, forcings = _constant_target_batch_builder(100.0)(
+            None,
+            indices=np.asarray([idx], dtype=np.int64),
+            input_steps=2,
+            target_steps=1,
+            task_cfg=_task_cfg(),
+            dt=pd.Timedelta("6h"),
+        )
+        chunk_inputs.append(inputs)
+        chunk_targets.append(targets)
+        chunk_forcings.append(forcings)
+
+    rng = jax.random.PRNGKey(0)
+    params, state = baseline_transform.init(
+        rng,
+        chunk_inputs[0],
+        chunk_targets[0],
+        chunk_forcings[0],
+        False,
+    )
+
+    @jax.jit
+    def prepare(params, state, rng_key, chunk_inputs, chunk_targets, chunk_forcings):
+        return prepare_baseline_only_residual_targets(
+            baseline_transform,
+            baseline_params=params,
+            baseline_state=state,
+            rng_key=rng_key,
+            chunk_inputs=chunk_inputs,
+            chunk_targets=chunk_targets,
+            chunk_forcings=chunk_forcings,
+            truth_prefix_steps=2,
+        )
+
+    residual_targets = prepare(
+        params,
+        state,
+        rng,
+        tuple(chunk_inputs),
+        tuple(chunk_targets),
+        tuple(chunk_forcings),
+    )
+
+    actual = [
+        np.asarray(jax.device_get(xarray_jax.unwrap_data(target["x"]))).item()
+        for target in residual_targets
+    ]
+    np.testing.assert_allclose(actual, [90.0, 89.0, 79.0, 69.0])
+
+
+def _run_constant_target_residual_eval(
+    *,
+    residual_ar_feedback: str | None = None,
+    rolling_loss_mode: str | None = None,
+) -> dict[str, float]:
     def baseline_forward(inputs, targets, forcings, is_training):
         del forcings, is_training
         pred = (inputs["x"].isel(time=-1, drop=True) + 10.0).expand_dims(
@@ -1219,6 +1376,8 @@ def _run_constant_target_residual_eval(*, residual_ar_feedback: str | None = Non
     kwargs = {}
     if residual_ar_feedback is not None:
         kwargs["residual_ar_feedback"] = residual_ar_feedback
+    if rolling_loss_mode is not None:
+        kwargs["rolling_loss_mode"] = rolling_loss_mode
     return run_residual_eval(
         residual_transform,
         baseline_transform,
@@ -1249,6 +1408,20 @@ def test_run_residual_eval_rolling_ar_uses_baseline_plus_residual_feedback() -> 
 def test_run_residual_eval_rolling_ar_can_use_baseline_only_feedback() -> None:
     metrics = _run_constant_target_residual_eval(residual_ar_feedback="baseline")
     np.testing.assert_allclose(metrics["total"], 302.5)
+
+
+def test_run_residual_eval_rolling_ar_loss_mode_can_score_all_bptt() -> None:
+    tail_metrics = _run_constant_target_residual_eval(
+        residual_ar_feedback="baseline",
+        rolling_loss_mode="tail_uniform",
+    )
+    all_bptt_metrics = _run_constant_target_residual_eval(
+        residual_ar_feedback="baseline",
+        rolling_loss_mode=AR_LOSS_MODE_ALL_BPTT_UNIFORM,
+    )
+
+    np.testing.assert_allclose(tail_metrics["total"], 302.5)
+    assert all_bptt_metrics["total"] != tail_metrics["total"]
 
 
 def test_device_metric_accumulator_matches_host_xarray_metrics() -> None:

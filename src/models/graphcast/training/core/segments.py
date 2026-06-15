@@ -27,6 +27,12 @@ from .prepared_array import PreparedArrayStore, is_prepared_array_store
 from .prepared_block_batches import PreparedBlockBatchLoader
 
 
+AR_LOSS_MODE_TAIL_UNIFORM = "tail_uniform"
+AR_LOSS_MODE_ALL_BPTT_UNIFORM = "all_bptt_uniform"
+AR_LOSS_MODE_CHOICES = (AR_LOSS_MODE_TAIL_UNIFORM, AR_LOSS_MODE_ALL_BPTT_UNIFORM)
+AR_EVAL_LOSS_MODE = AR_LOSS_MODE_TAIL_UNIFORM
+
+
 @dataclasses.dataclass(frozen=True)
 class SegmentRunConfig:
     base_cfg: RunConfig
@@ -40,6 +46,7 @@ class SegmentRunConfig:
     final_eval_num_segments: int | None = None
     eval_subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED
     eval_rotating_diagnostics: bool = True
+    autoregressive_loss_mode: str = AR_LOSS_MODE_TAIL_UNIFORM
 
 
 @dataclasses.dataclass(frozen=True)
@@ -402,6 +409,15 @@ def _chunk_ar_truth_prefix(target_steps: int, bptt_steps: int) -> int:
     return bptt_steps - target_steps
 
 
+def include_bptt_loss_step(loss_mode: str, bptt_i: int, truth_prefix_steps: int) -> bool:
+    """Return whether a BPTT lane loss contributes to the AR training objective."""
+    if loss_mode == AR_LOSS_MODE_TAIL_UNIFORM:
+        return bptt_i >= truth_prefix_steps
+    if loss_mode == AR_LOSS_MODE_ALL_BPTT_UNIFORM:
+        return True
+    raise ValueError(f"Unknown autoregressive loss mode: {loss_mode!r}")
+
+
 def _write_segment_run_config(
     out_dir: Path,
     *,
@@ -438,6 +454,13 @@ def _write_segment_run_config(
         "final_eval_num_segments": segment_cfg.final_eval_num_segments,
         "eval_subset_policy": segment_cfg.eval_subset_policy,
         "eval_rotating_diagnostics": segment_cfg.eval_rotating_diagnostics,
+        "ar_gradient_alignment_diagnostics": bool(
+            getattr(segment_cfg, "ar_gradient_alignment_diagnostics", False)
+        ),
+        "ar_gradient_alignment_every": getattr(segment_cfg, "ar_gradient_alignment_every", None),
+        "ar_gradient_alignment_num_chunks": int(
+            getattr(segment_cfg, "ar_gradient_alignment_num_chunks", 1)
+        ),
         "shuffle_segments": True,
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
@@ -447,16 +470,30 @@ def _write_segment_run_config(
             int(segment_cfg.base_cfg.target_steps),
             int(segment_cfg.bptt_steps),
         )
+        loss_mode = getattr(segment_cfg, "autoregressive_loss_mode", AR_LOSS_MODE_TAIL_UNIFORM)
         payload["autoregressive_training"] = {
             "enabled": True,
             "mode": "chunk_local_corrected_ar_tail",
-            "loss_mode": "tail_uniform",
+            "loss_mode": loss_mode,
+            "eval_loss_mode": loss_mode,
             "target_steps": int(segment_cfg.base_cfg.target_steps),
             "truth_prefix_steps": int(truth_prefix_steps),
             "ar_tail_steps": int(segment_cfg.base_cfg.target_steps),
             "feedback_gradient": "full_bptt_chunk_detached",
             "state_carry_steps": "temporal_state_stop_gradient_chunks",
             "physical_state_carry": "truth_reset_each_chunk",
+        }
+    else:
+        payload["single_step_training"] = {
+            "enabled": True,
+            "mode": "teacher_forced_one_step_uniform_bptt",
+            "loss_path": "loss_and_predictions",
+            "single_step_loss_mode": AR_LOSS_MODE_ALL_BPTT_UNIFORM,
+            "target_steps": int(segment_cfg.base_cfg.target_steps),
+            "truth_prefix_steps": int(segment_cfg.bptt_steps),
+            "feedback_gradient": "none_truth_fed_bptt",
+            "state_carry_steps": "temporal_state_stop_gradient_chunks",
+            "physical_state_carry": "truth_reset_each_bptt_step",
         }
     if finite_segment_filter_stats is not None:
         payload["segment_training"]["finite_segment_filter"] = finite_segment_filter_stats
@@ -1000,6 +1037,7 @@ def run_eval_segments(
     load_executor: concurrent.futures.Executor | None = None,
     segment_loader: SegmentBlockBatchLoader | None = None,
     rolling_ar: bool = False,
+    rolling_loss_mode: str = AR_EVAL_LOSS_MODE,
     load_target_steps: int | None = None,
     max_segments: int | None = None,
     subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
@@ -1107,7 +1145,11 @@ def run_eval_segments(
                             chunk_forcings[bptt_i],
                             False,
                         )
-                        if bptt_i >= truth_prefix_steps:
+                        if include_bptt_loss_step(
+                            rolling_loss_mode,
+                            bptt_i,
+                            truth_prefix_steps,
+                        ):
                             loss_by_lane = _loss_by_lane(loss_and_diag[0])
                             weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
                             valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)

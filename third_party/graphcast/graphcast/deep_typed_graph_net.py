@@ -35,6 +35,7 @@ Generalization to TypedGraphs of the deep Graph Neural Network from:
 """
 
 import functools
+import math
 from typing import Callable, List, Mapping, Optional, Tuple
 
 import chex
@@ -52,6 +53,83 @@ from src.models.mamba.modules.temporal_mesh_mamba import (
 
 
 GraphToGraphNetwork = Callable[[typed_graph.TypedGraph], typed_graph.TypedGraph]
+
+LORA_SCOPE_NONE = "none"
+LORA_SCOPE_PROCESSOR_MLP = "processor_mlp"
+
+
+class _LoRALinearUpdate(hk.Module):
+  """Low-rank additive update for an existing linear projection."""
+
+  def __init__(self, *, output_size: int, rank: int, alpha: float, name: str):
+    super().__init__(name=name)
+    self._output_size = int(output_size)
+    self._rank = int(rank)
+    self._alpha = float(alpha)
+
+  def __call__(self, inputs: chex.Array) -> chex.Array:
+    input_size = inputs.shape[-1]
+    if input_size is None:
+      raise ValueError("LoRA requires a statically known input feature size.")
+    input_size = int(input_size)
+    a = hk.get_parameter(
+        "a",
+        shape=(input_size, self._rank),
+        init=hk.initializers.RandomNormal(
+            stddev=1.0 / math.sqrt(max(input_size, 1))))
+    b = hk.get_parameter(
+        "b",
+        shape=(self._rank, self._output_size),
+        init=hk.initializers.Constant(0.0),
+    )
+    delta = jnp.matmul(jnp.matmul(inputs.astype(a.dtype), a), b)
+    return (delta * (self._alpha / float(self._rank))).astype(inputs.dtype)
+
+
+class _LoRAMLP(hk.Module):
+  """MLP with additive LoRA updates on each linear layer.
+
+  The base linear layer names match hk.nets.MLP's `linear_{i}` convention so
+  pretrained GraphCast checkpoints can still be overlaid leaf-for-leaf.
+  """
+
+  def __init__(
+      self,
+      *,
+      output_sizes: List[int],
+      activation: Callable[[chex.Array], chex.Array],
+      lora_rank: int,
+      lora_alpha: float,
+      name: str,
+  ):
+    super().__init__(name=name)
+    self._output_sizes = [int(size) for size in output_sizes]
+    self._activation = activation
+    self._layers = tuple(
+        hk.Linear(output_size=output_size, name=f"linear_{layer_i}")
+        for layer_i, output_size in enumerate(self._output_sizes)
+    )
+    self._lora_layers = tuple(
+        _LoRALinearUpdate(
+            output_size=output_size,
+            rank=int(lora_rank),
+            alpha=float(lora_alpha),
+            name=f"linear_{layer_i}_lora",
+        )
+        for layer_i, output_size in enumerate(self._output_sizes)
+    )
+
+  def __call__(self, inputs: chex.Array) -> chex.Array:
+    out = inputs
+    last_layer = len(self._output_sizes) - 1
+    for layer_i, (base_layer, lora_layer) in enumerate(zip(
+        self._layers, self._lora_layers)):
+      layer_input = out
+      out = base_layer(out)
+      out = out + lora_layer(layer_input).astype(out.dtype)
+      if layer_i != last_layer:
+        out = self._activation(out)
+    return out
 
 
 class DeepTypedGraphNet(hk.Module):
@@ -113,6 +191,9 @@ class DeepTypedGraphNet(hk.Module):
                temporal_layers: int = 1,
                temporal_dropout: float = 0.0,
                remat_processor_steps: bool = False,
+               lora_rank: int = 0,
+               lora_alpha: float = 1.0,
+               lora_scope: str = LORA_SCOPE_NONE,
                name: str = "DeepTypedGraphNet"):
     """Inits the model.
 
@@ -171,6 +252,10 @@ class DeepTypedGraphNet(hk.Module):
       temporal_dropout: Dropout rate inside the temporal processor.
       remat_processor_steps: Whether to rematerialize each processor step during
         backward.
+      lora_rank: Rank for optional low-rank processor MLP adapters. Zero
+        disables LoRA.
+      lora_alpha: LoRA scaling numerator. Effective scale is alpha / rank.
+      lora_scope: Adapter target scope. V1 supports "processor_mlp".
       name: Name of the model.
     """
 
@@ -211,6 +296,10 @@ class DeepTypedGraphNet(hk.Module):
     self._temporal_layers = temporal_layers
     self._temporal_dropout = temporal_dropout
     self._remat_processor_steps = remat_processor_steps
+    self._lora_rank = int(lora_rank)
+    self._lora_alpha = float(lora_alpha)
+    self._lora_scope = lora_scope
+    self._gnn_name = name
 
     if aggregate_normalization:
       # using aggregate_normalization only makes sense with segment_sum.
@@ -242,10 +331,30 @@ class DeepTypedGraphNet(hk.Module):
       GraphToGraphNetwork, List[GraphToGraphNetwork], GraphToGraphNetwork
   ]:
     # TODO(aelkadi): move to mlp_builder.
+    def should_apply_lora(name):
+      if self._lora_rank <= 0:
+        return False
+      if self._lora_scope != LORA_SCOPE_PROCESSOR_MLP:
+        return False
+      if self._gnn_name != "mesh_gnn":
+        return False
+      return name.startswith("processor_edges_") or name.startswith(
+          "processor_nodes_")
+
     def build_mlp(name, output_size):
-      mlp = hk.nets.MLP(
-          output_sizes=[self._mlp_hidden_size] * self._mlp_num_hidden_layers + [
-              output_size], name=name + "_mlp", activation=self._activation)
+      output_sizes = [self._mlp_hidden_size] * self._mlp_num_hidden_layers + [
+          output_size]
+      if should_apply_lora(name):
+        mlp = _LoRAMLP(
+            output_sizes=output_sizes,
+            activation=self._activation,
+            lora_rank=self._lora_rank,
+            lora_alpha=self._lora_alpha,
+            name=name + "_mlp")
+      else:
+        mlp = hk.nets.MLP(
+            output_sizes=output_sizes, name=name + "_mlp",
+            activation=self._activation)
       return jraph.concatenated_args(mlp)
 
     def build_mlp_with_maybe_layer_norm(name, output_size):

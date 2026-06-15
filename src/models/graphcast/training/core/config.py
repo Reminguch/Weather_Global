@@ -90,6 +90,15 @@ class RunConfig:
     eval_rotating_diagnostics: bool = True
     residual_output_head: bool = False
     memory_mode: str = "standard"
+    graphcast_lr: float | None = None
+    mamba_lr: float | None = None
+    lora_lr: float | None = None
+    adamw_beta1: float = 0.9
+    adamw_beta2: float = 0.999
+    max_grad_norm: float | None = None
+    lora_rank: int = 0
+    lora_alpha: float = 1.0
+    lora_scope: str = "processor_mlp"
 
 
 def _positive_int_or_all(value: str) -> int | None:
@@ -151,6 +160,10 @@ def parse_args() -> RunConfig:
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--lora-rank", type=int, default=0)
+    parser.add_argument("--lora-alpha", type=float, default=1.0)
+    parser.add_argument("--lora-scope", choices=["processor_mlp"], default="processor_mlp")
+    parser.add_argument("--lora-lr", type=float, default=None)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--precision", choices=["bf16", "fp16", "fp32"], default="bf16")
     parser.add_argument("--resume-step", type=int, default=None, help="Resume from this step (load params from --ckpt-in).")
@@ -234,6 +247,12 @@ def parse_args() -> RunConfig:
         raise ValueError("--batch-size must be > 0")
     if args.grad_accum_steps <= 0:
         raise ValueError("--grad-accum-steps must be > 0")
+    if args.lora_rank < 0:
+        raise ValueError("--lora-rank must be >= 0")
+    if args.lora_alpha <= 0:
+        raise ValueError("--lora-alpha must be > 0")
+    if args.lora_lr is not None and args.lora_lr <= 0:
+        raise ValueError("--lora-lr must be > 0")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -308,6 +327,10 @@ def parse_args() -> RunConfig:
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
+        lora_lr=args.lora_lr,
+        lora_rank=args.lora_rank,
+        lora_alpha=args.lora_alpha,
+        lora_scope=args.lora_scope,
         seed=args.seed,
         precision=args.precision,
         resume_step=args.resume_step,

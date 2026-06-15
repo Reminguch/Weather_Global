@@ -353,6 +353,9 @@ def build_predictor(
     residual_output_head: bool = False,
     autoregressive_loss_mode: str = "mean",
     memory_mode: str = "standard",
+    lora_rank: int = 0,
+    lora_alpha: float = 1.0,
+    lora_scope: str = "processor_mlp",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
     if hasattr(predictor, "_remat_processor_steps"):
@@ -372,6 +375,10 @@ def build_predictor(
         predictor._temporal_dropout = temporal_dropout
         predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
+    if hasattr(predictor, "_lora_rank"):
+        predictor._lora_rank = int(lora_rank)
+        predictor._lora_alpha = float(lora_alpha)
+        predictor._lora_scope = lora_scope if int(lora_rank) > 0 else "none"
     predictor._residual_output_head_enabled = residual_output_head
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
@@ -418,6 +425,9 @@ def build_residual_correction_predictor(
     residual_output_head: bool = False,
     autoregressive_loss_mode: str = "mean",
     memory_mode: str = "standard",
+    lora_rank: int = 0,
+    lora_alpha: float = 1.0,
+    lora_scope: str = "processor_mlp",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
     if hasattr(predictor, "_remat_processor_steps"):
@@ -437,6 +447,10 @@ def build_residual_correction_predictor(
         predictor._temporal_dropout = temporal_dropout
         predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
+    if hasattr(predictor, "_lora_rank"):
+        predictor._lora_rank = int(lora_rank)
+        predictor._lora_alpha = float(lora_alpha)
+        predictor._lora_scope = lora_scope if int(lora_rank) > 0 else "none"
     predictor._residual_output_head_enabled = residual_output_head
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
@@ -480,6 +494,9 @@ def build_loss_transform(
     temporal_stateful: bool = False,
     temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
+    lora_rank: int = 0,
+    lora_alpha: float = 1.0,
+    lora_scope: str = "processor_mlp",
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
         del is_training
@@ -502,6 +519,9 @@ def build_loss_transform(
             temporal_stateful=temporal_stateful,
             temporal_insert_count=temporal_insert_count,
             zero_init_temporal_out=zero_init_temporal_out,
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_scope=lora_scope,
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -528,6 +548,9 @@ def build_prediction_transform(
     temporal_stateful: bool = False,
     temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
+    lora_rank: int = 0,
+    lora_alpha: float = 1.0,
+    lora_scope: str = "processor_mlp",
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
         del is_training
@@ -550,6 +573,9 @@ def build_prediction_transform(
             temporal_stateful=temporal_stateful,
             temporal_insert_count=temporal_insert_count,
             zero_init_temporal_out=zero_init_temporal_out,
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_scope=lora_scope,
         )
         return predictor(inputs, targets, forcings)
 

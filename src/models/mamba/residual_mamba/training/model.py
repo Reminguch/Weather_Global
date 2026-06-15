@@ -28,6 +28,8 @@ from src.models.graphcast.training.core.model import (
     xarray_jax,
 )
 from src.models.graphcast.training.core.segments import (
+    AR_EVAL_LOSS_MODE,
+    AR_LOSS_MODE_TAIL_UNIFORM,
     _advance_autoregressive_inputs,
     _build_chunk_batches,
     _chunk_ar_truth_prefix,
@@ -35,6 +37,7 @@ from src.models.graphcast.training.core.segments import (
     _reset_temporal_state_lanes,
     _stop_gradient_dataset,
     build_full_segments,
+    include_bptt_loss_step,
     iter_eval_segment_chunks,
     segment_midpoint_times,
 )
@@ -222,6 +225,51 @@ def compute_residual_targets(targets: xr.Dataset, baseline_predictions: xr.Datas
     return targets - baseline_predictions
 
 
+def prepare_baseline_only_residual_targets(
+    baseline_predict_transform,
+    *,
+    baseline_params: hk.Params,
+    baseline_state: hk.State,
+    rng_key: jax.Array,
+    chunk_inputs: tuple[xr.Dataset, ...],
+    chunk_targets: tuple[xr.Dataset, ...],
+    chunk_forcings: tuple[xr.Dataset, ...],
+    truth_prefix_steps: int,
+) -> tuple[xr.Dataset, ...]:
+    """Build target-minus-baseline residual targets for baseline-feedback AR chunks.
+
+    This is intended to run in its own JIT, outside the residual model's
+    value-and-grad step, so the frozen baseline rollout is not part of BPTT.
+    """
+    current_rolling_inputs = chunk_inputs[0]
+    current_baseline_state = baseline_state
+    keys = jax.random.split(rng_key, len(chunk_inputs) * 2)
+    residual_targets: list[xr.Dataset] = []
+    for bptt_i in range(len(chunk_inputs)):
+        if bptt_i < truth_prefix_steps:
+            current_rolling_inputs = chunk_inputs[bptt_i]
+        baseline_preds, current_baseline_state = baseline_predict_transform.apply(
+            baseline_params,
+            current_baseline_state,
+            keys[2 * bptt_i],
+            current_rolling_inputs,
+            chunk_targets[bptt_i],
+            chunk_forcings[bptt_i],
+            False,
+        )
+        residual_targets.append(compute_residual_targets(chunk_targets[bptt_i], baseline_preds))
+        if bptt_i < len(chunk_inputs) - 1:
+            if bptt_i + 1 < truth_prefix_steps:
+                current_rolling_inputs = chunk_inputs[bptt_i + 1]
+            else:
+                current_rolling_inputs = _advance_autoregressive_inputs(
+                    current_rolling_inputs,
+                    baseline_preds,
+                    chunk_forcings[bptt_i],
+                )
+    return tuple(residual_targets)
+
+
 def reconstruct_full_predictions(
     baseline_predictions: xr.Dataset,
     residual_predictions: xr.Dataset,
@@ -401,6 +449,10 @@ def augment_run_config(
     residual_ar_feedback = validate_residual_ar_feedback(
         getattr(segment_cfg, "residual_ar_feedback", RESIDUAL_AR_FEEDBACK)
     )
+    baseline_outside_bptt = (
+        int(segment_cfg.base_cfg.target_steps) > 1
+        and residual_ar_feedback == RESIDUAL_AR_FEEDBACK_BASELINE
+    )
     payload["segment_training"] = {
         "len_segment": segment_cfg.len_segment,
         "bptt_steps": segment_cfg.bptt_steps,
@@ -415,15 +467,19 @@ def augment_run_config(
         "max_steps_unit": "optimizer_updates",
     }
     if segment_cfg.base_cfg.target_steps > 1:
+        loss_mode = getattr(segment_cfg, "autoregressive_loss_mode", AR_LOSS_MODE_TAIL_UNIFORM)
         payload["autoregressive_training"] = {
             "enabled": True,
             "mode": "chunk_local_corrected_ar_tail",
-            "loss_mode": "tail_uniform",
+            "loss_mode": loss_mode,
+            "eval_loss_mode": loss_mode,
             "target_steps": int(segment_cfg.base_cfg.target_steps),
             "truth_prefix_steps": int(truth_prefix_steps),
             "ar_tail_steps": int(segment_cfg.base_cfg.target_steps),
             "feedback_gradient": "full_bptt_chunk_detached",
             "physical_feedback": residual_ar_feedback,
+            "baseline_rollout_placement": "split_jit" if baseline_outside_bptt else "inline_train_chunk",
+            "baseline_outside_bptt": bool(baseline_outside_bptt),
             "state_carry_steps": "temporal_state_stop_gradient_chunks",
             "physical_state_carry": "truth_reset_each_chunk",
         }
@@ -435,6 +491,8 @@ def augment_run_config(
         "baseline_rollout_mode": (
             "chunk_local_corrected_ar_tail" if segment_cfg.base_cfg.target_steps > 1 else "per_window_one_step"
         ),
+        "baseline_rollout_placement": "split_jit" if baseline_outside_bptt else "inline_train_chunk",
+        "baseline_outside_bptt": bool(baseline_outside_bptt),
         "autoregressive_feedback": (
             "baseline" if residual_ar_feedback == RESIDUAL_AR_FEEDBACK_BASELINE else "baseline_plus_predicted_residual"
         ),
@@ -488,9 +546,11 @@ def run_residual_eval(
     subset_role: str = "fixed_checkpoint",
     subset_fold: int | None = None,
     residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK,
+    rolling_loss_mode: str = AR_EVAL_LOSS_MODE,
 ) -> dict[str, float]:
     residual_ar_feedback = validate_residual_ar_feedback(residual_ar_feedback)
     rolling_ar = target_steps > 1
+    split_baseline_outside_bptt = rolling_ar and residual_ar_feedback == RESIDUAL_AR_FEEDBACK_BASELINE
     target_load_steps = 1 if rolling_ar else target_steps
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
@@ -520,6 +580,7 @@ def run_residual_eval(
     residual_state_by_batch_size: dict[int, hk.State] = {}
     baseline_state_by_batch_size: dict[int, hk.State] = {}
     residual_inputs_by_batch_size: dict[int, xr.Dataset] = {}
+    baseline_target_fn_by_batch_size: dict[int, callable] = {}
     eval_fn_by_batch_size: dict[int, callable] = {}
     total_weighted_loss = 0.0
     total_windows = 0
@@ -577,7 +638,81 @@ def run_residual_eval(
             residual_eval_state = residual_state_by_batch_size[batch_size]
             baseline_eval_state = baseline_state_by_batch_size[batch_size]
 
-            if rolling_ar:
+            if rolling_ar and split_baseline_outside_bptt:
+                @jax.jit
+                def prepare_eval_residual_targets(
+                    baseline_params,
+                    eval_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                ):
+                    return prepare_baseline_only_residual_targets(
+                        baseline_predict_transform,
+                        baseline_params=baseline_params,
+                        baseline_state=baseline_eval_state,
+                        rng_key=eval_key,
+                        chunk_inputs=chunk_inputs,
+                        chunk_targets=chunk_targets,
+                        chunk_forcings=chunk_forcings,
+                        truth_prefix_steps=truth_prefix_steps,
+                    )
+
+                @jax.jit
+                def eval_chunk(
+                    params,
+                    residual_state,
+                    eval_key,
+                    residual_targets,
+                    chunk_forcings,
+                    residual_inputs,
+                    reset_mask,
+                ):
+                    current_state = _reset_temporal_state_lanes(residual_state, reset_mask)
+                    current_residual_inputs = reset_residual_input_lanes(
+                        residual_inputs,
+                        residual_targets[0],
+                        jnp.ones_like(reset_mask, dtype=bool),
+                    )
+                    weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                    valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                    eval_keys = jax.random.split(eval_key, len(residual_targets) * 2)
+                    for bptt_i in range(len(residual_targets)):
+                        (loss_and_diag, residual_preds), current_state = residual_eval_transform.apply(
+                            params,
+                            current_state,
+                            eval_keys[2 * bptt_i + 1],
+                            current_residual_inputs,
+                            residual_targets[bptt_i],
+                            chunk_forcings[bptt_i],
+                            False,
+                        )
+                        if include_bptt_loss_step(
+                            rolling_loss_mode,
+                            bptt_i,
+                            truth_prefix_steps,
+                        ):
+                            loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                            weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                            valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                        if bptt_i < len(residual_targets) - 1:
+                            residual_feedback = (
+                                residual_targets[bptt_i]
+                                if bptt_i < truth_prefix_steps
+                                else residual_preds
+                            )
+                            current_residual_inputs = advance_residual_inputs(
+                                current_residual_inputs,
+                                residual_feedback,
+                            )
+                    return (
+                        current_state,
+                        weighted_loss_sum,
+                        valid_count,
+                    )
+
+                baseline_target_fn_by_batch_size[batch_size] = prepare_eval_residual_targets
+            elif rolling_ar:
                 @jax.jit
                 def eval_chunk(
                     params,
@@ -625,7 +760,11 @@ def run_residual_eval(
                             chunk_forcings[bptt_i],
                             False,
                         )
-                        if bptt_i >= truth_prefix_steps:
+                        if include_bptt_loss_step(
+                            rolling_loss_mode,
+                            bptt_i,
+                            truth_prefix_steps,
+                        ):
                             loss_by_lane = _loss_by_lane(loss_and_diag[0])
                             weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
                             valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
@@ -708,22 +847,46 @@ def run_residual_eval(
 
         rng, base_key, eval_key = jax.random.split(rng, 3)
         if rolling_ar:
-            (
-                next_state,
-                chunk_loss_sum,
-                chunk_valid_count,
-            ) = eval_fn_by_batch_size[batch_size](
-                params,
-                baseline_params,
-                residual_state_by_batch_size[batch_size],
-                base_key,
-                eval_key,
-                chunk_inputs,
-                chunk_targets,
-                chunk_forcings,
-                residual_inputs_by_batch_size[batch_size],
-                jnp.asarray(reset_mask_np),
-            )
+            if split_baseline_outside_bptt:
+                residual_targets = baseline_target_fn_by_batch_size[batch_size](
+                    baseline_params,
+                    eval_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                )
+                chunk_inputs = ()
+                chunk_targets = ()
+                (
+                    next_state,
+                    chunk_loss_sum,
+                    chunk_valid_count,
+                ) = eval_fn_by_batch_size[batch_size](
+                    params,
+                    residual_state_by_batch_size[batch_size],
+                    eval_key,
+                    residual_targets,
+                    chunk_forcings,
+                    residual_inputs_by_batch_size[batch_size],
+                    jnp.asarray(reset_mask_np),
+                )
+            else:
+                (
+                    next_state,
+                    chunk_loss_sum,
+                    chunk_valid_count,
+                ) = eval_fn_by_batch_size[batch_size](
+                    params,
+                    baseline_params,
+                    residual_state_by_batch_size[batch_size],
+                    base_key,
+                    eval_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    residual_inputs_by_batch_size[batch_size],
+                    jnp.asarray(reset_mask_np),
+                )
             residual_state_by_batch_size[batch_size] = next_state
         else:
             next_state, next_residual_inputs, chunk_loss_sum, chunk_valid_count = eval_fn_by_batch_size[batch_size](

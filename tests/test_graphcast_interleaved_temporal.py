@@ -17,13 +17,126 @@ if str(ROOT) not in sys.path:
 if str(GRAPHCAST_LOCAL) not in sys.path:
     sys.path.insert(0, str(GRAPHCAST_LOCAL))
 
+from graphcast import deep_typed_graph_net as dtgn  # noqa: E402
 from graphcast import graphcast as gc  # noqa: E402
+from graphcast import typed_graph  # noqa: E402
 
 
 def test_temporal_processor_group_sizes_for_mp6_sweep() -> None:
     assert gc._temporal_processor_group_sizes(6, 2) == [3, 3]
     assert gc._temporal_processor_group_sizes(6, 3) == [2, 2, 2]
     assert gc._temporal_processor_group_sizes(6, 6) == [1, 1, 1, 1, 1, 1]
+
+
+def test_lora_mlp_preserves_base_linear_paths_and_starts_as_noop() -> None:
+    output_sizes = [4, 3]
+
+    def lora_forward(x):
+        mlp = dtgn._LoRAMLP(
+            output_sizes=output_sizes,
+            activation=jax.nn.swish,
+            lora_rank=2,
+            lora_alpha=2,
+            name="processor_nodes_0_mesh_nodes_mlp",
+        )
+        return mlp(x)
+
+    def base_forward(x):
+        mlp = hk.nets.MLP(
+            output_sizes=output_sizes,
+            activation=jax.nn.swish,
+            name="processor_nodes_0_mesh_nodes_mlp",
+        )
+        return mlp(x)
+
+    lora_transformed = hk.transform(lora_forward)
+    base_transformed = hk.transform(base_forward)
+    rng = jax.random.PRNGKey(0)
+    x = jnp.ones((2, 5), dtype=jnp.float32)
+
+    params = lora_transformed.init(rng, x)
+    flat = hk.data_structures.to_mutable_dict(params)
+
+    assert "processor_nodes_0_mesh_nodes_mlp/~/linear_0" in flat
+    assert "processor_nodes_0_mesh_nodes_mlp/~/linear_1" in flat
+    assert "processor_nodes_0_mesh_nodes_mlp/~/linear_0_lora" in flat
+    assert "processor_nodes_0_mesh_nodes_mlp/~/linear_1_lora" in flat
+    np.testing.assert_allclose(
+        np.asarray(flat["processor_nodes_0_mesh_nodes_mlp/~/linear_0_lora"]["b"]),
+        np.zeros((2, 4), dtype=np.float32),
+    )
+
+    lora_y = lora_transformed.apply(params, rng, x)
+    base_y = base_transformed.apply(params, rng, x)
+    np.testing.assert_allclose(np.asarray(lora_y), np.asarray(base_y), rtol=1e-6, atol=1e-6)
+
+
+def test_processor_lora_only_adds_processor_mlp_params_and_is_disabled_by_default() -> None:
+    graph = typed_graph.TypedGraph(
+        context=typed_graph.Context(n_graph=jnp.asarray([1]), features=()),
+        nodes={
+            "mesh_nodes": typed_graph.NodeSet(
+                n_node=jnp.asarray([2]),
+                features=jnp.ones((2, 3), dtype=jnp.float32),
+            )
+        },
+        edges={
+            typed_graph.EdgeSetKey("mesh_edges", ("mesh_nodes", "mesh_nodes")): typed_graph.EdgeSet(
+                n_edge=jnp.asarray([2]),
+                indices=typed_graph.EdgesIndices(
+                    senders=jnp.asarray([0, 1]),
+                    receivers=jnp.asarray([1, 0]),
+                ),
+                features=jnp.ones((2, 2), dtype=jnp.float32),
+            )
+        },
+    )
+
+    def forward(lora_rank: int):
+        net = dtgn.DeepTypedGraphNet(
+            node_latent_size={"mesh_nodes": 4},
+            edge_latent_size={"mesh_edges": 4},
+            node_output_size={"mesh_nodes": 2},
+            mlp_hidden_size=4,
+            mlp_num_hidden_layers=1,
+            num_message_passing_steps=1,
+            use_layer_norm=False,
+            activation="swish",
+            lora_rank=lora_rank,
+            lora_alpha=4,
+            lora_scope=dtgn.LORA_SCOPE_PROCESSOR_MLP,
+            name="mesh_gnn",
+        )
+        return net(graph).nodes["mesh_nodes"].features
+
+    transformed = hk.transform(forward)
+    rng = jax.random.PRNGKey(0)
+
+    disabled_params = transformed.init(rng, 0)
+    disabled_flat = hk.data_structures.to_mutable_dict(disabled_params)
+    assert not any("_lora" in name for name in disabled_flat)
+
+    lora_params = transformed.init(rng, 4)
+    lora_flat = hk.data_structures.to_mutable_dict(lora_params)
+    lora_names = {name for name in lora_flat if "_lora" in name}
+    assert lora_names
+    assert all("/processor_" in name for name in lora_names)
+    assert all(name.endswith("_lora") for name in lora_names)
+    assert any("/processor_edges_0_mesh_edges_mlp/~/linear_0_lora" in name for name in lora_names)
+    assert any("/processor_nodes_0_mesh_nodes_mlp/~/linear_1_lora" in name for name in lora_names)
+    assert not any("/encoder_" in name or "/decoder_" in name for name in lora_names)
+
+    for name in lora_names:
+        np.testing.assert_allclose(np.asarray(lora_flat[name]["b"]), np.zeros_like(lora_flat[name]["b"]))
+
+    lora_y = transformed.apply(lora_params, rng, 4)
+    disabled_y_with_lora_params = transformed.apply(lora_params, rng, 0)
+    np.testing.assert_allclose(
+        np.asarray(lora_y),
+        np.asarray(disabled_y_with_lora_params),
+        rtol=1e-6,
+        atol=1e-6,
+    )
 
 
 def test_mamba_call_uses_vanilla_stacked_input_encoder() -> None:

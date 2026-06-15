@@ -26,6 +26,7 @@ MODEL_NAME = "gc_mamba"
 def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
     del model_cfg
     temporal_cfg = run_cfg.get("temporal_config", {})
+    lora_cfg = run_cfg.get("lora_config", {})
     temporal_backbone = temporal_cfg.get("backbone", "none")
     temporal_d_inner = temporal_cfg.get("d_inner", None)
     if temporal_backbone == "mamba" and temporal_d_inner is None:
@@ -47,6 +48,9 @@ def _temporal_kwargs(model_cfg, run_cfg: dict) -> dict:
         "temporal_stateful": bool(temporal_cfg.get("stateful", False)),
         "temporal_insert_count": temporal_cfg.get("insert_count", None),
         "zero_init_temporal_out": bool(temporal_cfg.get("zero_init_output", False)),
+        "lora_rank": int(lora_cfg.get("rank", 0) or 0),
+        "lora_alpha": float(lora_cfg.get("alpha", 1.0)),
+        "lora_scope": lora_cfg.get("scope", "processor_mlp"),
     }
 
 
@@ -65,6 +69,11 @@ def _apply_temporal_config(predictor: gc.GraphCast, temporal_kwargs: dict) -> gc
         predictor._temporal_stateful = temporal_kwargs["temporal_stateful"]
         predictor._temporal_insert_count = temporal_kwargs["temporal_insert_count"]
         predictor._temporal_zero_init_out = temporal_kwargs["zero_init_temporal_out"]
+    if hasattr(predictor, "_lora_rank"):
+        lora_rank = int(temporal_kwargs.get("lora_rank", 0))
+        predictor._lora_rank = lora_rank
+        predictor._lora_alpha = float(temporal_kwargs.get("lora_alpha", 1.0))
+        predictor._lora_scope = temporal_kwargs.get("lora_scope", "processor_mlp") if lora_rank > 0 else "none"
     return predictor
 
 

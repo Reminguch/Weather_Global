@@ -173,6 +173,9 @@ def main() -> None:
             temporal_stateful=cfg.temporal_stateful,
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
+            lora_rank=cfg.lora_rank,
+            lora_alpha=cfg.lora_alpha,
+            lora_scope=cfg.lora_scope,
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -196,6 +199,9 @@ def main() -> None:
         temporal_stateful=cfg.temporal_stateful,
         temporal_insert_count=cfg.temporal_insert_count,
         zero_init_temporal_out=cfg.zero_init_temporal_out,
+        lora_rank=cfg.lora_rank,
+        lora_alpha=cfg.lora_alpha,
+        lora_scope=cfg.lora_scope,
     )
     rng = jax.random.PRNGKey(cfg.seed)
 

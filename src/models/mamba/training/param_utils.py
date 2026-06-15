@@ -18,14 +18,41 @@ def is_temporal_param(module_name: str, param_name: str) -> bool:
     return "temporal" in path or "mamba" in path
 
 
+def is_lora_param(module_name: str, param_name: str) -> bool:
+    path = f"{module_name}/{param_name}".lower()
+    return "_lora/" in path or path.endswith("_lora/a") or path.endswith("_lora/b")
+
+
 def trainable_label(module_name: str, param_name: str, trainable_part: str) -> str:
     if trainable_part == "all":
         return "train"
     is_temporal = is_temporal_param(module_name, param_name)
+    is_lora = is_lora_param(module_name, param_name)
     if trainable_part == "mamba":
         return "train" if is_temporal else "freeze"
+    if trainable_part == "mamba_lora":
+        return "train" if (is_temporal or is_lora) else "freeze"
     if trainable_part == "graphcast":
-        return "freeze" if is_temporal else "train"
+        return "freeze" if (is_temporal or is_lora) else "train"
+    raise ValueError(f"Unsupported trainable_part={trainable_part!r}")
+
+
+def optimizer_group_label(module_name: str, param_name: str, trainable_part: str) -> str:
+    """Label leaves for optimizer groups: graphcast, mamba, lora, or freeze."""
+    is_temporal = is_temporal_param(module_name, param_name)
+    is_lora = is_lora_param(module_name, param_name)
+    if trainable_part == "all":
+        if is_lora:
+            return "lora"
+        return "mamba" if is_temporal else "graphcast"
+    if trainable_part == "mamba":
+        return "mamba" if is_temporal else "freeze"
+    if trainable_part == "mamba_lora":
+        if is_lora:
+            return "lora"
+        return "mamba" if is_temporal else "freeze"
+    if trainable_part == "graphcast":
+        return "freeze" if (is_temporal or is_lora) else "graphcast"
     raise ValueError(f"Unsupported trainable_part={trainable_part!r}")
 
 
@@ -33,6 +60,16 @@ def build_trainable_labels(params: Mapping[str, Mapping[str, Any]], trainable_pa
     return {
         module_name: {
             param_name: trainable_label(module_name, param_name, trainable_part)
+            for param_name in module_params
+        }
+        for module_name, module_params in params.items()
+    }
+
+
+def build_optimizer_group_labels(params: Mapping[str, Mapping[str, Any]], trainable_part: str) -> dict[str, dict[str, str]]:
+    return {
+        module_name: {
+            param_name: optimizer_group_label(module_name, param_name, trainable_part)
             for param_name in module_params
         }
         for module_name, module_params in params.items()

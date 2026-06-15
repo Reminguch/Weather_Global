@@ -15,6 +15,8 @@ if ROOT_STR not in sys.path:
     sys.path.insert(0, ROOT_STR)
 
 from scripts.analyze_models import unified_resolution_eval as ure
+from src.models.graphcast.runtime import infer_family
+from src.models.mamba.gc_mamba.runtime import _temporal_kwargs
 from scripts.analyze_models import plot_res1_bptt16_k_sweep_lead_curves as res1_plot
 from src.data_operations.staging.stage_wb2_graphcast37_window import PRESSURE_LEVELS_37
 from src.models.graphcast.evaluation.device_resolution_eval import build_metric_spec
@@ -130,6 +132,28 @@ def test_checkpoint_resolution_parser_accepts_deepmind_graphcast37_filename() ->
     )
 
     assert ure._parse_res_from_path(ckpt_path, {}) == 0.25
+
+
+def test_gc_mamba_lora_config_keeps_family_and_runtime_kwargs() -> None:
+    run_cfg = {
+        "temporal_config": {
+            "backbone": "mamba",
+            "d_inner": 128,
+        },
+        "lora_config": {
+            "enabled": True,
+            "rank": 4,
+            "alpha": 4,
+            "scope": "processor_mlp",
+        },
+    }
+
+    kwargs = _temporal_kwargs(None, run_cfg)
+
+    assert infer_family(run_cfg) == "gc_mamba"
+    assert kwargs["lora_rank"] == 4
+    assert kwargs["lora_alpha"] == 4
+    assert kwargs["lora_scope"] == "processor_mlp"
 
 
 def test_metric_variables_filter_rmse_rows_to_2m_temperature() -> None:

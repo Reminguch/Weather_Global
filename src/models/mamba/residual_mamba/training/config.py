@@ -28,6 +28,7 @@ class ResidualSegmentRunConfig:
     eval_subset_policy: str = "stratified_fixed"
     eval_rotating_diagnostics: bool = True
     residual_ar_feedback: str = RESIDUAL_AR_FEEDBACK
+    autoregressive_loss_mode: str = "tail_uniform"
 
 
 def _positive_int_or_all(value: str) -> int | None:
@@ -40,6 +41,11 @@ def _positive_int_or_all(value: str) -> int | None:
 
 
 def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
+    from src.models.graphcast.training.core.segments import (
+        AR_LOSS_MODE_CHOICES,
+        AR_LOSS_MODE_TAIL_UNIFORM,
+    )
+
     parser = argparse.ArgumentParser(
         description="Train GraphCast/Mamba on one-step residuals over shuffled chronological segments."
     )
@@ -87,6 +93,15 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
     parser.add_argument("--target-steps", type=int, default=1)
     parser.add_argument("--len-segment", type=int, default=30)
     parser.add_argument("--bptt-steps", type=int, default=6)
+    parser.add_argument(
+        "--autoregressive-loss-mode",
+        choices=AR_LOSS_MODE_CHOICES,
+        default=AR_LOSS_MODE_TAIL_UNIFORM,
+        help=(
+            "Training loss accumulation for target_steps > 1. "
+            "tail_uniform scores only AR-tail steps; all_bptt_uniform scores every BPTT step."
+        ),
+    )
     parser.add_argument("--chunk-load-workers", type=int, default=6)
     parser.add_argument("--temporal-backbone", choices=["none", "mamba"], default="none")
     parser.add_argument(
@@ -262,4 +277,5 @@ def parse_args(argv: list[str] | None = None) -> ResidualSegmentRunConfig:
         eval_subset_policy=args.eval_subset_policy,
         eval_rotating_diagnostics=args.eval_rotating_diagnostics,
         residual_ar_feedback=args.residual_ar_feedback,
+        autoregressive_loss_mode=args.autoregressive_loss_mode,
     )
