@@ -39,9 +39,11 @@ example: `sinfo -o "%P %G %f"`
 4.1 then use salloc to get a GPU node.
 example: salloc --nodes=1 --ntasks=1 --mem=32G --time=02:00:00 --gres=gpu:a100:1
 
+
 4.2 On the compute node: env + start Jupyter
 
 cd /scratch/gpfs/DABANIN/iv9432/Weather_global
+
 source scripts/graphcast_env.sh
 jupyter notebook --no-browser --port=8888 --ip=0.0.0.0
 
