@@ -1451,6 +1451,16 @@ def _checkpoint_family(ckpt_path: Path, run_cfg: dict) -> str:
     return "legacy_gc_mamba" if is_legacy_gc_mamba_checkpoint(ckpt_obj) else family
 
 
+def _variant_name_for_checkpoint(ckpt_path: Path) -> str:
+    if ckpt_path.name == "ckpt_best.npz":
+        return ckpt_path.parent.name
+    if ckpt_path.parent.name == "intermediate_checkpoints":
+        run_name = ckpt_path.parent.parent.name
+    else:
+        run_name = ckpt_path.parent.name
+    return f"{run_name}_{ckpt_path.stem}"
+
+
 def discover_model_entries(
     families: list[str],
     resolutions: list[float] | None = None,
@@ -1468,7 +1478,7 @@ def discover_model_entries(
             continue
         if resolutions is not None and not any(np.isclose(res, requested, atol=1e-6) for requested in resolutions):
             continue
-        run_name = ckpt_path.parent.name if ckpt_path.name == "ckpt_best.npz" else ckpt_path.stem
+        run_name = _variant_name_for_checkpoint(ckpt_path)
         di = _parse_di_from_name(run_name)
         entries.append(
             ModelEntry(

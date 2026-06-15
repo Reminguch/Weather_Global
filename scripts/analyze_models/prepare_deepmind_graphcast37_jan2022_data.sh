@@ -62,7 +62,7 @@ PREP_GRAPHCAST37=(
   --data-path "${GRAPHCAST37_DATA}"
   --ckpt-in "${GRAPHCAST37_PARAMS}"
   --out-root "${GRAPHCAST37_PREPARED_ROOT}"
-  --resolutions 0.25
+  --resolutions 0.25 1
   --time-start "${WINDOW_START}"
   --time-end "${WINDOW_END}"
 )

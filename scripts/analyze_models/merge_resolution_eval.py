@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge unified resolution-eval shards and render vs-res plots."""
+"""Merge unified resolution-eval shards and render default lead-curve plots."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ DI_DS_TOKEN_RE = re.compile(r"_di(?P<di>\d+)_ds(?P<ds>\d+)")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Merge unified resolution-eval shards and plot vs-res curves.")
+    parser = argparse.ArgumentParser(description="Merge unified resolution-eval shards and plot lead curves.")
     parser.add_argument("--input-data-dir", type=Path, required=True)
     parser.add_argument("--output-data-dir", type=Path, default=DEFAULT_OUTPUT_DATA_DIR)
     parser.add_argument("--output-image-dir", type=Path, default=DEFAULT_OUTPUT_IMAGE_DIR)
@@ -69,6 +69,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--baseline-eval-mode", type=str, default="cold")
     parser.add_argument("--baseline-res", type=float, default=1)
     parser.add_argument("--baseline-variant", type=str, default=None)
+    parser.add_argument(
+        "--plot-res-axis",
+        action="store_true",
+        help="Also render legacy resolution-axis plots. Defaults now use lead time on the x axis.",
+    )
     return parser.parse_args()
 
 
@@ -143,6 +148,14 @@ def _curve_style(curve_df: pd.DataFrame) -> dict[str, str]:
     if "_frozen50k" in variant:
         return {"color": "#1f77b4", "marker": marker, "linestyle": "-"}
     return {"marker": marker, "linestyle": "-"}
+
+
+def _curve_label_with_res(curve_df: pd.DataFrame) -> str:
+    label = _curve_label(curve_df)
+    res_values = sorted(pd.to_numeric(curve_df["res"], errors="coerce").dropna().unique().tolist())
+    if len(res_values) == 1:
+        label = f"{label} res{_format_resolution_value(float(res_values[0]))}"
+    return label
 
 
 def _matching_baseline_rows(
@@ -247,10 +260,107 @@ def plot_vs_res(
     return True
 
 
-def render_default_plots(
+def plot_vs_lead(
     df: pd.DataFrame,
     *,
     lead_steps: list[int],
+    metric_kind: str,
+    eval_mode: str,
+    variable: str | None,
+    out_path: Path,
+    title: str,
+    ylabel: str,
+    baseline_df: pd.DataFrame | None = None,
+    baseline_label: str = "Baseline",
+    baseline_eval_mode: str = "cold",
+    baseline_res: float = 1,
+    baseline_variant: str | None = None,
+) -> bool:
+    keep_steps = {int(step) for step in lead_steps}
+    sub = df[
+        (df["lead_steps"].astype(int).isin(keep_steps))
+        & (df["metric_kind"] == metric_kind)
+        & (df["eval_mode"] == eval_mode)
+    ]
+    if metric_kind in {"per_variable", "rmse_k"}:
+        sub = sub[sub["variable"] == (variable or "")]
+    else:
+        sub = sub[sub["variable"].fillna("") == ""]
+    if sub.empty:
+        return False
+
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    plotted = False
+    sub = sub.copy()
+    sub["model_key"] = sub["variant"].astype(str).map(_model_key)
+    for _, curve_df in sub.groupby(["family", "model_key", "res"], sort=True):
+        curve_df = curve_df.sort_values("lead_steps")
+        if curve_df["value"].notna().sum() == 0:
+            continue
+        ax.plot(
+            curve_df["lead_steps"].astype(int),
+            curve_df["value"].astype(float),
+            label=_curve_label_with_res(curve_df),
+            **_curve_style(curve_df),
+        )
+        plotted = True
+
+    if baseline_df is not None and not baseline_df.empty:
+        baseline_rows = baseline_df[
+            (baseline_df["lead_steps"].astype(int).isin(keep_steps))
+            & (baseline_df["metric_kind"] == metric_kind)
+            & (baseline_df["eval_mode"].astype(str) == baseline_eval_mode)
+            & (pd.to_numeric(baseline_df["res"], errors="coerce").sub(float(baseline_res)).abs() < 1e-6)
+        ].copy()
+        if baseline_variant:
+            baseline_rows = baseline_rows[baseline_rows["variant"].astype(str) == baseline_variant]
+        if metric_kind in {"per_variable", "rmse_k"}:
+            baseline_rows = baseline_rows[baseline_rows["variable"] == (variable or "")]
+        else:
+            baseline_rows = baseline_rows[baseline_rows["variable"].fillna("") == ""]
+        baseline_rows["model_key"] = baseline_rows["variant"].astype(str).map(_model_key)
+        for _, curve_df in baseline_rows.groupby(["variant", "res"], sort=True):
+            curve_df = curve_df.sort_values("lead_steps").dropna(subset=["value"])
+            if curve_df.empty:
+                continue
+            label = baseline_label
+            if baseline_variant is None:
+                label = f"{baseline_label}: {_model_key(str(curve_df['variant'].iloc[0]))}"
+            ax.plot(
+                curve_df["lead_steps"].astype(int),
+                curve_df["value"].astype(float),
+                color="#1f77b4",
+                linestyle=":",
+                linewidth=2.2,
+                marker="D",
+                markersize=4,
+                label=label,
+            )
+            plotted = True
+
+    if not plotted:
+        plt.close(fig)
+        return False
+
+    ax.set_xticks(lead_steps)
+    ax.set_xticklabels([_lead_label(step) for step in lead_steps])
+    ax.set_xlabel("Lead time")
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=160)
+    plt.close(fig)
+    print(f"Saved image: {out_path}")
+    return True
+
+
+def render_default_plots(
+    df: pd.DataFrame,
+    *,
+    lead_steps: list[int] | None = None,
+    lead_days: list[int] | None = None,
     image_dir: Path,
     plot_prefix: str,
     include_per_variable: bool = False,
@@ -261,9 +371,97 @@ def render_default_plots(
     baseline_eval_mode: str = "cold",
     baseline_res: float = 1,
     baseline_variant: str | None = None,
+    plot_res_axis: bool = False,
 ) -> None:
     image_dir.mkdir(parents=True, exist_ok=True)
     default_per_variable_plots = default_per_variable_plots or []
+    if lead_steps is None:
+        lead_steps = _lead_steps_from_days(lead_days or [1, 2, 4])
+    lead_steps = sorted({int(step) for step in lead_steps})
+    for eval_mode in sorted(df["eval_mode"].dropna().astype(str).unique().tolist()):
+        rmse_variables = sorted(
+            df[
+                (df["lead_steps"].astype(int).isin(lead_steps))
+                & (df["metric_kind"] == "rmse_k")
+                & (df["eval_mode"] == eval_mode)
+            ]["variable"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        for variable in [v for v in rmse_variables if v == default_rmse_variable]:
+            rmse_png = image_dir / (
+                f"{plot_prefix}_rmse_k_{_sanitize_filename_part(variable)}_vs_lead_{eval_mode}.png"
+            )
+            plot_vs_lead(
+                df,
+                lead_steps=lead_steps,
+                metric_kind="rmse_k",
+                eval_mode=eval_mode,
+                variable=variable,
+                out_path=rmse_png,
+                title=f"{variable} physical RMSE vs lead time | {eval_mode}",
+                ylabel=f"{variable} RMSE (K)" if variable in {"2m_temperature", "temperature"} else f"{variable} RMSE",
+                baseline_df=baseline_df,
+                baseline_label=baseline_label,
+                baseline_eval_mode=baseline_eval_mode,
+                baseline_res=baseline_res,
+                baseline_variant=baseline_variant,
+            )
+        weighted_png = image_dir / f"{plot_prefix}_weighted_allvars_vs_lead_{eval_mode}.png"
+        plot_vs_lead(
+            df,
+            lead_steps=lead_steps,
+            metric_kind="weighted_allvars",
+            eval_mode=eval_mode,
+            variable=None,
+            out_path=weighted_png,
+            title=f"Normalized weighted all-variable MSE vs lead time | {eval_mode}",
+            ylabel="Normalized weighted MSE",
+            baseline_df=baseline_df,
+            baseline_label=baseline_label,
+            baseline_eval_mode=baseline_eval_mode,
+            baseline_res=baseline_res,
+            baseline_variant=baseline_variant,
+        )
+        available_variables = sorted(
+            df[
+                (df["lead_steps"].astype(int).isin(lead_steps))
+                & (df["metric_kind"] == "per_variable")
+                & (df["eval_mode"] == eval_mode)
+            ]["variable"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        if include_per_variable:
+            variables = available_variables
+        else:
+            selected_variables = set(default_per_variable_plots)
+            variables = [variable for variable in available_variables if variable in selected_variables]
+        for variable in variables:
+            variable_png = image_dir / (
+                f"{plot_prefix}_per_variable_{_sanitize_filename_part(variable)}_vs_lead_{eval_mode}.png"
+            )
+            plot_vs_lead(
+                df,
+                lead_steps=lead_steps,
+                metric_kind="per_variable",
+                eval_mode=eval_mode,
+                variable=variable,
+                out_path=variable_png,
+                title=f"{variable} normalized MSE vs lead time | {eval_mode}",
+                ylabel=f"{variable} normalized MSE",
+                baseline_df=baseline_df,
+                baseline_label=baseline_label,
+                baseline_eval_mode=baseline_eval_mode,
+                baseline_res=baseline_res,
+                baseline_variant=baseline_variant,
+            )
+    if not plot_res_axis:
+        return
     for lead_step in lead_steps:
         lead_label = _lead_label(lead_step)
         for eval_mode in sorted(df["eval_mode"].dropna().astype(str).unique().tolist()):
@@ -313,41 +511,6 @@ def render_default_plots(
                 baseline_res=baseline_res,
                 baseline_variant=baseline_variant,
             )
-            available_variables = sorted(
-                df[
-                    (df["lead_steps"].astype(int) == int(lead_step))
-                    & (df["metric_kind"] == "per_variable")
-                    & (df["eval_mode"] == eval_mode)
-                ]["variable"]
-                .dropna()
-                .astype(str)
-                .unique()
-                .tolist()
-            )
-            if include_per_variable:
-                variables = available_variables
-            else:
-                selected_variables = set(default_per_variable_plots)
-                variables = [variable for variable in available_variables if variable in selected_variables]
-            for variable in variables:
-                variable_png = image_dir / (
-                    f"{plot_prefix}_per_variable_{_sanitize_filename_part(variable)}_vs_res_lead{lead_label}_{eval_mode}.png"
-                )
-                plot_vs_res(
-                    df,
-                    lead_step=lead_step,
-                    metric_kind="per_variable",
-                    eval_mode=eval_mode,
-                    variable=variable,
-                    out_path=variable_png,
-                    title=f"{variable} normalized MSE vs res | lead={lead_label} | {eval_mode}",
-                    ylabel=f"{variable} normalized MSE",
-                    baseline_df=baseline_df,
-                    baseline_label=baseline_label,
-                    baseline_eval_mode=baseline_eval_mode,
-                    baseline_res=baseline_res,
-                    baseline_variant=baseline_variant,
-                )
 
 
 def main() -> None:
@@ -401,6 +564,7 @@ def main() -> None:
         baseline_eval_mode=args.baseline_eval_mode,
         baseline_res=args.baseline_res,
         baseline_variant=args.baseline_variant,
+        plot_res_axis=args.plot_res_axis,
     )
 
 
