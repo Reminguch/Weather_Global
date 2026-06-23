@@ -336,6 +336,8 @@ def _write_run_config(
     lora_rank = int(getattr(cfg, "lora_rank", 0))
     lora_alpha = float(getattr(cfg, "lora_alpha", 1.0))
     lora_scope = getattr(cfg, "lora_scope", "processor_mlp")
+    processor_remat_group_size = getattr(cfg, "processor_remat_group_size", None)
+    use_processor_group_remat = memory_mode == "optimal" and processor_remat_group_size is not None
     builder_metadata = build_batch_builder_metadata(
         requested_batch_builder=cfg.batch_builder,
         effective_train_batch_builder=effective_train_batch_builder,
@@ -411,7 +413,10 @@ def _write_run_config(
                 memory_mode in ("conservative", "optimal")
                 and cfg.trainable_part in ("mamba", "mamba_lora")
             ),
-            "processor_step_remat": memory_mode == "optimal",
+            "processor_step_remat": memory_mode == "optimal" and not use_processor_group_remat,
+            "processor_group_remat_size": (
+                int(processor_remat_group_size) if use_processor_group_remat else None
+            ),
             "mesh2grid_remat": memory_mode == "optimal",
         },
         "temporal_config": {

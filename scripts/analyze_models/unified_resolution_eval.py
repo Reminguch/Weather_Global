@@ -1395,6 +1395,9 @@ def _parse_res_from_path(ckpt_path: Path, run_cfg: dict) -> float | None:
         match = re.search(r"resolution\s+(\d+(?:\.\d+)?)", candidate)
         if match:
             return float(match.group(1))
+    cfg_res = run_cfg.get("model_config", {}).get("resolution")
+    if cfg_res is not None:
+        return float(cfg_res)
     return None
 
 

@@ -296,6 +296,7 @@ class DeepTypedGraphNet(hk.Module):
     self._temporal_layers = temporal_layers
     self._temporal_dropout = temporal_dropout
     self._remat_processor_steps = remat_processor_steps
+    self._processor_remat_group_size = None
     self._lora_rank = int(lora_rank)
     self._lora_alpha = float(lora_alpha)
     self._lora_scope = lora_scope
@@ -512,15 +513,44 @@ class DeepTypedGraphNet(hk.Module):
     # with unshared weights, and repeat that `self._num_processor_repetitions`
     # times.
     latent_graph = latent_graph_0
+    processor_remat_group_size = getattr(
+        self, "_processor_remat_group_size", None)
+    use_group_remat = (
+        processor_remat_group_size is not None
+        and not (
+            self._temporal_backbone != "none"
+            and self._temporal_location == "mesh_processor_interleaved"
+        )
+    )
+
+    def run_processor_step(processor_network, graph):
+      def process_step(step_graph):
+        return self._process_step(processor_network, step_graph)
+      if getattr(self, "_remat_processor_steps", False):
+        process_step = hk.remat(process_step)
+      return process_step(graph)
+
+    def run_processor_group(group_processor_networks, graph):
+      def process_group(group_graph):
+        for group_processor_network in group_processor_networks:
+          group_graph = self._process_step(
+              group_processor_network, group_graph)
+        return group_graph
+      process_group = hk.remat(process_group)
+      return process_group(graph)
+
     for repetition_i in range(self._num_processor_repetitions):
-      for step_i, processor_network in enumerate(processor_networks):
-        def process_step(graph):
-          return self._process_step(processor_network, graph)
-        if getattr(self, "_remat_processor_steps", False):
-          process_step = hk.remat(process_step)
-        latent_graph = process_step(latent_graph)
-        latent_graph = self._maybe_temporal_process_step(
-            latent_graph, repetition_i=repetition_i, step_i=step_i)
+      if use_group_remat:
+        group_size = int(processor_remat_group_size)
+        for group_start in range(0, len(processor_networks), group_size):
+          latent_graph = run_processor_group(
+              processor_networks[group_start:group_start + group_size],
+              latent_graph)
+      else:
+        for step_i, processor_network in enumerate(processor_networks):
+          latent_graph = run_processor_step(processor_network, latent_graph)
+          latent_graph = self._maybe_temporal_process_step(
+              latent_graph, repetition_i=repetition_i, step_i=step_i)
 
     return latent_graph
 

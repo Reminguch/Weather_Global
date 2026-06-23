@@ -270,9 +270,12 @@ class _TinyGraph(NamedTuple):
 class _TinyMeshGNN:
     _num_processor_repetitions = 1
 
+    def __init__(self, num_processor_steps: int = 1):
+        self._num_processor_steps = num_processor_steps
+
     def _networks_builder(self, input_graph):
         del input_graph
-        return None, [None], None
+        return None, [None] * self._num_processor_steps, None
 
     def _embed(self, graph, embedder_network):
         del embedder_network
@@ -440,6 +443,58 @@ def test_interleaved_processor_remat_wiring(monkeypatch: pytest.MonkeyPatch) -> 
     assert remat_calls == 0
     run(True)
     assert remat_calls == 1
+
+
+def test_interleaved_processor_group_remat_wraps_groups_not_steps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remat_calls = 0
+
+    def fake_remat(fn):
+        nonlocal remat_calls
+        remat_calls += 1
+        return fn
+
+    class _NoopTemporalBlock:
+        def __init__(self, cfg, name=None):
+            del name
+            self.cfg = cfg
+
+        def __call__(self, node_features, **kwargs):
+            del kwargs
+            return node_features
+
+    monkeypatch.setattr(gc.hk, "remat", fake_remat)
+    monkeypatch.setattr(gc, "_get_temporal_block_cls", lambda _stateful: _NoopTemporalBlock)
+
+    graph = _TinyGraph(
+        nodes={"mesh_nodes": _NodeSet(features=jnp.zeros((5, 1), dtype=jnp.float32))},
+        edges={"mesh": _EdgeSet(features=jnp.zeros((4, 1), dtype=jnp.float32))},
+    )
+    predictor = object.__new__(gc.GraphCast)
+    predictor._mesh_graph_structure = graph
+    predictor._mesh_gnn = _TinyMeshGNN(num_processor_steps=10)
+    predictor._temporal_backbone = "none"
+    predictor._temporal_location = "mesh_processor_interleaved"
+    predictor._temporal_stateful = False
+    predictor._temporal_d_inner = None
+    predictor._temporal_d_state = 16
+    predictor._temporal_d_conv = 4
+    predictor._temporal_dt_rank = "auto"
+    predictor._temporal_bias = False
+    predictor._temporal_conv_bias = True
+    predictor._temporal_layers = 1
+    predictor._temporal_dropout = 0.0
+    predictor._temporal_zero_init_out = False
+    predictor._temporal_insert_count = 1
+    predictor._remat_processor_steps = True
+    predictor._processor_remat_group_size = 4
+
+    x = jnp.ones((5, 2, 8), dtype=jnp.float32)
+    out = gc.GraphCast._run_mesh_gnn_interleaved(predictor, x, is_training=True)
+
+    assert out.shape == x.shape
+    assert remat_calls == 3
 
 
 def test_mesh2grid_remat_wiring(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -245,11 +245,20 @@ def test_partitioned_gradients_only_include_trainable_tree() -> None:
         return jnp.sum(frozen_w * trainable_w)
 
     grads = jax.grad(loss_fn, argnums=0)(trainable, frozen)
+    frozen_alt = {
+        "graph_cast/encoder": {"w": jnp.full((2,), 5.0)},
+    }
+    grads_alt = jax.grad(loss_fn, argnums=0)(trainable, frozen_alt)
 
     assert set(grads) == {"graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"}
     np.testing.assert_allclose(
         grads["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"],
         np.full((2,), 3.0),
+    )
+    assert set(grads_alt) == {"graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"}
+    np.testing.assert_allclose(
+        grads_alt["graph_cast/mesh_interleaved_temporal_r0_s0/mamba_block_0/out_proj"]["w"],
+        np.full((2,), 5.0),
     )
 
 

@@ -28,7 +28,6 @@ a 2D mesh over latitudes and longitudes.
 from typing import Any, Callable, Mapping, Optional
 
 import chex
-import haiku as hk
 from graphcast import deep_typed_graph_net
 from graphcast import grid_mesh_connectivity
 from graphcast import icosahedral_mesh
@@ -58,16 +57,6 @@ from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
 
 def _get_temporal_block_cls(stateful: bool):
     return _StatefulTemporalBlock if stateful else _StatelessTemporalBlock
-
-def _temporal_processor_group_sizes(num_processor_steps: int, insert_count: int) -> list[int]:
-    if insert_count <= 0:
-      raise ValueError("temporal insert count must be > 0")
-    if insert_count > num_processor_steps:
-      raise ValueError("temporal insert count must be <= processor steps")
-    base = num_processor_steps // insert_count
-    remainder = num_processor_steps % insert_count
-    return [base + (1 if group_i < remainder else 0)
-            for group_i in range(insert_count)]
 
 Kwargs = Mapping[str, Any]
 
@@ -281,15 +270,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_layers = 1
     self._temporal_dropout = 0.0
     self._temporal_stateful = False
-    self._temporal_insert_count = None
     self._temporal_zero_init_out = False
-    self._residual_output_head_enabled = False
-    self._remat_processor_steps = False
-    self._remat_mesh2grid = False
-    self._processor_remat_group_size = None
-    self._lora_rank = 0
-    self._lora_alpha = 1.0
-    self._lora_scope = "none"
 
     self._spatial_features_kwargs = dict(
         add_node_positions=False,
@@ -348,9 +329,6 @@ class GraphCast(predictor_base.Predictor):
         temporal_conv_bias=self._temporal_conv_bias,
         temporal_layers=self._temporal_layers,
         temporal_dropout=self._temporal_dropout,
-        lora_rank=self._lora_rank,
-        lora_alpha=self._lora_alpha,
-        lora_scope=self._lora_scope,
         name="mesh_gnn",
     )
 
@@ -446,13 +424,6 @@ class GraphCast(predictor_base.Predictor):
     # [num_grid_nodes, batch, output_size]
     output_grid_nodes = self._run_mesh2grid_gnn(
         updated_latent_mesh_nodes, latent_grid_nodes)
-    if getattr(self, "_residual_output_head_enabled", False):
-      output_grid_nodes = hk.Linear(
-          output_grid_nodes.shape[-1],
-          w_init=hk.initializers.Constant(0.0),
-          b_init=hk.initializers.Constant(0.0),
-          name="residual_output_head")(
-              output_grid_nodes).astype(output_grid_nodes.dtype)
 
     # Conver output flat vectors for the grid nodes to the format of the output.
     # [num_grid_nodes, batch, output_size] ->
@@ -784,17 +755,7 @@ class GraphCast(predictor_base.Predictor):
         edges={mesh_edges_key: new_edges}, nodes={"mesh_nodes": nodes})
 
     # Run the GNN.
-    self._sync_mesh_gnn_runtime_options()
     return self._mesh_gnn(input_graph).nodes["mesh_nodes"].features
-
-  def _sync_mesh_gnn_runtime_options(self) -> None:
-    self._mesh_gnn._remat_processor_steps = getattr(
-        self, "_remat_processor_steps", False)
-    self._mesh_gnn._processor_remat_group_size = getattr(
-        self, "_processor_remat_group_size", None)
-    self._mesh_gnn._lora_rank = int(getattr(self, "_lora_rank", 0))
-    self._mesh_gnn._lora_alpha = float(getattr(self, "_lora_alpha", 1.0))
-    self._mesh_gnn._lora_scope = getattr(self, "_lora_scope", "none")
 
   def _run_mesh_gnn_interleaved(
       self,
@@ -823,14 +784,16 @@ class GraphCast(predictor_base.Predictor):
               features=node_features)})
 
     input_graph = build_graph(latent_mesh_nodes)
-    self._sync_mesh_gnn_runtime_options()
     embedder_network, processor_networks, _ = self._mesh_gnn._networks_builder(
         input_graph)
 
     latent_graph = self._mesh_gnn._embed(
         build_graph(latent_mesh_nodes), embedder_network)
 
-    def run_temporal_block(latent_graph, repetition_i: int, block_i: int):
+    for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
+      for step_i, processor_network in enumerate(processor_networks):
+        latent_graph = self._mesh_gnn._process_step(
+            processor_network, latent_graph)
         node_features = latent_graph.nodes["mesh_nodes"].features
         expected_prefix = (n_mesh, batch_size)
         if node_features.shape[:2] != expected_prefix:
@@ -838,7 +801,7 @@ class GraphCast(predictor_base.Predictor):
               "Unexpected interleaved mesh node shape before temporal "
               f"block: expected prefix {expected_prefix}, got "
               f"{node_features.shape}.")
-        temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{block_i}"
+        temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}"
         temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
@@ -881,55 +844,6 @@ class GraphCast(predictor_base.Predictor):
         latent_graph = latent_graph._replace(
             nodes={"mesh_nodes": latent_graph.nodes["mesh_nodes"]._replace(
                 features=node_features)})
-        return latent_graph
-
-    def run_processor_step(processor_network, latent_graph):
-      def process_step(graph):
-        return self._mesh_gnn._process_step(processor_network, graph)
-      if getattr(self, "_remat_processor_steps", False):
-        process_step = hk.remat(process_step)
-      return process_step(latent_graph)
-
-    def run_processor_group(group_processor_networks, latent_graph):
-      def process_group(graph):
-        for group_processor_network in group_processor_networks:
-          graph = self._mesh_gnn._process_step(group_processor_network, graph)
-        return graph
-      process_group = hk.remat(process_group)
-      return process_group(latent_graph)
-
-    processor_remat_group_size = getattr(
-        self, "_processor_remat_group_size", None)
-
-    def run_processor_sequence(sequence_processor_networks, latent_graph):
-      if processor_remat_group_size is None:
-        for sequence_processor_network in sequence_processor_networks:
-          latent_graph = run_processor_step(
-              sequence_processor_network, latent_graph)
-        return latent_graph
-      group_size = int(processor_remat_group_size)
-      for group_start in range(0, len(sequence_processor_networks), group_size):
-        latent_graph = run_processor_group(
-            sequence_processor_networks[
-                group_start:group_start + group_size], latent_graph)
-      return latent_graph
-
-    insert_count = getattr(self, "_temporal_insert_count", None)
-    if insert_count is None:
-      for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
-        for step_i, processor_network in enumerate(processor_networks):
-          latent_graph = run_processor_sequence([processor_network], latent_graph)
-          latent_graph = run_temporal_block(latent_graph, repetition_i, step_i)
-    else:
-      group_sizes = _temporal_processor_group_sizes(
-          len(processor_networks), int(insert_count))
-      for repetition_i in range(self._mesh_gnn._num_processor_repetitions):
-        step_i = 0
-        for block_i, group_size in enumerate(group_sizes):
-          latent_graph = run_temporal_block(latent_graph, repetition_i, block_i)
-          latent_graph = run_processor_sequence(
-              processor_networks[step_i:step_i + group_size], latent_graph)
-          step_i += group_size
 
     return latent_graph.nodes["mesh_nodes"].features
 
@@ -1016,11 +930,7 @@ class GraphCast(predictor_base.Predictor):
         })
 
     # Run the GNN.
-    def run_mesh2grid(graph):
-      return self._mesh2grid_gnn(graph)
-    if getattr(self, "_remat_mesh2grid", False):
-      run_mesh2grid = hk.remat(run_mesh2grid)
-    output_graph = run_mesh2grid(input_graph)
+    output_graph = self._mesh2grid_gnn(input_graph)
     output_grid_nodes = output_graph.nodes["grid_nodes"].features
 
     return output_grid_nodes

@@ -74,6 +74,7 @@ TEMPORAL_LAYERS=${TEMPORAL_LAYERS:-2}
 D_INNER=${D_INNER:-128}
 D_STATE=${D_STATE:-16}
 MEMORY_MODE=${MEMORY_MODE:-optimal}
+PROCESSOR_REMAT_GROUP_SIZE=${PROCESSOR_REMAT_GROUP_SIZE:-4}
 AR_LOSS_MODE=${AR_LOSS_MODE:-all_bptt_uniform}
 AR_GRADIENT_ALIGNMENT_DIAGNOSTICS=${AR_GRADIENT_ALIGNMENT_DIAGNOSTICS:-0}
 AR_GRADIENT_ALIGNMENT_EVERY=${AR_GRADIENT_ALIGNMENT_EVERY:-2000}
@@ -98,6 +99,7 @@ echo "Run directory: ${OUT_DIR}/${RUN_NAME}"
 echo "Checkpoint in: ${CKPT_IN}"
 echo "LRs: lr=${LR} mamba_lr=${MAMBA_LR} lora_lr=${LORA_LR}"
 echo "AdamW: weight_decay=${WEIGHT_DECAY} beta1=${ADAMW_BETA1} beta2=${ADAMW_BETA2} max_grad_norm=${MAX_GRAD_NORM}"
+echo "Memory: mode=${MEMORY_MODE} processor_remat_group_size=${PROCESSOR_REMAT_GROUP_SIZE:-none}"
 echo "AR loss: ${AR_LOSS_MODE}; gradient diagnostics=${AR_GRADIENT_ALIGNMENT_DIAGNOSTICS} every=${AR_GRADIENT_ALIGNMENT_EVERY} chunks=${AR_GRADIENT_ALIGNMENT_NUM_CHUNKS}"
 
 CMD=(
@@ -159,6 +161,10 @@ CMD=(
   --lora-scope "${LORA_SCOPE}"
   --zero-init-temporal-out
 )
+
+if [[ -n "${PROCESSOR_REMAT_GROUP_SIZE}" ]]; then
+  CMD+=(--processor-remat-group-size "${PROCESSOR_REMAT_GROUP_SIZE}")
+fi
 
 if [[ "${AR_GRADIENT_ALIGNMENT_DIAGNOSTICS}" == "1" ]]; then
   CMD+=(

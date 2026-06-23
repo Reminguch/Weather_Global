@@ -338,6 +338,15 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
             "plus mesh2grid."
         ),
     )
+    parser.add_argument(
+        "--processor-remat-group-size",
+        type=int,
+        default=None,
+        help=(
+            "When --memory-mode=optimal, rematerialize contiguous mesh processor "
+            "groups of this size instead of rematerializing every processor step."
+        ),
+    )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
     parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default=None)
@@ -415,6 +424,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--lora-alpha must be > 0")
     if args.trainable_part == "mamba_lora" and args.lora_rank <= 0:
         raise ValueError("--trainable-part=mamba_lora requires --lora-rank > 0")
+    if args.processor_remat_group_size is not None and args.processor_remat_group_size <= 0:
+        raise ValueError("--processor-remat-group-size must be > 0")
     if args.data_cache_max_gib <= 0:
         raise ValueError("--data-cache-max-gib must be > 0")
     if args.resume_step is not None and args.init_from_graphcast_ckpt is not None:
@@ -483,6 +494,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         trainable_part=args.trainable_part,
         zero_init_temporal_out=args.zero_init_temporal_out or args.temporal_backbone == "mamba",
         memory_mode=args.memory_mode,
+        processor_remat_group_size=args.processor_remat_group_size,
         lora_rank=args.lora_rank,
         lora_alpha=args.lora_alpha,
         lora_scope=args.lora_scope,
@@ -733,6 +745,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             zero_init_temporal_out=cfg.zero_init_temporal_out,
             autoregressive_loss_mode="none",
             memory_mode=training_memory_mode,
+            processor_remat_group_size=cfg.processor_remat_group_size,
             lora_rank=cfg.lora_rank,
             lora_alpha=cfg.lora_alpha,
             lora_scope=cfg.lora_scope,
@@ -787,11 +800,17 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             f"frozen_leaves={frozen_leaves})."
         )
 
-    def full_params_for(current_params: hk.Params) -> hk.Params:
+    frozen_params_for_jit = frozen_params if frozen_params is not None else {}
+
+    def full_params_for(
+        current_params: hk.Params,
+        frozen_params_arg: hk.Params | None = None,
+    ) -> hk.Params:
         if not use_trainable_param_partition:
             return current_params
-        assert frozen_params is not None
-        return merge_param_partitions(current_params, frozen_params)
+        frozen_source = frozen_params if frozen_params_arg is None else frozen_params_arg
+        assert frozen_source is not None
+        return merge_param_partitions(current_params, frozen_source)
 
     def adamw_transform(learning_rate: float) -> optax.GradientTransformation:
         tx = optax.adamw(
@@ -885,6 +904,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     @functools.partial(jax.jit)
     def train_chunk(
         params: hk.Params,
+        frozen_params_arg: hk.Params,
         state: hk.State,
         opt_state: optax.OptState,
         rng_key: jax.Array,
@@ -895,7 +915,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     ):
         state = _reset_temporal_state_lanes(state, reset_mask)
 
-        def loss_fn(p, s, key):
+        def loss_fn(p, frozen_p, s, key):
             current_state = s
             current_inputs = chunk_inputs[0]
             weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
@@ -905,7 +925,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 if bptt_i < truth_prefix_steps:
                     current_inputs = chunk_inputs[bptt_i]
                 (loss_and_diag, predictions), current_state = transformed.apply(
-                    full_params_for(p),
+                    full_params_for(p, frozen_p),
                     current_state,
                     keys[bptt_i],
                     current_inputs,
@@ -936,7 +956,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         (loss, new_state), grads = jax.value_and_grad(
             loss_fn,
             has_aux=True,
-        )(params, state, rng_key)
+            argnums=0,
+        )(params, frozen_params_arg, state, rng_key)
         updates, new_opt_state = opt.update(grads, opt_state, params)
         new_params = optax.apply_updates(params, updates)
         return (
@@ -967,6 +988,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     @functools.partial(jax.jit)
     def ar_alignment_group_grad(
         params: hk.Params,
+        frozen_params_arg: hk.Params,
         state: hk.State,
         rng_key: jax.Array,
         chunk_inputs: tuple[xr.Dataset, ...],
@@ -977,7 +999,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     ):
         state = _reset_temporal_state_lanes(state, reset_mask)
 
-        def loss_fn(p, s, key):
+        def loss_fn(p, frozen_p, s, key):
             current_state = s
             current_inputs = chunk_inputs[0]
             weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
@@ -987,7 +1009,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 if bptt_i < truth_prefix_steps:
                     current_inputs = chunk_inputs[bptt_i]
                 (loss_and_diag, predictions), current_state = transformed.apply(
-                    full_params_for(p),
+                    full_params_for(p, frozen_p),
                     current_state,
                     keys[bptt_i],
                     current_inputs,
@@ -1013,7 +1035,12 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                         )
             return weighted_loss_sum / jnp.maximum(valid_count, 1.0)
 
-        loss, grads = jax.value_and_grad(loss_fn)(params, state, rng_key)
+        loss, grads = jax.value_and_grad(loss_fn, argnums=0)(
+            params,
+            frozen_params_arg,
+            state,
+            rng_key,
+        )
         return loss, grads
 
     def _label_lr(label: str | None) -> float:
@@ -1279,6 +1306,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 for name, loss_mask in ar_alignment_masks.items():
                     loss_value, grads = ar_alignment_group_grad(
                         params_value,
+                        frozen_params_for_jit,
                         diag_state,
                         apply_key,
                         chunk_inputs,
@@ -1357,6 +1385,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             t0 = time.time()
             params, state, opt_state, loss = train_chunk(
                 params,
+                frozen_params_for_jit,
                 state,
                 opt_state,
                 step_key,

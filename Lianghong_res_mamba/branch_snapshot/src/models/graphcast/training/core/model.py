@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import warnings
 from pathlib import Path
 
@@ -51,72 +50,6 @@ warnings.filterwarnings(
 _ORIG_NORMALIZED_LATITUDE_WEIGHTS = gc_losses.normalized_latitude_weights
 
 
-class FinalStepLossAutoregressivePredictor(autoregressive.Predictor):
-    """Autoregressive predictor whose multi-step loss uses only the final step."""
-
-    def loss(
-        self,
-        inputs: xr.Dataset,
-        targets: xr.Dataset,
-        forcings: xr.Dataset,
-        **kwargs,
-    ) -> predictor_base.LossAndDiagnostics:
-        if targets.sizes["time"] == 1:
-            return self._predictor.loss(inputs, targets, forcings, **kwargs)
-
-        constant_inputs = self._get_and_validate_constant_inputs(inputs, targets, forcings)
-        self._validate_targets_and_forcings(targets, forcings)
-        inputs = inputs.drop_vars(constant_inputs.keys())
-
-        if self._noise_level:
-            def add_noise(x):
-                return x + self._noise_level * jax.random.normal(hk.next_rng_key(), shape=x.shape)
-
-            inputs = jax.tree.map(add_noise, inputs)
-
-        flat_targets, target_treedef = autoregressive._get_flat_arrays_and_single_timestep_treedef(targets)
-        flat_forcings, forcings_treedef = autoregressive._get_flat_arrays_and_single_timestep_treedef(forcings)
-        scan_variables = (flat_targets, flat_forcings)
-
-        def one_step_loss(current_inputs, scan_step_variables):
-            flat_target, flat_step_forcings = scan_step_variables
-            step_forcings = autoregressive._unflatten_and_expand_time(
-                flat_step_forcings,
-                forcings_treedef,
-                targets.coords["time"][:1],
-            )
-            target = autoregressive._unflatten_and_expand_time(
-                flat_target,
-                target_treedef,
-                targets.coords["time"][:1],
-            )
-            all_inputs = xr.merge([constant_inputs, current_inputs])
-            (loss, diagnostics), predictions = self._predictor.loss_and_predictions(
-                all_inputs,
-                target,
-                forcings=step_forcings,
-                **kwargs,
-            )
-            loss, diagnostics = xarray_tree.map_structure(xarray_jax.unwrap_data, (loss, diagnostics))
-            next_frame = xr.merge([predictions, step_forcings])
-            next_inputs = self._update_inputs(current_inputs, next_frame)
-            return next_inputs, (loss, diagnostics)
-
-        if self._gradient_checkpointing:
-            one_step_loss = hk.remat(one_step_loss)
-
-        _, (per_timestep_losses, per_timestep_diagnostics) = hk.scan(
-            one_step_loss,
-            inputs,
-            scan_variables,
-        )
-
-        return jax.tree_util.tree_map(
-            lambda x: xarray_jax.DataArray(x, dims=("time", "batch")).isel(time=-1, drop=True),
-            (per_timestep_losses, per_timestep_diagnostics),
-        )
-
-
 def _fallback_normalized_latitude_weights(data: xr.DataArray) -> xr.DataArray:
     """Area weights for any uniformly spaced latitude vector (with or without poles)."""
     latitude = data.coords["lat"]
@@ -165,26 +98,6 @@ def load_graphcast_checkpoint(path: Path) -> gc.CheckPoint:
         return checkpoint.load(f, gc.CheckPoint)
 
 
-def derive_model_config_from_checkpoint(
-    base_model_cfg: gc.ModelConfig,
-    *,
-    resolution: float,
-    mesh_size: int,
-    latent_size: int,
-    gnn_msg_steps: int,
-    hidden_layers: int = 1,
-) -> gc.ModelConfig:
-    return dataclasses.replace(
-        base_model_cfg,
-        resolution=resolution,
-        mesh_size=mesh_size,
-        latent_size=latent_size,
-        gnn_msg_steps=gnn_msg_steps,
-        hidden_layers=hidden_layers,
-        mesh2grid_edge_normalization_factor=base_model_cfg.mesh2grid_edge_normalization_factor,
-    )
-
-
 class DirectResidualNormalizer(predictor_base.Predictor):
     """Normalizes inputs normally and target corrections as direct residual fields."""
 
@@ -202,20 +115,6 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         self._residual_scales = diffs_stddev_by_level
         self._residual_locations = None
 
-    def _normalize_inputs(self, inputs: xr.Dataset) -> xr.Dataset:
-        residual_vars = [name for name in inputs.data_vars if name in self._residual_scales.data_vars]
-        normal_vars = [name for name in inputs.data_vars if name not in residual_vars]
-        normalized_parts = []
-        if normal_vars:
-            normalized_parts.append(normalization.normalize(inputs[normal_vars], self._scales, self._locations))
-        if residual_vars:
-            normalized_parts.append(
-                normalization.normalize(inputs[residual_vars], self._residual_scales, self._residual_locations)
-            )
-        if not normalized_parts:
-            return xr.Dataset(coords=inputs.coords)
-        return xr.merge(normalized_parts)
-
     def __call__(
         self,
         inputs: xr.Dataset,
@@ -223,7 +122,7 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         forcings: xr.Dataset,
         **kwargs,
     ) -> xr.Dataset:
-        norm_inputs = self._normalize_inputs(inputs)
+        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
         norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
         norm_predictions = self._predictor(
             norm_inputs,
@@ -243,7 +142,7 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         forcings: xr.Dataset,
         **kwargs,
     ) -> predictor_base.LossAndDiagnostics:
-        norm_inputs = self._normalize_inputs(inputs)
+        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
         norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
         norm_targets = normalization.normalize(targets, self._residual_scales, self._residual_locations)
         return self._predictor.loss(norm_inputs, norm_targets, forcings=norm_forcings, **kwargs)
@@ -255,7 +154,7 @@ class DirectResidualNormalizer(predictor_base.Predictor):
         forcings: xr.Dataset,
         **kwargs,
     ) -> predictor_base.LossAndDiagnostics:
-        norm_inputs = self._normalize_inputs(inputs)
+        norm_inputs = normalization.normalize(inputs, self._scales, self._locations)
         norm_forcings = normalization.normalize(forcings, self._scales, self._locations)
         norm_targets = normalization.normalize(targets, self._residual_scales, self._residual_locations)
         (loss, scalars), norm_predictions = self._predictor.loss_and_predictions(
@@ -269,65 +168,6 @@ class DirectResidualNormalizer(predictor_base.Predictor):
             norm_predictions,
         )
         return (loss, scalars), predictions
-
-
-def build_zero_residual_inputs(inputs: xr.Dataset, targets_template: xr.Dataset) -> xr.Dataset:
-    """Return an input-shaped dataset whose prognostic variables are residual-valued zeros."""
-    residual_vars = [name for name in inputs.data_vars if name in targets_template.data_vars]
-    constant_vars = [name for name in inputs.data_vars if name not in residual_vars]
-    pieces = []
-    if constant_vars:
-        pieces.append(inputs[constant_vars])
-    if residual_vars:
-        pieces.append(xr.Dataset({name: xr.zeros_like(inputs[name]) for name in residual_vars}))
-    return xr.merge(pieces) if pieces else xr.Dataset(coords=inputs.coords)
-
-
-def reset_residual_input_lanes(
-    residual_inputs: xr.Dataset,
-    targets_template: xr.Dataset,
-    reset_mask: jax.Array,
-) -> xr.Dataset:
-    """Zero residual input history for lanes that start a new segment."""
-    residual_vars = [name for name in residual_inputs.data_vars if name in targets_template.data_vars]
-    if not residual_vars:
-        return residual_inputs
-    pieces = [residual_inputs.drop_vars(residual_vars)]
-    reset_mask = jnp.asarray(reset_mask, dtype=bool)
-    reset_vars = {}
-    for name in residual_vars:
-        data_array = residual_inputs[name]
-        if "batch" not in data_array.dims:
-            raise ValueError(f"Residual input variable {name!r} must have a 'batch' dimension.")
-        batch_axis = data_array.dims.index("batch")
-        data = xarray_jax.unwrap_data(data_array)
-        mask_shape = [1] * data.ndim
-        mask_shape[batch_axis] = reset_mask.shape[0]
-        reset_by_batch = jnp.reshape(reset_mask, mask_shape)
-        reset_data = jnp.where(reset_by_batch, jnp.zeros_like(data), data)
-        reset_vars[name] = xr.DataArray(
-            xarray_jax.wrap(reset_data),
-            dims=data_array.dims,
-            coords=data_array.coords,
-            attrs=data_array.attrs,
-            name=data_array.name,
-        )
-    pieces.append(xr.Dataset(reset_vars))
-    return xr.merge(pieces)
-
-
-def advance_residual_inputs(residual_inputs: xr.Dataset, residual_targets: xr.Dataset) -> xr.Dataset:
-    """Shift residual target predictions into the next input window."""
-    residual_vars = [name for name in residual_inputs.data_vars if name in residual_targets.data_vars]
-    if not residual_vars:
-        return residual_inputs
-    num_input_times = residual_inputs.sizes["time"]
-    updated = (
-        xr.concat([residual_inputs[residual_vars], residual_targets[residual_vars]], dim="time")
-        .tail(time=num_input_times)
-        .assign_coords(time=residual_inputs.coords["time"])
-    )
-    return xr.merge([residual_inputs.drop_vars(residual_vars), updated])
 
 
 def build_predictor(
@@ -348,24 +188,9 @@ def build_predictor(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
-    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
-    residual_output_head: bool = False,
-    autoregressive_loss_mode: str = "mean",
-    memory_mode: str = "standard",
-    processor_remat_group_size: int | None = None,
-    lora_rank: int = 0,
-    lora_alpha: float = 1.0,
-    lora_scope: str = "processor_mlp",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
-    if hasattr(predictor, "_remat_processor_steps"):
-        use_group_remat = memory_mode == "optimal" and processor_remat_group_size is not None
-        predictor._remat_processor_steps = memory_mode == "optimal" and not use_group_remat
-        predictor._processor_remat_group_size = (
-            int(processor_remat_group_size) if use_group_remat else None
-        )
-        predictor._remat_mesh2grid = memory_mode == "optimal"
     if hasattr(predictor, "_temporal_backbone"):
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location
@@ -378,13 +203,7 @@ def build_predictor(
         predictor._temporal_conv_bias = temporal_conv_bias
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
-        predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
-    if hasattr(predictor, "_lora_rank"):
-        predictor._lora_rank = int(lora_rank)
-        predictor._lora_alpha = float(lora_alpha)
-        predictor._lora_scope = lora_scope if int(lora_rank) > 0 else "none"
-    predictor._residual_output_head_enabled = residual_output_head
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
     predictor = normalization.InputsAndResiduals(
@@ -393,17 +212,7 @@ def build_predictor(
         mean_by_level=stats["mean_by_level"],
         diffs_stddev_by_level=stats["diffs_stddev_by_level"],
     )
-    if autoregressive_loss_mode == "none":
-        pass
-    elif autoregressive_loss_mode == "mean":
-        predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
-    elif autoregressive_loss_mode == "final":
-        predictor = FinalStepLossAutoregressivePredictor(
-            predictor,
-            gradient_checkpointing=gradient_checkpointing,
-        )
-    else:
-        raise ValueError(f"Unknown autoregressive_loss_mode={autoregressive_loss_mode!r}")
+    predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
     return predictor
 
 
@@ -425,24 +234,9 @@ def build_residual_correction_predictor(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
-    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
-    residual_output_head: bool = False,
-    autoregressive_loss_mode: str = "mean",
-    memory_mode: str = "standard",
-    processor_remat_group_size: int | None = None,
-    lora_rank: int = 0,
-    lora_alpha: float = 1.0,
-    lora_scope: str = "processor_mlp",
 ):
     predictor = gc.GraphCast(model_cfg, task_cfg)
-    if hasattr(predictor, "_remat_processor_steps"):
-        use_group_remat = memory_mode == "optimal" and processor_remat_group_size is not None
-        predictor._remat_processor_steps = memory_mode == "optimal" and not use_group_remat
-        predictor._processor_remat_group_size = (
-            int(processor_remat_group_size) if use_group_remat else None
-        )
-        predictor._remat_mesh2grid = memory_mode == "optimal"
     if hasattr(predictor, "_temporal_backbone"):
         predictor._temporal_backbone = temporal_backbone
         predictor._temporal_location = temporal_location
@@ -455,13 +249,7 @@ def build_residual_correction_predictor(
         predictor._temporal_conv_bias = temporal_conv_bias
         predictor._temporal_layers = temporal_layers
         predictor._temporal_dropout = temporal_dropout
-        predictor._temporal_insert_count = temporal_insert_count
         predictor._temporal_zero_init_out = zero_init_temporal_out
-    if hasattr(predictor, "_lora_rank"):
-        predictor._lora_rank = int(lora_rank)
-        predictor._lora_alpha = float(lora_alpha)
-        predictor._lora_scope = lora_scope if int(lora_rank) > 0 else "none"
-    predictor._residual_output_head_enabled = residual_output_head
     if use_bf16:
         predictor = casting.Bfloat16Cast(predictor)
     predictor = DirectResidualNormalizer(
@@ -470,17 +258,7 @@ def build_residual_correction_predictor(
         mean_by_level=stats["mean_by_level"],
         diffs_stddev_by_level=stats["diffs_stddev_by_level"],
     )
-    if autoregressive_loss_mode == "none":
-        pass
-    elif autoregressive_loss_mode == "mean":
-        predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
-    elif autoregressive_loss_mode == "final":
-        predictor = FinalStepLossAutoregressivePredictor(
-            predictor,
-            gradient_checkpointing=gradient_checkpointing,
-        )
-    else:
-        raise ValueError(f"Unknown autoregressive_loss_mode={autoregressive_loss_mode!r}")
+    predictor = autoregressive.Predictor(predictor, gradient_checkpointing=gradient_checkpointing)
     return predictor
 
 
@@ -502,11 +280,7 @@ def build_loss_transform(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
-    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
-    lora_rank: int = 0,
-    lora_alpha: float = 1.0,
-    lora_scope: str = "processor_mlp",
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
         del is_training
@@ -527,11 +301,7 @@ def build_loss_transform(
             temporal_layers=temporal_layers,
             temporal_dropout=temporal_dropout,
             temporal_stateful=temporal_stateful,
-            temporal_insert_count=temporal_insert_count,
             zero_init_temporal_out=zero_init_temporal_out,
-            lora_rank=lora_rank,
-            lora_alpha=lora_alpha,
-            lora_scope=lora_scope,
         )
         return predictor.loss(inputs, targets, forcings)
 
@@ -556,11 +326,7 @@ def build_prediction_transform(
     temporal_layers: int,
     temporal_dropout: float,
     temporal_stateful: bool = False,
-    temporal_insert_count: int | None = None,
     zero_init_temporal_out: bool = False,
-    lora_rank: int = 0,
-    lora_alpha: float = 1.0,
-    lora_scope: str = "processor_mlp",
 ) -> hk.TransformedWithState:
     def forward_fn(inputs, targets, forcings, is_training):
         del is_training
@@ -581,11 +347,7 @@ def build_prediction_transform(
             temporal_layers=temporal_layers,
             temporal_dropout=temporal_dropout,
             temporal_stateful=temporal_stateful,
-            temporal_insert_count=temporal_insert_count,
             zero_init_temporal_out=zero_init_temporal_out,
-            lora_rank=lora_rank,
-            lora_alpha=lora_alpha,
-            lora_scope=lora_scope,
         )
         return predictor(inputs, targets, forcings)
 

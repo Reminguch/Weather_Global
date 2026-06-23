@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ if ROOT_STR not in sys.path:
     sys.path.insert(0, ROOT_STR)
 
 from src.models.graphcast.training.core.config import parse_args
+from src.models.graphcast.training.core.logging import _write_run_config
 from src.models.graphcast.training.core.model import derive_model_config_from_checkpoint, gc
 from src.models.graphcast.training.core.segments import include_bptt_loss_step
 from src.models.mamba.training.segments_training import parse_gc_mamba_args
@@ -172,6 +174,47 @@ def test_gc_mamba_optimizer_group_args_accept_explicit_values() -> None:
     assert cfg.base_cfg.adamw_beta1 == 0.9
     assert cfg.base_cfg.adamw_beta2 == 0.95
     assert cfg.base_cfg.max_grad_norm == 32
+
+
+def test_gc_mamba_processor_remat_group_size_accepts_positive_values() -> None:
+    cfg = parse_gc_mamba_args(["--processor-remat-group-size", "4"])
+
+    assert cfg.base_cfg.processor_remat_group_size == 4
+
+
+def test_gc_mamba_processor_remat_group_size_rejects_nonpositive_values() -> None:
+    with pytest.raises(ValueError, match="processor-remat-group-size"):
+        parse_gc_mamba_args(["--processor-remat-group-size", "0"])
+
+
+def test_run_config_records_grouped_processor_remat(tmp_path: Path) -> None:
+    cfg = parse_gc_mamba_args(
+        [
+            "--memory-mode",
+            "optimal",
+            "--processor-remat-group-size",
+            "4",
+            "--trainable-part",
+            "mamba_lora",
+            "--lora-rank",
+            "4",
+        ]
+    ).base_cfg
+    model_cfg = gc.ModelConfig(
+        resolution=1.0,
+        mesh_size=5,
+        latent_size=512,
+        gnn_msg_steps=16,
+        hidden_layers=1,
+        radius_query_fraction_edge_length=0.6,
+    )
+
+    _write_run_config(tmp_path, cfg, model_cfg, gc.TASK_13)
+    payload = json.loads((tmp_path / "run_config.json").read_text(encoding="utf-8"))
+
+    assert payload["memory_optimization"]["processor_group_remat_size"] == 4
+    assert payload["memory_optimization"]["processor_step_remat"] is False
+    assert payload["memory_optimization"]["mesh2grid_remat"] is True
 
 
 @pytest.mark.parametrize("loss_mode", ["tail_uniform", "all_bptt_uniform"])

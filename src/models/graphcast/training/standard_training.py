@@ -173,6 +173,8 @@ def main() -> None:
             temporal_stateful=cfg.temporal_stateful,
             temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
+            memory_mode=cfg.memory_mode,
+            processor_remat_group_size=cfg.processor_remat_group_size,
             lora_rank=cfg.lora_rank,
             lora_alpha=cfg.lora_alpha,
             lora_scope=cfg.lora_scope,
