@@ -38,7 +38,7 @@ example: `sinfo -o "%P %G %f"`
 
 4.1 then use salloc to get a GPU node.
 example: salloc --nodes=1 --ntasks=1 --mem=32G --time=02:00:00 --gres=gpu:a100:1
-
+hostname
 
 4.2 On the compute node: env + start Jupyter
 

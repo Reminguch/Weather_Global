@@ -1,0 +1,2 @@
+"""Shared GraphCast training internals."""
+

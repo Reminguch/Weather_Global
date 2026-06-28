@@ -39,6 +39,7 @@ from src.models.graphcast.training.core.logging import (
     sample_actual_usage,
     save_checkpoint,
     save_logs,
+    save_usage_logs,
 )
 from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
 from src.models.graphcast.training.core.model import (
@@ -739,6 +740,12 @@ def run_training(
         )
         _save_chunk_timing_logs(out_dir, chunk_timing)
 
+    usage_log_flush_every = 50
+
+    def maybe_flush_usage_logs() -> None:
+        if actual_usage and (len(actual_usage) == 1 or len(actual_usage) % usage_log_flush_every == 0):
+            save_usage_logs(out_dir, actual_usage)
+
     load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=segment_cfg.chunk_load_workers)
     prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     train_segment_loader = (
@@ -888,6 +895,7 @@ def run_training(
             actual_usage.append(usage)
             if usage.get("gpu_mem_gib") is not None:
                 mem_usage.append((step, float(usage["gpu_mem_gib"])))
+            maybe_flush_usage_logs()
 
             if step % 200 == 0:
                 print(

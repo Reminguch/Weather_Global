@@ -56,6 +56,7 @@ def main() -> None:
         sample_actual_usage,
         save_checkpoint,
         save_logs,
+        save_usage_logs,
     )
     from .core.model import (
         build_loss_transform,
@@ -384,6 +385,12 @@ def main() -> None:
             )
         print(f"[best] updated step {best_eval_step} val {best_eval_loss:.6f}")
 
+    usage_log_flush_every = 50
+
+    def maybe_flush_usage_logs() -> None:
+        if actual_usage and (len(actual_usage) == 1 or len(actual_usage) % usage_log_flush_every == 0):
+            save_usage_logs(out_dir, actual_usage)
+
     np_rng = np.random.default_rng(cfg.seed)
 
     # Build sampling structure
@@ -604,6 +611,7 @@ def main() -> None:
             actual_usage.append(usage)
             if usage.get("gpu_mem_gib") is not None:
                 mem_usage.append((step, float(usage["gpu_mem_gib"])))
+            maybe_flush_usage_logs()
 
         if step % 200 == 0:
             print(

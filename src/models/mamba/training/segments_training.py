@@ -24,7 +24,7 @@ class SegmentRunConfig:
     eval_subset_policy: str = "stratified_fixed"
     eval_rotating_diagnostics: bool = True
     autoregressive_loss_mode: str = "tail_uniform"
-    ar_gradient_alignment_diagnostics: bool = False
+    ar_gradient_alignment_diagnostics: bool = True
     ar_gradient_alignment_every: int | None = None
     ar_gradient_alignment_num_chunks: int = 1
     archive_step_checkpoints: bool = False
@@ -245,9 +245,19 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     )
     parser.add_argument(
         "--ar-gradient-alignment-diagnostics",
+        dest="ar_gradient_alignment_diagnostics",
         action="store_true",
-        default=False,
-        help="Log passive early/mid/late AR-tail gradient-alignment diagnostics.",
+        default=None,
+        help=(
+            "Log passive early/mid/late AR-tail gradient-alignment diagnostics. "
+            "Enabled by default when --target-steps > 1."
+        ),
+    )
+    parser.add_argument(
+        "--no-ar-gradient-alignment-diagnostics",
+        dest="ar_gradient_alignment_diagnostics",
+        action="store_false",
+        help="Disable passive AR-tail gradient-alignment diagnostics.",
     )
     parser.add_argument(
         "--ar-gradient-alignment-every",
@@ -386,7 +396,12 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--max-grad-norm must be > 0")
     if args.target_steps > 1 and args.target_steps >= args.bptt_steps:
         raise ValueError("--target-steps must be < --bptt-steps for chunk-local AR tail training")
-    if args.ar_gradient_alignment_diagnostics and args.target_steps <= 1:
+    ar_gradient_alignment_diagnostics = (
+        args.target_steps > 1
+        if args.ar_gradient_alignment_diagnostics is None
+        else args.ar_gradient_alignment_diagnostics
+    )
+    if ar_gradient_alignment_diagnostics and args.target_steps <= 1:
         raise ValueError("--ar-gradient-alignment-diagnostics requires --target-steps > 1")
     if args.ar_gradient_alignment_every is not None and args.ar_gradient_alignment_every <= 0:
         raise ValueError("--ar-gradient-alignment-every must be > 0")
@@ -512,7 +527,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         eval_subset_policy=args.eval_subset_policy,
         eval_rotating_diagnostics=args.eval_rotating_diagnostics,
         autoregressive_loss_mode=args.autoregressive_loss_mode,
-        ar_gradient_alignment_diagnostics=args.ar_gradient_alignment_diagnostics,
+        ar_gradient_alignment_diagnostics=ar_gradient_alignment_diagnostics,
         ar_gradient_alignment_every=args.ar_gradient_alignment_every,
         ar_gradient_alignment_num_chunks=args.ar_gradient_alignment_num_chunks,
         archive_step_checkpoints=args.archive_step_checkpoints,
@@ -555,6 +570,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         sample_actual_usage,
         save_checkpoint,
         save_logs,
+        save_usage_logs,
     )
     from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
     from src.models.graphcast.training.core.model import (
@@ -1189,6 +1205,12 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         )
         _save_chunk_timing_logs(out_dir, chunk_timing)
 
+    usage_log_flush_every = 50
+
+    def maybe_flush_usage_logs() -> None:
+        if actual_usage and (len(actual_usage) == 1 or len(actual_usage) % usage_log_flush_every == 0):
+            save_usage_logs(out_dir, actual_usage)
+
     load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=segment_cfg.chunk_load_workers)
     prefetch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     train_segment_loader = (
@@ -1426,6 +1448,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             actual_usage.append(usage)
             if usage.get("gpu_mem_gib") is not None:
                 mem_usage.append((step, float(usage["gpu_mem_gib"])))
+            maybe_flush_usage_logs()
 
             write_ar_gradient_alignment_diagnostics(
                 step,

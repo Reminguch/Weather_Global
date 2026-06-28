@@ -1,0 +1,3 @@
+branch_ref=origin/AR-Training-Lianghong
+snapshot_dir=/scratch/gpfs/DABANIN/lm8598/Weather_Global/docs/model_source_snapshots/v20_v22_mamba_2026-05-23
+source_root=/scratch/gpfs/DABANIN/iv9432/Weather_global/Lianghong_res_mamba/v22_exact_code/source

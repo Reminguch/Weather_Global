@@ -43,6 +43,7 @@ from src.models.graphcast.evaluation.device_resolution_eval import (  # noqa: E4
     build_metric_spec,
 )
 from src.models.mamba.residual_mamba.training import model as residual_training_model  # noqa: E402
+from src.models.mamba.residual_mamba.training.config import parse_args as parse_residual_args  # noqa: E402
 from src.models.mamba.residual_mamba.training.model import (  # noqa: E402
     augment_run_config,
     build_loss_prediction_transform as build_residual_loss_prediction_transform,
@@ -761,6 +762,12 @@ def test_residual_output_head_run_config_defaults_to_disabled_for_old_checkpoint
     assert _residual_output_head_enabled(
         {"residual_training": {"output_head": {"enabled": True}}}
     )
+
+
+def test_residual_output_head_parser_defaults_to_enabled() -> None:
+    cfg = parse_residual_args(["--baseline-ckpt", "baseline.npz"])
+
+    assert cfg.residual_output_head_mode == "enabled"
 
 
 def test_residual_augment_run_config_records_output_head(tmp_path, monkeypatch) -> None:

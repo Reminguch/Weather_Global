@@ -32,26 +32,6 @@ def prune_old_step_checkpoints(out_dir: Path, *, keep_step: int) -> None:
         print(f"pruned {removed} old step checkpoint(s), kept {out_dir / keep_name}")
 
 
-def archive_old_step_checkpoints(
-    out_dir: Path,
-    *,
-    keep_step: int,
-    archive_dir_name: str = "intermediate_checkpoints",
-) -> None:
-    keep_name = f"ckpt_step{keep_step}.npz"
-    archive_dir = out_dir / archive_dir_name
-    archived = 0
-    for path in out_dir.glob("ckpt_step*.npz"):
-        match = _STEP_CKPT_RE.match(path.name)
-        if match is None or path.name == keep_name:
-            continue
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        path.replace(archive_dir / path.name)
-        archived += 1
-    if archived:
-        print(f"archived {archived} old step checkpoint(s) under {archive_dir}; kept {out_dir / keep_name}")
-
-
 def save_checkpoint(
     out_dir: Path,
     *,
@@ -62,8 +42,6 @@ def save_checkpoint(
     description: str,
     license_text: str,
     filename: str | None = None,
-    archive_old_steps: bool = False,
-    archive_dir_name: str = "intermediate_checkpoints",
 ) -> None:
     path = out_dir / (filename if filename is not None else f"ckpt_step{step}.npz")
     ckpt_out = gc.CheckPoint(
@@ -77,10 +55,7 @@ def save_checkpoint(
         checkpoint.dump(f, ckpt_out)
     print(f"saved checkpoint: {path}")
     if filename is None:
-        if archive_old_steps:
-            archive_old_step_checkpoints(out_dir, keep_step=step, archive_dir_name=archive_dir_name)
-        else:
-            prune_old_step_checkpoints(out_dir, keep_step=step)
+        prune_old_step_checkpoints(out_dir, keep_step=step)
 
 
 def save_logs(
@@ -106,94 +81,25 @@ def save_logs(
         json.dump(timing_details, f, indent=2)
     with (out_dir / "memory_gib.json").open("w", encoding="utf-8") as f:
         json.dump(mem_usage, f)
-    save_usage_logs(out_dir, actual_usage)
-    with (out_dir / "epoch_summary.json").open("w", encoding="utf-8") as f:
-        json.dump(epoch_summaries, f, indent=2)
-
-
-def _cpu_memory_series(actual_usage: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    first_timestamp = next(
-        (float(x["timestamp"]) for x in actual_usage if x.get("timestamp") is not None),
-        None,
-    )
-    series: list[dict[str, Any]] = []
-    for sample in actual_usage:
-        rss = sample.get("proc_rss_gib")
-        hwm = sample.get("proc_hwm_gib")
-        if rss is None and hwm is None:
-            continue
-        timestamp = sample.get("timestamp")
-        entry = {
-            "step": int(sample["step"]) if sample.get("step") is not None else None,
-            "timestamp": float(timestamp) if timestamp is not None else None,
-            "elapsed_s": (
-                float(timestamp) - first_timestamp
-                if timestamp is not None and first_timestamp is not None
-                else None
-            ),
-            "proc_rss_gib": float(rss) if rss is not None else None,
-            "proc_hwm_gib": float(hwm) if hwm is not None else None,
-        }
-        series.append(entry)
-    return series
-
-
-def _float_summary(values: list[float]) -> dict[str, float | None]:
-    if not values:
-        return {"min": None, "max": None, "avg": None, "median": None, "last": None}
-    return {
-        "min": float(np.min(values)),
-        "max": float(np.max(values)),
-        "avg": float(np.mean(values)),
-        "median": float(np.median(values)),
-        "last": float(values[-1]),
-    }
-
-
-def save_usage_logs(out_dir: Path, actual_usage: list[dict[str, Any]]) -> None:
     with (out_dir / "actual_usage.json").open("w", encoding="utf-8") as f:
         json.dump(actual_usage, f, indent=2)
 
-    cpu_series = _cpu_memory_series(actual_usage)
-    with (out_dir / "cpu_memory_usage.json").open("w", encoding="utf-8") as f:
-        json.dump(cpu_series, f, indent=2)
-
     rss_vals = [float(x["proc_rss_gib"]) for x in actual_usage if x.get("proc_rss_gib") is not None]
-    hwm_vals = [float(x["proc_hwm_gib"]) for x in actual_usage if x.get("proc_hwm_gib") is not None]
     gpu_vals = [float(x["gpu_mem_gib"]) for x in actual_usage if x.get("gpu_mem_gib") is not None]
-    timestamps = [float(x["timestamp"]) for x in actual_usage if x.get("timestamp") is not None]
-    summary = {
-        "samples": len(actual_usage),
-        "cpu_samples": len(cpu_series),
-        "first_timestamp": float(timestamps[0]) if timestamps else None,
-        "last_timestamp": float(timestamps[-1]) if timestamps else None,
-        "duration_s": float(timestamps[-1] - timestamps[0]) if len(timestamps) >= 2 else None,
-        "rss_gib": _float_summary(rss_vals),
-        "hwm_gib": _float_summary(hwm_vals),
-        "gpu_mem_gib": _float_summary(gpu_vals),
-        "rss_gib_peak": float(np.max(rss_vals)) if rss_vals else None,
-        "rss_gib_avg": float(np.mean(rss_vals)) if rss_vals else None,
-        "rss_gib_median": float(np.median(rss_vals)) if rss_vals else None,
-        "hwm_gib_peak": float(np.max(hwm_vals)) if hwm_vals else None,
-        "gpu_mem_gib_peak": float(np.max(gpu_vals)) if gpu_vals else None,
-        "gpu_mem_gib_avg": float(np.mean(gpu_vals)) if gpu_vals else None,
-        "gpu_mem_gib_median": float(np.median(gpu_vals)) if gpu_vals else None,
-    }
     with (out_dir / "actual_usage_summary.json").open("w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2)
-    with (out_dir / "cpu_memory_usage_summary.json").open("w", encoding="utf-8") as f:
         json.dump(
             {
-                "samples": len(cpu_series),
-                "first_timestamp": summary["first_timestamp"],
-                "last_timestamp": summary["last_timestamp"],
-                "duration_s": summary["duration_s"],
-                "proc_rss_gib": summary["rss_gib"],
-                "proc_hwm_gib": summary["hwm_gib"],
+                "rss_gib_peak": float(np.max(rss_vals)) if rss_vals else None,
+                "rss_gib_avg": float(np.mean(rss_vals)) if rss_vals else None,
+                "gpu_mem_gib_peak": float(np.max(gpu_vals)) if gpu_vals else None,
+                "gpu_mem_gib_avg": float(np.mean(gpu_vals)) if gpu_vals else None,
+                "samples": len(actual_usage),
             },
             f,
             indent=2,
         )
+    with (out_dir / "epoch_summary.json").open("w", encoding="utf-8") as f:
+        json.dump(epoch_summaries, f, indent=2)
 
 
 def build_batch_builder_metadata(
@@ -392,21 +298,6 @@ def _write_run_config(
     effective_train_batch_builder: str | None = None,
     effective_eval_batch_builder: str | None = None,
 ) -> None:
-    memory_mode = getattr(cfg, "memory_mode", "standard")
-    graphcast_lr = getattr(cfg, "graphcast_lr", None)
-    mamba_lr = getattr(cfg, "mamba_lr", None)
-    lora_lr = getattr(cfg, "lora_lr", None)
-    resolved_graphcast_lr = graphcast_lr if graphcast_lr is not None else cfg.lr
-    resolved_mamba_lr = mamba_lr if mamba_lr is not None else cfg.lr
-    resolved_lora_lr = lora_lr if lora_lr is not None else resolved_mamba_lr
-    adamw_beta1 = getattr(cfg, "adamw_beta1", 0.9)
-    adamw_beta2 = getattr(cfg, "adamw_beta2", 0.999)
-    max_grad_norm = getattr(cfg, "max_grad_norm", None)
-    lora_rank = int(getattr(cfg, "lora_rank", 0))
-    lora_alpha = float(getattr(cfg, "lora_alpha", 1.0))
-    lora_scope = getattr(cfg, "lora_scope", "processor_mlp")
-    processor_remat_group_size = getattr(cfg, "processor_remat_group_size", None)
-    use_processor_group_remat = memory_mode == "optimal" and processor_remat_group_size is not None
     builder_metadata = build_batch_builder_metadata(
         requested_batch_builder=cfg.batch_builder,
         effective_train_batch_builder=effective_train_batch_builder,
@@ -426,24 +317,13 @@ def _write_run_config(
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
         "eval_batch_size": cfg.eval_batch_size,
-        "eval_num_batches": cfg.eval_num_batches,
-        "final_eval_num_batches": cfg.final_eval_num_batches,
-        "eval_subset_policy": cfg.eval_subset_policy,
-        "eval_rotating_diagnostics": cfg.eval_rotating_diagnostics,
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,
-        "graphcast_lr": graphcast_lr,
-        "mamba_lr": mamba_lr,
-        "lora_lr": lora_lr,
         "weight_decay": cfg.weight_decay,
-        "adamw_beta1": adamw_beta1,
-        "adamw_beta2": adamw_beta2,
-        "max_grad_norm": max_grad_norm,
         "precision": cfg.precision,
         "init_from_graphcast_ckpt": cfg.init_from_graphcast_ckpt,
         "trainable_part": cfg.trainable_part,
-        "memory_mode": memory_mode,
         "data_pipeline": {
             "data_source": cfg.data_source,
             "prepared_data_root": cfg.prepared_data_root,
@@ -463,30 +343,6 @@ def _write_run_config(
             "microbatch_size": cfg.batch_size,
             "grad_accum_steps": cfg.grad_accum_steps,
             "effective_batch_size": cfg.batch_size * cfg.grad_accum_steps,
-            "lr": cfg.lr,
-            "weight_decay": cfg.weight_decay,
-            "graphcast_lr": graphcast_lr,
-            "mamba_lr": mamba_lr,
-            "lora_lr": lora_lr,
-            "resolved_graphcast_lr": resolved_graphcast_lr,
-            "resolved_mamba_lr": resolved_mamba_lr,
-            "resolved_lora_lr": resolved_lora_lr,
-            "grouped_lr": graphcast_lr is not None or mamba_lr is not None or lora_lr is not None,
-            "adamw_beta1": adamw_beta1,
-            "adamw_beta2": adamw_beta2,
-            "max_grad_norm": max_grad_norm,
-        },
-        "memory_optimization": {
-            "mode": memory_mode,
-            "trainable_param_partition": (
-                memory_mode in ("conservative", "optimal")
-                and cfg.trainable_part in ("mamba", "mamba_lora")
-            ),
-            "processor_step_remat": memory_mode == "optimal" and not use_processor_group_remat,
-            "processor_group_remat_size": (
-                int(processor_remat_group_size) if use_processor_group_remat else None
-            ),
-            "mesh2grid_remat": memory_mode == "optimal",
         },
         "temporal_config": {
             "backbone": cfg.temporal_backbone,
@@ -500,15 +356,7 @@ def _write_run_config(
             "conv_bias": cfg.temporal_conv_bias,
             "layers": cfg.temporal_layers,
             "dropout": cfg.temporal_dropout,
-            "insert_count": cfg.temporal_insert_count,
             "zero_init_output": cfg.zero_init_temporal_out,
-        },
-        "lora_config": {
-            "enabled": lora_rank > 0,
-            "rank": lora_rank,
-            "alpha": lora_alpha,
-            "scope": lora_scope,
-            "scale": (lora_alpha / lora_rank) if lora_rank > 0 else 0.0,
         },
         "model_config": dataclasses.asdict(model_cfg),
         "task_config": dataclasses.asdict(task_cfg),

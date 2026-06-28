@@ -121,6 +121,29 @@ def test_gc_mamba_segment_one_step_can_equal_bptt_boundary_case() -> None:
     cfg = parse_gc_mamba_args(["--target-steps", "1", "--bptt-steps", "1"])
 
     assert cfg.base_cfg.target_steps == 1
+    assert cfg.ar_gradient_alignment_diagnostics is False
+
+
+def test_gc_mamba_ar_gradient_alignment_defaults_on_for_ar_tail() -> None:
+    cfg = parse_gc_mamba_args(["--target-steps", "4", "--bptt-steps", "8", "--len-segment", "32"])
+
+    assert cfg.ar_gradient_alignment_diagnostics is True
+
+
+def test_gc_mamba_ar_gradient_alignment_can_be_disabled() -> None:
+    cfg = parse_gc_mamba_args(
+        [
+            "--target-steps",
+            "4",
+            "--bptt-steps",
+            "8",
+            "--len-segment",
+            "32",
+            "--no-ar-gradient-alignment-diagnostics",
+        ]
+    )
+
+    assert cfg.ar_gradient_alignment_diagnostics is False
 
 
 def test_gc_mamba_autoregressive_loss_mode_defaults_to_tail_uniform() -> None:
