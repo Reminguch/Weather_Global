@@ -70,17 +70,57 @@ the residual head continues to grow in output amplitude, and the paper-weighted
 MSE improvement at long leads **starts to decay**. Late checkpoints overfit an
 amplitude that no longer helps.
 
-This is well-known in noisy-optimization / late-training regimes. Standard fix:
-**SWA (Stochastic Weight Averaging)** — average the trained residual parameters
-across several checkpoints spanning the region around the per-K optimum. The
-averaged parameters:
+### 3.1 Data supporting the drift claim
 
-1. **Beat every single-step checkpoint** in paper-weighted MSE improvement at
-   long leads (K=22: +20.65% @ 240h vs +18.9% for best single ckpt)
-2. **Reduce SSM drift** — the parameters live near the centroid of a "good
-   region" rather than at any single noisy point
-3. **Are stable across K** — every K=2..22 SWA improves on both step 6k (early)
-   and step 20k (over-trained) individual ckpts
+**Per-K single-step evaluation** shows peak-then-decay clearly:
+
+```csv
+K,step6k_imp%,best_step,best_step_imp%,step20k_imp%,SWA_imp%,SWA-best_gain%
+14,+3.24, 6000,+3.24, -2.80, +8.36, +5.11
+18,+6.70,10000,+9.27, -6.11,+13.14, +3.88
+20,+12.26,8000,+12.99,+4.50,+19.21,+6.22
+22,+16.17,6000,+16.17,+7.57,+18.96,+2.79
+```
+(paper-weighted MSE improvement% @ lead 240h vs GC baseline; cold_full mode; full CSV: [`results/SWA_full_eval/plots/swa_vs_single_ckpts_table.csv`](results/SWA_full_eval/plots/swa_vs_single_ckpts_table.csv))
+
+**Observations**:
+- Best single-step ckpt lives at step 6000–10000 for every K ≥ 14
+- By step 20k, improvement has decayed **8–14 percentage points** vs the peak
+  (K=18: +9.27 → -6.11 = **−15.4 pp collapse**; K=22: +16.17 → +7.57 = −8.6 pp)
+- **SWA (uniform average over steps ~6k–16k) beats every single step at every K ≥ 14**,
+  with the largest gain at K=20 (+6.22 pp over the best individual step)
+
+See [`results/SWA_full_eval/plots/drift_vs_step_lead240.png`](results/SWA_full_eval/plots/drift_vs_step_lead240.png)
+for the per-step trajectory (colored lines) with SWA horizontal reference (dashed).
+See [`results/SWA_full_eval/plots/swa_vs_single_ckpts_bar.png`](results/SWA_full_eval/plots/swa_vs_single_ckpts_bar.png)
+for a bar chart comparing step 6k vs best-step vs step 20k vs SWA per K.
+
+### 3.2 Is the drift caused by output amplitude?
+
+Partial evidence: **α-sweep** — scale the residual by α at inference:
+`full_pred = baseline + α · residual`. Amplitude reduction should undo overshoot.
+
+For K=22 (see [`results/SWA_full_eval/plots/K22_alpha_sweep.png`](results/SWA_full_eval/plots/K22_alpha_sweep.png)):
+
+| ckpt | α=0.25 | α=0.5 | α=0.75 | α=1.0 |
+|---|---:|---:|---:|---:|
+| step 6k  (near-optimum) | +9.1  | +14.2 | **+16.4** | +15.7 |
+| step 20k (overtrained)  | +6.4  | +9.0  | **+9.1**  | +7.6  |
+| **K=22 SWA (imp = +18.96%)** for reference |
+
+Interpretation:
+- Step 6k's optimal α is ~0.75 → the trained residual is already close to
+  right amplitude (slight over-scaling)
+- Step 20k benefits from α reduction (α=0.75 gives +9.1% vs α=1.0 gives +7.6%)
+  → confirming **the residual output amplitude has grown too large by step 20k**
+- BUT even step 20k with best α doesn't reach SWA — so amplitude is not the
+  entire story. Direction of the residual also drifts (SWA averages out those
+  directional oscillations too)
+
+**SWA is the practical fix** because it doesn't require identifying a per-K
+optimal α at inference — the average handles amplitude and direction together.
+
+### 3.3 How SWA is built
 
 The per-K EMA/SWA `.pkl` files live at
 `/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22cl_r1_EMA/K{K}_ema.pkl`.
@@ -96,16 +136,18 @@ depending on K).
 
 At **lead 240h** (paper's headline metric, 10-day forecast):
 
-| K  | SWA improve% | best-single-ckpt improve% |
-|----|---:|---:|
-| 2  | +6.9  | +5.4 |
-| 8  | +12.5 | +11.6 |
-| 14 | +17.8 | +16.9 |
-| 18 | +19.4 | +18.4 |
-| 22 | **+20.7** | +19.5 |
+| K  | SWA improve% | best-single-ckpt improve% | step 20k improve% |
+|----|---:|---:|---:|
+| 10 |  +3.9 |  +3.2 |  −8.2 |
+| 14 |  +8.4 |  +3.2 |  −2.8 |
+| 18 | +13.1 |  +9.3 |  −6.1 |
+| 20 | +19.2 | +13.0 |  +4.5 |
+| 22 | **+19.0** | +16.2 |  +7.6 |
 
-See `results/SWA_full_eval/plots/cold_full_vs_baseline.png` for the full
-per-lead + K-scan overlays.
+SWA improves on the best single-step ckpt at every K ≥ 14, and dramatically
+improves on step 20k (overtrained ckpt). See
+`results/SWA_full_eval/plots/cold_full_vs_baseline.png` for full per-lead + K-scan
+overlays and Section 3.1 for the drift analysis.
 
 ### 4.2 Channels improving vs GC baseline (out of 82 non-precip channels)
 
