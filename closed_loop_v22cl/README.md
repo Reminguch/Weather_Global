@@ -30,10 +30,14 @@ closed_loop_v22cl/
     ├── SWA_full_eval/
     │   ├── eval_jsons/                 — 22 JSONs (K=2..22 × {cold_bp, cold_full})
     │   └── plots/                      — per-K MSE-improvement curves + channels-improve heatmaps
+    │                                     + drift_vs_step / alpha-sweep / SWA-vs-single-ckpt bars
     ├── city_traces/
     │   ├── v22cl_SWA_JSONs/            — 16 JSONs (K=14/18/20/22 × 4 anchors)
-    │   ├── v22_paper_JSONs/            — v22 paper cold_bp city traces for comparison
+    │   ├── v22_paper_JSONs/            — 44 JSONs (v22 paper K=2..22 × 4 anchors, cold_bp)
     │   └── plots/                      — 20 per-city comparison figures (4 seasons × 10 cities)
+    ├── extreme_records/
+    │   └── plots/K{2,4,6,8,10,12,14,16,18,20,22}/extreme_records_K40.png
+    │                                   — heat/cold/wind record-exceedance eval per K
     └── ssm_state_analysis/             — h_t evolution plot + CSV
 ```
 
@@ -181,7 +185,34 @@ Both are within normal 10-day forecast error. See per-city 4-panel figures in
 `results/city_traces/plots/city_{City}_K22_comparison.png` — each shows Jan/Apr/Jul/Oct
 2m_T + precip traces for baseline, v22 paper open-loop, and v22cl SWA cold_full.
 
-### 4.5 SSM hidden-state stability
+### 4.5 Extreme-event record-exceedance eval
+
+We also test whether the SWA closed-loop residual **improves forecast skill on
+extreme events** — specifically pointwise heat, cold, and wind extremes that
+exceed the local 2015–2021 daily record. For each K, we sample ~118 anchors
+(every 3 days in 2022), run K=40 (240h) cold_full rollouts, and bin the
+forecast error against the record-exceedance magnitude (in K for
+temperature, m/s for wind).
+
+Setup:
+- Anchor set: ~118 anchors × 40 leads × global grid (181 × 360)
+- Reference climatology: `records_climatology_2015_2021.nc` (per-DOY / per-cell
+  min/max of 2m_T and wind speed 2015–2021)
+- Comparison lines: GC baseline self-rollout (gray) vs v22cl SWA closed-loop (blue)
+- Rows = forecast lead: 24h / 48h / 72h / 120h / 168h / 240h
+- Columns = event type × metric: {Heat RMSE, Cold RMSE, Wind RMSE, Heat bias,
+  Cold bias, Wind bias}
+
+Result: **v22cl SWA closed-loop tracks or improves on GC baseline** on all
+three extreme categories across all K. The largest wins are at long leads
+(120h–240h) on Heat/Cold RMSE — the same regime where the global-average
+paper-weighted MSE improvement is largest.
+
+Per-K figures live at `results/extreme_records/plots/K{K}/extreme_records_K40.png`.
+Same axis convention as `results/2026-05-23-v22/plots/K{K}/extreme_records_K40.png`
+in the v22 open-loop branch.
+
+### 4.6 SSM hidden-state stability
 
 At inference, `v22cl` cold_full: `h_t` stabilizes by step ~10, `Δh_t → constant
 small` for the rest of the rollout. `v22 paper` (open-loop trained) forced into
