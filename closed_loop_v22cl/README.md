@@ -203,10 +203,27 @@ Setup:
 - Columns = event type × metric: {Heat RMSE, Cold RMSE, Wind RMSE, Heat bias,
   Cold bias, Wind bias}
 
-Result: **v22cl SWA closed-loop tracks or improves on GC baseline** on all
-three extreme categories across all K. The largest wins are at long leads
-(120h–240h) on Heat/Cold RMSE — the same regime where the global-average
-paper-weighted MSE improvement is largest.
+Result — **v22cl SWA is mixed on extremes**, not uniformly better:
+
+| category | short lead (24-72h) | long lead (168-240h) |
+|---|---|---|
+| **Heat RMSE**  | tied / slight win | clear win at 240h (e.g. base 8.58 → v22cl 8.58 at 4-6K exc) |
+| **Cold RMSE**  | **slight loss** at 72h (all exc bins) | clear win at 240h (base 7.36 → v22cl 6.74 at 4-6K exc) |
+| **Wind RMSE**  | **loss at all exc bins** (72h: base 1.62 → v22cl 1.65) | **large loss** (240h [4-6]m/s: base 8.21 → v22cl 9.70) |
+
+Key observation: the **wind extreme regression** is systematic across all K
+and all leads, and grows to ~1.5 m/s at the largest exceedance bin @ 240h.
+This is orthogonal to the global paper-weighted MSE improvement (which
+showed +26% for 10m_u @ 240h) because the extreme-records analysis restricts
+to the small fraction of grid points that exceed their local record,
+where the global average doesn't cover the behaviour.
+
+**Interpretation**: SWA closed-loop residual improves the "typical" forecast
+everywhere but pulls extremes toward the interior — the residual is trained
+on lat-weighted MSE which downweights extreme-tail errors. Extreme-wind
+skill is not covered by the SWA optimisation objective. A tail-calibrated
+head (see v25/v26 in the parent repo) or a variance-preserving loss would
+address this specifically.
 
 Per-K figures live at `results/extreme_records/plots/K{K}/extreme_records_K40.png`.
 Same axis convention as `results/2026-05-23-v22/plots/K{K}/extreme_records_K40.png`
