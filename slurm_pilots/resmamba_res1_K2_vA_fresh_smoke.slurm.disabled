@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Version A Stage A smoke at res=1:
+# K=2 closed-loop res_mamba on DeepMind small baseline. 6k steps fresh.
+# λ ramp 0.0 → 0.1 (very gentle, since no K=1 V-A pretraining at res=1 yet).
+# Goal: verify V-A stabilises closed-loop training at res=1 too.
+#SBATCH --job-name=resmamba-res1-K2-vA-smoke
+#SBATCH --account=biao
+#SBATCH --gres=gpu:1
+#SBATCH --qos=gpu
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=120G
+#SBATCH --constraint=gpu80
+#SBATCH --time=06:00:00
+#SBATCH --output=/home/lm8598/Weather_Global_experiments/logs/resmamba_res1_K2_vA_smoke_%j.out
+#SBATCH --error=/home/lm8598/Weather_Global_experiments/logs/resmamba_res1_K2_vA_smoke_%j.err
+set -euo pipefail
+export MPLCONFIGDIR=/tmp/mpl-weather-global; mkdir -p $MPLCONFIGDIR
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export XLA_PYTHON_CLIENT_ALLOCATOR=platform
+export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false"
+PYTHON=/home/lm8598/Weather_Global_experiments/.conda/envs/graphcast311/bin/python
+cd /home/lm8598/Weather_Global_experiments
+
+ROOT=/scratch/gpfs/DABANIN/lm8598/Weather_Global
+# Baseline: DeepMind GraphCast small (res=1, mesh=5, mp=16)
+DEEPMIND_SMALL="${ROOT}/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"
+RUN_NAME=resmamba_res1_K2_vA_smoke
+OUT_DIR=${ROOT}/results/resmamba_res1
+
+mkdir -p "${OUT_DIR}"
+[ -f "${DEEPMIND_SMALL}" ] || { echo "ERR: DeepMind small ckpt missing"; exit 1; }
+echo "=== res=1 V-A K=2 smoke (fresh from DeepMind small) ==="
+
+$PYTHON -u -m src.models.mamba.training.segments_training \
+  --model residual_mamba \
+  --data-path ${ROOT}/data/graphcast/graphcast/dataset/wb2_res1_levels13_2015_2022.zarr \
+  --data-source prepared_array \
+  --prepared-data-root /scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/dataset/prepared_stream \
+  --stats-dir ${ROOT}/data/graphcast/graphcast/stats \
+  --baseline-ckpt "${DEEPMIND_SMALL}" \
+  --out-dir "${OUT_DIR}" \
+  --run-name "${RUN_NAME}" \
+  --val-year 2022 --train-start-year 2015 --train-end-year 2021 \
+  --resolution 1.0 --mesh-size 5 --width 512 --processor-msg-steps 2 \
+  --baseline-msg-steps 16 \
+  --input-duration 12h \
+  --bptt-steps 24 --target-steps 2 --len-segment 48 \
+  --batch-size 1 --eval-batch-size 1 \
+  --eval-num-segments 4 --final-eval-num-segments 4 \
+  --chunk-load-workers 6 \
+  --batch-builder prepared_array \
+  --data-cache-mode never \
+  --max-steps 6000 --eval-every 500 --checkpoint-every 1000 \
+  --lr 1e-5 --weight-decay 1e-4 --precision bf16 \
+  --temporal-backbone mamba \
+  --temporal-location mesh_processor_interleaved \
+  --temporal-d-inner 128 --temporal-d-state 16 --temporal-d-conv 4 \
+  --temporal-dt-rank auto --temporal-layers 1 \
+  --temporal-stateful \
+  --temporal-insert-count 2 \
+  --residual-ar-feedback gated \
+  --feedback-lambda-init 0.0 \
+  --feedback-lambda-final 0.1 \
+  --feedback-lambda-warmup-start-step 0 \
+  --feedback-lambda-warmup-end-step 5000 \
+  --stop-grad-feedback \
+  --grad-clip-norm 0.5 \
+  --residual-output-head enabled \
+  --init-from-baseline \
+  --trainable-part proc_and_mamba \
+  --memory-mode optimal \
+  --seed 22
+
+echo "res=1 V-A K=2 smoke done"

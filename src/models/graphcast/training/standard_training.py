@@ -43,6 +43,7 @@ def main() -> None:
         open_training_splits,
     )
     from .core.eval import run_eval
+    from .core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
     from .core.logging import (
         _filter_pairs_upto_step,
         _load_dict_series_upto_step,
@@ -59,6 +60,7 @@ def main() -> None:
     from .core.model import (
         build_loss_transform,
         build_predictor,
+        derive_model_config_from_checkpoint,
         gc,
         load_graphcast_checkpoint,
         load_stats,
@@ -77,14 +79,13 @@ def main() -> None:
     if cfg.input_duration is not None:
         task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
 
-    model_cfg = dataclasses.replace(
+    model_cfg = derive_model_config_from_checkpoint(
         base_model_cfg,
         resolution=cfg.resolution,
         mesh_size=cfg.mesh_size,
         latent_size=cfg.width,
         gnn_msg_steps=cfg.processor_msg_steps,
         hidden_layers=1,
-        mesh2grid_edge_normalization_factor=None,
     )
 
     norm_stats = load_stats(Path(cfg.stats_dir))
@@ -170,6 +171,7 @@ def main() -> None:
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
         )
         return predictor.loss(inputs, targets, forcings)
@@ -192,6 +194,7 @@ def main() -> None:
         temporal_layers=cfg.temporal_layers,
         temporal_dropout=cfg.temporal_dropout,
         temporal_stateful=cfg.temporal_stateful,
+        temporal_insert_count=cfg.temporal_insert_count,
         zero_init_temporal_out=cfg.zero_init_temporal_out,
     )
     rng = jax.random.PRNGKey(cfg.seed)
@@ -222,6 +225,10 @@ def main() -> None:
             dt=dt_train,
             progress_label="eval-only",
             batch_builder=eval_batch_builder_fn,
+            max_batches=cfg.final_eval_num_batches,
+            subset_policy=cfg.eval_subset_policy,
+            subset_role="eval_only",
+            subset_fold=None,
         )
         print(f"[eval-only] total {eval_metrics['total']:.6f}")
         return
@@ -614,17 +621,49 @@ def main() -> None:
                 dt=dt_train,
                 progress_label=f"eval@step{step}",
                 batch_builder=eval_batch_builder_fn,
+                max_batches=cfg.eval_num_batches,
+                subset_policy=cfg.eval_subset_policy,
+                subset_role="fixed_checkpoint",
+                subset_fold=0,
             )
             eval_losses.append((step, eval_metrics["total"]))
             maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
             eval_details.append(
                 {
                     "step": step,
-                    "total": eval_metrics["total"],
+                    **eval_metrics,
                     **batch_builder_metadata,
                 }
             )
             print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+            if cfg.eval_rotating_diagnostics and cfg.eval_num_batches is not None:
+                rotating_eval = run_eval(
+                    transformed_eval_loss,
+                    params,
+                    state,
+                    rng,
+                    eval_ds,
+                    eval_final_indices,
+                    eval_batch_size=cfg.eval_batch_size,
+                    input_steps=input_steps,
+                    target_steps=target_steps,
+                    task_cfg=task_cfg,
+                    dt=dt_train,
+                    progress_label=f"eval_rotating@step{step}",
+                    batch_builder=eval_batch_builder_fn,
+                    max_batches=cfg.eval_num_batches,
+                    subset_policy=EVAL_SUBSET_STRATIFIED_ROTATING,
+                    subset_role="rotating_diagnostic",
+                    subset_fold=step // cfg.eval_every,
+                )
+                eval_details.append(
+                    {
+                        "step": step,
+                        **rotating_eval,
+                        **batch_builder_metadata,
+                    }
+                )
+                print(f"[eval_rotating] step {step} total {rotating_eval['total']:.6f}")
             plot_loss_curves(out_dir, train_losses, eval_losses)
             save_logs(
                 out_dir,
@@ -681,6 +720,10 @@ def main() -> None:
         dt=dt_train,
         progress_label="eval@final",
         batch_builder=eval_batch_builder_fn,
+        max_batches=cfg.final_eval_num_batches,
+        subset_policy=cfg.eval_subset_policy,
+        subset_role="final",
+        subset_fold=None,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
@@ -688,7 +731,7 @@ def main() -> None:
         {
             "step": step,
             "final": True,
-            "total": final_eval["total"],
+            **final_eval,
             **batch_builder_metadata,
         }
     )

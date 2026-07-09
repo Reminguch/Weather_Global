@@ -1,0 +1,294 @@
+"""City trace CLOSED-LOOP eval: same data layout as eval_city_trace.py but
+uses closed-loop AR feedback (full_pred = baseline + residual fed forward).
+Optional --warmup-steps W truth warmup before metric phase. Matches v22closed
+training semantics.
+
+Two independent branches (per eval_v24_closed.py design):
+  baseline branch: x_b_{k+1} = G(x_b_k)         (pure GraphCast self-rollout)
+  full branch:     x_f_{k+1} = G(x_f_k) + R(x_f_k, s_k)   (closed-loop)
+"""
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import json
+import pickle
+import sys
+from pathlib import Path
+
+import haiku as hk
+import jax
+import numpy as np
+import xarray as xr
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "third_party" / "graphcast"))
+
+from graphcast import casting, graphcast as gc, normalization  # noqa: E402
+
+import scripts.training.train_graphcast as base_train  # noqa: E402
+from src.models.graphcast.training.core.model import DirectResidualNormalizer  # noqa: E402
+from src.models.mamba.training.param_utils import overlay_matching_params  # noqa: E402
+from scripts.training.full_mamba_v9.train_mz_v9 import GCResidualWithZeroHead, _attach_temporal  # noqa: E402
+
+
+# (city_name, lat_N, lon_E) — lon in 0-360 (E positive)
+CITIES = [
+    ("NYC",       40.7,  286.0),  # -74°W
+    ("LA",        34.0,  241.7),  # -118°W
+    ("Chicago",   41.9,  272.4),
+    ("Tokyo",     35.7,  139.7),
+    ("Beijing",   39.9,  116.4),
+    ("Shanghai",  31.2,  121.5),
+    ("London",    51.5,    0.1),
+    ("Paris",     48.9,    2.4),
+    ("Mumbai",    19.1,   72.9),
+    ("Sydney",   -33.9,  151.2),
+]
+
+VARS = ["2m_temperature", "total_precipitation_6hr"]
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--ckpt", required=True)
+    p.add_argument("--data-path", default=base_train.DEFAULT_DATA_PATH)
+    p.add_argument("--stats-dir", default=base_train.DEFAULT_STATS_DIR)
+    p.add_argument("--ckpt-in", default=(
+        "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/params/"
+        "GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - "
+        "mesh 2to5 - precipitation input and output.npz"))
+    p.add_argument("--resolution", type=float, default=1.0)
+    p.add_argument("--mesh-size", type=int, default=5)
+    p.add_argument("--width", type=int, default=512)
+    p.add_argument("--baseline-msg-steps", type=int, default=16)
+    p.add_argument("--residual-msg-steps", type=int, default=2)
+    p.add_argument("--val-year", type=int, default=2022)
+    p.add_argument("--train-start-year", type=int, default=2020)
+    p.add_argument("--train-end-year", type=int, default=2021)
+    p.add_argument("--input-duration", default="12h")
+    p.add_argument("--target-steps", type=int, default=40)
+    p.add_argument("--warmup-steps", type=int, default=24,
+                   help="Truth-feedback warmup before metric phase.")
+    p.add_argument("--anchor-date", default="2022-07-01T00:00:00")
+    p.add_argument("--temporal-location", default="mesh_processor_interleaved")
+    p.add_argument("--temporal-hidden-size", type=int, default=128)
+    p.add_argument("--temporal-d-inner", type=int, default=None)
+    p.add_argument("--temporal-d-state", type=int, default=16)
+    p.add_argument("--temporal-d-conv", type=int, default=4)
+    p.add_argument("--temporal-dt-rank", default="auto")
+    p.add_argument("--temporal-layers", type=int, default=2)
+    p.add_argument("--no-temporal-conv-bias", dest="temporal_conv_bias",
+                   action="store_false", default=True)
+    p.add_argument("--no-zero-init-out", dest="temporal_zero_init_out",
+                   action="store_false", default=True)
+    p.add_argument("--temporal-bias", action="store_true", default=False)
+    p.add_argument("--temporal-dropout", type=float, default=0.0)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--out-json", required=True)
+    return p.parse_args()
+
+
+def main():
+    cfg = parse_args()
+    ckpt_path = Path(cfg.ckpt)
+    K = cfg.target_steps
+    W = cfg.warmup_steps
+    total_steps = W + K
+
+    ckpt_in = base_train.load_graphcast_checkpoint(Path(cfg.ckpt_in))
+    base_model_cfg = ckpt_in.model_config
+    task_cfg = ckpt_in.task_config
+    if cfg.input_duration is not None:
+        task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
+    model_cfg_baseline = dataclasses.replace(
+        base_model_cfg, resolution=cfg.resolution, mesh_size=cfg.mesh_size,
+        latent_size=cfg.width, gnn_msg_steps=cfg.baseline_msg_steps)
+    model_cfg_residual = dataclasses.replace(
+        base_model_cfg, resolution=cfg.resolution, mesh_size=cfg.mesh_size,
+        latent_size=cfg.width, gnn_msg_steps=cfg.residual_msg_steps)
+
+    norm_stats = base_train.load_stats(Path(cfg.stats_dir))
+
+    class _SplitCfg:
+        data_path = cfg.data_path
+        resolution = cfg.resolution
+        val_year = cfg.val_year
+        train_start_year = cfg.train_start_year
+        train_end_year = cfg.train_end_year
+    _train_ds, eval_ds = base_train._open_local_splits(_SplitCfg)
+    eval_ds = base_train.prepare_dataset_for_task(eval_ds, task_cfg)
+    dt = base_train.infer_time_step(eval_ds)
+    input_steps = base_train.input_steps_from_duration(task_cfg.input_duration, dt)
+
+    target_time = np.datetime64(cfg.anchor_date)
+    time_vals = eval_ds.time.values
+    anchor_idx = int(np.argmin(np.abs(time_vals - target_time)))
+    print(f"[city-trace] anchor={cfg.anchor_date} idx={anchor_idx} actual={time_vals[anchor_idx]}")
+
+    use_bf16 = True
+
+    def _build_baseline():
+        p = gc.GraphCast(model_cfg_baseline, task_cfg)
+        if use_bf16: p = casting.Bfloat16Cast(p)
+        p = normalization.InputsAndResiduals(
+            p, stddev_by_level=norm_stats["stddev_by_level"],
+            mean_by_level=norm_stats["mean_by_level"],
+            diffs_stddev_by_level=norm_stats["diffs_stddev_by_level"])
+        return p
+
+    def _build_residual():
+        p = GCResidualWithZeroHead(model_cfg_residual, task_cfg)
+        _attach_temporal(p, cfg)
+        if use_bf16: p = casting.Bfloat16Cast(p)
+        p = DirectResidualNormalizer(
+            p, stddev_by_level=norm_stats["stddev_by_level"],
+            mean_by_level=norm_stats["mean_by_level"],
+            diffs_stddev_by_level=norm_stats["diffs_stddev_by_level"])
+        return p
+
+    def baseline_fn(inputs, targets, forcings):
+        return _build_baseline()(inputs, targets_template=targets, forcings=forcings)
+    def residual_fn(inputs, targets, forcings):
+        return _build_residual()(inputs, targets_template=targets, forcings=forcings)
+    baseline_predict = hk.transform_with_state(baseline_fn)
+    residual_predict = hk.transform_with_state(residual_fn)
+
+    sample_inputs, sample_targets, sample_forcings = base_train.build_batch_from_indices(
+        eval_ds, indices=[anchor_idx],
+        input_steps=input_steps, target_steps=total_steps,
+        task_cfg=task_cfg, dt=dt)
+    sample_targets_1step = sample_targets.isel(time=slice(0, 1))
+    sample_forcings_1step = sample_forcings.isel(time=slice(0, 1))
+
+    rng = jax.random.PRNGKey(cfg.seed)
+    rng, k_b, k_r = jax.random.split(rng, 3)
+    baseline_params, baseline_state_init = baseline_predict.init(
+        k_b, sample_inputs, sample_targets_1step, sample_forcings_1step)
+    baseline_params, _ = overlay_matching_params(baseline_params, ckpt_in.params, strict=True)
+    _residual_params_init, residual_state_init = residual_predict.init(
+        k_r, sample_inputs, sample_targets_1step, sample_forcings_1step)
+
+    with ckpt_path.open("rb") as f:
+        ckpt = pickle.load(f)
+    residual_params = ckpt["residual_params"]
+    print(f"[city-trace] residual_params loaded, residual_state=zero init")
+
+    @jax.jit
+    def _baseline_step(params, state, key, inp, tgt, frc):
+        return baseline_predict.apply(params, state, key, inp, tgt, frc)
+    @jax.jit
+    def _residual_step(params, state, key, inp, tgt, frc):
+        return residual_predict.apply(params, state, key, inp, tgt, frc)
+
+    def _shift_inputs_with_field(prev_inputs, new_field_ds, forcings_next):
+        target_time = prev_inputs.time.values[-1:] + dt
+        ns = new_field_ds.assign_coords(time=target_time)
+        fn = forcings_next.assign_coords(time=target_time)
+        next_frame = xr.merge([ns, fn])
+        if "datetime" in next_frame.coords:
+            next_frame = next_frame.drop_vars("datetime")
+        keys_in_next = [k for k in next_frame.data_vars if k in prev_inputs.data_vars]
+        next_inputs_part = next_frame[keys_in_next]
+        merged = xr.concat([prev_inputs, next_inputs_part], dim="time", data_vars="different")
+        return merged.tail(time=input_steps)
+
+    # CLOSED-LOOP rollout: 2 branches (matches v22closed training semantics).
+    # PHASE 1: W-step truth-feedback warmup (both branches see same truth path).
+    cur = sample_inputs
+    bs = baseline_state_init
+    rs = residual_state_init
+    rng_chain = rng
+    for k in range(W):
+        tgt_k = sample_targets.isel(time=slice(k, k + 1))
+        frc_k = sample_forcings.isel(time=slice(k, k + 1))
+        rng_chain, kk_b, kk_r = jax.random.split(rng_chain, 3)
+        _bp, bs = _baseline_step(baseline_params, bs, kk_b, cur, tgt_k, frc_k)
+        _rp, rs = _residual_step(residual_params, rs, kk_r, cur, tgt_k, frc_k)
+        cur = _shift_inputs_with_field(cur, tgt_k, frc_k)
+
+    # PHASE 2: closed-loop AR, two branches diverge from same warmed cur.
+    cur_b = cur; bs_b = bs
+    cur_f = cur; bs_f = bs; rs_f = rs
+    baseline_traj = []
+    full_traj = []
+    for k in range(K):
+        kk = W + k
+        tgt_k = sample_targets.isel(time=slice(kk, kk + 1))
+        frc_k = sample_forcings.isel(time=slice(kk, kk + 1))
+        rng_chain, kk_base, kk_res = jax.random.split(rng_chain, 3)
+        # Baseline branch — pure self-rollout
+        bp_b, bs_b = _baseline_step(baseline_params, bs_b, kk_base, cur_b, tgt_k, frc_k)
+        baseline_traj.append(bp_b)
+        # Full branch — closed-loop (full_pred fed forward)
+        bp_f, bs_f = _baseline_step(baseline_params, bs_f, kk_base, cur_f, tgt_k, frc_k)
+        rp_f, rs_f = _residual_step(residual_params, rs_f, kk_res, cur_f, tgt_k, frc_k)
+        full_pred = jax.tree_util.tree_map(lambda b, r: b + r, bp_f, rp_f)
+        full_traj.append(full_pred)
+        if k < K - 1:
+            cur_b = _shift_inputs_with_field(cur_b, bp_b, frc_k)
+            cur_f = _shift_inputs_with_field(cur_f, full_pred, frc_k)  # CLOSED-LOOP
+        if (k + 1) % 10 == 0:
+            print(f"[city-trace-closed] step {k+1}/{K}")
+
+    baseline_pred = xr.concat(baseline_traj, dim="time")
+    full_pred = xr.concat(full_traj, dim="time")
+    # Truth for metric phase = targets at slice(W, W+K)
+    sample_targets_metric = sample_targets.isel(time=slice(W, W + K))
+
+    # Find nearest grid points for each city
+    lat_vals = eval_ds.lat.values
+    lon_vals = eval_ds.lon.values
+    print(f"\n=== City grid points ===")
+    city_info = {}
+    for name, target_lat, target_lon in CITIES:
+        lat_idx = int(np.argmin(np.abs(lat_vals - target_lat)))
+        lon_idx = int(np.argmin(np.abs(lon_vals - target_lon)))
+        city_info[name] = (lat_idx, lon_idx, float(lat_vals[lat_idx]), float(lon_vals[lon_idx]))
+        print(f"  {name}: target ({target_lat},{target_lon}) → grid ({lat_vals[lat_idx]:.1f},{lon_vals[lon_idx]:.1f})")
+
+    # Extract per-city per-var trajectory (metric phase only)
+    lead_times = [str(sample_targets_metric.time.isel(time=k).values) for k in range(K)]
+    out = {
+        "ckpt": str(ckpt_path),
+        "anchor_date": cfg.anchor_date,
+        "anchor_idx": anchor_idx,
+        "anchor_actual_time": str(time_vals[anchor_idx]),
+        "eval_mode": f"closed_loop_W{W}",
+        "warmup_steps": W,
+        "target_steps": K,
+        "lead_times": lead_times,
+        "cities": {},
+    }
+    for name, (lat_idx, lon_idx, lat_actual, lon_actual) in city_info.items():
+        out["cities"][name] = {
+            "lat": lat_actual, "lon": lon_actual,
+            "vars": {},
+        }
+        def _at_point(da, k):
+            v = da.isel(time=k, lat=lat_idx, lon=lon_idx).values
+            return float(np.asarray(v).squeeze())
+        for var in VARS:
+            truth_arr = [_at_point(sample_targets_metric[var], k) for k in range(K)]
+            baseline_arr = [_at_point(baseline_pred[var], k) for k in range(K)]
+            full_arr = [_at_point(full_pred[var], k) for k in range(K)]
+            out["cities"][name]["vars"][var] = {
+                "truth": truth_arr,
+                "baseline": baseline_arr,
+                "full": full_arr,
+            }
+
+    Path(cfg.out_json).parent.mkdir(parents=True, exist_ok=True)
+    Path(cfg.out_json).write_text(json.dumps(out, indent=1))
+    print(f"\n[city-trace] wrote {cfg.out_json}")
+    print(f"NYC 2m_temp lead 6h: truth={out['cities']['NYC']['vars']['2m_temperature']['truth'][0]:.2f}K "
+          f"baseline={out['cities']['NYC']['vars']['2m_temperature']['baseline'][0]:.2f}K "
+          f"full={out['cities']['NYC']['vars']['2m_temperature']['full'][0]:.2f}K")
+    print(f"NYC 2m_temp lead 240h: truth={out['cities']['NYC']['vars']['2m_temperature']['truth'][-1]:.2f}K "
+          f"baseline={out['cities']['NYC']['vars']['2m_temperature']['baseline'][-1]:.2f}K "
+          f"full={out['cities']['NYC']['vars']['2m_temperature']['full'][-1]:.2f}K")
+
+
+if __name__ == "__main__":
+    main()

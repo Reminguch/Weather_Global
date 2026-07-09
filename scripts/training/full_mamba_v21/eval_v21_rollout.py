@@ -1,0 +1,1 @@
+/home/lm8598/Weather_Global_experiments/scripts/training/full_mamba_v20/eval_v20_rollout.py

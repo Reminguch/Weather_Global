@@ -149,6 +149,7 @@ class LegacyGraphCastMamba(gc.GraphCast):
                     gc.TemporalMeshConfig(
                         backbone=self._temporal_backbone,
                         location=self._temporal_location,
+                        hidden_size=self._temporal_hidden_size,
                         d_inner=self._temporal_d_inner,
                         d_state=self._temporal_d_state,
                         dt_rank=self._temporal_dt_rank,
@@ -209,6 +210,7 @@ class LegacyGraphCastMamba(gc.GraphCast):
                 gc.TemporalMeshConfig(
                     backbone=self._temporal_backbone,
                     location=self._temporal_location,
+                    hidden_size=self._temporal_hidden_size,
                     d_inner=self._temporal_d_inner,
                     d_state=self._temporal_d_state,
                     dt_rank=self._temporal_dt_rank,

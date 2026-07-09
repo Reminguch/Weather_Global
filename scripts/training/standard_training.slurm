@@ -20,8 +20,8 @@ mkdir -p logs
 source scripts/graphcast_env.sh
 
 DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}
-DATA_SOURCE=${DATA_SOURCE:-raw}
-PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-prepared}
+DATA_SOURCE=${DATA_SOURCE:-prepared_array}
+PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}
 VAL_YEAR=${VAL_YEAR:-2022}
 TRAIN_START_YEAR=${TRAIN_START_YEAR:-}
 TRAIN_END_YEAR=${TRAIN_END_YEAR:-}
@@ -35,12 +35,14 @@ BATCH_SIZE=${BATCH_SIZE:-4}
 MAX_STEPS=${MAX_STEPS:-50000}
 EVAL_EVERY=${EVAL_EVERY:-2000}
 EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE:-4}
+EVAL_NUM_BATCHES=${EVAL_NUM_BATCHES:-16}
+FINAL_EVAL_NUM_BATCHES=${FINAL_EVAL_NUM_BATCHES:-all}
 CHECKPOINT_EVERY=${CHECKPOINT_EVERY:-2000}
 LR=${LR:-1e-4}
 WEIGHT_DECAY=${WEIGHT_DECAY:-1e-4}
 SEED=${SEED:-0}
 PRECISION=${PRECISION:-bf16}
-BATCH_BUILDER=${BATCH_BUILDER:-vectorized}
+BATCH_BUILDER=${BATCH_BUILDER:-prepared_array}
 
 OUT_DIR=${OUT_DIR:-artifacts/checkpoints/graphcast_res${RESOLUTION%.*}_manual}
 RES_TAG="res${RESOLUTION%.0}"
@@ -73,6 +75,8 @@ CMD=(
   --max-steps "${MAX_STEPS}"
   --eval-every "${EVAL_EVERY}"
   --eval-batch-size "${EVAL_BATCH_SIZE}"
+  --eval-num-batches "${EVAL_NUM_BATCHES}"
+  --final-eval-num-batches "${FINAL_EVAL_NUM_BATCHES}"
   --checkpoint-every "${CHECKPOINT_EVERY}"
   --lr "${LR}"
   --weight-decay "${WEIGHT_DECAY}"

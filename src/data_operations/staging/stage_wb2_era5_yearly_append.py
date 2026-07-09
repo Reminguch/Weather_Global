@@ -274,9 +274,9 @@ def _write_year(ds_year: xr.Dataset, output: Path, *, mode: str) -> None:
     if mode == "w":
         # Force Zarr v2 for compatibility with upstream WB2 encodings that
         # include numcodecs compressors (e.g., Blosc), which fail under v3.
-        ds_year.to_zarr(output, mode="w", consolidated=True, zarr_version=2)
+        ds_year.to_zarr(output, mode="w", consolidated=True, zarr_format=2)
     else:
-        ds_year.to_zarr(output, mode="a", append_dim="time", zarr_version=2)
+        ds_year.to_zarr(output, mode="a", append_dim="time", zarr_format=2)
         zarr.consolidate_metadata(str(output))
 
 
@@ -296,56 +296,10 @@ def _resolve_requested_years(
     return list(range(DEFAULT_BOOTSTRAP_START, DEFAULT_BOOTSTRAP_END + 1))
 
 
-def _canonical_report_path(output: Path) -> Path:
-    return output.parent / f"{output.name}.stage_report.json"
-
-
-def _load_json_report(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Report must contain a JSON object: {path}")
-    return payload
-
-
-def _collect_superseded_reports(canonical_path: Path) -> tuple[list[dict], list[Path]]:
-    superseded: list[dict] = []
-    auxiliary_paths: list[Path] = []
-    if canonical_path.exists():
-        existing_report = _load_json_report(canonical_path)
-        existing_superseded = existing_report.get("superseded_reports", [])
-        if isinstance(existing_superseded, list):
-            superseded.extend(existing_superseded)
-
-    output_name = canonical_path.name[: -len(".stage_report.json")]
-    for path in sorted(canonical_path.parent.glob(f"{output_name}.*report.json")):
-        if path == canonical_path:
-            continue
-        auxiliary_paths.append(path)
-        superseded.append(
-            {
-                "path": str(path),
-                "report": _load_json_report(path),
-            }
-        )
-    return superseded, auxiliary_paths
-
-
 def _save_report(path: Path, report: RunReport) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = asdict(report)
-    superseded_reports, auxiliary_paths = _collect_superseded_reports(path)
-    if superseded_reports:
-        payload["superseded_reports"] = superseded_reports
-
-    tmp_path = path.with_name(f".{path.name}.tmp")
-    with tmp_path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-        f.write("\n")
-    tmp_path.replace(path)
-
-    for auxiliary_path in auxiliary_paths:
-        auxiliary_path.unlink(missing_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(asdict(report), f, indent=2)
 
 
 def main() -> None:
@@ -354,7 +308,7 @@ def main() -> None:
 
     output = args.output.resolve()
     lock_path = output.parent / f"{output.name}.lock"
-    report_path = _canonical_report_path(output)
+    report_path = output.parent / f"{output.name}.stage_report.json"
 
     print(f"Opening source WB2 Zarr: {args.uri}")
     source = xr.open_zarr(args.uri, consolidated=True, storage_options={"token": "anon"})
@@ -497,33 +451,13 @@ def main() -> None:
                 raise RuntimeError("Internal error: rebuild requested but existing dataset was not loaded.")
 
             tmp_output = output.parent / f"{output.name}.tmp_rebuild"
-            years_to_write = sorted(set(existing_years) | set(missing_years))
-            completed_tmp_years: list[int] = []
             if tmp_output.exists():
-                tmp_ds = xr.open_zarr(tmp_output, consolidated=False)
-                tmp_ds = _ensure_datetime_time(_normalize_coords(tmp_ds))
-                _validate_local_layout(tmp_ds)
-                completed_tmp_years, partial_tmp = _infer_existing_years(tmp_ds)
-                if partial_tmp:
-                    detail = "; ".join(f"{y}: {msg}" for y, msg in sorted(partial_tmp.items()))
-                    raise ValueError(
-                        "Detected partial/incomplete years in existing rebuild temp output. "
-                        f"Remove {tmp_output} and retry. Details: {detail}"
-                    )
-                expected_prefix = years_to_write[: len(completed_tmp_years)]
-                if completed_tmp_years != expected_prefix:
-                    raise ValueError(
-                        "Existing rebuild temp output is not a prefix of the requested rebuild. "
-                        f"tmp_years={completed_tmp_years} expected_prefix={expected_prefix}. "
-                        f"Remove {tmp_output} and retry."
-                    )
-                appended_years.extend(y for y in completed_tmp_years if y in set(missing_years))
-                print(f"resuming rebuild temp: completed_years={completed_tmp_years}")
+                shutil.rmtree(tmp_output)
 
+            years_to_write = sorted(set(existing_years) | set(missing_years))
             total = len(years_to_write)
-            mode = "a" if completed_tmp_years else "w"
-            remaining_years = years_to_write[len(completed_tmp_years) :]
-            for i, year in enumerate(remaining_years, start=len(completed_tmp_years) + 1):
+            mode = "w"
+            for i, year in enumerate(years_to_write, start=1):
                 t0 = time.time()
                 print(f"processing year {year} ({i}/{total}) ({'missing->source' if year in missing_years else 'existing->local'})")
                 if year in missing_years:

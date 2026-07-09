@@ -19,6 +19,19 @@ class SegmentRunConfig:
     segment_prefetch_depth: int = 2
     use_segment_block_loader: bool = True
     filter_nan_segments: bool = True
+    eval_num_segments: int | None = 16
+    final_eval_num_segments: int | None = None
+    eval_subset_policy: str = "stratified_fixed"
+    eval_rotating_diagnostics: bool = True
+
+
+def _positive_int_or_all(value: str) -> int | None:
+    if value.lower() == "all":
+        return None
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
+    return parsed
 
 
 def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
@@ -27,6 +40,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         DEFAULT_DATA_PATH,
         DEFAULT_PREPARED_DATA_ROOT,
         DEFAULT_STATS_DIR,
+        MEMORY_MODE_CHOICES,
         RunConfig,
     )
 
@@ -34,7 +48,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         description="Train GraphCast on shuffled chronological segments with chunked BPTT."
     )
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
-    parser.add_argument("--data-source", choices=["raw", "prepared_array"], default="raw")
+    parser.add_argument("--data-source", choices=["raw", "prepared_array"], default="prepared_array")
     parser.add_argument("--prepared-data-root", default=DEFAULT_PREPARED_DATA_ROOT)
     parser.add_argument("--resolution", type=float, default=2.0)
     parser.add_argument("--mesh-size", type=int, default=4)
@@ -51,6 +65,31 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--max-steps", type=int, default=10000, help="Optimizer updates, not forecast windows.")
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--eval-num-segments",
+        type=_positive_int_or_all,
+        default=16,
+        help="Number of deterministic validation segments for intermediate evals, or 'all'.",
+    )
+    parser.add_argument(
+        "--final-eval-num-segments",
+        type=_positive_int_or_all,
+        default=None,
+        help="Number of validation segments for final eval, or 'all' (default).",
+    )
+    parser.add_argument(
+        "--eval-subset-policy",
+        choices=["first", "stratified_fixed"],
+        default="stratified_fixed",
+        help="Policy for capped regular validation evals. Default selects a fixed full-year stratified subset.",
+    )
+    parser.add_argument(
+        "--no-eval-rotating-diagnostics",
+        dest="eval_rotating_diagnostics",
+        action="store_false",
+        default=True,
+        help="Disable the second rotating stratified diagnostic eval for capped regular validation evals.",
+    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -90,8 +129,16 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--temporal-backbone", choices=["none", "mamba"], default="none")
     parser.add_argument(
         "--temporal-location",
-        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
+        choices=["mesh_post_encoder", "mesh_processor_interleaved", "mesh_post_processor"],
         default="mesh_post_encoder",
+        help=(
+            "Where to insert Mamba block in GraphCast: "
+            "mesh_post_encoder = after grid2mesh, before processor (aggressive); "
+            "mesh_processor_interleaved = inserted between processor steps "
+            "(maximally expressive, can disturb mid-processor latent); "
+            "mesh_post_processor = after the full processor, before mesh2grid "
+            "(conservative: GraphCast spatial reasoning runs to completion first)."
+        ),
     )
     parser.add_argument("--temporal-d-inner", type=int, default=None)
     parser.add_argument("--temporal-d-state", type=int, default=16)
@@ -102,6 +149,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
     parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False)
+    parser.add_argument("--temporal-insert-count", type=int, default=None)
     parser.add_argument(
         "--init-from-graphcast-ckpt",
         default=None,
@@ -117,15 +165,30 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         "--zero-init-temporal-out",
         action="store_true",
         default=False,
-        help="Zero initialize temporal output projections so inserted Mamba starts as a no-op.",
+        help=(
+            "Zero initialize temporal output projections so inserted Mamba starts as a no-op. "
+            "Enabled automatically when --temporal-backbone=mamba."
+        ),
+    )
+    parser.add_argument(
+        "--memory-mode",
+        choices=MEMORY_MODE_CHOICES,
+        default="standard",
+        help=(
+            "Training memory behavior: standard preserves current behavior, "
+            "conservative partitions Mamba-only GC-Mamba gradients or, for "
+            "residual_mamba, stops frozen-baseline gradients and checkpoints "
+            "each residual AR step; optimal also rematerializes processor steps "
+            "plus mesh2grid."
+        ),
     )
     parser.add_argument("--data-cache-mode", choices=["auto", "always", "never"], default="auto")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0)
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="numpy")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default=None)
     args = parser.parse_args(argv)
 
-    if args.max_steps <= 0:
-        raise ValueError("--max-steps must be > 0")
+    if args.max_steps < 0:
+        raise ValueError("--max-steps must be >= 0")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be > 0")
     if args.len_segment <= 0:
@@ -138,8 +201,10 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--segment-prefetch-depth must be > 0")
     if args.len_segment % args.bptt_steps != 0:
         raise ValueError("--bptt-steps must divide --len-segment")
-    if args.target_steps != 1:
-        raise ValueError("Segment BPTT training currently requires --target-steps 1.")
+    if args.target_steps <= 0:
+        raise ValueError("--target-steps must be > 0")
+    if args.target_steps > 1 and args.target_steps >= args.bptt_steps:
+        raise ValueError("--target-steps must be < --bptt-steps for chunk-local AR tail training")
     if args.train_start_year is not None and args.train_end_year is None:
         raise ValueError("Provide both --train-start-year and --train-end-year, or neither.")
     if args.train_end_year is not None and args.train_start_year is None:
@@ -160,12 +225,18 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer")
     if args.temporal_layers <= 0:
         raise ValueError("--temporal-layers must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count <= 0:
+        raise ValueError("--temporal-insert-count must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count > args.processor_msg_steps:
+        raise ValueError("--temporal-insert-count must be <= --processor-msg-steps")
     if not (0.0 <= args.temporal_dropout < 1.0):
         raise ValueError("--temporal-dropout must be in [0, 1)")
     if args.data_cache_max_gib <= 0:
         raise ValueError("--data-cache-max-gib must be > 0")
     if args.resume_step is not None and args.init_from_graphcast_ckpt is not None:
         raise ValueError("--resume-step cannot be combined with --init-from-graphcast-ckpt")
+
+    batch_builder = args.batch_builder or ("prepared_array" if args.data_source == "prepared_array" else "numpy")
 
     base_cfg = RunConfig(
         data_path=args.data_path,
@@ -187,6 +258,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_num_batches=None,
+        final_eval_num_batches=None,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -205,11 +278,12 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
+        temporal_insert_count=args.temporal_insert_count,
         target_steps=args.target_steps,
         sequential_segment_steps=None,
         data_cache_mode=args.data_cache_mode,
         data_cache_max_gib=args.data_cache_max_gib,
-        batch_builder=args.batch_builder,
+        batch_builder=batch_builder,
         prefetch_workers=0,
         prefetch_depth=0,
         prefetch_device_depth=0,
@@ -217,7 +291,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         eval_only=False,
         init_from_graphcast_ckpt=args.init_from_graphcast_ckpt,
         trainable_part=args.trainable_part,
-        zero_init_temporal_out=args.zero_init_temporal_out,
+        zero_init_temporal_out=args.zero_init_temporal_out or args.temporal_backbone == "mamba",
+        memory_mode=args.memory_mode,
     )
     return SegmentRunConfig(
         base_cfg=base_cfg,
@@ -227,6 +302,10 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         segment_prefetch_depth=args.segment_prefetch_depth,
         use_segment_block_loader=args.use_segment_block_loader,
         filter_nan_segments=args.filter_nan_segments,
+        eval_num_segments=args.eval_num_segments,
+        final_eval_num_segments=args.final_eval_num_segments,
+        eval_subset_policy=args.eval_subset_policy,
+        eval_rotating_diagnostics=args.eval_rotating_diagnostics,
     )
 
 
@@ -267,8 +346,10 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         save_checkpoint,
         save_logs,
     )
+    from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
     from src.models.graphcast.training.core.model import (
         build_predictor,
+        derive_model_config_from_checkpoint,
         gc,
         load_graphcast_checkpoint,
         load_stats,
@@ -280,7 +361,10 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         SegmentBlockBatchLoader,
         SegmentChunk,
         SegmentLoadStats,
+        _advance_autoregressive_inputs,
         _build_chunk_batches,
+        _chunk_ar_truth_prefix,
+        _loss_by_lane,
         _reset_temporal_state_lanes,
         _save_chunk_timing_logs,
         _stop_gradient_temporal_state,
@@ -290,7 +374,12 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         run_eval_segments,
         valid_contiguous_final_input_indices,
     )
-    from src.models.mamba.training.param_utils import build_trainable_labels, overlay_matching_params
+    from src.models.mamba.training.param_utils import (
+        build_trainable_labels,
+        merge_param_partitions,
+        overlay_matching_params,
+        partition_params_by_trainable_part,
+    )
 
     cfg = segment_cfg.base_cfg
     out_dir = Path(cfg.out_dir) / cfg.run_name
@@ -302,14 +391,13 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     if cfg.input_duration is not None:
         task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
 
-    model_cfg = dataclasses.replace(
+    model_cfg = derive_model_config_from_checkpoint(
         base_model_cfg,
         resolution=cfg.resolution,
         mesh_size=cfg.mesh_size,
         latent_size=cfg.width,
         gnn_msg_steps=cfg.processor_msg_steps,
         hidden_layers=1,
-        mesh2grid_edge_normalization_factor=None,
     )
 
     norm_stats = load_stats(Path(cfg.stats_dir))
@@ -325,6 +413,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
     if input_steps < 2:
         raise ValueError("Segment training expects at least two input frames.")
     target_steps = cfg.target_steps
+    rolling_ar = target_steps > 1
+    target_load_steps = 1 if rolling_ar else target_steps
 
     train_final_indices = valid_contiguous_final_input_indices(
         train_ds,
@@ -355,7 +445,8 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         f"train_windows={len(train_final_indices)}, eval_windows={len(eval_final_indices)}, "
         f"train_segments={len(segments)}, eval_segments={len(eval_segments)}, "
         f"len_segment={segment_cfg.len_segment}, "
-        f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, target_steps={target_steps}"
+        f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, "
+        f"target_steps={target_steps}, target_load_steps={target_load_steps}"
     )
 
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
@@ -417,13 +508,14 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         effective_train_batch_builder = "segment_block"
         effective_eval_batch_builder = "segment_block"
 
-    def forward_fn(inputs, targets, forcings, is_training):
+    def loss_forward_fn(inputs, targets, forcings, is_training):
+        training_memory_mode = cfg.memory_mode if bool(is_training) else "standard"
         predictor = build_predictor(
             model_cfg,
             task_cfg,
             norm_stats,
             use_bf16=(cfg.precision == "bf16"),
-            gradient_checkpointing=True,
+            gradient_checkpointing=bool(is_training),
             temporal_backbone=cfg.temporal_backbone,
             temporal_location=cfg.temporal_location,
             temporal_d_inner=cfg.temporal_d_inner,
@@ -435,11 +527,39 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             temporal_layers=cfg.temporal_layers,
             temporal_dropout=cfg.temporal_dropout,
             temporal_stateful=cfg.temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
             zero_init_temporal_out=cfg.zero_init_temporal_out,
+            memory_mode=training_memory_mode,
         )
         return predictor.loss(inputs, targets, forcings)
 
-    transformed = hk.transform_with_state(forward_fn)
+    def loss_prediction_forward_fn(inputs, targets, forcings, is_training):
+        training_memory_mode = cfg.memory_mode if bool(is_training) else "standard"
+        predictor = build_predictor(
+            model_cfg,
+            task_cfg,
+            norm_stats,
+            use_bf16=(cfg.precision == "bf16"),
+            gradient_checkpointing=bool(is_training),
+            temporal_backbone=cfg.temporal_backbone,
+            temporal_location=cfg.temporal_location,
+            temporal_d_inner=cfg.temporal_d_inner,
+            temporal_d_state=cfg.temporal_d_state,
+            temporal_d_conv=cfg.temporal_d_conv,
+            temporal_dt_rank=cfg.temporal_dt_rank,
+            temporal_bias=cfg.temporal_bias,
+            temporal_conv_bias=cfg.temporal_conv_bias,
+            temporal_layers=cfg.temporal_layers,
+            temporal_dropout=cfg.temporal_dropout,
+            temporal_stateful=cfg.temporal_stateful,
+            temporal_insert_count=cfg.temporal_insert_count,
+            zero_init_temporal_out=cfg.zero_init_temporal_out,
+            autoregressive_loss_mode="none",
+            memory_mode=training_memory_mode,
+        )
+        return predictor.loss_and_predictions(inputs, targets, forcings)
+
+    transformed = hk.transform_with_state(loss_prediction_forward_fn if rolling_ar else loss_forward_fn)
     rng = jax.random.PRNGKey(cfg.seed)
 
     init_indices = [int(segments[lane % len(segments)][0]) for lane in range(cfg.batch_size)]
@@ -447,7 +567,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         train_ds,
         indices=init_indices,
         input_steps=input_steps,
-        target_steps=target_steps,
+        target_steps=target_load_steps,
         task_cfg=task_cfg,
         dt=dt_train,
     )
@@ -464,7 +584,33 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             f"initialized_new={overlay_stats.initialized}"
         )
 
-    if cfg.trainable_part == "all":
+    use_trainable_param_partition = (
+        cfg.memory_mode in ("conservative", "optimal")
+        and cfg.trainable_part == "mamba"
+    )
+    frozen_params = None
+    if use_trainable_param_partition:
+        params, frozen_params = partition_params_by_trainable_part(params, cfg.trainable_part)
+        trainable_leaves = sum(len(module_params) for module_params in params.values())
+        frozen_leaves = sum(len(module_params) for module_params in frozen_params.values())
+        if trainable_leaves == 0:
+            raise ValueError(
+                "Memory-mode param partitioning found no trainable Mamba params. "
+                "Use --temporal-backbone=mamba or --memory-mode=standard."
+            )
+        print(
+            "Using trainable-only GC-Mamba params "
+            f"(memory_mode={cfg.memory_mode}, trainable_leaves={trainable_leaves}, "
+            f"frozen_leaves={frozen_leaves})."
+        )
+
+    def full_params_for(current_params: hk.Params) -> hk.Params:
+        if not use_trainable_param_partition:
+            return current_params
+        assert frozen_params is not None
+        return merge_param_partitions(current_params, frozen_params)
+
+    if cfg.trainable_part == "all" or use_trainable_param_partition:
         opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
     else:
         opt = optax.multi_transform(
@@ -493,40 +639,108 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         numpy_cache_active=numpy_cache_active,
     )
 
-    @functools.partial(jax.jit)
-    def train_chunk(
-        params: hk.Params,
-        state: hk.State,
-        opt_state: optax.OptState,
-        rng_key: jax.Array,
-        chunk_inputs: tuple[xr.Dataset, ...],
-        chunk_targets: tuple[xr.Dataset, ...],
-        chunk_forcings: tuple[xr.Dataset, ...],
-        reset_mask: jax.Array,
-    ):
-        state = _reset_temporal_state_lanes(state, reset_mask)
+    if rolling_ar:
+        truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, segment_cfg.bptt_steps)
 
-        def loss_fn(p, s, key):
-            current_state = s
-            losses = []
-            keys = jax.random.split(key, segment_cfg.bptt_steps)
-            for bptt_i in range(segment_cfg.bptt_steps):
-                (loss_and_diag, current_state) = transformed.apply(
-                    p,
-                    current_state,
-                    keys[bptt_i],
-                    chunk_inputs[bptt_i],
-                    chunk_targets[bptt_i],
-                    chunk_forcings[bptt_i],
-                    True,
-                )
-                losses.append(scalarize_loss(loss_and_diag[0]))
-            return jnp.mean(jnp.stack(losses)), current_state
+        @functools.partial(jax.jit)
+        def train_chunk(
+            params: hk.Params,
+            state: hk.State,
+            opt_state: optax.OptState,
+            rng_key: jax.Array,
+            chunk_inputs: tuple[xr.Dataset, ...],
+            chunk_targets: tuple[xr.Dataset, ...],
+            chunk_forcings: tuple[xr.Dataset, ...],
+            reset_mask: jax.Array,
+        ):
+            state = _reset_temporal_state_lanes(state, reset_mask)
 
-        (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
-        updates, new_opt_state = opt.update(grads, opt_state, params)
-        new_params = optax.apply_updates(params, updates)
-        return new_params, _stop_gradient_temporal_state(new_state), new_opt_state, loss
+            def loss_fn(p, s, key):
+                # PATCHED: accumulate loss over the FULL bptt trunk, including
+                # the truth-prefix phase. Ilya's original code only counted
+                # AR-tail steps (bptt_i >= truth_prefix_steps). We count every
+                # step so the loss signal is dense across the entire BPTT
+                # window. Truth-prefix advance / AR-tail advance logic
+                # unchanged — only the loss gate is removed.
+                current_state = s
+                current_inputs = chunk_inputs[0]
+                weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                keys = jax.random.split(key, segment_cfg.bptt_steps)
+                for bptt_i in range(segment_cfg.bptt_steps):
+                    if bptt_i < truth_prefix_steps:
+                        current_inputs = chunk_inputs[bptt_i]
+                    (loss_and_diag, predictions), current_state = transformed.apply(
+                        full_params_for(p),
+                        current_state,
+                        keys[bptt_i],
+                        current_inputs,
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        True,
+                    )
+                    loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                    weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                    valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                    if bptt_i < segment_cfg.bptt_steps - 1:
+                        if bptt_i + 1 < truth_prefix_steps:
+                            current_inputs = chunk_inputs[bptt_i + 1]
+                        else:
+                            current_inputs = _advance_autoregressive_inputs(
+                                current_inputs,
+                                predictions,
+                                chunk_forcings[bptt_i],
+                            )
+                loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
+                return loss, current_state
+
+            (loss, new_state), grads = jax.value_and_grad(
+                loss_fn,
+                has_aux=True,
+            )(params, state, rng_key)
+            updates, new_opt_state = opt.update(grads, opt_state, params)
+            new_params = optax.apply_updates(params, updates)
+            return (
+                new_params,
+                _stop_gradient_temporal_state(new_state),
+                new_opt_state,
+                loss,
+            )
+    else:
+        @functools.partial(jax.jit)
+        def train_chunk(
+            params: hk.Params,
+            state: hk.State,
+            opt_state: optax.OptState,
+            rng_key: jax.Array,
+            chunk_inputs: tuple[xr.Dataset, ...],
+            chunk_targets: tuple[xr.Dataset, ...],
+            chunk_forcings: tuple[xr.Dataset, ...],
+            reset_mask: jax.Array,
+        ):
+            state = _reset_temporal_state_lanes(state, reset_mask)
+
+            def loss_fn(p, s, key):
+                current_state = s
+                losses = []
+                keys = jax.random.split(key, segment_cfg.bptt_steps)
+                for bptt_i in range(segment_cfg.bptt_steps):
+                    (loss_and_diag, current_state) = transformed.apply(
+                        full_params_for(p),
+                        current_state,
+                        keys[bptt_i],
+                        chunk_inputs[bptt_i],
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        True,
+                    )
+                    losses.append(scalarize_loss(loss_and_diag[0]))
+                return jnp.mean(jnp.stack(losses)), current_state
+
+            (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
+            updates, new_opt_state = opt.update(grads, opt_state, params)
+            new_params = optax.apply_updates(params, updates)
+            return new_params, _stop_gradient_temporal_state(new_state), new_opt_state, loss
 
     step = cfg.resume_step if cfg.resume_step is not None else 0
     train_losses: list[tuple[int, float]] = []
@@ -562,7 +776,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         best_eval_loss = float(eval_total)
         save_checkpoint(
             out_dir,
-            params=params,
+            params=full_params_for(params),
             step=eval_step,
             model_cfg=model_cfg,
             task_cfg=task_cfg,
@@ -614,7 +828,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             train_ds,
             segments,
             input_steps=input_steps,
-            target_steps=target_steps,
+            target_steps=target_load_steps,
             task_cfg=task_cfg,
             dt=dt_train,
             load_executor=load_executor,
@@ -629,7 +843,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             eval_ds,
             eval_segments,
             input_steps=input_steps,
-            target_steps=target_steps,
+            target_steps=target_load_steps,
             task_cfg=task_cfg,
             dt=dt_train,
             load_executor=load_executor,
@@ -658,7 +872,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                 train_ds,
                 chunk.chunk_indices,
                 input_steps=input_steps,
-                target_steps=target_steps,
+                target_steps=target_load_steps,
                 task_cfg=task_cfg,
                 dt=dt_train,
                 batch_builder=train_batch_builder,
@@ -705,16 +919,28 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
             rng, step_key = jax.random.split(rng)
             t0 = time.time()
-            params, state, opt_state, loss = train_chunk(
-                params,
-                state,
-                opt_state,
-                step_key,
-                chunk_inputs,
-                chunk_targets,
-                chunk_forcings,
-                jnp.asarray(reset_mask_np),
-            )
+            if rolling_ar:
+                params, state, opt_state, loss = train_chunk(
+                    params,
+                    state,
+                    opt_state,
+                    step_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    jnp.asarray(reset_mask_np),
+                )
+            else:
+                params, state, opt_state, loss = train_chunk(
+                    params,
+                    state,
+                    opt_state,
+                    step_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    jnp.asarray(reset_mask_np),
+                )
 
             if step + 1 + len(pending_chunks) < cfg.max_steps:
                 pending_chunks.append(submit_next_chunk())
@@ -760,7 +986,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
             if step % cfg.eval_every == 0:
                 eval_metrics = run_eval_segments(
                     transformed,
-                    params,
+                    full_params_for(params),
                     rng,
                     eval_ds,
                     eval_final_indices,
@@ -776,18 +1002,52 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
                     segment_loader=eval_segment_loader,
+                    rolling_ar=rolling_ar,
+                    load_target_steps=target_load_steps,
+                    max_segments=segment_cfg.eval_num_segments,
+                    subset_policy=segment_cfg.eval_subset_policy,
+                    subset_role="fixed_checkpoint",
+                    subset_fold=0,
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
-                eval_details.append({"step": step, "total": eval_metrics["total"], **batch_builder_metadata})
+                eval_details.append({"step": step, **eval_metrics, **batch_builder_metadata})
                 print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+                if segment_cfg.eval_rotating_diagnostics and segment_cfg.eval_num_segments is not None:
+                    rotating_eval = run_eval_segments(
+                        transformed,
+                        full_params_for(params),
+                        rng,
+                        eval_ds,
+                        eval_final_indices,
+                        eval_batch_size=cfg.eval_batch_size,
+                        input_steps=input_steps,
+                        target_steps=target_steps,
+                        task_cfg=task_cfg,
+                        dt=dt_train,
+                        len_segment=segment_cfg.len_segment,
+                        bptt_steps=segment_cfg.bptt_steps,
+                        progress_label=f"eval_rotating@step{step}",
+                        batch_builder=eval_batch_builder,
+                        chunk_load_workers=segment_cfg.chunk_load_workers,
+                        load_executor=load_executor,
+                        segment_loader=eval_segment_loader,
+                        rolling_ar=rolling_ar,
+                        load_target_steps=target_load_steps,
+                        max_segments=segment_cfg.eval_num_segments,
+                        subset_policy=EVAL_SUBSET_STRATIFIED_ROTATING,
+                        subset_role="rotating_diagnostic",
+                        subset_fold=step // cfg.eval_every,
+                    )
+                    eval_details.append({"step": step, **rotating_eval, **batch_builder_metadata})
+                    print(f"[eval_rotating] step {step} total {rotating_eval['total']:.6f}")
                 plot_loss_curves(out_dir, train_losses, eval_losses)
                 save_all_logs()
 
             if step % cfg.checkpoint_every == 0:
                 save_checkpoint(
                     out_dir,
-                    params=params,
+                    params=full_params_for(params),
                     step=step,
                     model_cfg=model_cfg,
                     task_cfg=task_cfg,
@@ -812,7 +1072,7 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
 
     final_eval = run_eval_segments(
         transformed,
-        params,
+        full_params_for(params),
         rng,
         eval_ds,
         eval_final_indices,
@@ -827,14 +1087,20 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
         segment_loader=eval_segment_loader,
+        rolling_ar=rolling_ar,
+        load_target_steps=target_load_steps,
+        max_segments=segment_cfg.final_eval_num_segments,
+        subset_policy=segment_cfg.eval_subset_policy,
+        subset_role="final",
+        subset_fold=None,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))
-    eval_details.append({"step": step, "final": True, "total": final_eval["total"], **batch_builder_metadata})
+    eval_details.append({"step": step, "final": True, **final_eval, **batch_builder_metadata})
 
     save_checkpoint(
         out_dir,
-        params=params,
+        params=full_params_for(params),
         step=step,
         model_cfg=model_cfg,
         task_cfg=task_cfg,

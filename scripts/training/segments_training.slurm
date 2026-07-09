@@ -26,8 +26,8 @@ if [[ "${MODEL}" != "gc_mamba" && "${MODEL}" != "residual_mamba" ]]; then
 fi
 
 DATA_PATH=${DATA_PATH:-data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr}
-DATA_SOURCE=${DATA_SOURCE:-raw}
-PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-prepared}
+DATA_SOURCE=${DATA_SOURCE:-prepared_array}
+PREPARED_DATA_ROOT=${PREPARED_DATA_ROOT:-data/graphcast/graphcast/dataset/prepared_stream}
 STATS_DIR=${STATS_DIR:-data/graphcast/graphcast/stats}
 CKPT_IN=${CKPT_IN:-"data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz"}
 BASELINE_CKPT=${BASELINE_CKPT:-${CKPT_IN}}
@@ -49,12 +49,14 @@ CHUNK_LOAD_WORKERS=${CHUNK_LOAD_WORKERS:-6}
 
 BATCH_SIZE=${BATCH_SIZE:-8}
 EVAL_BATCH_SIZE=${EVAL_BATCH_SIZE:-4}
+EVAL_NUM_SEGMENTS=${EVAL_NUM_SEGMENTS:-16}
+FINAL_EVAL_NUM_SEGMENTS=${FINAL_EVAL_NUM_SEGMENTS:-all}
 MAX_STEPS=${MAX_STEPS:-20000}
 EVAL_EVERY=${EVAL_EVERY:-2000}
 CHECKPOINT_EVERY=${CHECKPOINT_EVERY:-2000}
 DATA_CACHE_MODE=${DATA_CACHE_MODE:-auto}
 DATA_CACHE_MAX_GIB=${DATA_CACHE_MAX_GIB:-48}
-BATCH_BUILDER=${BATCH_BUILDER:-numpy}
+BATCH_BUILDER=${BATCH_BUILDER:-prepared_array}
 LR=${LR:-1e-4}
 WEIGHT_DECAY=${WEIGHT_DECAY:-1e-4}
 PRECISION=${PRECISION:-bf16}
@@ -69,6 +71,7 @@ TEMPORAL_DT_RANK=${TEMPORAL_DT_RANK:-auto}
 TEMPORAL_LAYERS=${TEMPORAL_LAYERS:-1}
 TEMPORAL_DROPOUT=${TEMPORAL_DROPOUT:-0.0}
 TEMPORAL_STATEFUL=${TEMPORAL_STATEFUL:-1}
+TEMPORAL_INSERT_COUNT=${TEMPORAL_INSERT_COUNT:-}
 
 if [[ "${MODEL}" == "gc_mamba" ]]; then
   RUN_NAME=${RUN_NAME:-gc_mamba_res${RESOLUTION%.*}_m${MESH_SIZE}_w${WIDTH}_mp${MSG}_ls${LEN_SEGMENT}_bptt${BPTT_STEPS}}
@@ -97,6 +100,8 @@ CMD=(
   --chunk-load-workers "${CHUNK_LOAD_WORKERS}"
   --batch-size "${BATCH_SIZE}"
   --eval-batch-size "${EVAL_BATCH_SIZE}"
+  --eval-num-segments "${EVAL_NUM_SEGMENTS}"
+  --final-eval-num-segments "${FINAL_EVAL_NUM_SEGMENTS}"
   --data-cache-mode "${DATA_CACHE_MODE}"
   --data-cache-max-gib "${DATA_CACHE_MAX_GIB}"
   --batch-builder "${BATCH_BUILDER}"
@@ -116,6 +121,10 @@ CMD=(
   --temporal-layers "${TEMPORAL_LAYERS}"
   --temporal-dropout "${TEMPORAL_DROPOUT}"
 )
+
+if [[ -n "${TEMPORAL_INSERT_COUNT}" ]]; then
+  CMD+=(--temporal-insert-count "${TEMPORAL_INSERT_COUNT}")
+fi
 
 if [[ "${TEMPORAL_STATEFUL}" == "1" ]]; then
   CMD+=(--temporal-stateful)
