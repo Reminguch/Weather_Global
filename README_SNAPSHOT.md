@@ -1,6 +1,6 @@
 # Frozen snapshot of the drifted tree (2026-07-09)
 
-This branch (`AR-Training-Lianghong-H256frozen-DRIFTED`) captures the EXACT on-disk code state of
+This branch (`AR-Training-Lianghong-H256frozen-DRIFTED-WRONG`) captures the EXACT on-disk code state of
 `/home/lm8598/Weather_Global_experiments/` on 2026-07-09 — the code that trained the
 res=1 H=256 K-scan (`/scratch/.../results/v22closed/K*_H256_fresh_20k/`).
 Use THIS tree for any eval of those ckpts. Original warning below.
@@ -59,3 +59,20 @@ Everything else (res=1 H=128 / open-loop v22 / all res=2) lives in
 `.conda/envs/graphcast311` inside this tree is shared by ALL experiments in both
 trees. It is unaffected by code drift (it's just the Python+JAX runtime), but its
 absolute path is baked into every slurm — hence the symlink at the old location.
+
+## Final verdict (2026-07-09, post-investigation)
+
+This code path is **WRONG** for the residual-mamba task, twice over:
+
+1. The `residual_inputs` architecture (Design B) information-starves the head:
+   its prognostic input lanes carry only the head's own past corrections plus
+   static/forcing channels — it never sees the absolute atmospheric state or
+   the baseline prediction, so it cannot model flow-dependent baseline error.
+   (Abandoned 2026-06-24 in favour of absolute-state input, Design A.)
+2. The H=256 runs trained here were an incoherent hybrid: absolute-state
+   feeding (Design A input) + Design B's residual-style input normalization
+   (tendency-std, no mean subtraction) → inputs at O(100) instead of O(1).
+   Result: max +1.60% paper-weighted MSE @240h (vs +19.2% for the clean-tree
+   H=128 equivalent). Not a valid d_inner ablation.
+
+Kept only for reproducibility of the H=256 checkpoint series.
