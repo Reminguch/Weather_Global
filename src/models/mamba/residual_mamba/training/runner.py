@@ -7,7 +7,9 @@ import concurrent.futures
 import dataclasses
 import functools
 import json
+import pickle
 import time
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
 
@@ -40,10 +42,14 @@ from src.models.graphcast.training.core.logging import (
     save_checkpoint,
     save_logs,
 )
+from src.models.graphcast.training.core.eval_selection import EVAL_SUBSET_STRATIFIED_ROTATING
 from src.models.graphcast.training.core.model import (
+    advance_residual_inputs,
+    build_zero_residual_inputs,
+    derive_model_config_from_checkpoint,
     load_graphcast_checkpoint,
     load_stats,
-    scalarize_loss,
+    reset_residual_input_lanes,
     validate_stats_coverage,
 )
 from src.models.graphcast.training.core.segments import (
@@ -51,21 +57,86 @@ from src.models.graphcast.training.core.segments import (
     SegmentBlockBatchLoader,
     SegmentChunk,
     SegmentLoadStats,
+    _advance_autoregressive_inputs,
     _build_chunk_batches,
+    _chunk_ar_truth_prefix,
+    _loss_by_lane,
     _reset_temporal_state_lanes,
     _save_chunk_timing_logs,
+    _stop_gradient_dataset,
     _stop_gradient_temporal_state,
     build_full_segments,
     valid_contiguous_final_input_indices,
 )
+from src.models.mamba.training.param_utils import (
+    build_trainable_labels,
+    overlay_matching_params,
+)
+from src.models.mamba.residual_mamba.feedback import residual_physical_feedback
 from .config import ResidualSegmentRunConfig, parse_args
 from .model import (
     augment_run_config,
-    build_eval_loss_transform,
-    build_loss_transform,
+    build_loss_prediction_transform,
     build_predict_transform,
+    residual_autoregressive_final_horizon,
     run_residual_eval,
+    should_checkpoint_residual_ar_step,
 )
+
+
+def _read_existing_output_head_enabled(out_dir: Path) -> bool:
+    run_config_path = out_dir / "run_config.json"
+    if not run_config_path.exists():
+        return False
+    with run_config_path.open("r", encoding="utf-8") as f:
+        run_config = json.load(f)
+    output_head = run_config.get("residual_training", {}).get("output_head", {})
+    return bool(output_head.get("enabled", False))
+
+
+def _load_resume_checkpoint_any(path: Path):
+    """Load resume checkpoint for residual_mamba.
+
+    Supports:
+      1. Standard residual_mamba/GraphCast .npz checkpoints (via load_graphcast_checkpoint).
+      2. v22-era residual .pkl checkpoints with keys:
+           residual_params  — module → leaf → array
+           residual_state   — Mamba SSM state (ignored at resume; reset to zero)
+         For training resume we only need .params for overlay; temporal state is
+         reinitialized per residual_mamba runner semantics.
+    """
+    if path.suffix == ".pkl":
+        with path.open("rb") as f:
+            ck = pickle.load(f)
+        if "residual_params" not in ck:
+            raise KeyError(f"{path} missing key 'residual_params'")
+        params = ck["residual_params"]
+        n_leaves = sum(len(leaves) for leaves in params.values())
+        n_params = sum(int(np.prod(v.shape)) for leaves in params.values() for v in leaves.values())
+        print(f"[resume:pkl] loaded v22 residual pkl: {path}")
+        print(f"[resume:pkl] modules={len(params)} leaves={n_leaves} params={n_params:,}")
+        print(f"[resume:pkl] has residual_state={bool(ck.get('residual_state', None))} (will be re-init)")
+        return SimpleNamespace(
+            params=params,
+            model_config=None,
+            task_config=None,
+            description="v22 residual pkl",
+            license="",
+        )
+    return load_graphcast_checkpoint(path)
+
+
+def _resolve_residual_output_head(segment_cfg: ResidualSegmentRunConfig, out_dir: Path) -> bool:
+    mode = segment_cfg.residual_output_head_mode
+    if mode == "enabled":
+        return True
+    if mode == "disabled":
+        return False
+    if mode != "auto":
+        raise ValueError(f"Unknown residual output head mode: {mode!r}")
+    if segment_cfg.resume_ckpt:
+        return _read_existing_output_head_enabled(out_dir)
+    return True
 
 
 def run_training(
@@ -78,23 +149,28 @@ def run_training(
     cfg = segment_cfg.base_cfg
     out_dir = Path(cfg.out_dir) / cfg.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
+    cfg.residual_output_head = _resolve_residual_output_head(segment_cfg, out_dir)
+    print(
+        "Residual output head "
+        f"{'enabled' if cfg.residual_output_head else 'disabled'} "
+        f"(mode={segment_cfg.residual_output_head_mode})"
+    )
 
     baseline_ckpt = load_graphcast_checkpoint(Path(segment_cfg.baseline_ckpt))
-    resume_ckpt = load_graphcast_checkpoint(Path(segment_cfg.resume_ckpt)) if segment_cfg.resume_ckpt else None
+    resume_ckpt = _load_resume_checkpoint_any(Path(segment_cfg.resume_ckpt)) if segment_cfg.resume_ckpt else None
 
     base_model_cfg = baseline_ckpt.model_config
     task_cfg = baseline_ckpt.task_config
     if cfg.input_duration is not None:
         task_cfg = dataclasses.replace(task_cfg, input_duration=cfg.input_duration)
 
-    model_cfg = dataclasses.replace(
+    model_cfg = derive_model_config_from_checkpoint(
         base_model_cfg,
         resolution=cfg.resolution,
         mesh_size=cfg.mesh_size,
         latent_size=cfg.width,
         gnn_msg_steps=cfg.processor_msg_steps,
         hidden_layers=1,
-        mesh2grid_edge_normalization_factor=None,
     )
     norm_stats = load_stats(Path(cfg.stats_dir))
     validate_stats_coverage(task_cfg, norm_stats)
@@ -109,6 +185,8 @@ def run_training(
     if input_steps < 2:
         raise ValueError("Residual segment training expects at least two input frames.")
     target_steps = cfg.target_steps
+    rolling_ar = target_steps > 1
+    target_load_steps = 1 if rolling_ar else target_steps
 
     train_final_indices = valid_contiguous_final_input_indices(
         train_ds,
@@ -139,7 +217,8 @@ def run_training(
         f"train_windows={len(train_final_indices)}, eval_windows={len(eval_final_indices)}, "
         f"train_segments={len(segments)}, eval_segments={len(eval_segments)}, "
         f"len_segment={segment_cfg.len_segment}, "
-        f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, target_steps={target_steps}"
+        f"bptt_steps={segment_cfg.bptt_steps}, input_steps={input_steps}, "
+        f"target_steps={target_steps}, target_load_steps={target_load_steps}"
     )
 
     should_cache_train, train_cache_estimate_gib = _training_cache_decision(train_ds, cfg, task_cfg)
@@ -171,23 +250,19 @@ def run_training(
         effective_train_batch_builder = "segment_block"
         effective_eval_batch_builder = "segment_block"
 
-    residual_loss_transform = build_loss_transform(model_cfg, task_cfg, norm_stats, cfg)
-    residual_eval_transform = build_eval_loss_transform(
+    residual_loss_transform = build_loss_prediction_transform(
         model_cfg,
         task_cfg,
         norm_stats,
         cfg,
-        temporal_backbone=cfg.temporal_backbone,
-        temporal_location=cfg.temporal_location,
-        temporal_d_inner=cfg.temporal_d_inner,
-        temporal_d_state=cfg.temporal_d_state,
-        temporal_d_conv=cfg.temporal_d_conv,
-        temporal_dt_rank=cfg.temporal_dt_rank,
-        temporal_bias=cfg.temporal_bias,
-        temporal_conv_bias=cfg.temporal_conv_bias,
-        temporal_layers=cfg.temporal_layers,
-        temporal_dropout=cfg.temporal_dropout,
-        temporal_stateful=cfg.temporal_stateful,
+        gradient_checkpointing=True,
+    )
+    residual_eval_transform = build_loss_prediction_transform(
+        model_cfg,
+        task_cfg,
+        norm_stats,
+        cfg,
+        gradient_checkpointing=False,
     )
     baseline_predict_transform = build_predict_transform(
         base_model_cfg,
@@ -213,21 +288,97 @@ def run_training(
         train_ds,
         indices=init_indices,
         input_steps=input_steps,
-        target_steps=target_steps,
+        target_steps=target_load_steps,
         task_cfg=task_cfg,
         dt=dt_train,
     )
-    params, state = residual_loss_transform.init(rng, sample_inputs, sample_targets, sample_forcings, True)
+    sample_targets_step = sample_targets.isel(time=slice(0, 1))
+    sample_forcings_step = sample_forcings.isel(time=slice(0, 1))
+    residual_inputs_state = build_zero_residual_inputs(sample_inputs, sample_targets_step)
+    params, state = residual_loss_transform.init(
+        rng,
+        residual_inputs_state,
+        sample_targets_step,
+        sample_forcings_step,
+        True,
+    )
     if cfg.resume_step is not None:
         assert resume_ckpt is not None
-        params = resume_ckpt.params
+        params, overlay_stats = overlay_matching_params(params, resume_ckpt.params)
         print(f"Resuming residual model from step {cfg.resume_step} ({segment_cfg.resume_ckpt})")
+        if overlay_stats.initialized:
+            print(
+                "Initialized "
+                f"{overlay_stats.initialized} new residual output head parameter(s) "
+                "while overlaying resume checkpoint."
+            )
     else:
-        print("Residual model uses fresh initialization; frozen baseline is used only for residual targets.")
+        if segment_cfg.init_from_baseline:
+            # strict=False: GC1 (baseline) may have more processor steps (mp=6)
+            # than GC2 (residual head, mp=2). Only matching modules are copied;
+            # extra GC1 processor steps are ignored.
+            params, overlay_stats = overlay_matching_params(
+                params, baseline_ckpt.params, strict=False)
+            print(
+                "Overlaid GC2 (residual head) with matching modules from GC1 baseline "
+                f"({segment_cfg.baseline_ckpt}): copied={overlay_stats.copied}, "
+                f"fresh_init={overlay_stats.initialized}"
+            )
+        else:
+            print("Residual model uses fresh initialization; frozen baseline is used only for residual targets.")
         if cfg.temporal_backbone == "mamba":
-            print("Residual Mamba fresh init uses zero-initialized temporal out_proj, so step-0 residual output is zero.")
+            print("Residual Mamba fresh init uses zero-initialized temporal out_proj, so inserted Mamba starts as a no-op.")
+        if cfg.residual_output_head:
+            print("Residual output head is zero-initialized, so step-0 full forecast equals the frozen baseline.")
 
-    opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
+    # --- Optimizer: optionally freeze a subset of GC2 via optax.multi_transform ---
+    labels = None
+    if segment_cfg.trainable_part == "all":
+        _core_opt = optax.adamw(cfg.lr, weight_decay=cfg.weight_decay)
+    else:
+        labels = build_trainable_labels(params, segment_cfg.trainable_part)
+        _core_opt = optax.multi_transform(
+            {
+                "train": optax.adamw(cfg.lr, weight_decay=cfg.weight_decay),
+                "freeze": optax.set_to_zero(),
+            },
+            labels,
+        )
+    # Optional global gradient norm clipping for closed-loop stability.
+    if segment_cfg.grad_clip_norm and segment_cfg.grad_clip_norm > 0.0:
+        opt = optax.chain(optax.clip_by_global_norm(segment_cfg.grad_clip_norm), _core_opt)
+        print(f"[opt] grad_clip_norm = {segment_cfg.grad_clip_norm}")
+    else:
+        opt = _core_opt
+    # Diagnostic counts (only when labels exist = trainable_part != "all").
+    if labels is not None:
+        n_train_leaves = sum(1 for m in labels.values() for v in m.values() if v == "train")
+        n_freeze_leaves = sum(1 for m in labels.values() for v in m.values() if v == "freeze")
+        # Aggregate trainable param count by module class
+        import numpy as _np
+        cls_train: dict[str, int] = {"g2m": 0, "proc": 0, "m2g": 0, "mamba": 0, "other": 0}
+        cls_freeze: dict[str, int] = {"g2m": 0, "proc": 0, "m2g": 0, "mamba": 0, "other": 0}
+        for mod, leaves in params.items():
+            for leaf, val in leaves.items():
+                n = int(_np.prod(val.shape))
+                lo = mod.lower()
+                bucket = (
+                    "mamba" if ("temporal" in lo or "mamba" in lo)
+                    else "g2m" if "grid2mesh" in lo
+                    else "m2g" if "mesh2grid" in lo
+                    else "proc" if "mesh_gnn" in lo
+                    else "other"
+                )
+                if labels[mod][leaf] == "train":
+                    cls_train[bucket] += n
+                else:
+                    cls_freeze[bucket] += n
+        print(
+            f"trainable_part={segment_cfg.trainable_part!r}: "
+            f"{n_train_leaves} train leaves, {n_freeze_leaves} freeze leaves."
+        )
+        print(f"  trainable params by component: {cls_train}")
+        print(f"  frozen    params by component: {cls_freeze}")
     opt_state = opt.init(params)
     augment_run_config(
         out_dir,
@@ -249,58 +400,261 @@ def run_training(
     _, baseline_train_state = baseline_predict_transform.init(
         rng,
         sample_inputs,
-        sample_targets,
-        sample_forcings,
+        sample_targets_step,
+        sample_forcings_step,
         False,
     )
+    memory_mode = getattr(cfg, "memory_mode", "standard")
+    stop_baseline_gradient = memory_mode in ("conservative", "optimal")
+    checkpoint_residual_ar_step = should_checkpoint_residual_ar_step(memory_mode)
+    if stop_baseline_gradient:
+        print(
+            "Stopping gradients through online frozen-baseline predictions "
+            f"(memory_mode={memory_mode})."
+        )
+    if checkpoint_residual_ar_step:
+        print(f"Checkpointing residual AR step body (memory_mode={memory_mode}).")
 
-    @functools.partial(jax.jit)
-    def train_chunk(
-        params: hk.Params,
-        state: hk.State,
-        opt_state: optax.OptState,
-        rng_key: jax.Array,
-        chunk_inputs: tuple[xr.Dataset, ...],
-        chunk_targets: tuple[xr.Dataset, ...],
-        chunk_forcings: tuple[xr.Dataset, ...],
-        reset_mask: jax.Array,
-    ):
-        state = _reset_temporal_state_lanes(state, reset_mask)
+    if rolling_ar:
+        truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, segment_cfg.bptt_steps)
 
-        def loss_fn(p, s, key):
-            current_state = s
-            losses = []
-            keys = jax.random.split(key, segment_cfg.bptt_steps)
-            for bptt_i in range(segment_cfg.bptt_steps):
-                baseline_key, residual_key = jax.random.split(keys[bptt_i])
-                baseline_preds, _ = baseline_predict_transform.apply(
-                    baseline_ckpt.params,
-                    baseline_train_state,
+        @functools.partial(jax.jit)
+        def train_chunk(
+            params: hk.Params,
+            state: hk.State,
+            opt_state: optax.OptState,
+            rng_key: jax.Array,
+            chunk_inputs: tuple[xr.Dataset, ...],
+            chunk_targets: tuple[xr.Dataset, ...],
+            chunk_forcings: tuple[xr.Dataset, ...],
+            residual_inputs: xr.Dataset,
+            reset_mask: jax.Array,
+            feedback_lambda: jax.Array,
+        ):
+            state = _reset_temporal_state_lanes(state, reset_mask)
+            residual_inputs = reset_residual_input_lanes(
+                residual_inputs,
+                chunk_targets[0],
+                jnp.ones_like(reset_mask, dtype=bool),
+            )
+
+            def loss_fn(p, s, key):
+                current_state = s
+                current_residual_inputs = residual_inputs
+                current_rolling_inputs = chunk_inputs[0]
+                current_baseline_state = baseline_train_state
+                weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                keys = jax.random.split(key, segment_cfg.bptt_steps * 2)
+
+                def one_bptt_step(
+                    p_step,
+                    current_state_step,
+                    current_residual_inputs_step,
+                    current_baseline_state_step,
+                    current_rolling_inputs_step,
                     baseline_key,
-                    chunk_inputs[bptt_i],
-                    chunk_targets[bptt_i],
-                    chunk_forcings[bptt_i],
-                    False,
-                )
-                residual_targets = chunk_targets[bptt_i] - baseline_preds
-                (loss_and_diag, current_state) = residual_loss_transform.apply(
-                    p,
-                    current_state,
                     residual_key,
-                    chunk_inputs[bptt_i],
-                    residual_targets,
-                    chunk_forcings[bptt_i],
-                    True,
-                )
-                losses.append(scalarize_loss(loss_and_diag[0]))
-            return jnp.mean(jnp.stack(losses)), current_state
+                    target_step,
+                    forcing_step,
+                    use_truth_residual_feedback: bool,
+                    update_tail_rolling_inputs: bool,
+                    feedback_lambda_inner: jax.Array | None = None,
+                ):
+                    baseline_preds, next_baseline_state = baseline_predict_transform.apply(
+                        baseline_ckpt.params,
+                        current_baseline_state_step,
+                        baseline_key,
+                        current_rolling_inputs_step,
+                        target_step,
+                        forcing_step,
+                        False,
+                    )
+                    if stop_baseline_gradient:
+                        baseline_preds = _stop_gradient_dataset(baseline_preds)
+                        next_baseline_state = jax.tree_util.tree_map(
+                            jax.lax.stop_gradient,
+                            next_baseline_state,
+                        )
+                    residual_targets = target_step - baseline_preds
+                    (loss_and_diag, residual_preds), next_state = residual_loss_transform.apply(
+                        p_step,
+                        current_state_step,
+                        residual_key,
+                        current_residual_inputs_step,
+                        residual_targets,
+                        forcing_step,
+                        True,
+                    )
+                    residual_feedback = residual_targets if use_truth_residual_feedback else residual_preds
+                    next_residual_inputs = advance_residual_inputs(
+                        current_residual_inputs_step,
+                        residual_feedback,
+                    )
+                    if update_tail_rolling_inputs:
+                        full_preds = baseline_preds + residual_preds
+                        feedback_preds = residual_physical_feedback(
+                            baseline_pred=baseline_preds,
+                            full_pred=full_preds,
+                            mode=segment_cfg.residual_ar_feedback,
+                            lam=feedback_lambda_inner,
+                            stop_grad=segment_cfg.stop_grad_feedback,
+                        )
+                        next_rolling_inputs = _advance_autoregressive_inputs(
+                            current_rolling_inputs_step,
+                            feedback_preds,
+                            forcing_step,
+                        )
+                    else:
+                        next_rolling_inputs = current_rolling_inputs_step
+                    return (
+                        next_state,
+                        next_baseline_state,
+                        next_residual_inputs,
+                        next_rolling_inputs,
+                        _loss_by_lane(loss_and_diag[0]),
+                    )
 
-        (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
-        updates, new_opt_state = opt.update(grads, opt_state, params)
-        new_params = optax.apply_updates(params, updates)
-        return new_params, _stop_gradient_temporal_state(new_state), new_opt_state, loss
+                one_bptt_step_fn = (
+                    jax.checkpoint(one_bptt_step, static_argnums=(9, 10))
+                    if checkpoint_residual_ar_step
+                    else one_bptt_step
+                )
+
+                for bptt_i in range(segment_cfg.bptt_steps):
+                    if bptt_i < truth_prefix_steps:
+                        current_rolling_inputs = chunk_inputs[bptt_i]
+                    (
+                        current_state,
+                        current_baseline_state,
+                        current_residual_inputs,
+                        next_rolling_inputs,
+                        loss_by_lane,
+                    ) = one_bptt_step_fn(
+                        p,
+                        current_state,
+                        current_residual_inputs,
+                        current_baseline_state,
+                        current_rolling_inputs,
+                        keys[2 * bptt_i],
+                        keys[2 * bptt_i + 1],
+                        chunk_targets[bptt_i],
+                        chunk_forcings[bptt_i],
+                        bptt_i < truth_prefix_steps,
+                        bptt_i < segment_cfg.bptt_steps - 1 and bptt_i + 1 >= truth_prefix_steps,
+                        feedback_lambda,
+                    )
+                    # PATCHED 2026-06-15: full-trunk loss to match gc_mamba.
+                    # Ilya original only accumulated AR-tail loss
+                    # (bptt_i >= truth_prefix_steps). We count every BPTT
+                    # step's loss so train signal is dense across the entire
+                    # 24-step window, matching the gc_mamba run's patched
+                    # full-trunk loss for a fair comparison.
+                    weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                    valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                    if bptt_i < segment_cfg.bptt_steps - 1:
+                        if bptt_i + 1 < truth_prefix_steps:
+                            current_rolling_inputs = chunk_inputs[bptt_i + 1]
+                        else:
+                            current_rolling_inputs = next_rolling_inputs
+                loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
+                return loss, current_state
+
+            (loss, new_state), grads = (
+                jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key)
+            )
+            updates, new_opt_state = opt.update(grads, opt_state, params)
+            new_params = optax.apply_updates(params, updates)
+            return (
+                new_params,
+                _stop_gradient_temporal_state(new_state),
+                new_opt_state,
+                loss,
+            )
+    else:
+        @functools.partial(jax.jit)
+        def train_chunk(
+            params: hk.Params,
+            state: hk.State,
+            opt_state: optax.OptState,
+            rng_key: jax.Array,
+            chunk_inputs: tuple[xr.Dataset, ...],
+            chunk_targets: tuple[xr.Dataset, ...],
+            chunk_forcings: tuple[xr.Dataset, ...],
+            residual_inputs: xr.Dataset,
+            reset_mask: jax.Array,
+        ):
+            state = _reset_temporal_state_lanes(state, reset_mask)
+            residual_inputs = reset_residual_input_lanes(residual_inputs, chunk_targets[0], reset_mask)
+
+            def loss_fn(p, s, key):
+                current_state = s
+                current_residual_inputs = residual_inputs
+                weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                keys = jax.random.split(key, segment_cfg.bptt_steps)
+                for bptt_i in range(segment_cfg.bptt_steps):
+                    loss_by_lane, current_state, current_residual_inputs = residual_autoregressive_final_horizon(
+                        residual_loss_transform,
+                        baseline_predict_transform,
+                        residual_params=p,
+                        baseline_params=baseline_ckpt.params,
+                        residual_state=current_state,
+                        baseline_state=baseline_train_state,
+                        rng_key=keys[bptt_i],
+                        inputs=chunk_inputs[bptt_i],
+                        targets=chunk_targets[bptt_i],
+                        forcings=chunk_forcings[bptt_i],
+                        residual_inputs=current_residual_inputs,
+                        is_training=True,
+                        residual_ar_feedback=segment_cfg.residual_ar_feedback,
+                        stop_baseline_gradient=stop_baseline_gradient,
+                        checkpoint_step=checkpoint_residual_ar_step,
+                    )
+                    valid_lanes = ~reset_mask if bptt_i == 0 else jnp.ones_like(reset_mask, dtype=bool)
+                    valid_weight = valid_lanes.astype(loss_by_lane.dtype)
+                    weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane * valid_weight)
+                    valid_count = valid_count + jnp.sum(valid_weight)
+                loss = weighted_loss_sum / jnp.maximum(valid_count, 1.0)
+                return loss, (current_state, current_residual_inputs)
+
+            (loss, (new_state, new_residual_inputs)), grads = jax.value_and_grad(loss_fn, has_aux=True)(
+                params,
+                state,
+                rng_key,
+            )
+            updates, new_opt_state = opt.update(grads, opt_state, params)
+            new_params = optax.apply_updates(params, updates)
+            return (
+                new_params,
+                _stop_gradient_temporal_state(new_state),
+                new_opt_state,
+                _stop_gradient_dataset(new_residual_inputs),
+                loss,
+            )
 
     step = cfg.resume_step if cfg.resume_step is not None else 0
+
+    # --- Feedback-lambda scheduler (Version A closed-loop) ---
+    def _feedback_lambda_at(s: int) -> float:
+        end = segment_cfg.feedback_lambda_warmup_end_step
+        start = segment_cfg.feedback_lambda_warmup_start_step
+        if end <= 0 or end <= start:
+            return segment_cfg.feedback_lambda_final
+        if s <= start:
+            return segment_cfg.feedback_lambda_init
+        if s >= end:
+            return segment_cfg.feedback_lambda_final
+        frac = (s - start) / max(1, (end - start))
+        return segment_cfg.feedback_lambda_init + frac * (
+            segment_cfg.feedback_lambda_final - segment_cfg.feedback_lambda_init
+        )
+    if segment_cfg.residual_ar_feedback == "gated":
+        print(f"[feedback] mode=gated, lambda ramp: "
+              f"{segment_cfg.feedback_lambda_init} @ step {segment_cfg.feedback_lambda_warmup_start_step} "
+              f"→ {segment_cfg.feedback_lambda_final} @ step {segment_cfg.feedback_lambda_warmup_end_step}, "
+              f"stop_grad={segment_cfg.stop_grad_feedback}")
+
     train_losses: list[tuple[int, float]] = []
     eval_losses: list[tuple[int, float]] = []
     eval_details: list[dict[str, Any]] = []
@@ -386,7 +740,7 @@ def run_training(
             train_ds,
             segments,
             input_steps=input_steps,
-            target_steps=target_steps,
+            target_steps=target_load_steps,
             task_cfg=task_cfg,
             dt=dt_train,
             load_executor=load_executor,
@@ -402,21 +756,21 @@ def run_training(
     ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], np.ndarray, int, SegmentLoadStats]:
         t_load = time.time()
         if train_segment_loader is not None:
-            chunk_inputs, chunk_targets, chunk_forcings, load_stats = train_segment_loader.load_chunk(chunk)
+            chunk_inputs, chunk_targets, chunk_forcings, load_info = train_segment_loader.load_chunk(chunk)
         else:
             chunk_inputs, chunk_targets, chunk_forcings = _build_chunk_batches(
                 train_ds,
                 chunk.chunk_indices,
                 input_steps=input_steps,
-                target_steps=target_steps,
+                target_steps=target_load_steps,
                 task_cfg=task_cfg,
                 dt=dt_train,
                 batch_builder=train_batch_builder,
                 chunk_load_workers=segment_cfg.chunk_load_workers,
                 load_executor=load_executor,
             )
-            load_stats = SegmentLoadStats(load_s=time.time() - t_load)
-        return chunk_inputs, chunk_targets, chunk_forcings, chunk.reset_mask, chunk.epoch, load_stats
+            load_info = SegmentLoadStats(load_s=time.time() - t_load)
+        return chunk_inputs, chunk_targets, chunk_forcings, chunk.reset_mask, chunk.epoch, load_info
 
     def submit_next_chunk() -> concurrent.futures.Future:
         return prefetch_executor.submit(load_chunk_payload, scheduler.next_chunk())
@@ -427,7 +781,7 @@ def run_training(
         while step < cfg.max_steps:
             iteration_t0 = time.time()
             t_data = time.time()
-            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch, load_stats = pending_chunk.result()
+            chunk_inputs, chunk_targets, chunk_forcings, reset_mask_np, chunk_epoch, load_info = pending_chunk.result()
             data_wait_s = time.time() - t_data
 
             if observed_epoch is None:
@@ -453,16 +807,32 @@ def run_training(
             rng, step_key = jax.random.split(rng)
             next_chunk = submit_next_chunk() if step + 1 < cfg.max_steps else None
             t0 = time.time()
-            params, state, opt_state, loss = train_chunk(
-                params,
-                state,
-                opt_state,
-                step_key,
-                chunk_inputs,
-                chunk_targets,
-                chunk_forcings,
-                jnp.asarray(reset_mask_np),
-            )
+            if rolling_ar:
+                _lam_now = jnp.asarray(_feedback_lambda_at(step), dtype=jnp.float32)
+                params, state, opt_state, loss = train_chunk(
+                    params,
+                    state,
+                    opt_state,
+                    step_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    residual_inputs_state,
+                    jnp.asarray(reset_mask_np),
+                    _lam_now,
+                )
+            else:
+                params, state, opt_state, residual_inputs_state, loss = train_chunk(
+                    params,
+                    state,
+                    opt_state,
+                    step_key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    residual_inputs_state,
+                    jnp.asarray(reset_mask_np),
+                )
 
             loss_f = float(loss)
             gpu_train_s = time.time() - t0
@@ -481,11 +851,11 @@ def run_training(
                     "batch_size": cfg.batch_size,
                     "bptt_steps": segment_cfg.bptt_steps,
                     "chunk_load_workers": segment_cfg.chunk_load_workers,
-                    "loader": load_stats.loader,
-                    "load_s": load_stats.load_s,
-                    "cache_hits": load_stats.cache_hits,
-                    "cache_misses": load_stats.cache_misses,
-                    "loaded_gib": load_stats.loaded_gib,
+                    "loader": load_info.loader,
+                    "load_s": load_info.load_s,
+                    "cache_hits": load_info.cache_hits,
+                    "cache_misses": load_info.cache_misses,
+                    "loaded_gib": load_info.loaded_gib,
                 }
             )
 
@@ -498,9 +868,9 @@ def run_training(
                 print(
                     f"step {step}/{cfg.max_steps} loss {loss_f:.6f} "
                     f"segment_epoch {chunk_epoch} reset_lanes {int(reset_mask_np.sum())} "
-                    f"load={load_stats.load_s:.3f}s data_wait={data_wait_s:.3f}s "
+                    f"load={load_info.load_s:.3f}s data_wait={data_wait_s:.3f}s "
                     f"gpu={gpu_train_s:.3f}s iter={iteration_wall_s:.3f}s "
-                    f"cache={load_stats.cache_hits}/{load_stats.cache_misses}"
+                    f"cache={load_info.cache_hits}/{load_info.cache_misses}"
                 )
 
             if step % cfg.eval_every == 0:
@@ -523,11 +893,48 @@ def run_training(
                     batch_builder=eval_batch_builder,
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
+                    max_segments=segment_cfg.eval_num_segments,
+                    subset_policy=segment_cfg.eval_subset_policy,
+                    subset_role="fixed_checkpoint",
+                    subset_fold=0,
+                    residual_ar_feedback=segment_cfg.residual_ar_feedback,
+                    feedback_lambda=jnp.asarray(_feedback_lambda_at(step), dtype=jnp.float32),
+                    stop_grad_feedback=False,  # eval: no backward grad anyway
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
                 eval_details.append({"step": step, **eval_metrics, **batch_builder_metadata})
                 print(f"[eval] step {step} total {eval_metrics['total']:.6f}")
+                if segment_cfg.eval_rotating_diagnostics and segment_cfg.eval_num_segments is not None:
+                    rotating_eval = run_residual_eval(
+                        residual_eval_transform,
+                        baseline_predict_transform,
+                        params,
+                        baseline_ckpt.params,
+                        rng,
+                        eval_ds,
+                        eval_final_indices,
+                        eval_batch_size=cfg.eval_batch_size,
+                        input_steps=input_steps,
+                        target_steps=target_steps,
+                        task_cfg=task_cfg,
+                        dt=dt_train,
+                        len_segment=segment_cfg.len_segment,
+                        bptt_steps=segment_cfg.bptt_steps,
+                        progress_label=f"eval_rotating@step{step}",
+                        batch_builder=eval_batch_builder,
+                        chunk_load_workers=segment_cfg.chunk_load_workers,
+                        load_executor=load_executor,
+                        max_segments=segment_cfg.eval_num_segments,
+                        subset_policy=EVAL_SUBSET_STRATIFIED_ROTATING,
+                        subset_role="rotating_diagnostic",
+                        subset_fold=step // cfg.eval_every,
+                        residual_ar_feedback=segment_cfg.residual_ar_feedback,
+                        feedback_lambda=jnp.asarray(_feedback_lambda_at(step), dtype=jnp.float32),
+                        stop_grad_feedback=False,
+                    )
+                    eval_details.append({"step": step, **rotating_eval, **batch_builder_metadata})
+                    print(f"[eval_rotating] step {step} total {rotating_eval['total']:.6f}")
                 plot_loss_curves(out_dir, train_losses, eval_losses)
                 save_all_logs()
 
@@ -579,6 +986,13 @@ def run_training(
         progress_label="eval@final",
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
+        max_segments=segment_cfg.final_eval_num_segments,
+        subset_policy=segment_cfg.eval_subset_policy,
+        subset_role="final",
+        subset_fold=None,
+        residual_ar_feedback=segment_cfg.residual_ar_feedback,
+        feedback_lambda=jnp.asarray(_feedback_lambda_at(step), dtype=jnp.float32),
+        stop_grad_feedback=False,
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

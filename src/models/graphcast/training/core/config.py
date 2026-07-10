@@ -11,6 +11,7 @@ DEFAULT_CKPT = (
 DEFAULT_STATS_DIR = "data/graphcast/graphcast/stats"
 DEFAULT_OUT_DIR = "artifacts/checkpoints/graphcast_res2_stream"
 DEFAULT_PREPARED_DATA_ROOT = "data/graphcast/graphcast/dataset/prepared_stream"
+MEMORY_MODE_CHOICES = ("standard", "conservative", "optimal")
 
 GRAPHCAST_VARS = [
     "2m_temperature",
@@ -51,6 +52,8 @@ class RunConfig:
     max_steps: int
     eval_every: int
     eval_batch_size: int
+    eval_num_batches: int | None
+    final_eval_num_batches: int | None
     checkpoint_every: int
     lr: float
     weight_decay: float
@@ -69,6 +72,7 @@ class RunConfig:
     temporal_layers: int
     temporal_dropout: float
     temporal_stateful: bool
+    temporal_insert_count: int | None
     target_steps: int
     sequential_segment_steps: int | None
     data_cache_mode: str
@@ -82,6 +86,19 @@ class RunConfig:
     init_from_graphcast_ckpt: str | None = None
     trainable_part: str = "all"
     zero_init_temporal_out: bool = False
+    eval_subset_policy: str = "stratified_fixed"
+    eval_rotating_diagnostics: bool = True
+    residual_output_head: bool = False
+    memory_mode: str = "standard"
+
+
+def _positive_int_or_all(value: str) -> int | None:
+    if value.lower() == "all":
+        return None
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
+    return parsed
 
 
 def parse_args() -> RunConfig:
@@ -90,7 +107,7 @@ def parse_args() -> RunConfig:
     parser.add_argument(
         "--data-source",
         choices=["raw", "prepared_array"],
-        default="raw",
+        default="prepared_array",
         help="Read from raw WeatherBench/GraphCast data or prepared_array/res{N} memmaps.",
     )
     parser.add_argument(
@@ -119,6 +136,18 @@ def parse_args() -> RunConfig:
     parser.add_argument("--max-steps", type=int, default=10000)
     parser.add_argument("--eval-every", type=int, default=1000)
     parser.add_argument("--eval-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--eval-num-batches",
+        type=_positive_int_or_all,
+        default=16,
+        help="Number of validation batches for intermediate training evals, or 'all'.",
+    )
+    parser.add_argument(
+        "--final-eval-num-batches",
+        type=_positive_int_or_all,
+        default=None,
+        help="Number of validation batches for final/eval-only evals, or 'all' (default).",
+    )
     parser.add_argument("--checkpoint-every", type=int, default=2000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -138,7 +167,7 @@ def parse_args() -> RunConfig:
     )
     parser.add_argument(
         "--temporal-location",
-        choices=["mesh_post_encoder", "mesh_processor_interleaved"],
+        choices=["mesh_post_encoder", "mesh_processor_interleaved", "mesh_post_processor"],
         default="mesh_post_encoder",
         help="Where to insert temporal module when enabled.",
     )
@@ -159,6 +188,9 @@ def parse_args() -> RunConfig:
     parser.add_argument("--temporal-dropout", type=float, default=0.0)
     parser.add_argument("--temporal-stateful", action="store_true", default=False,
                         help="Use stateful Mamba (preserves SSM state across autoregressive steps).")
+    parser.add_argument("--temporal-insert-count", type=int, default=None,
+                        help="Number of temporal blocks to insert across mesh processor steps. "
+                             "Default inserts after every processor step for compatibility.")
     parser.add_argument("--target-steps", type=int, default=1,
                         help="Number of autoregressive target steps (default 1 = 6h single step).")
     parser.add_argument("--sequential-segment-steps", type=int, default=None,
@@ -169,8 +201,8 @@ def parse_args() -> RunConfig:
                         help="Cache the training split in RAM. 'auto' uses --data-cache-max-gib.")
     parser.add_argument("--data-cache-max-gib", type=float, default=48.0,
                         help="Maximum estimated train split size for --data-cache-mode=auto.")
-    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default="vectorized",
-                        help="Batch construction implementation. Numpy requires an active full-RAM train cache.")
+    parser.add_argument("--batch-builder", choices=["legacy", "vectorized", "direct", "numpy", "prepared_array"], default=None,
+                        help="Batch construction implementation. Default: prepared_array for prepared data, vectorized for raw data.")
     parser.add_argument("--prefetch-workers", type=int, default=4,
                         help="Background workers used to build future random-sampling batches.")
     parser.add_argument("--prefetch-depth", type=int, default=8,
@@ -181,6 +213,19 @@ def parse_args() -> RunConfig:
                         help="Sample process/GPU memory every N steps. Set 0 to disable periodic sampling.")
     parser.add_argument("--eval-only", action="store_true", default=False,
                         help="Skip training, only run eval on the loaded checkpoint.")
+    parser.add_argument(
+        "--eval-subset-policy",
+        choices=["first", "stratified_fixed"],
+        default="stratified_fixed",
+        help="Policy for capped regular validation evals. Default selects a fixed full-year stratified subset.",
+    )
+    parser.add_argument(
+        "--no-eval-rotating-diagnostics",
+        dest="eval_rotating_diagnostics",
+        action="store_false",
+        default=True,
+        help="Disable the second rotating stratified diagnostic eval for capped regular validation evals.",
+    )
     args = parser.parse_args()
 
     if not args.eval_only and args.max_steps <= 0:
@@ -214,6 +259,10 @@ def parse_args() -> RunConfig:
             raise ValueError("--temporal-dt-rank must be 'auto' or a positive integer")
     if args.temporal_layers <= 0:
         raise ValueError("--temporal-layers must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count <= 0:
+        raise ValueError("--temporal-insert-count must be > 0")
+    if args.temporal_insert_count is not None and args.temporal_insert_count > args.processor_msg_steps:
+        raise ValueError("--temporal-insert-count must be <= --processor-msg-steps")
     if not (0.0 <= args.temporal_dropout < 1.0):
         raise ValueError("--temporal-dropout must be in [0, 1)")
     if args.data_cache_max_gib <= 0:
@@ -231,6 +280,8 @@ def parse_args() -> RunConfig:
             raise ValueError("--grad-accum-steps > 1 is currently supported only for vanilla GraphCast.")
         if args.sequential_segment_steps is not None:
             raise ValueError("--grad-accum-steps > 1 is not supported with --sequential-segment-steps.")
+
+    batch_builder = args.batch_builder or ("prepared_array" if args.data_source == "prepared_array" else "vectorized")
 
     return RunConfig(
         data_path=args.data_path,
@@ -252,6 +303,8 @@ def parse_args() -> RunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_num_batches=args.eval_num_batches,
+        final_eval_num_batches=args.final_eval_num_batches,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -270,14 +323,17 @@ def parse_args() -> RunConfig:
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
+        temporal_insert_count=args.temporal_insert_count,
         target_steps=args.target_steps,
         sequential_segment_steps=args.sequential_segment_steps,
         data_cache_mode=args.data_cache_mode,
         data_cache_max_gib=args.data_cache_max_gib,
-        batch_builder=args.batch_builder,
+        batch_builder=batch_builder,
         prefetch_workers=args.prefetch_workers,
         prefetch_depth=args.prefetch_depth,
         prefetch_device_depth=args.prefetch_device_depth,
         usage_every=args.usage_every,
         eval_only=args.eval_only,
+        eval_subset_policy=args.eval_subset_policy,
+        eval_rotating_diagnostics=args.eval_rotating_diagnostics,
     )

@@ -20,6 +20,12 @@ _STEP_CKPT_RE = re.compile(r"^ckpt_step(\d+)\.npz$")
 
 
 def prune_old_step_checkpoints(out_dir: Path, *, keep_step: int) -> None:
+    # PATCHED: skip pruning by default — keep all intermediate ckpts for
+    # Mamba ablation diagnostics across training horizons.
+    # Set GCMAMBA_PRUNE_CKPTS=1 to restore the original pruning behavior.
+    import os
+    if os.environ.get("GCMAMBA_PRUNE_CKPTS", "0") != "1":
+        return
     keep_name = f"ckpt_step{keep_step}.npz"
     removed = 0
     for path in out_dir.glob("ckpt_step*.npz"):
@@ -298,6 +304,7 @@ def _write_run_config(
     effective_train_batch_builder: str | None = None,
     effective_eval_batch_builder: str | None = None,
 ) -> None:
+    memory_mode = getattr(cfg, "memory_mode", "standard")
     builder_metadata = build_batch_builder_metadata(
         requested_batch_builder=cfg.batch_builder,
         effective_train_batch_builder=effective_train_batch_builder,
@@ -317,6 +324,10 @@ def _write_run_config(
         "max_steps": cfg.max_steps,
         "eval_every": cfg.eval_every,
         "eval_batch_size": cfg.eval_batch_size,
+        "eval_num_batches": cfg.eval_num_batches,
+        "final_eval_num_batches": cfg.final_eval_num_batches,
+        "eval_subset_policy": cfg.eval_subset_policy,
+        "eval_rotating_diagnostics": cfg.eval_rotating_diagnostics,
         "checkpoint_every": cfg.checkpoint_every,
         "seed": cfg.seed,
         "lr": cfg.lr,
@@ -324,6 +335,7 @@ def _write_run_config(
         "precision": cfg.precision,
         "init_from_graphcast_ckpt": cfg.init_from_graphcast_ckpt,
         "trainable_part": cfg.trainable_part,
+        "memory_mode": memory_mode,
         "data_pipeline": {
             "data_source": cfg.data_source,
             "prepared_data_root": cfg.prepared_data_root,
@@ -344,6 +356,14 @@ def _write_run_config(
             "grad_accum_steps": cfg.grad_accum_steps,
             "effective_batch_size": cfg.batch_size * cfg.grad_accum_steps,
         },
+        "memory_optimization": {
+            "mode": memory_mode,
+            "trainable_param_partition": (
+                memory_mode in ("conservative", "optimal") and cfg.trainable_part == "mamba"
+            ),
+            "processor_step_remat": memory_mode == "optimal",
+            "mesh2grid_remat": memory_mode == "optimal",
+        },
         "temporal_config": {
             "backbone": cfg.temporal_backbone,
             "location": cfg.temporal_location,
@@ -356,6 +376,7 @@ def _write_run_config(
             "conv_bias": cfg.temporal_conv_bias,
             "layers": cfg.temporal_layers,
             "dropout": cfg.temporal_dropout,
+            "insert_count": cfg.temporal_insert_count,
             "zero_init_output": cfg.zero_init_temporal_out,
         },
         "model_config": dataclasses.asdict(model_cfg),

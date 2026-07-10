@@ -54,6 +54,13 @@ def parse_args():
     p.add_argument("--anchor-stride-days", type=int, default=3,
                    help="anchor every N days in 2022 (default 3 → ~120 anchors)")
     p.add_argument("--out-nc", required=True)
+    # v25 gated extreme head support
+    p.add_argument("--gated-extreme-head", action="store_true",
+                   help="Use GCResidualWithGatedExtremeHead instead of zero head.")
+    p.add_argument("--gate-bias-init", type=float, default=-3.5)
+    # v26 tail calibration head support
+    p.add_argument("--tail-calib-head", action="store_true",
+                   help="Use GCResidualWithTailCalibrationHead.")
     return p.parse_args()
 
 
@@ -83,7 +90,18 @@ def main():
             diffs_stddev_by_level=norm_stats["diffs_stddev_by_level"])
         return p(inp, targets_template=tgt, forcings=frc)
     def residual_fn(inp, tgt, frc):
-        p = GCResidualWithZeroHead(model_cfg_residual, task_cfg)
+        if cfg.tail_calib_head:
+            from scripts.training.full_mamba_v26.tail_calibration_head import (
+                GCResidualWithTailCalibrationHead)
+            p = GCResidualWithTailCalibrationHead(model_cfg_residual, task_cfg)
+        elif cfg.gated_extreme_head:
+            from scripts.training.full_mamba_v25.gated_extreme_head import (
+                GCResidualWithGatedExtremeHead)
+            p = GCResidualWithGatedExtremeHead(
+                model_cfg_residual, task_cfg,
+                gate_bias_init=cfg.gate_bias_init)
+        else:
+            p = GCResidualWithZeroHead(model_cfg_residual, task_cfg)
         _attach_temporal(p, cfg)
         p = casting.Bfloat16Cast(p)
         p = DirectResidualNormalizer(p,

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Extend res=2 inner128 K-scan from step 2000 → 10000 (for fair comparison vs inner1024).
+# K ∈ {2, 4, 6, 8, 10, 12, 14, 16, 20, 22}; K=18 inner128 already extended (arch-screen).
+#SBATCH --job-name=v22cl-res2-inner128-Kscan-ext
+#SBATCH --account=biao
+#SBATCH --gres=gpu:1
+#SBATCH --qos=gpu
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=240G
+#SBATCH --constraint=gpu80
+#SBATCH --time=06:00:00
+#SBATCH --array=0-9
+#SBATCH --output=/home/lm8598/Weather_Global_experiments/logs/v22cl_res2_inner128_ext_t%a_%A.out
+#SBATCH --error=/home/lm8598/Weather_Global_experiments/logs/v22cl_res2_inner128_ext_t%a_%A.err
+set -euo pipefail
+export MPLCONFIGDIR=/tmp/mpl-weather-global; mkdir -p $MPLCONFIGDIR
+export XLA_PYTHON_CLIENT_PREALLOCATE=false; export XLA_PYTHON_CLIENT_ALLOCATOR=platform
+export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false"
+PYTHON=/home/lm8598/Weather_Global_experiments/.conda/envs/graphcast311/bin/python
+cd /home/lm8598/Weather_Global_experiments_v22clean
+
+ROOT=/scratch/gpfs/DABANIN/lm8598/Weather_Global
+GCV1_K3=${ROOT}/results/GCv1/K3_cascade_res2_m4_w512_mp6/ckpt_step52000.npz
+PREPARED_ROOT=/scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/dataset/prepared_stream/res2
+RESIDUAL_ROOT=${ROOT}/data/graphcast/graphcast/dataset/precomputed_residuals/v22_res2_GCv1K3_synthetic
+
+KS=(2 4 6 8 10 12 14 16 20 22)
+K=${KS[$SLURM_ARRAY_TASK_ID]}
+
+OUT_PARENT=${ROOT}/results/v22_res2_closedloop
+# Old dir with inner128 step-2000 ckpt
+PREV_DIR=${OUT_PARENT}/K${K}_res2_closedloop_sg_fresh
+# New dir for extended run
+OUT=${OUT_PARENT}/K${K}_res2_inner128
+mkdir -p ${OUT}
+# Seed with prior ckpts so downstream SWA has full step 2000-10000 range
+if [ ! -f "${OUT}/v13_residual_step2000.pkl" ]; then
+  cp ${PREV_DIR}/v13_residual_step*.pkl ${OUT}/ 2>/dev/null || true
+fi
+RESUME_CKPT=${OUT}/v13_residual_step2000.pkl
+[ -f "${RESUME_CKPT}" ] || { echo "ERR: missing ${RESUME_CKPT}"; exit 1; }
+
+echo "=== v22cl res=2 K=${K} inner128 extend 2000->10000 ==="
+${PYTHON} -u scripts/training/full_mamba_v20/train_mz_v20.py \
+  --prepared-root "${PREPARED_ROOT}" \
+  --residual-root "${RESIDUAL_ROOT}" \
+  --ckpt-in "${GCV1_K3}" \
+  --stats-dir ${ROOT}/data/graphcast/graphcast/stats \
+  --out-dir "${OUT_PARENT}" \
+  --run-name K${K}_res2_inner128 \
+  --resolution 2.0 --mesh-size 4 --width 512 \
+  --baseline-msg-steps 6 \
+  --residual-msg-steps 2 \
+  --input-duration 12h --target-steps 1 \
+  --batch-size 1 \
+  --max-steps 10000 --checkpoint-every 500 \
+  --lr 1e-4 --weight-decay 1e-4 --seed 22 --precision bf16 \
+  --grad-clip 1.0 --warmup-steps 200 \
+  --sequential-segment-steps 96 --bptt-steps 24 \
+  --ar-tail-K ${K} \
+  --feedback-mode closed_loop_sg \
+  --resume-from "${RESUME_CKPT}" \
+  --start-step 2001 \
+  --temporal-location mesh_processor_interleaved \
+  --temporal-hidden-size 128 \
+  --temporal-d-inner 128 \
+  --temporal-d-state 16 --temporal-d-conv 4 --temporal-dt-rank auto \
+  --temporal-layers 2
+
+echo "=== K=${K} inner128 extend done ==="

@@ -17,9 +17,14 @@ import xarray as xr
 
 from .batching import BatchBuilder, build_batch_from_indices_vectorized, valid_final_input_indices
 from .config import RunConfig
+from .eval_selection import (
+    EVAL_SUBSET_STRATIFIED_FIXED,
+    select_eval_subset,
+)
 from .logging import _write_run_config
-from .model import gc, scalarize_loss
-from .prepared_array import PreparedArrayBlock, PreparedArrayStore, is_prepared_array_store
+from .model import gc, scalarize_loss, xarray_jax
+from .prepared_array import PreparedArrayStore, is_prepared_array_store
+from .prepared_block_batches import PreparedBlockBatchLoader
 
 
 @dataclasses.dataclass(frozen=True)
@@ -31,6 +36,10 @@ class SegmentRunConfig:
     segment_prefetch_depth: int = 2
     use_segment_block_loader: bool = True
     filter_nan_segments: bool = True
+    eval_num_segments: int | None = 16
+    final_eval_num_segments: int | None = None
+    eval_subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED
+    eval_rotating_diagnostics: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -165,11 +174,22 @@ def build_full_segments(indices: np.ndarray, len_segment: int) -> list[np.ndarra
     return segments
 
 
+def segment_midpoint_times(ds: xr.Dataset, segments: list[np.ndarray]) -> pd.DatetimeIndex | None:
+    if not hasattr(ds, "time"):
+        return None
+    try:
+        time_index = pd.DatetimeIndex(pd.to_datetime(ds.time.values))
+        return pd.DatetimeIndex([time_index[int(segment[len(segment) // 2])] for segment in segments])
+    except (IndexError, TypeError, ValueError):
+        return None
+
+
 def iter_eval_segment_chunks(
     segments: list[np.ndarray],
     *,
     batch_size: int,
     bptt_steps: int,
+    segment_ids: np.ndarray | None = None,
 ) -> Iterable[tuple[tuple[np.ndarray, ...], np.ndarray]]:
     """Yield deterministic eval chunks over full segments without wraparound.
 
@@ -200,6 +220,7 @@ def iter_eval_segment_chunks(
         segments,
         batch_size=batch_size,
         bptt_steps=bptt_steps,
+        segment_ids=segment_ids,
     ):
         yield chunk.chunk_indices, chunk.reset_mask
 
@@ -209,6 +230,7 @@ def iter_eval_segment_chunk_infos(
     *,
     batch_size: int,
     bptt_steps: int,
+    segment_ids: np.ndarray | None = None,
 ) -> Iterable[SegmentChunk]:
     """Yield deterministic eval chunks with lane segment metadata."""
     if batch_size <= 0:
@@ -227,9 +249,16 @@ def iter_eval_segment_chunk_infos(
         )
     if any(len(segment) != segment_len for segment in segments):
         raise ValueError("All eval segments must have the same full length.")
+    if segment_ids is None:
+        segment_ids = np.arange(len(segments), dtype=np.int64)
+    else:
+        segment_ids = np.asarray(segment_ids, dtype=np.int64)
+        if segment_ids.shape != (len(segments),):
+            raise ValueError("segment_ids must have one entry per eval segment.")
 
     for start in range(0, len(segments), batch_size):
         segment_group = segments[start : start + batch_size]
+        segment_id_group = segment_ids[start : start + len(segment_group)]
         lane_count = len(segment_group)
         for offset in range(0, segment_len, bptt_steps):
             reset_mask = np.zeros(lane_count, dtype=np.bool_)
@@ -245,7 +274,7 @@ def iter_eval_segment_chunk_infos(
             yield SegmentChunk(
                 chunk_indices=chunk_indices,
                 reset_mask=reset_mask,
-                lane_segment_ids=np.arange(start, start + lane_count, dtype=np.int64),
+                lane_segment_ids=np.asarray(segment_id_group, dtype=np.int64),
                 lane_offsets=np.full(lane_count, offset, dtype=np.int64),
                 epoch=0,
             )
@@ -276,6 +305,101 @@ def _reset_temporal_state_lanes(state: hk.State, reset_mask: jax.Array) -> hk.St
 
 def _stop_gradient_temporal_state(state: hk.State) -> hk.State:
     return _map_temporal_state_leaves(state, jax.lax.stop_gradient)
+
+
+def _loss_by_lane(loss_da: xr.DataArray) -> jax.Array:
+    loss = xarray_jax.unwrap_data(loss_da)
+    if "batch" not in loss_da.dims:
+        return loss[None]
+    batch_axis = loss_da.dims.index("batch")
+    if batch_axis != 0:
+        loss = jnp.moveaxis(loss, batch_axis, 0)
+    reduce_axes = tuple(range(1, loss.ndim))
+    if reduce_axes:
+        loss = jnp.mean(loss, axis=reduce_axes)
+    return loss
+
+
+def _reset_dataset_lanes(current: xr.Dataset, reset_values: xr.Dataset, reset_mask: jax.Array) -> xr.Dataset:
+    reset_mask = jnp.asarray(reset_mask, dtype=bool)
+    data_vars = {}
+    for name, current_da in current.data_vars.items():
+        if name not in reset_values:
+            data_vars[name] = current_da
+            continue
+        if "batch" not in current_da.dims:
+            data_vars[name] = current_da
+            continue
+        batch_axis = current_da.dims.index("batch")
+        current_data = xarray_jax.unwrap_data(current_da)
+        reset_data = xarray_jax.unwrap_data(reset_values[name])
+        mask_shape = [1] * current_data.ndim
+        mask_shape[batch_axis] = reset_mask.shape[0]
+        data = jnp.where(jnp.reshape(reset_mask, mask_shape), reset_data, current_data)
+        data_vars[name] = xr.DataArray(
+            xarray_jax.wrap(data),
+            dims=current_da.dims,
+            coords=current_da.coords,
+            attrs=current_da.attrs,
+            name=current_da.name,
+        )
+    return xr.Dataset(data_vars, coords=current.coords)
+
+
+def _stop_gradient_dataset(dataset: xr.Dataset) -> xr.Dataset:
+    data_vars = {}
+    for name, data_array in dataset.data_vars.items():
+        data = jax.lax.stop_gradient(xarray_jax.unwrap_data(data_array))
+        data_vars[name] = xr.DataArray(
+            xarray_jax.wrap(data),
+            dims=data_array.dims,
+            coords=data_array.coords,
+            attrs=data_array.attrs,
+            name=data_array.name,
+        )
+    return xr.Dataset(data_vars, coords=dataset.coords)
+
+
+def _constant_inputs(inputs: xr.Dataset, targets_template: xr.Dataset, forcings: xr.Dataset) -> xr.Dataset:
+    constant_inputs = inputs.drop_vars(targets_template.keys(), errors="ignore")
+    constant_inputs = constant_inputs.drop_vars(forcings.keys(), errors="ignore")
+    for name, var in constant_inputs.items():
+        if "time" in var.dims:
+            raise ValueError(
+                f"Time-dependent input variable {name} must either be a forcing variable or target variable."
+            )
+    return constant_inputs
+
+
+def _advance_autoregressive_inputs(
+    inputs: xr.Dataset,
+    predictions: xr.Dataset,
+    forcings: xr.Dataset,
+) -> xr.Dataset:
+    constant_inputs = _constant_inputs(inputs, predictions, forcings)
+    rolling_inputs = inputs.drop_vars(constant_inputs.keys())
+    num_inputs = rolling_inputs.sizes["time"]
+    next_frame = xr.merge([predictions, forcings])
+    predicted_or_forced_inputs = next_frame[list(rolling_inputs.keys())]
+    updated = (
+        xr.concat([rolling_inputs, predicted_or_forced_inputs], dim="time")
+        .tail(time=num_inputs)
+        .assign_coords(time=rolling_inputs.coords["time"])
+    )
+    return xr.merge([constant_inputs, updated])
+
+
+def _chunk_ar_truth_prefix(target_steps: int, bptt_steps: int) -> int:
+    """Return truth-fed prefix length for chunk-local corrected AR training."""
+    if target_steps <= 1:
+        return bptt_steps
+    if target_steps >= bptt_steps:
+        raise ValueError(
+            "Chunk-local autoregressive segment training requires "
+            f"--target-steps < --bptt-steps, got target_steps={target_steps}, "
+            f"bptt_steps={bptt_steps}."
+        )
+    return bptt_steps - target_steps
 
 
 def _write_segment_run_config(
@@ -310,10 +434,30 @@ def _write_segment_run_config(
         "prefetch_chunks": segment_cfg.segment_prefetch_depth,
         "segment_block_loader": segment_cfg.use_segment_block_loader,
         "filter_nan_segments": segment_cfg.filter_nan_segments,
+        "eval_num_segments": segment_cfg.eval_num_segments,
+        "final_eval_num_segments": segment_cfg.final_eval_num_segments,
+        "eval_subset_policy": segment_cfg.eval_subset_policy,
+        "eval_rotating_diagnostics": segment_cfg.eval_rotating_diagnostics,
         "shuffle_segments": True,
         "drop_short_tail_segments": True,
         "max_steps_unit": "optimizer_updates",
     }
+    if segment_cfg.base_cfg.target_steps > 1:
+        truth_prefix_steps = _chunk_ar_truth_prefix(
+            int(segment_cfg.base_cfg.target_steps),
+            int(segment_cfg.bptt_steps),
+        )
+        payload["autoregressive_training"] = {
+            "enabled": True,
+            "mode": "chunk_local_corrected_ar_tail",
+            "loss_mode": "tail_uniform",
+            "target_steps": int(segment_cfg.base_cfg.target_steps),
+            "truth_prefix_steps": int(truth_prefix_steps),
+            "ar_tail_steps": int(segment_cfg.base_cfg.target_steps),
+            "feedback_gradient": "full_bptt_chunk_detached",
+            "state_carry_steps": "temporal_state_stop_gradient_chunks",
+            "physical_state_carry": "truth_reset_each_chunk",
+        }
     if finite_segment_filter_stats is not None:
         payload["segment_training"]["finite_segment_filter"] = finite_segment_filter_stats
     with path.open("w", encoding="utf-8") as f:
@@ -373,6 +517,21 @@ class SegmentBlockBatchLoader:
         label: str = "segment-block",
     ) -> None:
         self._array_store = ds if is_prepared_array_store(ds) else None
+        self._prepared_loader = (
+            PreparedBlockBatchLoader(
+                self._array_store,
+                segments,
+                input_steps=input_steps,
+                target_steps=target_steps,
+                task_cfg=task_cfg,
+                dt=dt,
+                load_executor=load_executor,
+                max_workers=max_workers,
+                label=label,
+            )
+            if self._array_store is not None
+            else None
+        )
         self._source = None if self._array_store is not None else _drop_source_batch(ds)
         self._segments = segments
         self._input_steps = int(input_steps)
@@ -382,7 +541,7 @@ class SegmentBlockBatchLoader:
         self._load_executor = load_executor
         self._max_workers = max(1, int(max_workers))
         self._label = label
-        self._cache: dict[int, _LaneBlock | PreparedArrayBlock] = {}
+        self._cache: dict[int, _LaneBlock] = {}
         self._cache_segment_ids: dict[int, int] = {}
         self._task_vars = tuple(
             sorted(set(task_cfg.input_variables) | set(task_cfg.target_variables) | set(task_cfg.forcing_variables))
@@ -402,6 +561,9 @@ class SegmentBlockBatchLoader:
         self,
         chunk: SegmentChunk,
     ) -> tuple[tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], tuple[xr.Dataset, ...], SegmentLoadStats]:
+        if self._prepared_loader is not None:
+            return self._prepared_loader.load_chunk(chunk)
+
         t0 = time.time()
         hits = 0
         misses: list[tuple[int, int]] = []
@@ -431,18 +593,7 @@ class SegmentBlockBatchLoader:
         targets: list[xr.Dataset] = []
         forcings: list[xr.Dataset] = []
         for bptt_i, step_indices in enumerate(chunk.chunk_indices):
-            if self._array_store is not None:
-                blocks = [self._cache[lane] for lane in range(len(step_indices))]
-                batch_inputs, batch_targets, batch_forcings = self._array_store.build_step_from_blocks(
-                    blocks,
-                    step_indices,
-                    input_steps=self._input_steps,
-                    target_steps=self._target_steps,
-                    task_cfg=self._task_cfg,
-                    dt=self._dt,
-                )
-            else:
-                batch_inputs, batch_targets, batch_forcings = self._build_step_batch(step_indices)
+            batch_inputs, batch_targets, batch_forcings = self._build_step_batch(step_indices)
             inputs.append(batch_inputs)
             targets.append(batch_targets)
             forcings.append(batch_forcings)
@@ -457,16 +608,10 @@ class SegmentBlockBatchLoader:
         self.last_stats = stats
         return tuple(inputs), tuple(targets), tuple(forcings), stats
 
-    def _load_lane_block(self, segment_id: int) -> _LaneBlock | PreparedArrayBlock:
+    def _load_lane_block(self, segment_id: int) -> _LaneBlock:
         segment = self._segments[int(segment_id)]
         block_start = int(segment[0]) - self._input_steps + 1
         block_stop = int(segment[-1]) + self._target_steps + 1
-        if self._array_store is not None:
-            return self._array_store.load_time_block(
-                block_start,
-                block_stop,
-                task_cfg=self._task_cfg,
-            )
         assert self._source is not None
         if block_start < 0 or block_stop > self._source.sizes["time"]:
             raise IndexError(
@@ -854,12 +999,38 @@ def run_eval_segments(
     chunk_load_workers: int = 1,
     load_executor: concurrent.futures.Executor | None = None,
     segment_loader: SegmentBlockBatchLoader | None = None,
+    rolling_ar: bool = False,
+    load_target_steps: int | None = None,
+    max_segments: int | None = None,
+    subset_policy: str = EVAL_SUBSET_STRATIFIED_FIXED,
+    subset_role: str = "fixed_checkpoint",
+    subset_fold: int | None = None,
 ) -> dict[str, float]:
+    target_load_steps = load_target_steps if load_target_steps is not None else (1 if rolling_ar else target_steps)
     eval_segments = build_full_segments(eval_indices, len_segment)
     if not eval_segments:
         raise ValueError(
             "No full eval segments after timestamp-contiguous filtering. "
             f"len_segment={len_segment}, valid_windows={len(eval_indices)}"
+        )
+    available_segments = len(eval_segments)
+    selection = select_eval_subset(
+        np.arange(available_segments, dtype=np.int64),
+        max_segments,
+        times=segment_midpoint_times(eval_ds, eval_segments),
+        policy=subset_policy,
+        role=subset_role,
+        fold=subset_fold,
+    )
+    eval_segments = [eval_segments[int(position)] for position in selection.positions.tolist()]
+    if not eval_segments:
+        raise ValueError("No eval segments selected.")
+    truth_prefix_steps = _chunk_ar_truth_prefix(target_steps, bptt_steps) if rolling_ar else bptt_steps
+    if selection.capped:
+        readable_policy = selection.policy.replace("_", " ")
+        print(
+            f"[{progress_label}] using {readable_policy} "
+            f"{len(eval_segments)}/{available_segments} validation segments"
         )
 
     state_by_lane_count: dict[int, hk.State] = {}
@@ -877,6 +1048,7 @@ def run_eval_segments(
             eval_segments,
             batch_size=eval_batch_size,
             bptt_steps=bptt_steps,
+            segment_ids=selection.item_ids,
         ),
         start=1,
     ):
@@ -887,7 +1059,7 @@ def run_eval_segments(
                 eval_ds,
                 chunk.chunk_indices,
                 input_steps=input_steps,
-                target_steps=target_steps,
+                target_steps=target_load_steps,
                 task_cfg=task_cfg,
                 dt=dt,
                 batch_builder=batch_builder,
@@ -907,49 +1079,143 @@ def run_eval_segments(
             )
 
         if lane_count not in eval_chunk_fn_by_lane_count:
-            @jax.jit
-            def eval_chunk(params, state, key, chunk_inputs, chunk_targets, chunk_forcings, reset_mask):
-                current_state = _reset_temporal_state_lanes(state, reset_mask)
-                losses = []
-                keys = jax.random.split(key, len(chunk_inputs))
-                for bptt_i in range(len(chunk_inputs)):
-                    (loss_and_diag, current_state) = transformed.apply(
-                        params,
+            if rolling_ar:
+                @jax.jit
+                def eval_chunk(
+                    params,
+                    state,
+                    key,
+                    chunk_inputs,
+                    chunk_targets,
+                    chunk_forcings,
+                    reset_mask,
+                ):
+                    current_state = _reset_temporal_state_lanes(state, reset_mask)
+                    current_inputs = chunk_inputs[0]
+                    weighted_loss_sum = jnp.asarray(0.0, dtype=jnp.float32)
+                    valid_count = jnp.asarray(0.0, dtype=jnp.float32)
+                    keys = jax.random.split(key, len(chunk_inputs))
+                    for bptt_i in range(len(chunk_inputs)):
+                        if bptt_i < truth_prefix_steps:
+                            current_inputs = chunk_inputs[bptt_i]
+                        (loss_and_diag, predictions), current_state = transformed.apply(
+                            params,
+                            current_state,
+                            keys[bptt_i],
+                            current_inputs,
+                            chunk_targets[bptt_i],
+                            chunk_forcings[bptt_i],
+                            False,
+                        )
+                        if bptt_i >= truth_prefix_steps:
+                            loss_by_lane = _loss_by_lane(loss_and_diag[0])
+                            weighted_loss_sum = weighted_loss_sum + jnp.sum(loss_by_lane)
+                            valid_count = valid_count + jnp.asarray(loss_by_lane.size, dtype=loss_by_lane.dtype)
+                        if bptt_i < len(chunk_inputs) - 1:
+                            if bptt_i + 1 < truth_prefix_steps:
+                                current_inputs = chunk_inputs[bptt_i + 1]
+                            else:
+                                current_inputs = _advance_autoregressive_inputs(
+                                    current_inputs,
+                                    predictions,
+                                    chunk_forcings[bptt_i],
+                                )
+                    return (
                         current_state,
-                        keys[bptt_i],
-                        chunk_inputs[bptt_i],
-                        chunk_targets[bptt_i],
-                        chunk_forcings[bptt_i],
-                        False,
+                        weighted_loss_sum,
+                        valid_count,
                     )
-                    losses.append(scalarize_loss(loss_and_diag[0]))
-                return current_state, jnp.stack(losses)
+            else:
+                @jax.jit
+                def eval_chunk(params, state, key, chunk_inputs, chunk_targets, chunk_forcings, reset_mask):
+                    current_state = _reset_temporal_state_lanes(state, reset_mask)
+                    losses = []
+                    keys = jax.random.split(key, len(chunk_inputs) * 2)
+                    for bptt_i in range(len(chunk_inputs)):
+                        loss_key = keys[2 * bptt_i]
+                        carry_key = keys[2 * bptt_i + 1]
+                        state_before_rollout = current_state
+                        (loss_and_diag, rollout_state) = transformed.apply(
+                            params,
+                            state_before_rollout,
+                            loss_key,
+                            chunk_inputs[bptt_i],
+                            chunk_targets[bptt_i],
+                            chunk_forcings[bptt_i],
+                            False,
+                        )
+                        losses.append(scalarize_loss(loss_and_diag[0]))
+                        if chunk_targets[bptt_i].sizes["time"] > 1:
+                            first_targets = chunk_targets[bptt_i].isel(time=slice(0, 1))
+                            first_forcings = chunk_forcings[bptt_i].isel(time=slice(0, 1))
+                            (_carry_loss_and_diag, current_state) = transformed.apply(
+                                params,
+                                state_before_rollout,
+                                carry_key,
+                                chunk_inputs[bptt_i],
+                                first_targets,
+                                first_forcings,
+                                False,
+                            )
+                        else:
+                            current_state = rollout_state
+                    return current_state, jnp.stack(losses)
 
             eval_chunk_fn_by_lane_count[lane_count] = eval_chunk
 
-        next_state, chunk_losses = eval_chunk_fn_by_lane_count[lane_count](
-            params,
-            state_by_lane_count[lane_count],
-            apply_key,
-            chunk_inputs,
-            chunk_targets,
-            chunk_forcings,
-            jnp.asarray(chunk.reset_mask),
-        )
-        state_by_lane_count[lane_count] = next_state
+        if rolling_ar:
+            (
+                next_state,
+                chunk_loss_sum,
+                chunk_valid_count,
+            ) = eval_chunk_fn_by_lane_count[lane_count](
+                params,
+                state_by_lane_count[lane_count],
+                apply_key,
+                chunk_inputs,
+                chunk_targets,
+                chunk_forcings,
+                jnp.asarray(chunk.reset_mask),
+            )
+            state_by_lane_count[lane_count] = next_state
+            chunk_loss_sum_f = float(jax.device_get(chunk_loss_sum))
+            chunk_valid_count_f = float(jax.device_get(chunk_valid_count))
+            total_weighted_loss += chunk_loss_sum_f
+            total_windows += int(chunk_valid_count_f)
+            current_loss = chunk_loss_sum_f / max(chunk_valid_count_f, 1.0)
+        else:
+            next_state, chunk_losses = eval_chunk_fn_by_lane_count[lane_count](
+                params,
+                state_by_lane_count[lane_count],
+                apply_key,
+                chunk_inputs,
+                chunk_targets,
+                chunk_forcings,
+                jnp.asarray(chunk.reset_mask),
+            )
+            state_by_lane_count[lane_count] = next_state
 
-        chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
-        total_weighted_loss += float(chunk_losses_np.sum()) * lane_count
-        total_windows += lane_count * len(chunk_inputs)
+            chunk_losses_np = np.asarray(jax.device_get(chunk_losses), dtype=np.float64)
+            total_weighted_loss += float(chunk_losses_np.sum()) * lane_count
+            total_windows += lane_count * len(chunk_inputs)
+            current_loss = float(chunk_losses_np.mean())
 
         if chunk_i == 1 or chunk_i % 10 == 0 or chunk_i == n_chunks:
             elapsed = time.time() - t_eval0
             print(
                 f"[{progress_label}] chunk {chunk_i}/{n_chunks} "
-                f"elapsed {elapsed:.1f}s current_loss {float(chunk_losses_np.mean()):.6f}"
+                f"elapsed {elapsed:.1f}s current_loss {current_loss:.6f}"
             )
 
-    return {"total": float(total_weighted_loss / total_windows)}
+    if total_windows <= 0:
+        raise ValueError("No eval windows were available for the chunk-local autoregressive tail loss.")
+
+    return {
+        "total": float(total_weighted_loss / total_windows),
+        "segments": float(len(eval_segments)),
+        "chunks": float(n_chunks),
+        **selection.metadata(item_name="segments"),
+    }
 
 
 def run_eval_fresh_state(
