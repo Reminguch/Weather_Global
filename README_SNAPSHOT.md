@@ -1,6 +1,6 @@
 # Frozen snapshot of the drifted tree (2026-07-09)
 
-This branch (`AR-Training-Lianghong-H256frozen`) captures the EXACT on-disk code state of
+This branch (`AR-Training-Lianghong-H256frozen-DRIFTED`) captures the EXACT on-disk code state of
 `/home/lm8598/Weather_Global_experiments/` on 2026-07-09 — the code that trained the
 res=1 H=256 K-scan (`/scratch/.../results/v22closed/K*_H256_fresh_20k/`).
 Use THIS tree for any eval of those ckpts. Original warning below.
