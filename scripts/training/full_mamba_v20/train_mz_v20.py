@@ -80,7 +80,9 @@ from src.models.graphcast.training.core.model import (  # noqa: E402
 from src.models.mamba.training.param_utils import (  # noqa: E402
     overlay_matching_params,
 )
-from src.data.prepared_array import PreparedArrayStore  # noqa: E402
+# Prepared-array support moved with the GraphCast training core.  v20 uses
+# exactly the same public store API (memmap batches/metadata validation).
+from src.models.graphcast.training.core.prepared_array import PreparedArrayStore  # noqa: E402
 
 from scripts.training.full_mamba_v9.train_mz_v9 import (  # noqa: E402
     GCResidualWithZeroHead, _attach_temporal,
@@ -702,7 +704,11 @@ def main():
         next_inputs_part = next_inputs_part.assign_coords(
             time=prev_inputs.time.values[-1:] + dt
         )
-        merged = xr.concat([prev_inputs, next_inputs_part], dim="time", data_vars="different")
+        # Pin the legacy compatibility mode explicitly.  This preserves the
+        # original concat semantics and avoids one warning per AR anchor.
+        merged = xr.concat(
+            [prev_inputs, next_inputs_part], dim="time", data_vars="different",
+            compat="equals")
         return merged.tail(time=input_steps)
 
     # v18 SINGLE-STREAM (baseline rollout): GC and Mamba both see the same

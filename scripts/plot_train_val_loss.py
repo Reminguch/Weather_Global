@@ -52,18 +52,36 @@ def _load_train_series(out_dir: Path) -> tuple[list[int], list[float]]:
     return steps, vals
 
 
+def _load_legacy_train_log(out_dir: Path) -> tuple[list[int], list[float]]:
+    """Load the per-step object records written by legacy residual-Mamba jobs."""
+    path = out_dir / "train_log.json"
+    if not path.exists():
+        return [], []
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            records = json.load(f)
+    except Exception:
+        return [], []
+    if not isinstance(records, list):
+        return [], []
+    pairs = [
+        (int(record["step"]), float(record["loss"]))
+        for record in records
+        if isinstance(record, dict) and "step" in record and "loss" in record
+    ]
+    return [step for step, _ in pairs], [loss for _, loss in pairs]
+
+
 def plot_train_and_val_loss(out_dir: Path) -> bool:
     """Plot train + val loss from JSONs in out_dir. Save val_loss.png. Return True if done."""
     eval_data = _load_pairs(out_dir / "eval_loss.json")
-    if not eval_data:
-        return False
-
     eval_steps = [int(x[0]) for x in eval_data if isinstance(x, (list, tuple)) and len(x) >= 2]
     eval_vals = [float(x[1]) for x in eval_data if isinstance(x, (list, tuple)) and len(x) >= 2]
-    if not eval_steps:
-        return False
-
     train_steps, train_vals = _load_train_series(out_dir)
+    if not train_steps:
+        train_steps, train_vals = _load_legacy_train_log(out_dir)
+    if not eval_steps and not train_steps:
+        return False
 
     # Downsample train for plotting if very long (max ~5000 points).
     max_train_points = 5000
@@ -75,20 +93,21 @@ def plot_train_and_val_loss(out_dir: Path) -> bool:
     fig, ax = plt.subplots()
     if train_steps and train_vals:
         ax.plot(train_steps, train_vals, alpha=0.7, label="Train loss", color="C0")
-    ax.plot(eval_steps, eval_vals, marker="o", linestyle="-", label="Val loss", color="C1")
-    # Scale y-axis from validation-loss dynamics only.
-    # Train loss may be clipped by this range, per intended behavior.
-    y_min = min(eval_vals)
-    y_max = max(eval_vals)
-    y_span = y_max - y_min
-    pad = 0.1 * y_span if y_span > 0 else max(1e-8, 0.1 * abs(y_max))
-    lo = max(0.0, y_min - pad)
-    hi = y_max + pad
-    if hi > lo:
-        ax.set_ylim(lo, hi)
+    if eval_steps:
+        ax.plot(eval_steps, eval_vals, marker="o", linestyle="-", label="Val loss", color="C1")
+        # Scale y-axis from validation-loss dynamics only.
+        # Train loss may be clipped by this range, per intended behavior.
+        y_min = min(eval_vals)
+        y_max = max(eval_vals)
+        y_span = y_max - y_min
+        pad = 0.1 * y_span if y_span > 0 else max(1e-8, 0.1 * abs(y_max))
+        lo = max(0.0, y_min - pad)
+        hi = y_max + pad
+        if hi > lo:
+            ax.set_ylim(lo, hi)
     ax.set_xlabel("step")
     ax.set_ylabel("loss")
-    ax.set_title("Train & validation loss")
+    ax.set_title("Train & validation loss" if eval_steps else "Training loss (validation not recorded)")
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -112,9 +131,9 @@ def main() -> None:
         if not root.is_dir():
             print(f"Not a directory: {root}", file=sys.stderr)
             continue
-        # Include nested run directories that contain eval_loss.json.
-        run_dirs = sorted({p.parent for p in root.rglob("eval_loss.json")})
-        if (root / "eval_loss.json").exists():
+        # Include both modern evaluation records and legacy training records.
+        run_dirs = sorted({p.parent for p in root.rglob("eval_loss.json")} | {p.parent for p in root.rglob("train_log.json")})
+        if (root / "eval_loss.json").exists() or (root / "train_log.json").exists():
             run_dirs = sorted(set(run_dirs + [root]))
         for run_dir in run_dirs:
             if plot_train_and_val_loss(run_dir):
