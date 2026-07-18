@@ -40,3 +40,33 @@ bf16/GPU nondeterminism:
 
 (A single-step loss involves a ~24-step AR rollout of a 16-/6-msg GraphCast + Mamba, so
 in bf16 the reproducibility floor is ~1e-3, not fp32's ~1e-7.)
+
+## Fixes applied after review
+- **res=1 walltime**: at ~6.6 s/step, step 16000 (SWA) ≈ 29 h and step 20000 ≈ 37 h,
+  which does not fit a 24 h job. res=1 open/closed now use **`--qos=gpu-long`
+  (MaxWall 6 d) with `--time=44:00:00`**, so a single uninterrupted job reaches step
+  20000 — no resume needed. (res=2 trains only 2000 steps, fits easily.)
+- **Result-dir pollution guard**: the training scripts now refuse to fresh-run into a
+  run dir that already holds `v13_residual_step*.pkl`, so a leftover interrupted run
+  can't silently mix old+new checkpoints into the SWA average.
+- **res=2 data portability**: the res=2 prepared stream was copied out of another
+  user's scratch (`iv9432/…`) into the project owner's tree
+  (`.../dataset/prepared_stream_res2/res2`); the slurms point there now.
+- **eval metadata**: `eval_v22_clean.py` now records the actual
+  `cfg.residual_state_init` instead of a hardcoded `"loaded_from_ckpt_or_zero_default"`.
+
+## Known limitations (by design / not fixed here)
+- **`--resume-from` is a params-only ("reset-style") resume**: it reloads
+  `residual_params`/`residual_state` but NOT the AdamW optimizer state, RNG, or data
+  iterator position (step is set via `--start-step`). This matches how the original
+  production runs themselves were chained at step 14000, so it reproduces them; it is
+  NOT identical to an uninterrupted run. The 44 h gpu-long job above avoids resume
+  entirely for the canonical run. A true full-state resume would be a larger trainer
+  change — ask if you want it.
+- **"val loss" is per-variable RMSE / MAE / RMSB**, not a single scalar validation loss.
+- **SWA averages the closed-loop run** (`*_swa.slurm`). To SWA/eval the open-loop run
+  instead, point `build_swa_generic.py --run-glob` at the `open_loop_*` dir (same steps).
+- **`--batch-size` is effectively unused** (fixed to 1); current results are unaffected.
+- The trainer's top docstring still says it uses a *precomputed* residual target; the
+  actual path computes `truth − sg(baseline)` **online** each step (the residual memmap
+  is opened but not read in closed_loop_sg). Behaviour is correct; the docstring is stale.

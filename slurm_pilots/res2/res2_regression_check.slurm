@@ -22,7 +22,7 @@ cd /home/lm8598/Weather_Global_v22clean_frozen
 
 ROOT=/scratch/gpfs/DABANIN/lm8598/Weather_Global
 GCV1_K3=${ROOT}/results/GCv1/K3_cascade_res2_m4_w512_mp6/ckpt_step52000.npz
-PREPARED_ROOT=/scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/dataset/prepared_stream/res2
+PREPARED_ROOT=${ROOT}/data/graphcast/graphcast/dataset/prepared_stream_res2/res2
 RESIDUAL_ROOT=${ROOT}/data/graphcast/graphcast/dataset/precomputed_residuals/v22_res2_GCv1K3_synthetic
 OUT=${ROOT}/results/res2_sync/regcheck
 mkdir -p ${OUT}

@@ -7,16 +7,16 @@
 # Runs in the frozen-clean tree. For a quick agreement check vs another codebase,
 # lower --max-steps (e.g. 1000) and compare the training-loss trajectory.
 # ============================================================================
-#SBATCH --job-name=res1-open-K20
+#SBATCH --job-name=res1-open
 #SBATCH --account=biao
 #SBATCH --gres=gpu:1
-#SBATCH --qos=gpu
+#SBATCH --qos=gpu-long
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=240G
 #SBATCH --constraint=gpu80
-#SBATCH --time=23:00:00
-#SBATCH --output=/home/lm8598/Weather_Global_experiments/logs/res1_open_K20_%j.out
-#SBATCH --error=/home/lm8598/Weather_Global_experiments/logs/res1_open_K20_%j.err
+#SBATCH --time=44:00:00
+#SBATCH --output=/home/lm8598/Weather_Global_experiments/logs/res1_open_%j.out
+#SBATCH --error=/home/lm8598/Weather_Global_experiments/logs/res1_open_%j.err
 set -euo pipefail
 export MPLCONFIGDIR=/tmp/mpl-weather-global; mkdir -p $MPLCONFIGDIR
 export XLA_PYTHON_CLIENT_PREALLOCATE=false; export XLA_PYTHON_CLIENT_ALLOCATOR=platform
@@ -30,8 +30,13 @@ PREPARED_ROOT=${ROOT}/data/graphcast/graphcast/dataset/prepared_stream_2015_2022
 RESIDUAL_ROOT=${ROOT}/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_7yr_v2
 OUT=${ROOT}/results/res1_sync/open_loop_K${K:-20}
 mkdir -p ${OUT}
+# guard: refuse to fresh-run into a dir that already holds checkpoints (a leftover
+# interrupted run would otherwise mix old+new ckpts and poison the SWA average).
+if ls ${OUT}/K${K:-20}_res1_open_loop/v13_residual_step*.pkl >/dev/null 2>&1; then
+  echo "ERROR: ${OUT}/K${K:-20}_res1_open_loop already has checkpoints. Move/delete it (or use a dedicated resume script) before a fresh run."; exit 1
+fi
 
-echo "=== res=1 OPEN-LOOP K=20 (feedback-mode baseline) ==="
+echo "=== res=1 OPEN-LOOP K=${K:-20} (feedback-mode baseline) ==="
 ${PYTHON} -u scripts/training/full_mamba_v20/train_mz_v20.py \
   --prepared-root "${PREPARED_ROOT}" \
   --residual-root "${RESIDUAL_ROOT}" \

@@ -26,11 +26,14 @@ cd /home/lm8598/Weather_Global_v22clean_frozen        # frozen-clean tree; relat
 
 ROOT=/scratch/gpfs/DABANIN/lm8598/Weather_Global
 GCV1_K3=${ROOT}/results/GCv1/K3_cascade_res2_m4_w512_mp6/ckpt_step52000.npz   # res=2 frozen baseline
-PREPARED_ROOT=/scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/dataset/prepared_stream/res2
+PREPARED_ROOT=${ROOT}/data/graphcast/graphcast/dataset/prepared_stream_res2/res2
 RESIDUAL_ROOT=${ROOT}/data/graphcast/graphcast/dataset/precomputed_residuals/v22_res2_GCv1K3_synthetic
 [ -f "${GCV1_K3}" ] || { echo "ERR: missing GCv1 K3 baseline"; exit 1; }
 OUT=${ROOT}/results/res2_sync/closed_loop_K${K:-18}
 mkdir -p ${OUT}
+if ls ${OUT}/K${K:-18}_res2_closed_loop/v13_residual_step*.pkl >/dev/null 2>&1; then
+  echo "ERROR: ${OUT}/K${K:-18}_res2_closed_loop already has checkpoints. Move/delete before a fresh run (avoids mixing ckpts in SWA)."; exit 1
+fi
 
 echo "=== res=2 CLOSED-LOOP K=${K:-18} (feedback-mode closed_loop_sg) ==="
 ${PYTHON} -u scripts/training/full_mamba_v20/train_mz_v20.py \

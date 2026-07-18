@@ -491,7 +491,7 @@ def main():
         "eval_feedback": "full" if is_full_fb else "baseline",
         "rs_reset_after_warmup": is_reset_state,
         "baseline_branch": "pure_baseline_self_rollout",
-        "residual_state_init": "loaded_from_ckpt_or_zero_default",
+        "residual_state_init": cfg.residual_state_init,
         "target_steps": K,
         "sample_total_steps": sample_total_steps,
         "n_samples": cfg.n_samples,
