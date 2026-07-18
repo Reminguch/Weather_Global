@@ -39,6 +39,9 @@ ${PYTHON} -u scripts/training/full_mamba_v23/build_swa_generic.py \
   --out-name ${SWA_NAME}
 
 SWA_CKPT=${CLOSED_OUT}/K${K:-20}_res1_closed_loop/${SWA_NAME}
+# build_swa exits non-zero + deletes any stale SWA on failure; double-check the file
+# was actually produced this run before evaluating (never eval a leftover stale SWA).
+[ -f "${SWA_CKPT}" ] || { echo "ERR: SWA ckpt was not produced this run: ${SWA_CKPT}"; exit 1; }
 echo "=== 2) eval SWA ckpt (cold_full, 32 inits, 2022) ==="
 ${PYTHON} -u scripts/training/full_mamba_v23/eval_v22_clean.py \
   --ckpt "${SWA_CKPT}" --ckpt-in "${DM_CKPT}" \

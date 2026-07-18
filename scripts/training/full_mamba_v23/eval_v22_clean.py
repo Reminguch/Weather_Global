@@ -232,17 +232,24 @@ def main():
     if cfg.residual_state_init == "ckpt":
         if "residual_state" in ckpt and ckpt["residual_state"]:
             residual_state_init = ckpt["residual_state"]
+            _resolved_state_init = "ckpt"
             print(f"[clean-eval] residual_state_init = LOADED FROM CKPT")
         else:
+            _resolved_state_init = "zero_missing_ckpt_state"
             print(f"[clean-eval] residual_state_init = zero (no residual_state in ckpt)")
     elif cfg.residual_state_init == "zero":
         residual_state_init = _hk_zero_state
+        _resolved_state_init = "zero_forced"
         print(f"[clean-eval] residual_state_init = ZERO (forced via --residual-state-init zero)")
     elif cfg.residual_state_init == "warm24":
         # warm24 init is applied per-sample below; defer until rollout
         residual_state_init = _hk_zero_state  # start from zero; warmup will fill
+        _resolved_state_init = "warm24"
         print(f"[clean-eval] residual_state_init = WARM24 (will roll 24 truth-fed steps per sample)")
-    _residual_state_init_mode = cfg.residual_state_init
+    else:
+        _resolved_state_init = cfg.residual_state_init
+    # RESOLVED mode (what actually happened), not just the requested flag
+    _residual_state_init_mode = _resolved_state_init
 
     n_p = sum(p.size for p in jax.tree_util.tree_leaves(residual_params))
     print(f"[clean-eval] loaded residual_params {n_p:,}")
@@ -491,7 +498,8 @@ def main():
         "eval_feedback": "full" if is_full_fb else "baseline",
         "rs_reset_after_warmup": is_reset_state,
         "baseline_branch": "pure_baseline_self_rollout",
-        "residual_state_init": cfg.residual_state_init,
+        "residual_state_init": _residual_state_init_mode,
+        "residual_state_init_requested": cfg.residual_state_init,
         "target_steps": K,
         "sample_total_steps": sample_total_steps,
         "n_samples": cfg.n_samples,

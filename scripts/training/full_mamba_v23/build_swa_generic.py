@@ -24,16 +24,21 @@ def main():
     ks = [int(x) for x in cfg.ks.split(",")]
     steps = [int(x) for x in cfg.steps.split(",")]
 
+    failures = []
     for K in ks:
         pat = cfg.run_glob.replace("{K}", str(K))
         dirs = sorted(glob.glob(pat))
         if not dirs:
-            print(f"K={K}: NO dir matches {pat}"); continue
+            print(f"K={K}: NO dir matches {pat}"); failures.append(K); continue
         ckpt_dir = Path(dirs[0])
         paths = [ckpt_dir / f"v13_residual_step{s}.pkl" for s in steps]
         missing = [p.name for p in paths if not p.exists()]
         if missing:
-            print(f"K={K}: MISSING {missing} in {ckpt_dir}"); continue
+            print(f"K={K}: MISSING {missing} in {ckpt_dir}"); failures.append(K); continue
+        # rebuild fresh: never leave a stale SWA from a previous run in place
+        out = ckpt_dir / cfg.out_name
+        if out.exists():
+            out.unlink()
         params_list, rs_first = [], None
         for pp in paths:
             with pp.open("rb") as f:
@@ -49,6 +54,10 @@ def main():
                          "swa_source_steps": steps,
                          "swa_source_ckpts": [str(x) for x in paths]}, f)
         print(f"K={K:2d}: SWA of {n} ckpts -> {out}")
+    if failures:
+        import sys
+        print(f"FAILED to build SWA for K={failures} (missing dir/ckpts). Exiting non-zero.")
+        sys.exit(1)
     print("Done.")
 
 
