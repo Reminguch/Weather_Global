@@ -123,7 +123,10 @@ def _attach_temporal(predictor, cfg):
     predictor._temporal_conv_bias = cfg.temporal_conv_bias
     predictor._temporal_layers = cfg.temporal_layers
     predictor._temporal_dropout = cfg.temporal_dropout
-    predictor._temporal_stateful = True
+    # Stateful Mamba carries both its SSM state and causal-convolution cache
+    # across successive autoregressive calls.  Keep that legacy default, while
+    # allowing v20 ablations to exercise the stateless temporal implementation.
+    predictor._temporal_stateful = getattr(cfg, "temporal_stateful", True)
     predictor._temporal_zero_init_out = cfg.temporal_zero_init_out
     return predictor
 

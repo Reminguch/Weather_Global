@@ -93,6 +93,13 @@ def parse_args():
     p.add_argument("--temporal-layers", type=int, default=2)
     p.add_argument("--no-temporal-conv-bias", dest="temporal_conv_bias",
                    action="store_false", default=True)
+    p.add_argument(
+        "--temporal-stateful",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=("Carry Mamba SSM and causal-convolution state between autoregressive "
+              "forecast calls. Must match the training configuration."),
+    )
     p.add_argument("--no-zero-init-out", dest="temporal_zero_init_out",
                    action="store_false", default=True)
     p.add_argument("--temporal-bias", action="store_true", default=False)
