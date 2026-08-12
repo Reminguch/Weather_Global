@@ -80,7 +80,14 @@ def weighted_mse_improvement(evaluation: dict, scales: xr.Dataset) -> np.ndarray
     return 100.0 * (1.0 - full_total / baseline_total)
 
 
-def input_specs() -> list[dict[str, object]]:
+def input_specs(*, swa_4k_12k: bool = False) -> list[dict[str, object]]:
+    if swa_4k_12k:
+        return [
+            {"label": "Stateful Mamba SWA 4k–12k", "feedback": "open", "stateful": True,
+             "path": STATEFUL_ROOT / "resmamba_res2_v20_k14_di16_l2_dc4_open_20000steps/eval/cold_bp/swa_step4k-12k.json"},
+            {"label": "Stateless Mamba SWA 4k–12k", "feedback": "open", "stateful": False,
+             "path": STATELESS_ROOT / "resmamba_res2_v20_k14_di16_l2_dc4_open_stateless_20000steps/eval/cold_bp_zero_matched/swa_step4k-12k.json"},
+        ]
     return [
         {"label": "Stateful Mamba", "feedback": "open", "stateful": True,
          "path": STATEFUL_ROOT / "resmamba_res2_v20_k14_di16_l2_dc4_open_20000steps/eval/cold_bp_zero_matched/step16000.json"},
@@ -98,14 +105,27 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--stats-dir", type=Path, default=ROOT / "data/graphcast/graphcast/stats")
+    parser.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="Render available curves only and label the result as partial.",
+    )
+    parser.add_argument(
+        "--swa-4k-12k",
+        action="store_true",
+        help="Compare the open-loop stateful and stateless 4k--12k SWA checkpoints.",
+    )
     args = parser.parse_args()
 
     scales = xr.open_dataset(args.stats_dir / "diffs_stddev_by_level.nc")
-    records, groups = [], {"open": [], "closed": []}
-    for spec in input_specs():
+    records, groups, missing = [], {"open": [], "closed": []}, []
+    for spec in input_specs(swa_4k_12k=args.swa_4k_12k):
         path = spec["path"]
         if not path.is_file():
-            raise FileNotFoundError(f"Missing evaluation output: {path}")
+            if not args.allow_missing:
+                raise FileNotFoundError(f"Missing evaluation output: {path}")
+            missing.append(f"{spec['label']} ({spec['feedback']} loop)")
+            continue
         with path.open(encoding="utf-8") as f:
             evaluation = json.load(f)
         temperature = evaluation["per_channel_per_step"]["2m_temperature"]
@@ -125,15 +145,34 @@ def main() -> None:
             })
 
     colors = {True: "#D55E00", False: "#0072B2"}
-    fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharex=True)
-    for row, feedback in enumerate(("open", "closed")):
+    feedbacks = ("open",) if args.swa_4k_12k else ("open", "closed")
+    if args.swa_4k_12k:
+        fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), sharex=True)
+        axes = np.asarray([axes])
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharex=True)
+    baseline_spreads = []
+    for row, feedback in enumerate(feedbacks):
         items = groups[feedback]
-        reference = items[0]["baseline"]
-        if not all(np.allclose(reference, item["baseline"], rtol=1e-7, atol=1e-8) for item in items[1:]):
-            raise ValueError(f"Vanilla GC baselines differ across {feedback} evaluations.")
+        if not items:
+            for ax in axes[row]:
+                ax.set_axis_off()
+                ax.text(0.5, 0.5, f"No completed {feedback}-loop evaluation", ha="center", va="center")
+            continue
+        baselines = np.asarray([item["baseline"] for item in items])
+        reference = baselines.mean(axis=0)
+        spread = float(np.max(np.ptp(baselines, axis=0)))
+        baseline_spreads.append(spread)
+        if spread > 0.01:
+            raise ValueError(
+                f"Vanilla GC baselines differ materially across {feedback} "
+                f"evaluations (max spread {spread:.4f} K).")
         ax_rmse, ax_gain = axes[row]
         hours = items[0]["hours"]
-        ax_rmse.plot(hours / 24, reference, color="0.2", lw=2.5, label="Frozen vanilla GC")
+        baseline_label = "Frozen vanilla GC"
+        if spread > 0:
+            baseline_label += " (mean recorded reference)"
+        ax_rmse.plot(hours / 24, reference, color="0.2", lw=2.5, label=baseline_label)
         for item in items:
             ax_rmse.plot(hours / 24, item["full"], color=colors[item["stateful"]], lw=2.3,
                          label=f"{item['label']} (step {Path(item['path']).stem.removeprefix('step')})")
@@ -150,15 +189,32 @@ def main() -> None:
             ax.set_xticks(np.arange(1, 11))
     for ax in axes[-1]:
         ax.set_xlabel("lead time (days)")
-    fig.suptitle("d_conv=4 residual-Mamba: state carried vs reset each rollout call\nmatched cold evaluation, zero residual state, 32 held-out anchors", fontsize=14)
+    if args.swa_4k_12k:
+        title = (
+            "d_conv=4 residual-Mamba: stateful vs stateless SWA (4k--12k)\n"
+            "open-loop matched cold evaluation, zero residual state, 32 held-out anchors"
+        )
+    else:
+        title = (
+            "d_conv=4 residual-Mamba: state carried vs reset each rollout call\n"
+            "matched cold evaluation, zero residual state, 32 held-out anchors"
+        )
+    if missing:
+        title += "\nPARTIAL: pending " + "; ".join(missing)
+    if any(spread > 0 for spread in baseline_spreads):
+        title += f"\nRecorded vanilla-reference spread ≤ {max(baseline_spreads):.4f} K"
+    fig.suptitle(title, fontsize=14)
     fig.tight_layout()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    output = args.output_dir / "resmamba_res2_v20_dc4_stateful_vs_stateless_cold_rollout.png"
+    suffix = "_swa_step4k-12k" if args.swa_4k_12k else ""
+    if missing:
+        suffix += "_partial"
+    output = args.output_dir / f"resmamba_res2_v20_dc4_stateful_vs_stateless_cold_rollout{suffix}.png"
     fig.savefig(output, dpi=180, bbox_inches="tight")
     plt.close(fig)
 
     args.data_dir.mkdir(parents=True, exist_ok=True)
-    summary = args.data_dir / "resmamba_res2_v20_dc4_stateful_vs_stateless_cold_rollout.csv"
+    summary = args.data_dir / f"resmamba_res2_v20_dc4_stateful_vs_stateless_cold_rollout{suffix}.csv"
     pd.DataFrame(records).to_csv(summary, index=False)
     print(f"Saved plot: {output}")
     print(f"Saved summary: {summary}")

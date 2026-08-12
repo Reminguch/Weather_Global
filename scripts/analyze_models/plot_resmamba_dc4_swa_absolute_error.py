@@ -88,6 +88,26 @@ def main() -> None:
     parser.add_argument("--comparison-variant", default=DEFAULT_COMPARISON_VARIANT)
     parser.add_argument("--comparison-label", default="Residual_Mamba (res2, cold)")
     parser.add_argument(
+        "--stateless-open-json",
+        type=Path,
+        default=None,
+        help="Optional final-checkpoint cold rollout JSON for the stateless open-loop K=12 residual-Mamba.",
+    )
+    parser.add_argument(
+        "--stateless-closed-json",
+        type=Path,
+        default=None,
+        help="Optional final-checkpoint cold rollout JSON for the stateless closed-loop K=12 residual-Mamba.",
+    )
+    parser.add_argument(
+        "--ar-gc-csv",
+        type=Path,
+        default=None,
+        help="Optional warm resolution-eval CSV for the 12-step AR vanilla-GraphCast control.",
+    )
+    parser.add_argument("--ar-gc-variant", default=None)
+    parser.add_argument("--ar-gc-label", default="Vanilla GC AR k=12 (res2, warm)")
+    parser.add_argument(
         "--comparison-summary-csv",
         type=Path,
         default=None,
@@ -123,11 +143,33 @@ def main() -> None:
     if args.comparison_csv is not None:
         comparison_hours, comparison_rmse = load_csv_curve(args.comparison_csv, args.comparison_variant)
 
+    stateless_open: tuple[np.ndarray, np.ndarray, int] | None = None
+    stateless_closed: tuple[np.ndarray, np.ndarray, int] | None = None
+    if args.stateless_open_json is not None:
+        stateless_open = load_swa(args.stateless_open_json)
+    if args.stateless_closed_json is not None:
+        stateless_closed = load_swa(args.stateless_closed_json)
+
+    ar_gc_hours: np.ndarray | None = None
+    ar_gc_rmse: np.ndarray | None = None
+    if args.ar_gc_csv is not None:
+        if args.ar_gc_variant is None:
+            raise ValueError("--ar-gc-csv requires --ar-gc-variant")
+        ar_gc_hours, ar_gc_rmse = load_csv_curve(args.ar_gc_csv, args.ar_gc_variant)
+
     fig, ax = plt.subplots(figsize=(10.5, 6.3))
     ax.plot(open_hours / 24, open_rmse, lw=2.5, color="#0072B2",
             label=f"Additiva_Mamba d_conv=4 SWA, open ({open_samples} cold samples)")
     ax.plot(closed_hours / 24, closed_rmse, lw=2.5, color="#D55E00",
             label=f"Additiva_Mamba d_conv=4 SWA, closed ({closed_samples} cold samples)")
+    if stateless_open is not None:
+        hours, rmse, samples = stateless_open
+        ax.plot(hours / 24, rmse, lw=2.2, ls="--", color="#56B4E9",
+                label=f"Additiva_Mamba d_conv=4 K=12, stateless open ({samples} cold samples)")
+    if stateless_closed is not None:
+        hours, rmse, samples = stateless_closed
+        ax.plot(hours / 24, rmse, lw=2.2, ls="--", color="#E69F00",
+                label=f"Additiva_Mamba d_conv=4 K=12, stateless closed ({samples} cold samples)")
     ax.plot(vanilla_hours / 24, vanilla_rmse, "o-", ms=5, lw=1.9, color="#555555",
             label="Vanilla GC (res2, warm)")
     ax.plot(continue_hours / 24, continue_rmse, "s-", ms=5, lw=1.9, color="#009E73",
@@ -137,6 +179,9 @@ def main() -> None:
     if comparison_hours is not None and comparison_rmse is not None:
         ax.plot(comparison_hours / 24, comparison_rmse, "P-", ms=6, lw=2.3, color="#7B3294",
                 label=args.comparison_label)
+    if ar_gc_hours is not None and ar_gc_rmse is not None:
+        ax.plot(ar_gc_hours / 24, ar_gc_rmse, "D-", ms=5, lw=2.1, color="#A6761D",
+                label=args.ar_gc_label)
 
     ax.set(
         xlabel="lead time (days)",

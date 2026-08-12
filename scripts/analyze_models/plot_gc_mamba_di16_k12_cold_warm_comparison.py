@@ -24,6 +24,12 @@ OLD_VARIANT = (
     "vanilla_gc_7y_res2_m4_w512_mp6_h6_bs8_accum1_stream50k_"
     "gc_mamba_tc2_di16_ds16_20k_target_step12_bptt16"
 )
+VANILLA_VARIANT = "vanilla_gc_7y_res2_m4_w512_mp6_h6_bs8_accum1_stream50k"
+VANILLA_WARM_CSV = (
+    ROOT / "plots/analyze_models/data/resolution_eval/"
+    "res2_ds16_gc_mamba_target_steps_bptt16_warm_leads1_9d/shards/"
+    "resolution_eval_graphcast_res2_baseline_init.csv"
+)
 SOURCES = (
     (
         "Frozen checkpoint, cold",
@@ -62,6 +68,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--image-dir", type=Path, default=DEFAULT_IMAGE_DIR)
+    parser.add_argument(
+        "--corrected-order-csv",
+        type=Path,
+        help=(
+            "Plot only cold and warm from a Mamba-before-processor evaluator "
+            "CSV, rather than the historical three-source comparison."
+        ),
+    )
+    parser.add_argument(
+        "--include-vanilla-gc",
+        action="store_true",
+        help="Add the matched frozen vanilla-GC warm reference to corrected-order plots.",
+    )
     return parser.parse_args()
 
 
@@ -104,6 +123,42 @@ def plot(curves: list[tuple[str, pd.DataFrame, str, str]], output: Path, title: 
 
 def main() -> None:
     args = parse_args()
+    if args.corrected_order_csv is None:
+        sources = SOURCES
+        output_prefix = "gc_mamba_di16_k12_cold_warm"
+        title_prefix = "GC-Mamba di16, target steps 12: cold vs warm evaluations"
+    else:
+        sources = (
+            (
+                "Mamba → processor, cold",
+                args.corrected_order_csv,
+                OLD_VARIANT,
+                "cold",
+                "#0072B2",
+                "o-",
+            ),
+            (
+                "Mamba → processor, warm",
+                args.corrected_order_csv,
+                OLD_VARIANT,
+                "warm",
+                "#D55E00",
+                "s-",
+            ),
+        )
+        if args.include_vanilla_gc:
+            sources += (
+                (
+                    "Frozen vanilla GC (warm reference)",
+                    VANILLA_WARM_CSV,
+                    VANILLA_VARIANT,
+                    "warm",
+                    "#333333",
+                    "--",
+                ),
+            )
+        output_prefix = "gc_mamba_di16_k12_mamba_before_processor_cold_warm"
+        title_prefix = "GC-Mamba di16, target steps 12 (Mamba → processor): cold vs warm"
     metric_specs = (
         ("weighted_allvars", "", "weighted_allvars", "Normalized weighted MSE (lower is better)"),
         ("rmse_k", "2m_temperature", "2m_temperature_rmse_k", "2 m temperature RMSE (K; lower is better)"),
@@ -112,7 +167,7 @@ def main() -> None:
     for metric_kind, variable, stem, ylabel in metric_specs:
         curves = []
         records = []
-        for label, csv_path, variant, mode, color, style in SOURCES:
+        for label, csv_path, variant, mode, color, style in sources:
             curve = load_curve(csv_path, variant, mode, metric_kind, variable)
             curve["comparison_label"] = label
             curve["source_csv"] = str(csv_path)
@@ -122,8 +177,8 @@ def main() -> None:
         combined.to_csv(args.data_dir / f"{stem}_curves.csv", index=False)
         plot(
             curves,
-            args.image_dir / f"gc_mamba_di16_k12_cold_warm_{stem}.png",
-            f"GC-Mamba di16, target steps 12: cold vs warm evaluations — {stem.replace('_', ' ')}",
+            args.image_dir / f"{output_prefix}_{stem}.png",
+            f"{title_prefix} — {stem.replace('_', ' ')}",
             ylabel,
         )
 
