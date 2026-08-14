@@ -14,11 +14,88 @@ from .model import gc
 
 
 PREPARED_ARRAY_FORMAT_VERSION = 1
+PREPARED_ARRAY_SHARDED_FORMAT_VERSION = 2
+SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS = (
+    PREPARED_ARRAY_FORMAT_VERSION,
+    PREPARED_ARRAY_SHARDED_FORMAT_VERSION,
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class _PreparedArrayShard:
+    start: int
+    stop: int
+    data: np.ndarray
+
+
+class PreparedShardedArray:
+    """A time-axis array assembled lazily from consecutive memmap shards."""
+
+    def __init__(self, shards: list[_PreparedArrayShard], shape: tuple[int, ...], dtype: np.dtype) -> None:
+        if not shards:
+            raise ValueError("Prepared sharded array requires at least one shard.")
+        self.shards = tuple(shards)
+        self.shape = tuple(int(value) for value in shape)
+        self.dtype = np.dtype(dtype)
+        self.nbytes = int(np.prod(self.shape, dtype=np.int64)) * int(self.dtype.itemsize)
+        expected_start = 0
+        for shard in self.shards:
+            if shard.start != expected_start:
+                raise ValueError(
+                    f"Prepared array shards must be consecutive: expected start {expected_start}, "
+                    f"found {shard.start}."
+                )
+            if shard.stop <= shard.start:
+                raise ValueError(f"Invalid prepared array shard range {shard.start}:{shard.stop}.")
+            expected_shape = (shard.stop - shard.start, *self.shape[1:])
+            if tuple(shard.data.shape) != expected_shape:
+                raise ValueError(
+                    f"Prepared array shard shape mismatch for {shard.start}:{shard.stop}: "
+                    f"expected {expected_shape}, found {tuple(shard.data.shape)}."
+                )
+            if np.dtype(shard.data.dtype) != self.dtype:
+                raise ValueError(
+                    f"Prepared array shard dtype mismatch: expected {self.dtype}, found {shard.data.dtype}."
+                )
+            expected_start = shard.stop
+        if expected_start != self.shape[0]:
+            raise ValueError(
+                f"Prepared array shards cover {expected_start} time steps, expected {self.shape[0]}."
+            )
+
+    def take(self, indices: np.ndarray, *, axis: int = 0) -> np.ndarray:
+        if axis != 0:
+            raise ValueError(f"Prepared sharded arrays only support time axis 0, got axis={axis}.")
+        requested = np.asarray(indices, dtype=np.int64)
+        normalized = requested.copy()
+        normalized[normalized < 0] += self.shape[0]
+        if normalized.size and (normalized.min() < 0 or normalized.max() >= self.shape[0]):
+            raise IndexError(f"Prepared array index outside 0:{self.shape[0]}.")
+
+        flat = normalized.reshape(-1)
+        output = np.empty((flat.size, *self.shape[1:]), dtype=self.dtype)
+        assigned = np.zeros(flat.size, dtype=bool)
+        for shard in self.shards:
+            positions = np.flatnonzero((flat >= shard.start) & (flat < shard.stop))
+            if positions.size == 0:
+                continue
+            output[positions] = np.take(shard.data, flat[positions] - shard.start, axis=0)
+            assigned[positions] = True
+        if not np.all(assigned):
+            missing = flat[~assigned]
+            raise IndexError(f"Prepared array indices are not covered by a shard: {missing.tolist()}.")
+        return output.reshape((*requested.shape, *self.shape[1:]))
+
+
+def _take_array(data: np.ndarray | PreparedShardedArray, indices: np.ndarray, *, axis: int) -> np.ndarray:
+    if isinstance(data, PreparedShardedArray):
+        return data.take(indices, axis=axis)
+    return np.take(data, indices, axis=axis)
 
 
 @dataclasses.dataclass(frozen=True)
 class PreparedArrayVar:
-    data: np.ndarray
+    data: np.ndarray | PreparedShardedArray
     dims: tuple[str, ...]
     coords: dict[str, np.ndarray]
 
@@ -52,15 +129,41 @@ class PreparedArrayStore:
         metadata_path = self.root / "metadata.json"
         if not metadata_path.exists():
             raise FileNotFoundError(f"Prepared array metadata not found: {metadata_path}")
+        if (self.root / ".incomplete").exists():
+            raise RuntimeError(f"Prepared array store is incomplete: {self.root}")
         self.metadata = json.loads(metadata_path.read_text())
+        version = int(self.metadata.get("prepared_array_format_version", -1))
+        if version not in SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS:
+            raise ValueError(
+                f"Unsupported prepared_array_format_version={version}; "
+                f"expected one of {SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS}."
+            )
         self.coords = {
             path.stem: np.load(path, mmap_mode="r")
             for path in sorted((self.root / "coords").glob("*.npy"))
         }
         self._vars: dict[str, PreparedArrayVar] = {}
         for name, info in self.metadata["variables"].items():
-            data = np.load(self.root / "vars" / f"{name}.npy", mmap_mode="r")
             dims = tuple(info["dims"])
+            if version == PREPARED_ARRAY_SHARDED_FORMAT_VERSION and "time" in dims:
+                if dims.index("time") != 0:
+                    raise ValueError(
+                        f"Format-v2 variable {name!r} must use time axis 0, found dims={dims}."
+                    )
+                shards = []
+                for shard_info in self.metadata.get("time_shards", []):
+                    start = int(shard_info["start"])
+                    stop = int(shard_info["stop"])
+                    shard_root = self.root / str(shard_info["path"])
+                    shard_data = np.load(shard_root / "vars" / f"{name}.npy", mmap_mode="r")
+                    shards.append(_PreparedArrayShard(start=start, stop=stop, data=shard_data))
+                data = PreparedShardedArray(
+                    shards,
+                    shape=tuple(int(value) for value in info["shape"]),
+                    dtype=np.dtype(info["dtype"]),
+                )
+            else:
+                data = np.load(self.root / "vars" / f"{name}.npy", mmap_mode="r")
             coords = {
                 dim: np.asarray(self.coords[dim])
                 for dim in dims
@@ -96,10 +199,10 @@ class PreparedArrayStore:
 
     def validate(self, *, resolution: float, task_cfg: gc.TaskConfig) -> None:
         version = int(self.metadata.get("prepared_array_format_version", -1))
-        if version != PREPARED_ARRAY_FORMAT_VERSION:
+        if version not in SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS:
             raise ValueError(
                 f"Unsupported prepared_array_format_version={version}; "
-                f"expected {PREPARED_ARRAY_FORMAT_VERSION}."
+                f"expected one of {SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS}."
             )
         stored_resolution = self.metadata.get("resolution")
         if stored_resolution is not None and not np.isclose(float(stored_resolution), resolution, atol=1e-6):
@@ -190,7 +293,9 @@ class PreparedArrayStore:
             data = source.data
             if "time" in source.dims:
                 axis = source.dims.index("time")
-                data = np.asarray(np.take(data, np.arange(global_start, global_stop, dtype=np.int64), axis=axis))
+                data = np.asarray(
+                    _take_array(data, np.arange(global_start, global_stop, dtype=np.int64), axis=axis)
+                )
             else:
                 data = np.asarray(data)
             bytes_loaded += int(data.nbytes)
@@ -257,11 +362,11 @@ class PreparedArrayStore:
                     assert global_windows is not None
                     gather = global_windows[:, positions]
                     if time_axis == 0:
-                        data = np.take(source.data, gather, axis=time_axis)
+                        data = _take_array(source.data, gather, axis=time_axis)
                     else:
                         lane_arrays = []
                         for lane in range(batch_size):
-                            data_lane = np.take(source.data, gather[lane], axis=time_axis)
+                            data_lane = _take_array(source.data, gather[lane], axis=time_axis)
                             data_lane = np.moveaxis(data_lane, time_axis, 0)
                             lane_arrays.append(data_lane)
                         data = np.stack(lane_arrays, axis=0)

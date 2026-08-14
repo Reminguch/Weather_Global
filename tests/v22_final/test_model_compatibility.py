@@ -5,8 +5,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from scripts.training.full_mamba_v9.train_mz_v9 import GCResidualWithZeroHead as LegacyHead
 from src.models.mamba.v22_final.model import GCResidualWithZeroHead as FinalHead
+
+
+EXPECTED_PARAMETER_SHAPES = {
+    "temporal_residual_head": {"w": (3, 3), "b": (3,)},
+}
 
 
 def _transformed(residual_class):
@@ -33,14 +37,13 @@ def _shapes(params) -> dict[str, dict[str, tuple[int, ...]]]:
     }
 
 
-def test_zero_head_parameter_tree_matches_legacy() -> None:
+def test_zero_head_matches_frozen_v22_contract() -> None:
     values = jnp.ones((5, 1, 3), dtype=jnp.float32)
     key = jax.random.PRNGKey(0)
-    legacy = _transformed(LegacyHead)
     final = _transformed(FinalHead)
-    legacy_params = legacy.init(key, values)
     final_params = final.init(key, values)
-    assert _shapes(final_params) == _shapes(legacy_params)
-    assert "temporal_residual_head" in _shapes(final_params)
-    np.testing.assert_array_equal(np.asarray(legacy.apply(legacy_params, key, values)), 0.0)
+
+    assert _shapes(final_params) == EXPECTED_PARAMETER_SHAPES
+    for leaf in jax.tree_util.tree_leaves(final_params):
+        np.testing.assert_array_equal(np.asarray(leaf), 0.0)
     np.testing.assert_array_equal(np.asarray(final.apply(final_params, key, values)), 0.0)

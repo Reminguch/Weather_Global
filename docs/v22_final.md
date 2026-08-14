@@ -1,8 +1,8 @@
 # v22_final
 
 `v22_final` is the maintained, additive training and evaluation interface for
-the final v22 residual-Mamba architecture. Its initial behavioral reference is commit
-`cfe27d4`, especially:
+the final v22 residual-Mamba architecture. Its historical behavioral reference
+is commit `cfe27d4`, particularly the archived:
 
 - `scripts/training/full_mamba_v9/train_mz_v9.py` for the residual model and
   temporal attachment;
@@ -12,8 +12,11 @@ the final v22 residual-Mamba architecture. Its initial behavioral reference is c
   alignment, full-chunk BPTT loss, and open/closed-SG training behavior;
 - the current modified `third_party/graphcast` integration.
 
-The reference files remain unchanged. Production `v22_final` code does not
-import from them; parity tests may import or execute them for comparison.
+Those paths document provenance only. Maintained `v22_final` source, scripts,
+launchers, and tests neither import nor execute the archived model folders.
+Accepted parameter-tree and metric behavior is frozen in self-contained tests
+and versioned fixtures under `tests/v22_final`. Keeping the archives is
+optional and has no effect on the maintained v22 workflow.
 
 ## Evaluation contract
 
@@ -137,7 +140,7 @@ The generic launcher requires `CONFIG` and accepts operational settings through
 `MAX_STEPS`, `CHECKPOINT_EVERY`, `OUTPUT_ROOT`, `RUN_NAME`, `RESUME`, or
 `INIT_FROM` environment variables. Its 32 GiB request is based on completed
 v20 array job `11317907`, whose tasks peaked near 24 GiB. It enables XLA's
-standard production kernels. The parity suite alone enables deterministic GPU
+standard production kernels. The opt-in GPU integration suite enables deterministic GPU
 operations because GraphCast scatter reductions otherwise vary enough between
 identical A100 runs to invalidate the `1e-6` comparison. Deterministic kernels
 are a validation mode, not a production default: they are substantially slower
@@ -180,8 +183,9 @@ python scripts/analyze_models/eval_v22_final.py \
   --out-json ${SMOKE_ROOT}/open/eval/cold_bp_step20.json
 ```
 
-No full 50k `v22_final` run should be submitted until the parity and 20-update
-smoke gate has been reviewed. The opt-in A100 suite is:
+No full 50k `v22_final` run should be submitted until the self-contained CPU
+suite and 20-update smoke gate have been reviewed. The opt-in A100 integration
+suite is:
 
 ```bash
 XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_deterministic_ops=true" \
@@ -191,5 +195,6 @@ V22_FINAL_TRAIN_GPU_TESTS=1 python -m pytest -q \
 ```
 
 GC-Mamba training and the v25/v26/v30 auxiliary heads are separate model
-families and are not part of immutable `v22_final`. Legacy cleanup remains
-deferred.
+families and are not part of immutable `v22_final`. The legacy experiment
+folders are optional archives: retain them for historical reproduction, or
+remove them without changing the maintained v22 runtime or test suite.

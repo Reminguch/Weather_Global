@@ -25,8 +25,10 @@ from src.models.graphcast.training.core.batching import (  # noqa: E402
 from src.models.graphcast.training.core.logging import build_batch_builder_metadata  # noqa: E402
 from src.models.graphcast.training.core.prepared_array import (  # noqa: E402
     PREPARED_ARRAY_FORMAT_VERSION,
+    PREPARED_ARRAY_SHARDED_FORMAT_VERSION,
     PreparedArrayStore,
 )
+from src.models.graphcast.training.core.prepared_data import split_prepared_store_by_year  # noqa: E402
 from src.models.graphcast.training.core.segments import SegmentBlockBatchLoader, SegmentChunk  # noqa: E402
 
 
@@ -273,6 +275,47 @@ def _write_tiny_prepared_array_store(tmp_path: Path, ds: xr.Dataset) -> Prepared
     return PreparedArrayStore(store)
 
 
+def _write_tiny_sharded_prepared_array_store(tmp_path: Path, ds: xr.Dataset) -> PreparedArrayStore:
+    store = tmp_path / "res1_v2"
+    (store / "coords").mkdir(parents=True)
+    (store / "vars").mkdir()
+    source = ds.isel(batch=0, drop=True)
+    for coord in ("time", "lat", "lon", "level"):
+        np.save(store / "coords" / f"{coord}.npy", np.asarray(source.coords[coord].values))
+
+    split = 4
+    shards = []
+    for shard_index, (start, stop) in enumerate(((0, split), (split, source.sizes["time"]))):
+        shard_root = store / "years" / str(2021 + shard_index)
+        (shard_root / "vars").mkdir(parents=True)
+        for name in ("temperature", "toa_incident_solar_radiation"):
+            np.save(shard_root / "vars" / f"{name}.npy", np.asarray(source[name].isel(time=slice(start, stop))))
+        shards.append({"path": str(shard_root.relative_to(store)), "start": start, "stop": stop})
+
+    static_values = np.asarray(source["land_sea_mask"].values)
+    np.save(store / "vars" / "land_sea_mask.npy", static_values)
+    variables = {}
+    for name in ("temperature", "toa_incident_solar_radiation", "land_sea_mask"):
+        values = np.asarray(source[name].values)
+        variables[name] = {
+            "dims": list(source[name].dims),
+            "shape": list(values.shape),
+            "dtype": str(values.dtype),
+        }
+    metadata = {
+        "prepared_array_format_version": PREPARED_ARRAY_SHARDED_FORMAT_VERSION,
+        "resolution": 1.0,
+        "pressure_levels": [500, 850],
+        "task_input_variables": ["temperature", "land_sea_mask"],
+        "task_target_variables": ["temperature"],
+        "task_forcing_variables": ["toa_incident_solar_radiation"],
+        "time_shards": shards,
+        "variables": variables,
+    }
+    (store / "metadata.json").write_text(__import__("json").dumps(metadata))
+    return PreparedArrayStore(store)
+
+
 def test_prepared_array_batch_builder_matches_direct(tmp_path) -> None:
     ds = _make_dataset()
     cfg = _task_cfg()
@@ -296,6 +339,58 @@ def test_prepared_array_batch_builder_matches_direct(tmp_path) -> None:
 
     for actual_ds, expected_ds in zip(actual, expected):
         _assert_datasets_match(actual_ds, expected_ds)
+
+
+def test_sharded_prepared_array_batch_builder_crosses_shard_boundary(tmp_path) -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+    store = _write_tiny_sharded_prepared_array_store(tmp_path, ds)
+
+    expected = build_batch_from_indices_direct(
+        ds,
+        indices=[3, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+    actual = store.build_batch_from_indices(
+        indices=[3, 5],
+        input_steps=2,
+        target_steps=1,
+        task_cfg=cfg,
+        dt=pd.Timedelta("6h"),
+    )
+
+    for actual_ds, expected_ds in zip(actual, expected):
+        _assert_datasets_match(actual_ds, expected_ds)
+
+
+def test_sharded_prepared_array_block_loader_crosses_shard_boundary(tmp_path) -> None:
+    ds = _make_dataset()
+    cfg = _task_cfg()
+    store = _write_tiny_sharded_prepared_array_store(tmp_path, ds)
+
+    block = store.load_time_block(3, 6, task_cfg=cfg)
+
+    np.testing.assert_array_equal(
+        block.vars["temperature"].data,
+        np.asarray(ds["temperature"].isel(batch=0, time=slice(3, 6))),
+    )
+
+
+def test_sharded_prepared_array_splits_by_year(tmp_path) -> None:
+    ds = _make_dataset().assign_coords(
+        time=np.array("2021-12-31T00:00:00", dtype="datetime64[ns]")
+        + np.arange(8) * np.timedelta64(6, "h")
+    )
+    store = _write_tiny_sharded_prepared_array_store(tmp_path, ds)
+
+    train, val, train_years = split_prepared_store_by_year(store, 2022)
+
+    assert train_years == [2021]
+    assert train.sizes["time"] == 4
+    assert val.sizes["time"] == 4
 
 
 def test_select_batch_builders_uses_prepared_array_without_full_cache(tmp_path) -> None:
