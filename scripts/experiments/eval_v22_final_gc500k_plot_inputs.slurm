@@ -123,7 +123,7 @@ python -u scripts/analyze_models/eval_v22_final.py \
   --val-year 2022 --train-start-year 2015 --train-end-year 2021 \
   --input-duration 12h \
   --temporal-location mesh_processor_interleaved \
-  --temporal-hidden-size 128 --temporal-d-inner 16 --temporal-d-state 16 \
+  --temporal-d-inner 16 --temporal-d-state 16 \
   --temporal-d-conv 4 --temporal-dt-rank auto --temporal-layers 2 \
   "${STATEFUL_FLAG[@]}" \
   --eval-mode "${EVAL_MODE}" --residual-state-init zero --residual-alpha "${ALPHA}" \

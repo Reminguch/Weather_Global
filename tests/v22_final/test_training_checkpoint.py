@@ -107,6 +107,12 @@ def test_swa_allows_operational_step_and_cadence_changes(tmp_path: Path) -> None
     second_payload = _payload(4, 4.0)
     second_payload["resolved_training_config"]["optimizer"]["max_steps"] = 60_000
     second_payload["resolved_training_config"]["optimizer"]["checkpoint_every"] = 1_000
+    second_payload["resolved_training_config"]["validation"] = {
+        "enabled": True,
+        "every_steps": 500,
+        "num_segments": 2,
+        "final_num_segments": 2,
+    }
     atomic_pickle_dump(first_payload, first)
     atomic_pickle_dump(second_payload, second)
     build_v22_final_swa([first, second], [2, 4], output)

@@ -57,7 +57,8 @@ def evaluate_v22_final(config: V22FinalEvalConfig) -> dict:
         f"[v22_final] checkpoint={config.ckpt} mode={config.eval_mode} "
         f"warmup={warmup_steps} target_steps={config.target_steps} "
         f"feedback={'full' if config.is_full_feedback else 'baseline'} "
-        f"reset_state={config.reset_state_after_warmup}"
+        f"reset_state={config.reset_state_after_warmup} "
+        f"reset_state_every_step={config.reset_state_every_step}"
     )
 
     baseline_checkpoint = load_graphcast_checkpoint(config.ckpt_in)
@@ -166,6 +167,7 @@ def evaluate_v22_final(config: V22FinalEvalConfig) -> dict:
             full_feedback=config.is_full_feedback,
             reset_state_after_warmup=config.reset_state_after_warmup,
             residual_alpha=config.residual_alpha,
+            reset_state_every_step=config.reset_state_every_step,
         )
         metric_targets = targets.isel(
             time=slice(warmup_steps, warmup_steps + config.target_steps)
@@ -192,6 +194,7 @@ def evaluate_v22_final(config: V22FinalEvalConfig) -> dict:
         "warmup_feedback": "truth" if warmup_steps > 0 else "none",
         "eval_feedback": "full" if config.is_full_feedback else "baseline",
         "rs_reset_after_warmup": config.reset_state_after_warmup,
+        "rs_reset_every_step": config.reset_state_every_step,
         "baseline_branch": "pure_baseline_self_rollout",
         "residual_state_init": resolved_state_init,
         "residual_state_init_requested": config.residual_state_init,

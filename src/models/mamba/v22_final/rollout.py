@@ -83,6 +83,7 @@ def run_v22_final_rollout(
     full_feedback: bool,
     reset_state_after_warmup: bool,
     residual_alpha: float,
+    reset_state_every_step: bool = False,
 ) -> RolloutResult:
     """Run truth warmup followed by baseline- or full-feedback evaluation."""
 
@@ -118,6 +119,8 @@ def run_v22_final_rollout(
             target,
             forcing,
         )
+        if reset_state_every_step:
+            residual_state = residual_state_init
         _residual_prediction, residual_state = residual_step(
             residual_params,
             residual_state,
@@ -168,6 +171,8 @@ def run_v22_final_rollout(
                 target,
                 forcing,
             )
+            if reset_state_every_step:
+                full_branch_residual_state = residual_state_init
             residual_prediction, full_branch_residual_state = residual_step(
                 residual_params,
                 full_branch_residual_state,
@@ -215,6 +220,8 @@ def run_v22_final_rollout(
                 target,
                 forcing,
             )
+            if reset_state_every_step:
+                residual_state = residual_state_init
             residual_prediction, residual_state = residual_step(
                 residual_params,
                 residual_state,

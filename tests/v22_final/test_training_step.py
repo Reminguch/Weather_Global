@@ -17,6 +17,7 @@ from src.models.mamba.v22_final.training.config import load_training_config
 from src.models.mamba.v22_final.training.step import (
     feedback_field,
     make_train_step,
+    make_validation_step,
     residual_target,
 )
 
@@ -182,3 +183,83 @@ def test_bptt_uses_truth_prefix_correct_forcing_and_prediction_state(
     # The closed-loop residual is stop-gradient, so this diagnostic loss has
     # no differentiable dependence on residual parameters in either mode.
     np.testing.assert_array_equal(result[4], 0.0)
+
+    validation = make_validation_step(
+        transforms=transforms,
+        baseline_params={"increment": jnp.asarray(1.0, dtype=jnp.float32)},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=1,
+    )
+    validation_loss, validation_state = validation(
+        residual_params,
+        jnp.asarray(0),
+        jax.random.split(jax.random.PRNGKey(0), 4),
+        (_toy_inputs(0.0, 10.0), _toy_inputs(20.0, 11.0)),
+        tuple(_toy_target() for _ in range(4)),
+        tuple(
+            xr.Dataset({"forcing": _jax_data_array(100.0 + index, name="forcing")})
+            for index in range(4)
+        ),
+    )
+    np.testing.assert_allclose(validation_loss, result[3])
+    assert int(validation_state) == 4
+    np.testing.assert_array_equal(residual_params["value"], 2.0)
+
+
+class _StateSensitiveLossTransform:
+    def apply(self, params, state, key, inputs, target, forcings):
+        del params, key, inputs, target, forcings
+        loss_array = xarray_jax.DataArray(
+            jnp.reshape(jnp.asarray(state, dtype=jnp.float32), (1, 1, 1)),
+            dims=("batch", "lat", "lon"),
+            coords={"batch": [0], "lat": [0.0], "lon": [0.0]},
+            name="loss",
+        )
+        return (loss_array, {}), state + 100
+
+
+@pytest.mark.parametrize(
+    ("state_policy", "expected_loss", "expected_state"),
+    [("carry", 1.5, 4), ("reset_every_anchor", 0.0, 0)],
+)
+def test_temporal_state_policy_isolates_anchor_state_carry(
+    state_policy: str,
+    expected_loss: float,
+    expected_state: int,
+) -> None:
+    config = dataclasses.replace(
+        load_training_config(REFERENCE_CONFIG),
+        segment_steps=4,
+        bptt_steps=4,
+        ar_tail_k=0,
+        temporal_state_policy=state_policy,
+    )
+    transforms = SimpleNamespace(
+        baseline_predict=_ToyBaselineTransform(),
+        residual_predict=_ToyResidualTransform(),
+        residual_loss=_StateSensitiveLossTransform(),
+    )
+    residual_params = {"value": jnp.asarray(2.0, dtype=jnp.float32)}
+    validation = make_validation_step(
+        transforms=transforms,
+        baseline_params={"increment": jnp.asarray(1.0, dtype=jnp.float32)},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=1,
+    )
+    loss, next_state = validation(
+        residual_params,
+        jnp.asarray(0),
+        jax.random.split(jax.random.PRNGKey(0), 4),
+        tuple(_toy_inputs(float(i), float(i)) for i in range(4)),
+        tuple(_toy_target() for _ in range(4)),
+        tuple(
+            xr.Dataset({"forcing": _jax_data_array(float(i), name="forcing")})
+            for i in range(4)
+        ),
+    )
+    np.testing.assert_allclose(loss, expected_loss)
+    assert int(next_state) == expected_state

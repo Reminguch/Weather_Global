@@ -25,6 +25,7 @@ class TemporalMeshConfig:
     backbone: str = "none"
     location: str = "mesh_post_encoder"
     d_inner: int = 0
+    bc_groups: int = 1
     d_state: int = 16
     dt_rank: int | str = "auto"
     d_conv: int = 4
@@ -56,6 +57,23 @@ def _resolve_d_inner(cfg: object) -> int:
     if d_inner <= 0:
         raise ValueError("Temporal Mamba requires explicit positive `d_inner`.")
     return d_inner
+
+
+def _resolve_bc_groups(cfg: object, d_inner: int) -> int:
+    bc_groups = int(_cfg_value(cfg, "bc_groups", 1))
+    if bc_groups <= 0:
+        raise ValueError(f"Temporal Mamba requires bc_groups > 0, got {bc_groups}.")
+    if bc_groups > d_inner:
+        raise ValueError(
+            "Temporal Mamba requires bc_groups <= d_inner, got "
+            f"bc_groups={bc_groups}, d_inner={d_inner}."
+        )
+    if d_inner % bc_groups:
+        raise ValueError(
+            "Temporal Mamba requires d_inner divisible by bc_groups, got "
+            f"d_inner={d_inner}, bc_groups={bc_groups}."
+        )
+    return bc_groups
 
 
 def _resolve_dt_rank(cfg: object, d_model: int) -> int:
@@ -278,6 +296,8 @@ class _StatefulSSMBlock(hk.Module):
         d_model: int,
     ) -> tuple[jax.Array, jax.Array]:
         d_inner = _resolve_d_inner(self._cfg)
+        bc_groups = _resolve_bc_groups(self._cfg, d_inner)
+        channels_per_group = d_inner // bc_groups
         d_state = int(_cfg_value(self._cfg, "d_state", 16))
         dt_rank = _resolve_dt_rank(self._cfg, d_model)
         x_dtype = x_btd.dtype
@@ -301,46 +321,69 @@ class _StatefulSSMBlock(hk.Module):
         )
 
         x_dbl = hk.Linear(
-            dt_rank + 2 * d_state,
+            dt_rank + 2 * bc_groups * d_state,
             with_bias=False,
             name="x_proj",
         )(x_btd)
-        delta_raw_btr, b_btn, c_btn = jnp.split(x_dbl, [dt_rank, dt_rank + d_state], axis=-1)
+        delta_raw_btr, b_flat, c_flat = jnp.split(
+            x_dbl,
+            [dt_rank, dt_rank + bc_groups * d_state],
+            axis=-1,
+        )
         delta_btd = jax.nn.softplus(
             hk.Linear(d_inner, with_bias=True, name="dt_proj")(delta_raw_btr)
         )
 
-        u_btd = x_btd.astype(jnp.float32)
-        delta_btd = delta_btd.astype(jnp.float32)
-        b_btn = b_btn.astype(jnp.float32)
-        c_btn = c_btn.astype(jnp.float32)
-        a_dn = -jnp.exp(a_log.astype(jnp.float32))
+        batch_size, time_steps = x_btd.shape[:2]
+        u_btgh = x_btd.astype(jnp.float32).reshape(
+            batch_size, time_steps, bc_groups, channels_per_group
+        )
+        delta_btgh = delta_btd.astype(jnp.float32).reshape(
+            batch_size, time_steps, bc_groups, channels_per_group
+        )
+        b_btgn = b_flat.astype(jnp.float32).reshape(
+            batch_size, time_steps, bc_groups, d_state
+        )
+        c_btgn = c_flat.astype(jnp.float32).reshape(
+            batch_size, time_steps, bc_groups, d_state
+        )
+        a_ghn = -jnp.exp(a_log.astype(jnp.float32)).reshape(
+            bc_groups, channels_per_group, d_state
+        )
         d_skip = d_skip.astype(jnp.float32)
 
-        delta_a_btdn = jnp.exp(jnp.einsum("btd,dn->btdn", delta_btd, a_dn))
-        delta_b_u_btdn = jnp.einsum("btd,btn,btd->btdn", delta_btd, b_btn, u_btd)
+        delta_a_btghn = jnp.exp(
+            jnp.einsum("btgh,ghn->btghn", delta_btgh, a_ghn)
+        )
+        delta_b_u_btghn = jnp.einsum(
+            "btgh,btgn,btgh->btghn", delta_btgh, b_btgn, u_btgh
+        )
 
         scan_inputs = (
-            jnp.swapaxes(delta_a_btdn, 0, 1),
-            jnp.swapaxes(delta_b_u_btdn, 0, 1),
-            jnp.swapaxes(c_btn, 0, 1),
+            jnp.swapaxes(delta_a_btghn, 0, 1),
+            jnp.swapaxes(delta_b_u_btghn, 0, 1),
+            jnp.swapaxes(c_btgn, 0, 1),
         )
 
         def scan_step(
-            state_bdn: jax.Array,
+            state_bghn: jax.Array,
             inputs_t: tuple[jax.Array, jax.Array, jax.Array],
         ) -> tuple[jax.Array, jax.Array]:
-            delta_a_bdn, delta_b_u_bdn, c_bn = inputs_t
-            next_state = delta_a_bdn * state_bdn + delta_b_u_bdn
-            y_bd = jnp.einsum("bdn,bn->bd", next_state, c_bn)
-            return next_state, y_bd
+            delta_a_bghn, delta_b_u_bghn, c_bgn = inputs_t
+            next_state = delta_a_bghn * state_bghn + delta_b_u_bghn
+            y_bgh = jnp.einsum("bghn,bgn->bgh", next_state, c_bgn)
+            return next_state, y_bgh
 
-        next_state_bdn, y_tbd = jax.lax.scan(
+        next_state_bghn, y_tbgh = jax.lax.scan(
             scan_step,
-            prev_state.astype(jnp.float32),
+            prev_state.astype(jnp.float32).reshape(
+                batch_size, bc_groups, channels_per_group, d_state
+            ),
             scan_inputs,
         )
-        y_btd = jnp.swapaxes(y_tbd, 0, 1)
+        next_state_bdn = next_state_bghn.reshape(batch_size, d_inner, d_state)
+        y_btd = jnp.swapaxes(y_tbgh, 0, 1).reshape(batch_size, time_steps, d_inner)
+        u_btd = u_btgh.reshape(batch_size, time_steps, d_inner)
         y_btd = y_btd + u_btd * d_skip[None, None, :]
         return y_btd.astype(x_dtype), next_state_bdn.astype(x_dtype)
 
@@ -402,6 +445,25 @@ class TemporalMeshBlock(hk.Module):
             reset_mask=reset_mask,
         )
         return sequence[-1], next_state
+
+    def apply_stateless(
+        self,
+        mesh_latent_tnbd: jax.Array,
+        *,
+        is_training: bool,
+    ) -> jax.Array:
+        """Run the full Mamba block from zero state and discard its next state.
+
+        This is the state-persistence ablation of the stateful path: it keeps
+        the same parameters and Mamba computation, but carries no SSM or
+        convolution state between separate GraphCast calls.
+        """
+        output, _ = self(
+            mesh_latent_tnbd,
+            prev_state=None,
+            is_training=is_training,
+        )
+        return output
 
     def _run_sequence(
         self,

@@ -16,7 +16,6 @@
     "baseline_msg_steps": 6,
     "residual_msg_steps": 2,
     "temporal_location": "mesh_processor_interleaved",
-    "temporal_hidden_size": 128,
     "temporal_d_inner": 16,
     "temporal_d_state": 16,
     "temporal_d_conv": 4,
@@ -43,6 +42,12 @@
     "grad_clip": 1.0,
     "seed": 18,
     "precision": "bf16"
+  },
+  "validation": {
+    "enabled": true,
+    "every_steps": 2000,
+    "num_segments": 16,
+    "final_num_segments": null
   },
   "output": {
     "output_root": "artifacts/checkpoints/v22_final/res2_gc500k_k12",

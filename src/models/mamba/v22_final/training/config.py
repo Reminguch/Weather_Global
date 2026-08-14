@@ -6,7 +6,7 @@ import argparse
 import dataclasses
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -20,6 +20,34 @@ from ..config import (
 
 FEEDBACK_MODES = ("baseline", "closed_loop_sg")
 PRECISIONS = ("bf16", "fp32")
+TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
+
+
+@dataclass(frozen=True)
+class V22FinalValidationConfig:
+    enabled: bool = False
+    every_steps: int = 2_000
+    num_segments: int | None = 16
+    final_num_segments: int | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise ValueError(f"validation.enabled must be boolean, got {self.enabled!r}")
+        if type(self.every_steps) is not int or self.every_steps <= 0:
+            raise ValueError(
+                f"validation.every_steps must be a positive integer, got "
+                f"{self.every_steps!r}"
+            )
+        for name in ("num_segments", "final_num_segments"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value <= 0):
+                raise ValueError(
+                    f"validation.{name} must be a positive integer or null, "
+                    f"got {value!r}"
+                )
+
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
 
 
 @dataclass(frozen=True)
@@ -37,6 +65,7 @@ class V22FinalTrainConfig:
     bptt_steps: int = 16
     ar_tail_k: int = 12
     feedback_mode: str = "baseline"
+    temporal_state_policy: str = "carry"
     max_steps: int = 50_000
     checkpoint_every: int = 2_000
     learning_rate: float = 1e-4
@@ -45,6 +74,9 @@ class V22FinalTrainConfig:
     grad_clip: float = 1.0
     seed: int = 18
     precision: str = "bf16"
+    validation: V22FinalValidationConfig = field(
+        default_factory=V22FinalValidationConfig
+    )
 
     def __post_init__(self) -> None:
         if not self.run_name or self.run_name in {".", ".."}:
@@ -68,6 +100,11 @@ class V22FinalTrainConfig:
             )
         if self.feedback_mode not in FEEDBACK_MODES:
             raise ValueError(f"feedback_mode must be one of {FEEDBACK_MODES}")
+        if self.temporal_state_policy not in TEMPORAL_STATE_POLICIES:
+            raise ValueError(
+                "temporal_state_policy must be one of "
+                f"{TEMPORAL_STATE_POLICIES}, got {self.temporal_state_policy!r}"
+            )
         if self.precision not in PRECISIONS:
             raise ValueError(f"precision must be one of {PRECISIONS}")
         if self.warmup_steps < 0:
@@ -103,6 +140,7 @@ class V22FinalTrainConfig:
                 "bptt_steps": self.bptt_steps,
                 "ar_tail_k": self.ar_tail_k,
                 "feedback_mode": self.feedback_mode,
+                "temporal_state_policy": self.temporal_state_policy,
             },
             "optimizer": {
                 "max_steps": self.max_steps,
@@ -114,6 +152,7 @@ class V22FinalTrainConfig:
                 "seed": self.seed,
                 "precision": self.precision,
             },
+            "validation": self.validation.to_dict(),
             "output": {
                 "output_root": str(self.output_root),
                 "run_name": self.run_name,
@@ -150,7 +189,17 @@ def load_training_config(path: Path) -> V22FinalTrainConfig:
     if not isinstance(payload, Mapping):
         raise ValueError("Training config must be a JSON object")
     extra_top = sorted(
-        set(payload) - {"architecture_id", "schema_version", "data", "architecture", "sequence", "optimizer", "output"}
+        set(payload)
+        - {
+            "architecture_id",
+            "schema_version",
+            "data",
+            "architecture",
+            "sequence",
+            "optimizer",
+            "validation",
+            "output",
+        }
     )
     if extra_top:
         raise ValueError(f"Unknown top-level training config keys: {extra_top}")
@@ -172,13 +221,27 @@ def load_training_config(path: Path) -> V22FinalTrainConfig:
     sequence = _section(
         payload,
         "sequence",
-        {"segment_steps", "bptt_steps", "ar_tail_k", "feedback_mode"},
+        {
+            "segment_steps",
+            "bptt_steps",
+            "ar_tail_k",
+            "feedback_mode",
+            "temporal_state_policy",
+        },
     )
     optimizer = _section(
         payload,
         "optimizer",
         {"max_steps", "checkpoint_every", "learning_rate", "weight_decay", "warmup_steps", "grad_clip", "seed", "precision"},
     )
+    if "validation" in payload:
+        validation_values = _section(
+            payload,
+            "validation",
+            {"enabled", "every_steps", "num_segments", "final_num_segments"},
+        )
+    else:
+        validation_values = {}
     output = _section(payload, "output", {"output_root", "run_name"})
     required = {
         "data": (data, {"prepared_root", "anchor_manifest_root", "baseline_checkpoint"}),
@@ -200,6 +263,7 @@ def load_training_config(path: Path) -> V22FinalTrainConfig:
     return V22FinalTrainConfig(
         **data,
         architecture=V22FinalArchitectureConfig(**architecture_values),
+        validation=V22FinalValidationConfig(**validation_values),
         **sequence,
         **optimizer,
         **output,
@@ -267,6 +331,23 @@ def validate_resume_config(
 ) -> None:
     candidate = current.to_dict()
     saved_copy = json.loads(json.dumps(saved))
+    saved_architecture = saved_copy.get("architecture")
+    if isinstance(saved_architecture, dict):
+        # This no-op field was recorded by early v22_final checkpoints but was
+        # never consumed by the full-Mamba implementation.
+        saved_architecture.pop("temporal_hidden_size", None)
+        saved_architecture.setdefault("temporal_bc_groups", 1)
+    saved_sequence = saved_copy.get("sequence")
+    if isinstance(saved_sequence, dict):
+        # Checkpoints written before the explicit state-policy field always
+        # used the legacy carry behavior.  For stateless architectures this
+        # carried an empty Haiku state tree and was therefore a no-op.
+        saved_sequence.setdefault("temporal_state_policy", "carry")
+    # Validation is operational and must not perturb exact-resume training.
+    # Older checkpoints predate this optional section, and resumed runs may
+    # safely change its cadence or subset size.
+    candidate.pop("validation", None)
+    saved_copy.pop("validation", None)
     try:
         saved_max_steps = int(saved_copy["optimizer"]["max_steps"])
     except (KeyError, TypeError, ValueError) as exc:

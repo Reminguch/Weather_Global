@@ -2,55 +2,56 @@
   "architecture_id": "v22_final",
   "schema_version": 1,
   "data": {
-    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream/res2",
-    "anchor_manifest_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v22_res2_GCv1K3_synthetic",
-    "baseline_checkpoint": "artifacts/checkpoints/7_years/vanilla_gc_7y_res2_m4_w512_mp6_h6_bs8_accum1_stream500k/ckpt_step500000.npz",
+    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream/res1",
+    "anchor_manifest_root": "data/graphcast/graphcast/dataset/precomputed_residuals/lianghong_v22_iv9432_res1",
+    "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
     "stats_dir": "data/graphcast/graphcast/stats",
     "input_duration": "12h",
     "target_steps": 1
   },
   "architecture": {
-    "resolution": 2.0,
-    "mesh_size": 4,
+    "resolution": 1.0,
+    "mesh_size": 5,
     "width": 512,
-    "baseline_msg_steps": 6,
+    "baseline_msg_steps": 16,
     "residual_msg_steps": 2,
     "temporal_location": "mesh_processor_interleaved",
-    "temporal_d_inner": 16,
+    "temporal_d_inner": 32,
+    "temporal_bc_groups": 4,
     "temporal_d_state": 16,
     "temporal_d_conv": 4,
     "temporal_dt_rank": "auto",
     "temporal_layers": 2,
     "temporal_conv_bias": true,
-    "temporal_stateful": false,
+    "temporal_stateful": true,
     "temporal_zero_init_out": true,
     "temporal_bias": false,
     "temporal_dropout": 0.0
   },
   "sequence": {
-    "segment_steps": 64,
-    "bptt_steps": 16,
-    "ar_tail_k": 12,
+    "segment_steps": 96,
+    "bptt_steps": 24,
+    "ar_tail_k": 20,
     "feedback_mode": "closed_loop_sg"
   },
   "optimizer": {
-    "max_steps": 50000,
+    "max_steps": 20000,
     "checkpoint_every": 2000,
     "learning_rate": 0.0001,
     "weight_decay": 0.0001,
     "warmup_steps": 200,
     "grad_clip": 1.0,
-    "seed": 18,
+    "seed": 22,
     "precision": "bf16"
   },
   "validation": {
-    "enabled": true,
+    "enabled": false,
     "every_steps": 2000,
     "num_segments": 16,
     "final_num_segments": null
   },
   "output": {
-    "output_root": "artifacts/checkpoints/v22_final/res2_gc500k_k12",
-    "run_name": "resmamba_res2_v22_final_k12_di16_l2_dc4_closed_sg_stateless"
+    "output_root": "artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_20k_20260813",
+    "run_name": "di32_bcg4_closed_sg_stateful_20k"
   }
 }

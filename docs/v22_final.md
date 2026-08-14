@@ -64,10 +64,60 @@ Training modes are deliberately distinct:
   manifest fingerprints, and restores parameters, temporal state, Adam
   moments, RNG, cursor, and completed step exactly.
 
+For controlled recurrence experiments, `sequence.temporal_state_policy` is
+explicit and checkpointed:
+
+- `carry` preserves the recurrent SSM and convolution-cache state between
+  anchors, with the usual segment-boundary and BPTT gradient stops;
+- `reset_every_anchor` supplies zero state at every anchor and discards the
+  resulting transition.
+
+Use `architecture.temporal_stateful=true` for both sides of this ablation.
+Both runs then construct the same full-Mamba parameter tree; only state carry
+changes. The paired res2 configs are
+`res2_gc500k_k12_di16_full_mamba_carry_20k.json` and
+`res2_gc500k_k12_di16_full_mamba_reset_every_anchor_20k.json`. Configurations
+that predate this field retain the legacy `carry` behavior on load and resume.
+
 Every periodic checkpoint under `RUN/checkpoints/` is both exactly resumable
 and directly readable by `eval_v22_final.py`. Checkpoints are written through
 an atomic temporary-file rename; `latest_checkpoint.json` is updated only
 after the checkpoint is complete. Training metrics are append-only JSONL.
+
+### Fixed-subset validation
+
+The reference configurations validate the exact training BPTT objective every
+2,000 updates, immediately after saving the corresponding checkpoint:
+
+```json
+"validation": {
+  "enabled": true,
+  "every_steps": 2000,
+  "num_segments": 16,
+  "final_num_segments": null
+}
+```
+
+Validation uses a fixed, quarter-stratified subset of complete held-out
+segments. It preserves BPTT, AR-tail, feedback, forcing, residual-target, and
+temporal-state semantics, but computes no gradients and never consumes the
+training RNG or cursor. State starts at zero for each validation segment. The
+current res2 manifest provides 22 complete validation segments: checkpoint
+selection uses the same 16 at every evaluation, while the final summary uses
+all 22.
+
+Results are written to `validation_metrics.jsonl`; `best_validation.json`
+points to the earliest checkpoint attaining the minimum fixed-subset loss, and
+`train_validation_loss.png` overlays that series with a trailing-100-step
+training mean. A checkpoint remains valid if validation is interrupted, and an
+exact resume fills in a missing checkpoint-validation record before training
+continues. Validation settings are operational and may change on resume.
+Configurations that omit the optional section retain legacy behavior with
+validation disabled.
+
+This loss is a checkpoint-selection proxy, not a ten-day forecast metric. Run
+the full rollout evaluator offline for the best-validation checkpoint, the
+final checkpoint, and SWA.
 
 Build uniform SWA from explicit, sorted checkpoints:
 

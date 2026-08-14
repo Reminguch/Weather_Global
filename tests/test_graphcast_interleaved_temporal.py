@@ -131,6 +131,7 @@ def test_stateful_interleaved_temporal_uses_3d_mesh_latents() -> None:
         predictor._temporal_location = "mesh_processor_interleaved"
         predictor._temporal_stateful = True
         predictor._temporal_d_inner = 4
+        predictor._temporal_bc_groups = 2
         predictor._temporal_d_state = 3
         predictor._temporal_d_conv = 1
         predictor._temporal_dt_rank = "auto"
@@ -149,6 +150,14 @@ def test_stateful_interleaved_temporal_uses_3d_mesh_latents() -> None:
     y, next_state = transformed.apply(params, state, rng, x)
 
     assert y.shape == (n_mesh, batch_size, channels)
+    x_proj_weights = [
+        module_params["w"]
+        for module_name, module_params in params.items()
+        if module_name.endswith("x_proj")
+    ]
+    assert len(x_proj_weights) == 1
+    assert x_proj_weights[0].shape == (4, 13)
+
     flat_state = hk.data_structures.to_mutable_dict(next_state)
     ssm_states = [
         value
@@ -160,3 +169,54 @@ def test_stateful_interleaved_temporal_uses_3d_mesh_latents() -> None:
     assert ssm_states[0].shape == (batch_size, n_mesh, 4, 3)
     assert np.isfinite(np.asarray(y)).all()
     assert np.isfinite(np.asarray(ssm_states[0])).all()
+
+
+def test_v22_stateless_interleaved_uses_full_mamba_without_persistent_state() -> None:
+    n_mesh = 5
+    batch_size = 2
+    channels = 8
+
+    graph = _TinyGraph(
+        nodes={"mesh_nodes": _NodeSet(features=jnp.zeros((n_mesh, 1), dtype=jnp.float32))},
+        edges={"mesh": _EdgeSet(features=jnp.zeros((4, 1), dtype=jnp.float32))},
+    )
+
+    def forward(x):
+        predictor = object.__new__(gc.GraphCast)
+        predictor._mesh_graph_structure = graph
+        predictor._mesh_gnn = _TinyMeshGNN()
+        predictor._temporal_backbone = "mamba"
+        predictor._temporal_location = "mesh_processor_interleaved"
+        predictor._temporal_stateful = False
+        predictor._temporal_use_full_mamba = True
+        predictor._temporal_d_inner = 4
+        predictor._temporal_d_state = 3
+        predictor._temporal_d_conv = 1
+        predictor._temporal_dt_rank = "auto"
+        predictor._temporal_bias = False
+        predictor._temporal_conv_bias = True
+        predictor._temporal_layers = 1
+        predictor._temporal_dropout = 0.0
+        predictor._temporal_zero_init_out = False
+        return gc.GraphCast._run_mesh_gnn_interleaved(predictor, x)
+
+    transformed = hk.transform_with_state(forward)
+    rng = jax.random.PRNGKey(1)
+    x = jnp.ones((n_mesh, batch_size, channels), dtype=jnp.float32)
+
+    params, state = transformed.init(rng, x)
+    first, next_state = transformed.apply(params, state, rng, x)
+    second, final_state = transformed.apply(params, next_state, rng, x)
+
+    flat_params = hk.data_structures.to_mutable_dict(params)
+    parameter_names = {
+        name
+        for module_params in flat_params.values()
+        for name in module_params
+    }
+    assert "A_log" in parameter_names
+    assert first.shape == (n_mesh, batch_size, channels)
+    np.testing.assert_allclose(first, second)
+    assert not state
+    assert not next_state
+    assert not final_state

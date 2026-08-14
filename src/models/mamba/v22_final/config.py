@@ -41,8 +41,8 @@ class V22FinalArchitectureConfig:
     baseline_msg_steps: int = 16
     residual_msg_steps: int = 2
     temporal_location: str = "mesh_processor_interleaved"
-    temporal_hidden_size: int = 128
     temporal_d_inner: int | None = None
+    temporal_bc_groups: int = 1
     temporal_d_state: int = 16
     temporal_d_conv: int = 4
     temporal_dt_rank: str = "auto"
@@ -59,7 +59,6 @@ class V22FinalArchitectureConfig:
             "width": self.width,
             "baseline_msg_steps": self.baseline_msg_steps,
             "residual_msg_steps": self.residual_msg_steps,
-            "temporal_hidden_size": self.temporal_hidden_size,
             "temporal_d_state": self.temporal_d_state,
             "temporal_d_conv": self.temporal_d_conv,
             "temporal_layers": self.temporal_layers,
@@ -73,6 +72,25 @@ class V22FinalArchitectureConfig:
             raise ValueError(
                 f"temporal_d_inner must be positive or None, got {self.temporal_d_inner}"
             )
+        if self.temporal_bc_groups <= 0:
+            raise ValueError(
+                f"temporal_bc_groups must be positive, got {self.temporal_bc_groups}"
+            )
+        if self.temporal_d_inner is None and self.temporal_bc_groups != 1:
+            raise ValueError(
+                "temporal_d_inner is required when temporal_bc_groups is not 1"
+            )
+        if self.temporal_d_inner is not None:
+            if self.temporal_bc_groups > self.temporal_d_inner:
+                raise ValueError(
+                    "temporal_bc_groups must not exceed temporal_d_inner, got "
+                    f"{self.temporal_bc_groups} > {self.temporal_d_inner}"
+                )
+            if self.temporal_d_inner % self.temporal_bc_groups:
+                raise ValueError(
+                    "temporal_d_inner must be divisible by temporal_bc_groups, got "
+                    f"{self.temporal_d_inner} and {self.temporal_bc_groups}"
+                )
         if self.temporal_location not in (
             "mesh_post_encoder",
             "mesh_processor_interleaved",
@@ -109,8 +127,8 @@ class V22FinalEvalConfig:
     target_steps: int = 40
     warmup_steps: int = 24
     temporal_location: str = "mesh_processor_interleaved"
-    temporal_hidden_size: int = 128
     temporal_d_inner: int | None = None
+    temporal_bc_groups: int = 1
     temporal_d_state: int = 16
     temporal_d_conv: int = 4
     temporal_dt_rank: str = "auto"
@@ -122,6 +140,7 @@ class V22FinalEvalConfig:
     temporal_dropout: float = 0.0
     n_samples: int = 32
     residual_state_init: str = "zero"
+    reset_state_every_step: bool = False
     seed: int = 0
     residual_alpha: float = 1.0
     force_idx: int | None = None
@@ -169,8 +188,8 @@ class V22FinalEvalConfig:
             baseline_msg_steps=self.baseline_msg_steps,
             residual_msg_steps=self.residual_msg_steps,
             temporal_location=self.temporal_location,
-            temporal_hidden_size=self.temporal_hidden_size,
             temporal_d_inner=self.temporal_d_inner,
+            temporal_bc_groups=self.temporal_bc_groups,
             temporal_d_state=self.temporal_d_state,
             temporal_d_conv=self.temporal_d_conv,
             temporal_dt_rank=self.temporal_dt_rank,
@@ -228,8 +247,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--warmup-steps", type=int, default=24)
     parser.add_argument("--eval-mode", choices=EVAL_MODES, required=True)
     parser.add_argument("--temporal-location", default="mesh_processor_interleaved")
-    parser.add_argument("--temporal-hidden-size", type=int, default=128)
     parser.add_argument("--temporal-d-inner", type=int, default=None)
+    parser.add_argument("--temporal-bc-groups", type=int, default=1)
     parser.add_argument("--temporal-d-state", type=int, default=16)
     parser.add_argument("--temporal-d-conv", type=int, default=4)
     parser.add_argument("--temporal-dt-rank", default="auto")
@@ -260,6 +279,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=RESIDUAL_STATE_INIT_MODES,
         default="zero",
         help="zero (default), ckpt, or legacy warm24 alias for zero followed by warmup.",
+    )
+    parser.add_argument(
+        "--reset-state-every-step",
+        action="store_true",
+        default=False,
+        help="Diagnostic: restore residual temporal state before every model step.",
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--residual-alpha", type=float, default=1.0)

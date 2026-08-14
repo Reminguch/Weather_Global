@@ -20,8 +20,8 @@ def attach_temporal(
 ) -> gc.GraphCast:
     predictor._temporal_backbone = "mamba"
     predictor._temporal_location = config.temporal_location
-    predictor._temporal_hidden_size = config.temporal_hidden_size
     predictor._temporal_d_inner = config.temporal_d_inner
+    predictor._temporal_bc_groups = config.temporal_bc_groups
     predictor._temporal_d_state = config.temporal_d_state
     predictor._temporal_d_conv = config.temporal_d_conv
     predictor._temporal_dt_rank = config.temporal_dt_rank
@@ -30,6 +30,10 @@ def attach_temporal(
     predictor._temporal_layers = config.temporal_layers
     predictor._temporal_dropout = config.temporal_dropout
     predictor._temporal_stateful = config.temporal_stateful
+    # v22 uses one full Mamba implementation for both persistence modes.
+    # False resets/discards memory instead of selecting the legacy
+    # lightweight temporal architecture.
+    predictor._temporal_use_full_mamba = True
     predictor._temporal_zero_init_out = config.temporal_zero_init_out
     return predictor
 

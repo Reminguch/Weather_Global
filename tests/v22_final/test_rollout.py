@@ -55,7 +55,13 @@ def _residual_step(params, state, key, inputs, targets, forcings):
     return prediction, {"count": state["count"] + 1}
 
 
-def _run(*, full_feedback: bool, warmup_steps: int = 0, reset: bool = False):
+def _run(
+    *,
+    full_feedback: bool,
+    warmup_steps: int = 0,
+    reset: bool = False,
+    reset_every_step: bool = False,
+):
     target_values = [10.0] * warmup_steps + [0.0, 0.0, 0.0]
     return run_v22_final_rollout(
         rng=jax.random.PRNGKey(0),
@@ -75,6 +81,7 @@ def _run(*, full_feedback: bool, warmup_steps: int = 0, reset: bool = False):
         full_feedback=full_feedback,
         reset_state_after_warmup=reset,
         residual_alpha=1.0,
+        reset_state_every_step=reset_every_step,
     )
 
 
@@ -99,6 +106,13 @@ def test_truth_warmup_and_state_reset() -> None:
     reset = _run(full_feedback=False, warmup_steps=1, reset=True)
     np.testing.assert_allclose(_values(continued.baseline_prediction), [11.0])
     assert continued.residual_state["count"] == 2
+    assert reset.residual_state["count"] == 1
+
+
+def test_reset_state_every_step_prevents_temporal_carry() -> None:
+    continued = _run(full_feedback=True, reset_every_step=False)
+    reset = _run(full_feedback=True, reset_every_step=True)
+    assert continued.residual_state["count"] == 3
     assert reset.residual_state["count"] == 1
 
 

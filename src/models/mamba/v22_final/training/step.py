@@ -106,17 +106,16 @@ def feedback_field(mode: str, baseline_prediction, residual_prediction):
     raise ValueError(f"Unsupported feedback mode: {mode!r}")
 
 
-def make_train_step(
+def make_bptt_objective(
     *,
     transforms: V22FinalTrainingTransforms,
-    optimizer,
     baseline_params,
     baseline_state,
     config: V22FinalTrainConfig,
     time_step,
     input_steps: int,
-) -> Callable[..., tuple[Any, Any, Any, Any, Any]]:
-    """Build the static-shape BPTT update used by the v20 reference."""
+) -> Callable[..., tuple[Any, Any]]:
+    """Build the shared legacy-compatible BPTT forward objective."""
 
     def one_ar_step(
         residual_params,
@@ -160,6 +159,75 @@ def make_train_step(
 
     checkpointed_ar_step = jax.checkpoint(one_ar_step, static_argnums=())
 
+    def bptt_objective(
+        residual_params,
+        residual_state,
+        keys,
+        truth_inputs,
+        truths,
+        forcings,
+    ):
+        reset_every_anchor = config.temporal_state_policy == "reset_every_anchor"
+        zero_state = jax.tree_util.tree_map(jnp.zeros_like, residual_state)
+        state = zero_state if reset_every_anchor else residual_state
+        losses = []
+        current_inputs = truth_inputs[0]
+        for index in range(config.bptt_steps):
+            baseline_prediction, residual_prediction, loss, next_state = checkpointed_ar_step(
+                residual_params,
+                state,
+                keys[index],
+                current_inputs,
+                truths[index],
+                forcings[index],
+            )
+            state = zero_state if reset_every_anchor else next_state
+            losses.append(loss)
+            if index >= config.bptt_steps - 1:
+                continue
+            next_index = index + 1
+            if next_index < config.truth_prefix_steps:
+                current_inputs = truth_inputs[next_index]
+            else:
+                next_field = feedback_field(
+                    config.feedback_mode,
+                    baseline_prediction,
+                    residual_prediction,
+                )
+                # The just-used forcing belongs to the frame being inserted.
+                current_inputs = shift_inputs_with_field(
+                    current_inputs,
+                    next_field,
+                    forcings[index],
+                    time_step=time_step,
+                    input_steps=input_steps,
+                )
+        return jnp.stack(losses).mean(), state
+
+    return bptt_objective
+
+
+def make_train_step(
+    *,
+    transforms: V22FinalTrainingTransforms,
+    optimizer,
+    baseline_params,
+    baseline_state,
+    config: V22FinalTrainConfig,
+    time_step,
+    input_steps: int,
+) -> Callable[..., tuple[Any, Any, Any, Any, Any]]:
+    """Build the static-shape BPTT update used by the v20 reference."""
+
+    bptt_objective = make_bptt_objective(
+        transforms=transforms,
+        baseline_params=baseline_params,
+        baseline_state=baseline_state,
+        config=config,
+        time_step=time_step,
+        input_steps=input_steps,
+    )
+
     @jax.jit
     def train_step(
         residual_params,
@@ -171,39 +239,14 @@ def make_train_step(
         forcings,
     ):
         def objective(params):
-            state = residual_state
-            losses = []
-            current_inputs = truth_inputs[0]
-            for index in range(config.bptt_steps):
-                baseline_prediction, residual_prediction, loss, state = checkpointed_ar_step(
-                    params,
-                    state,
-                    keys[index],
-                    current_inputs,
-                    truths[index],
-                    forcings[index],
-                )
-                losses.append(loss)
-                if index >= config.bptt_steps - 1:
-                    continue
-                next_index = index + 1
-                if next_index < config.truth_prefix_steps:
-                    current_inputs = truth_inputs[next_index]
-                else:
-                    next_field = feedback_field(
-                        config.feedback_mode,
-                        baseline_prediction,
-                        residual_prediction,
-                    )
-                    # The just-used forcing belongs to the frame being inserted.
-                    current_inputs = shift_inputs_with_field(
-                        current_inputs,
-                        next_field,
-                        forcings[index],
-                        time_step=time_step,
-                        input_steps=input_steps,
-                    )
-            return jnp.stack(losses).mean(), state
+            return bptt_objective(
+                params,
+                residual_state,
+                keys,
+                truth_inputs,
+                truths,
+                forcings,
+            )
 
         (loss, next_residual_state), gradients = jax.value_and_grad(
             objective, has_aux=True
@@ -227,3 +270,48 @@ def make_train_step(
         )
 
     return train_step
+
+
+def make_validation_step(
+    *,
+    transforms: V22FinalTrainingTransforms,
+    baseline_params,
+    baseline_state,
+    config: V22FinalTrainConfig,
+    time_step,
+    input_steps: int,
+) -> Callable[..., tuple[Any, Any]]:
+    """Build a no-gradient evaluation of the exact training objective."""
+
+    bptt_objective = make_bptt_objective(
+        transforms=transforms,
+        baseline_params=baseline_params,
+        baseline_state=baseline_state,
+        config=config,
+        time_step=time_step,
+        input_steps=input_steps,
+    )
+
+    @jax.jit
+    def validation_step(
+        residual_params,
+        residual_state,
+        keys,
+        truth_inputs,
+        truths,
+        forcings,
+    ):
+        loss, next_residual_state = bptt_objective(
+            residual_params,
+            residual_state,
+            keys,
+            truth_inputs,
+            truths,
+            forcings,
+        )
+        next_residual_state = jax.tree_util.tree_map(
+            jax.lax.stop_gradient, next_residual_state
+        )
+        return loss, next_residual_state
+
+    return validation_step

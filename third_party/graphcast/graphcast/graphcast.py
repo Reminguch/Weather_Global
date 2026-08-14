@@ -43,7 +43,7 @@ import xarray
 from src.models.mamba.modules.temporal_mesh_mamba import (
     TemporalMeshBlock as _StatelessTemporalBlock,
 )
-from src.models.mamba.modules.temporal_mesh_mamba import TemporalMeshConfig
+from src.models.mamba.modules.temporal_mesh_mamba_Ilya import TemporalMeshConfig
 from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
     TemporalMeshBlock as _StatefulTemporalBlock,
 )
@@ -55,8 +55,8 @@ from src.models.mamba.modules.temporal_mesh_mamba_Ilya import (
 )
 
 
-def _get_temporal_block_cls(stateful: bool):
-    return _StatefulTemporalBlock if stateful else _StatelessTemporalBlock
+def _get_temporal_block_cls(stateful: bool, *, use_full_mamba: bool = False):
+    return _StatefulTemporalBlock if stateful or use_full_mamba else _StatelessTemporalBlock
 
 Kwargs = Mapping[str, Any]
 
@@ -262,6 +262,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_backbone = "none"
     self._temporal_location = "mesh_post_encoder"
     self._temporal_d_inner = None
+    self._temporal_bc_groups = 1
     self._temporal_d_state = 16
     self._temporal_d_conv = 4
     self._temporal_dt_rank = "auto"
@@ -270,6 +271,7 @@ class GraphCast(predictor_base.Predictor):
     self._temporal_layers = 1
     self._temporal_dropout = 0.0
     self._temporal_stateful = False
+    self._temporal_use_full_mamba = False
     self._temporal_zero_init_out = False
 
     self._spatial_features_kwargs = dict(
@@ -802,11 +804,16 @@ class GraphCast(predictor_base.Predictor):
               f"block: expected prefix {expected_prefix}, got "
               f"{node_features.shape}.")
         temporal_block_name = f"mesh_interleaved_temporal_r{repetition_i}_s{step_i}"
-        temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
+        use_full_mamba = getattr(self, "_temporal_use_full_mamba", False)
+        temporal_block = _get_temporal_block_cls(
+            self._temporal_stateful,
+            use_full_mamba=use_full_mamba,
+        )(
             TemporalMeshConfig(
                 backbone=self._temporal_backbone,
                 location=self._temporal_location,
                 d_inner=self._temporal_d_inner,
+                bc_groups=getattr(self, "_temporal_bc_groups", 1),
                 d_state=self._temporal_d_state,
                 dt_rank=self._temporal_dt_rank,
                 d_conv=self._temporal_d_conv,
@@ -833,6 +840,9 @@ class GraphCast(predictor_base.Predictor):
           )
           store_temporal_state_to_haiku(
               f"{temporal_block_name}_state", next_temporal_state)
+        elif use_full_mamba:
+          node_features = temporal_block.apply_stateless(
+              node_features, is_training=is_training)
         else:
           node_features = temporal_block(
               node_features, is_training=is_training)
@@ -860,11 +870,15 @@ class GraphCast(predictor_base.Predictor):
           "Expected mesh latent rank 3, got "
           f"{latent_mesh_nodes.ndim} with shape={latent_mesh_nodes.shape}")
     if not hasattr(self, '_temporal_block'):
-      self._temporal_block = _get_temporal_block_cls(self._temporal_stateful)(
+      self._temporal_block = _get_temporal_block_cls(
+          self._temporal_stateful,
+          use_full_mamba=getattr(self, "_temporal_use_full_mamba", False),
+      )(
           TemporalMeshConfig(
               backbone=self._temporal_backbone,
               location=self._temporal_location,
               d_inner=self._temporal_d_inner,
+              bc_groups=getattr(self, "_temporal_bc_groups", 1),
               d_state=self._temporal_d_state,
               dt_rank=self._temporal_dt_rank,
               d_conv=self._temporal_d_conv,
@@ -877,6 +891,9 @@ class GraphCast(predictor_base.Predictor):
           name="temporal_mesh_block",
       )
     if not self._temporal_stateful:
+      if getattr(self, "_temporal_use_full_mamba", False):
+        return self._temporal_block.apply_stateless(
+            latent_mesh_nodes, is_training=is_training)
       return self._temporal_block(latent_mesh_nodes, is_training=is_training)
 
     batch_size = latent_mesh_nodes.shape[1]

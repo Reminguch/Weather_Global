@@ -302,6 +302,12 @@ def build_v22_final_swa(
         optimizer = normalized.get("optimizer", {})
         optimizer.pop("max_steps", None)
         optimizer.pop("checkpoint_every", None)
+        normalized.pop("validation", None)
+        architecture = normalized.get("architecture")
+        if isinstance(architecture, dict):
+            # Normalize checkpoints written before the no-op field was removed.
+            architecture.pop("temporal_hidden_size", None)
+            architecture.setdefault("temporal_bc_groups", 1)
         return normalized
 
     first_config_signature = swa_config_signature(first.resolved_training_config)

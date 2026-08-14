@@ -25,11 +25,49 @@ def test_cli_defaults_to_zero_residual_state() -> None:
             "cold_bp",
             "--out-json",
             "result.json",
+            "--temporal-d-inner",
+            "64",
+            "--temporal-bc-groups",
+            "4",
         ]
     )
     assert config.residual_state_init == "zero"
     assert config.ckpt == Path("checkpoint.pkl")
     assert config.out_json == Path("result.json")
+    assert config.temporal_bc_groups == 4
+    assert config.architecture.temporal_bc_groups == 4
+    assert not config.reset_state_every_step
+
+
+def test_cli_enables_reset_state_every_step() -> None:
+    config = parse_args(
+        [
+            "--ckpt",
+            "checkpoint.pkl",
+            "--eval-mode",
+            "cold_full",
+            "--out-json",
+            "result.json",
+            "--reset-state-every-step",
+        ]
+    )
+    assert config.reset_state_every_step
+
+
+def test_cli_rejects_removed_temporal_hidden_size() -> None:
+    with pytest.raises(SystemExit):
+        parse_args(
+            [
+                "--ckpt",
+                "checkpoint.pkl",
+                "--eval-mode",
+                "cold_bp",
+                "--out-json",
+                "result.json",
+                "--temporal-hidden-size",
+                "128",
+            ]
+        )
 
 
 def test_config_derives_rollout_mode() -> None:

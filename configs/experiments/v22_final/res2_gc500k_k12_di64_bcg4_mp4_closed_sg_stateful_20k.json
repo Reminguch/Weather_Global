@@ -14,15 +14,16 @@
     "mesh_size": 4,
     "width": 512,
     "baseline_msg_steps": 6,
-    "residual_msg_steps": 2,
+    "residual_msg_steps": 4,
     "temporal_location": "mesh_processor_interleaved",
-    "temporal_d_inner": 32,
+    "temporal_d_inner": 64,
+    "temporal_bc_groups": 4,
     "temporal_d_state": 16,
     "temporal_d_conv": 4,
     "temporal_dt_rank": "auto",
     "temporal_layers": 2,
     "temporal_conv_bias": true,
-    "temporal_stateful": false,
+    "temporal_stateful": true,
     "temporal_zero_init_out": true,
     "temporal_bias": false,
     "temporal_dropout": 0.0
@@ -34,7 +35,7 @@
     "feedback_mode": "closed_loop_sg"
   },
   "optimizer": {
-    "max_steps": 50000,
+    "max_steps": 20000,
     "checkpoint_every": 2000,
     "learning_rate": 0.0001,
     "weight_decay": 0.0001,
@@ -44,7 +45,7 @@
     "precision": "bf16"
   },
   "output": {
-    "output_root": "artifacts/checkpoints/v22_final/res2_gc500k_k12",
-    "run_name": "resmamba_res2_v22_final_k12_di32_l2_dc4_closed_sg_stateless"
+    "output_root": "artifacts/checkpoints/v22_final/res2_gc500k_k12_20k_di_crosscheck",
+    "run_name": "di64_bcg4_mp4_closed_sg_stateful_20k"
   }
 }

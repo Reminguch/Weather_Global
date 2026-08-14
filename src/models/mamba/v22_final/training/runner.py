@@ -5,11 +5,13 @@ from __future__ import annotations
 import dataclasses
 import json
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Mapping
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from src.models.graphcast.training.core.model import (
     load_graphcast_checkpoint,
@@ -34,7 +36,21 @@ from .config import (
     validate_resume_config,
 )
 from .data import TrainingCursor, open_training_data
-from .step import build_optimizer, build_training_transforms, make_train_step
+from .step import (
+    build_optimizer,
+    build_training_transforms,
+    make_train_step,
+    make_validation_step,
+)
+from .validation import (
+    append_validation_record,
+    find_validation_record,
+    load_validation_records,
+    run_fixed_validation,
+    select_validation_segment_ids,
+    update_best_validation,
+    update_train_validation_plot,
+)
 
 
 def validate_input_paths(config: V22FinalTrainConfig) -> None:
@@ -220,6 +236,7 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
     optimizer_state = initial_optimizer_state
     cursor = TrainingCursor()
     completed_step = 0
+    resume_checkpoint_was_final = False
     overlay_metadata = {
         "residual_copied": residual_overlay.copied,
         "residual_fresh": residual_overlay.initialized,
@@ -252,6 +269,13 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
         cursor = TrainingCursor.from_mapping(checkpoint.training_cursor)
         training_data.validate_cursor(cursor, config)
         completed_step = checkpoint.completed_step
+        try:
+            saved_max_steps = int(
+                checkpoint.resolved_training_config["optimizer"]["max_steps"]
+            )
+        except (KeyError, TypeError, ValueError):
+            saved_max_steps = -1
+        resume_checkpoint_was_final = saved_max_steps == completed_step
         overlay_metadata = dict(checkpoint.parameter_overlay_metadata)
         print(f"[v22_final] exact resume from {invocation.resume} at step {completed_step}")
     elif invocation.init_from is not None:
@@ -285,6 +309,18 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
             "train_anchors": int(training_data.train_split.size),
             "validation_anchors": int(training_data.val_split.size),
             "segments": len(training_data.segments),
+            "validation_complete_segments": len(training_data.validation_segments),
+            "validation_fixed_subset": (
+                {
+                    "policy": training_data.validation_subset_policy,
+                    "fingerprint": training_data.validation_subset_fingerprint,
+                    "segments": training_data.validation_segment_metadata(
+                        training_data.fixed_validation_segment_ids
+                    ),
+                }
+                if config.validation.enabled
+                else None
+            ),
             "chunks_per_segment": config.segment_steps // config.bptt_steps,
             "residual_parameters": n_residual_parameters,
             "baseline_parameters_frozen": n_baseline_parameters,
@@ -311,15 +347,109 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
         input_steps=training_data.input_steps,
     )
     metrics_path = config.run_dir / "train_metrics.jsonl"
+    validation_metrics_path = config.run_dir / "validation_metrics.jsonl"
+    validation_step = None
+    if config.validation.enabled:
+        validation_step = make_validation_step(
+            transforms=transforms,
+            baseline_params=baseline_params,
+            baseline_state=baseline_state,
+            config=config,
+            time_step=training_data.time_step,
+            input_steps=training_data.input_steps,
+        )
+
+    def checkpoint_for_step(step: int) -> Path:
+        return config.run_dir / "checkpoints" / f"checkpoint_step{step:08d}.pkl"
+
+    def perform_validation(
+        *, step: int, segment_ids: np.ndarray, role: str, subset_policy: str
+    ) -> Mapping[str, Any]:
+        if validation_step is None:
+            raise RuntimeError("Validation requested while disabled")
+        expected_fingerprint = training_data.fingerprint_validation_subset(
+            segment_ids
+        )
+        records = load_validation_records(validation_metrics_path)
+        existing = find_validation_record(
+            records,
+            step=step,
+            role=role,
+            subset_fingerprint=expected_fingerprint,
+        )
+        if existing is not None:
+            return existing
+        checkpoint_path = checkpoint_for_step(step)
+        if not checkpoint_path.is_file():
+            raise FileNotFoundError(
+                f"Validation requires the completed checkpoint {checkpoint_path}"
+            )
+        record = run_fixed_validation(
+            validation_step=validation_step,
+            residual_params=residual_params,
+            zero_residual_state=zero_residual_state,
+            training_data=training_data,
+            task_config=task_config,
+            config=config,
+            segment_ids=segment_ids,
+            step=step,
+            role=role,
+            subset_policy=subset_policy,
+        )
+        append_validation_record(validation_metrics_path, record)
+        records = load_validation_records(validation_metrics_path)
+        if role == "fixed_checkpoint":
+            update_best_validation(
+                records=records,
+                checkpoint_for_step=checkpoint_for_step,
+                output_path=config.run_dir / "best_validation.json",
+                subset_fingerprint=expected_fingerprint,
+            )
+        try:
+            update_train_validation_plot(
+                train_metrics_path=metrics_path,
+                validation_metrics_path=validation_metrics_path,
+                output_path=config.run_dir / "train_validation_loss.png",
+                subset_fingerprint=expected_fingerprint,
+            )
+        except Exception as exc:  # plotting must never invalidate training
+            warnings.warn(f"Could not update validation loss plot: {exc}")
+        print(
+            f"[v22_final] validation step={step} role={role} "
+            f"loss={float(record['loss']):.6f} "
+            f"segments={int(record['selected_segments'])} "
+            f"time={float(record['duration_seconds']):.1f}s",
+            flush=True,
+        )
+        return record
+
     print(
         f"[v22_final] residual_params={n_residual_parameters:,} "
         f"segments={len(training_data.segments)} truth_prefix={config.truth_prefix_steps} "
-        f"ar_tail={config.ar_tail_k} feedback={config.feedback_mode}",
+        f"ar_tail={config.ar_tail_k} feedback={config.feedback_mode} "
+        f"state_policy={config.temporal_state_policy}",
         flush=True,
     )
 
-    last_checkpoint: Path | None = None
+    last_checkpoint: Path | None = invocation.resume
     has_consumed_update = completed_step > 0
+    if (
+        config.validation.enabled
+        and completed_step > 0
+        and (
+            completed_step % config.validation.every_steps == 0
+            or resume_checkpoint_was_final
+        )
+    ):
+        # Recover a checkpoint that was saved immediately before an interrupted
+        # validation without consuming any training state.
+        perform_validation(
+            step=completed_step,
+            segment_ids=training_data.fixed_validation_segment_ids,
+            role="fixed_checkpoint",
+            subset_policy=training_data.validation_subset_policy,
+        )
+
     for step in range(completed_step + 1, config.max_steps + 1):
         if cursor.segment_offset == 0 and has_consumed_update:
             residual_state = jax.tree_util.tree_map(
@@ -370,7 +500,15 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
                 f"grad_norm {gradient_norm_value:.4f} step_time {step_seconds:.2f}s",
                 flush=True,
             )
-        if step % config.checkpoint_every == 0 or step == config.max_steps:
+        should_validate = config.validation.enabled and (
+            step % config.validation.every_steps == 0 or step == config.max_steps
+        )
+        should_checkpoint = (
+            step % config.checkpoint_every == 0
+            or step == config.max_steps
+            or should_validate
+        )
+        if should_checkpoint:
             last_checkpoint = _save_checkpoint(
                 config=config,
                 completed_step=step,
@@ -384,6 +522,30 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
                 overlay_metadata=overlay_metadata,
             )
             print(f"[v22_final] saved {last_checkpoint}", flush=True)
+        if should_validate:
+            fixed_record = perform_validation(
+                step=step,
+                segment_ids=training_data.fixed_validation_segment_ids,
+                role="fixed_checkpoint",
+                subset_policy=training_data.validation_subset_policy,
+            )
+            if step == config.max_steps:
+                final_ids, final_policy = select_validation_segment_ids(
+                    training_data, config.validation.final_num_segments
+                )
+                if np.array_equal(
+                    final_ids, training_data.fixed_validation_segment_ids
+                ):
+                    final_record = dict(fixed_record)
+                    final_record["role"] = "final_full"
+                    append_validation_record(validation_metrics_path, final_record)
+                else:
+                    perform_validation(
+                        step=step,
+                        segment_ids=final_ids,
+                        role="final_full",
+                        subset_policy=final_policy,
+                    )
 
     if last_checkpoint is None:
         raise RuntimeError("Training completed without writing a checkpoint")
