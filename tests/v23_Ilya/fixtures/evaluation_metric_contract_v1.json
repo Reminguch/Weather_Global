@@ -1,0 +1,45 @@
+{
+  "chosen_idx": [
+    4
+  ],
+  "per_variable_per_step": {
+    "x": {
+      "rmse_baseline": [1.0, 2.0],
+      "rmse_full": [0.0, 1.0],
+      "mae_baseline": [1.0, 2.0],
+      "mae_full": [0.0, 1.0],
+      "improvement_pct": [100.0, 50.0],
+      "improvement_pct_rmse": [100.0, 50.0],
+      "improvement_pct_mae": [100.0, 50.0],
+      "rmsb_baseline": [1.0, 2.0],
+      "rmsb_full": [0.0, 1.0],
+      "improvement_pct_rmsb": [100.0, 50.0]
+    }
+  },
+  "per_channel_per_step": {
+    "x": {
+      "rmse_baseline": [1.0, 2.0],
+      "rmse_full": [0.0, 1.0],
+      "mae_baseline": [1.0, 2.0],
+      "mae_full": [0.0, 1.0],
+      "improvement_pct": [100.0, 50.0],
+      "improvement_pct_rmse": [100.0, 50.0],
+      "improvement_pct_mae": [100.0, 50.0],
+      "rmsb_baseline": [1.0, 2.0],
+      "rmsb_full": [0.0, 1.0],
+      "improvement_pct_rmsb": [100.0, 50.0]
+    }
+  },
+  "residual_diagnostics_per_variable": {
+    "x": {
+      "residual_cosine_by_lead": [1.0, 1.0],
+      "residual_gain_by_lead": [1.0, 0.5],
+      "residual_norm_by_lead": [1.0, 1.0],
+      "baseline_err_norm_by_lead": [1.0, 2.0],
+      "dot_r_epre_by_lead": [1.0, 2.0],
+      "delta_mse_by_lead": [1.0, 3.0],
+      "E_pre_mse_by_lead": [1.0, 4.0],
+      "E_post_mse_by_lead": [0.0, 1.0]
+    }
+  }
+}
