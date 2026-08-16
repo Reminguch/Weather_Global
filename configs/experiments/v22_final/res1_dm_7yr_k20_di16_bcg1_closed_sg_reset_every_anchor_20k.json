@@ -1,0 +1,58 @@
+{
+  "architecture_id": "v22_final",
+  "schema_version": 1,
+  "data": {
+    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream/res1",
+    "anchor_manifest_root": "data/graphcast/graphcast/dataset/precomputed_residuals/lianghong_v22_iv9432_res1",
+    "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "stats_dir": "data/graphcast/graphcast/stats",
+    "input_duration": "12h",
+    "target_steps": 1
+  },
+  "architecture": {
+    "resolution": 1.0,
+    "mesh_size": 5,
+    "width": 512,
+    "baseline_msg_steps": 16,
+    "residual_msg_steps": 2,
+    "temporal_location": "mesh_processor_interleaved",
+    "temporal_d_inner": 16,
+    "temporal_bc_groups": 1,
+    "temporal_d_state": 16,
+    "temporal_d_conv": 4,
+    "temporal_dt_rank": "auto",
+    "temporal_layers": 2,
+    "temporal_conv_bias": true,
+    "temporal_stateful": true,
+    "temporal_zero_init_out": true,
+    "temporal_bias": false,
+    "temporal_dropout": 0.0
+  },
+  "sequence": {
+    "segment_steps": 96,
+    "bptt_steps": 24,
+    "ar_tail_k": 20,
+    "feedback_mode": "closed_loop_sg",
+    "temporal_state_policy": "reset_every_anchor"
+  },
+  "optimizer": {
+    "max_steps": 20000,
+    "checkpoint_every": 2000,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "warmup_steps": 200,
+    "grad_clip": 1.0,
+    "seed": 22,
+    "precision": "bf16"
+  },
+  "validation": {
+    "enabled": false,
+    "every_steps": 2000,
+    "num_segments": 16,
+    "final_num_segments": null
+  },
+  "output": {
+    "output_root": "artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_reset_every_anchor_20k_20260815",
+    "run_name": "di16_bcg1_closed_sg_reset_every_anchor_20k"
+  }
+}
