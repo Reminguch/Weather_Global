@@ -124,6 +124,7 @@ def load_endpoint_frame_batch(
     input_steps: int,
     truth_prefix_steps: int,
     loss_mode: str,
+    supervised_step_indices: tuple[int, ...] | None = None,
     task_config,
     dt: pd.Timedelta,
 ) -> EndpointFrameBatch:
@@ -140,8 +141,30 @@ def load_endpoint_frame_batch(
         raise ValueError("truth_prefix_steps must lie within the BPTT chunk")
     if anchors.size > 1 and not np.all(np.diff(anchors) == 1):
         raise ValueError("v23_Ilya BPTT chunks require consecutive anchor indices")
-    if loss_mode not in {"last_step", "all_steps"}:
+    if loss_mode not in {"last_step", "all_steps", "sparse_steps"}:
         raise ValueError(f"Unsupported loss_mode={loss_mode!r}")
+    if loss_mode == "sparse_steps":
+        if not supervised_step_indices:
+            raise ValueError(
+                "sparse_steps requires non-empty supervised_step_indices"
+            )
+        selected = np.asarray(supervised_step_indices, dtype=np.int64)
+        if (
+            selected.ndim != 1
+            or np.any(selected < 0)
+            or np.any(selected >= anchors.size)
+        ):
+            raise ValueError(
+                "supervised_step_indices must lie within the BPTT chunk"
+            )
+        if selected.size > 1 and np.any(np.diff(selected) <= 0):
+            raise ValueError("supervised_step_indices must be ordered and unique")
+        if selected[-1] != anchors.size - 1:
+            raise ValueError("sparse_steps must supervise the final BPTT endpoint")
+    elif supervised_step_indices is not None:
+        raise ValueError(
+            "supervised_step_indices is only valid for loss_mode='sparse_steps'"
+        )
 
     first = int(anchors[0])
     teacher_frame_indices = np.arange(
@@ -174,7 +197,12 @@ def load_endpoint_frame_batch(
     )
     forcings = _split_steps(forcing_data, dt)
 
-    truth_indices = target_indices[-1:] if loss_mode == "last_step" else target_indices
+    if loss_mode == "last_step":
+        truth_indices = target_indices[-1:]
+    elif loss_mode == "all_steps":
+        truth_indices = target_indices
+    else:
+        truth_indices = target_indices[selected]
     truth_data, truth_bytes = _temporal_dataset(
         store,
         task_config.target_variables,

@@ -159,6 +159,11 @@ class V23IlyaTrainingData:
             input_steps=self.input_steps,
             truth_prefix_steps=config.truth_prefix_steps,
             loss_mode=config.loss_mode,
+            supervised_step_indices=(
+                config.supervised_step_indices
+                if config.loss_mode == "sparse_steps"
+                else None
+            ),
             task_config=task_config,
             dt=self.time_step,
         )

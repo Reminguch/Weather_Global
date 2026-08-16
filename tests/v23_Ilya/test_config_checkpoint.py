@@ -120,6 +120,66 @@ def test_supported_objective_and_tape_modes(loss_mode: str, tape_precision: str)
     assert config.weather_tape_precision == tape_precision
 
 
+def test_sparse_objective_roundtrip_and_exact_index_mapping(tmp_path: Path) -> None:
+    config = V23IlyaTrainConfig(
+        **{
+            **_config().__dict__,
+            "ar_tail_k": 19,
+            "loss_mode": "sparse_steps",
+            "supervised_horizons": (1, 4, 8, 12, 16, 20),
+            "supervised_weights": (1, 1, 2, 2, 4, 8),
+        }
+    )
+    assert config.truth_prefix_steps == 5
+    assert config.supervised_step_indices == (4, 7, 11, 15, 19, 23)
+    np.testing.assert_allclose(
+        config.normalized_supervised_weights,
+        np.asarray([1, 1, 2, 2, 4, 8]) / 18.0,
+    )
+    path = tmp_path / "sparse.json"
+    path.write_text(json.dumps(config.to_dict()))
+    assert load_training_config(path) == config
+
+
+@pytest.mark.parametrize(
+    ("horizons", "weights", "message"),
+    [
+        ((1, 20), (1,), "matching lengths"),
+        ((4, 1, 20), (1, 1, 1), "ordered and unique"),
+        ((1, 1, 20), (1, 1, 1), "ordered and unique"),
+        ((1, 20), (1, 0), "positive finite"),
+        ((1, 20), (1, float("nan")), "positive finite"),
+        ((1, 16), (1, 1), "final AR endpoint"),
+    ],
+)
+def test_sparse_objective_rejects_malformed_values(
+    horizons: tuple[int, ...],
+    weights: tuple[float, ...],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        V23IlyaTrainConfig(
+            **{
+                **_config().__dict__,
+                "ar_tail_k": 19,
+                "loss_mode": "sparse_steps",
+                "supervised_horizons": horizons,
+                "supervised_weights": weights,
+            }
+        )
+
+
+def test_existing_modes_reject_sparse_only_fields() -> None:
+    with pytest.raises(ValueError, match="only valid"):
+        V23IlyaTrainConfig(
+            **{
+                **_config().__dict__,
+                "supervised_horizons": (21,),
+                "supervised_weights": (1,),
+            }
+        )
+
+
 def test_config_rejects_unknown_keys_and_backend(tmp_path: Path) -> None:
     payload = _config().to_dict()
     payload["objective"]["unexpected"] = True
@@ -226,4 +286,3 @@ def test_data_selection_fields_are_strict_and_roundtrip(tmp_path: Path) -> None:
 def test_data_selection_fields_reject_invalid_combinations(overrides: dict) -> None:
     with pytest.raises(ValueError, match=r"data\.|provided together|requires"):
         V23IlyaTrainConfig(**{**_config().__dict__, **overrides})
-

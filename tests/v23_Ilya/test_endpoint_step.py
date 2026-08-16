@@ -67,6 +67,14 @@ class StatefulResidualLoss:
 
 
 def _config(loss_mode: str, tape_precision: str = "fp32") -> V23IlyaTrainConfig:
+    sparse_objective = (
+        {
+            "supervised_horizons": (1, 3),
+            "supervised_weights": (1, 3),
+        }
+        if loss_mode == "sparse_steps"
+        else {}
+    )
     return V23IlyaTrainConfig(
         prepared_root=Path("prepared"),
         anchor_manifest_root=Path("anchors"),
@@ -80,6 +88,7 @@ def _config(loss_mode: str, tape_precision: str = "fp32") -> V23IlyaTrainConfig:
         feedback_mode="closed_loop_sg",
         loss_mode=loss_mode,
         weather_tape_precision=tape_precision,
+        **sparse_objective,
     )
 
 
@@ -100,11 +109,13 @@ def _input_frame(value: float) -> xr.Dataset:
 
 
 def _arguments(loss_mode: str):
-    truths = (
-        (_dataset(5.0, hour=6),)
-        if loss_mode == "last_step"
-        else tuple(_dataset(value, hour=6) for value in (3.0, 4.0, 5.0, 6.0))
-    )
+    if loss_mode == "last_step":
+        truth_values = (5.0,)
+    elif loss_mode == "all_steps":
+        truth_values = (3.0, 4.0, 5.0, 6.0)
+    else:
+        truth_values = (4.0, 6.0)
+    truths = tuple(_dataset(value, hour=6) for value in truth_values)
     return (
         jnp.stack([jax.random.PRNGKey(index) for index in range(4)]),
         (_input_frame(1.0), _input_frame(2.0), _input_frame(3.0)),
@@ -116,25 +127,36 @@ def _arguments(loss_mode: str):
 
 def _naive_reference(params, initial_state, loss_mode: str):
     frames = [jnp.asarray(value, jnp.float32) for value in (1.0, 2.0, 3.0)]
-    targets = [5.0] if loss_mode == "last_step" else [3.0, 4.0, 5.0, 6.0]
+    if loss_mode == "last_step":
+        supervised_positions = {3: 0}
+        targets = (5.0,)
+        weights = (1.0,)
+    elif loss_mode == "all_steps":
+        supervised_positions = {index: index for index in range(4)}
+        targets = (3.0, 4.0, 5.0, 6.0)
+        weights = (0.25,) * 4
+    else:
+        supervised_positions = {1: 0, 3: 1}
+        targets = (4.0, 6.0)
+        weights = (0.25, 0.75)
     state = initial_state
     losses = []
     for index in range(4):
         value = 0.5 * (frames[index] + frames[index + 1])
         state = 0.7 * state + params["a"] * value
         prediction = params["b"] * state
-        if loss_mode == "all_steps" or index == 3:
-            target = targets[index] if loss_mode == "all_steps" else targets[0]
+        if index in supervised_positions:
+            target = targets[supervised_positions[index]]
             losses.append((prediction - target) ** 2)
         if index >= 1 and index < 3:
             frames.append(jax.lax.stop_gradient(prediction))
-    loss = losses[-1] if loss_mode == "last_step" else jnp.stack(losses).mean()
+    loss = jnp.sum(jnp.stack(losses) * jnp.asarray(weights))
     return loss, state
 
 
 @pytest.mark.parametrize(
     ("loss_mode", "expected_baseline_calls"),
-    [("last_step", 3), ("all_steps", 4)],
+    [("last_step", 3), ("all_steps", 4), ("sparse_steps", 3)],
 )
 def test_explicit_reverse_matches_naive_unroll(
     loss_mode: str,
@@ -190,7 +212,7 @@ def test_host_tape_train_step_matches_naive_parameter_update() -> None:
     baseline = FrozenBaseline()
     residual = StatefulResidual()
     residual_loss = StatefulResidualLoss()
-    config = _config("last_step")
+    config = _config("sparse_steps")
     transforms = V23IlyaTrainingTransforms(
         baseline,
         residual,
@@ -209,9 +231,16 @@ def test_host_tape_train_step_matches_naive_parameter_update() -> None:
     )
     params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
     state = {"s": jnp.asarray(0.0)}
-    keys, frames, static, truths, forcings = _arguments("last_step")
+    keys, frames, static, truths, forcings = _arguments("sparse_steps")
 
-    next_params, next_state, _optimizer_state, loss, gradient_norm = train_step(
+    (
+        next_params,
+        next_state,
+        _optimizer_state,
+        loss,
+        gradient_norm,
+        loss_components,
+    ) = train_step(
         params,
         state,
         optimizer.init(params),
@@ -222,7 +251,7 @@ def test_host_tape_train_step_matches_naive_parameter_update() -> None:
         forcings,
     )
     (expected_loss, expected_state), expected_gradient = jax.value_and_grad(
-        lambda value: _naive_reference(value, state["s"], "last_step"),
+        lambda value: _naive_reference(value, state["s"], "sparse_steps"),
         has_aux=True,
     )(params)
     expected_params = jax.tree_util.tree_map(
@@ -232,6 +261,12 @@ def test_host_tape_train_step_matches_naive_parameter_update() -> None:
     )
 
     np.testing.assert_allclose(loss, expected_loss, rtol=1e-6)
+    np.testing.assert_allclose(
+        loss,
+        np.sum(np.asarray(loss_components) * np.asarray([0.25, 0.75])),
+        rtol=1e-6,
+    )
+    assert np.asarray(loss_components).shape == (2,)
     np.testing.assert_allclose(next_state["s"], expected_state, rtol=1e-6)
     for name in params:
         np.testing.assert_allclose(

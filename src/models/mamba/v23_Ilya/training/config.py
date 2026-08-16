@@ -21,7 +21,7 @@ from ..config import (
 FEEDBACK_MODES = ("baseline", "closed_loop_sg")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
-LOSS_MODES = ("last_step", "all_steps")
+LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
 WEATHER_TAPE_PRECISIONS = ("bf16", "fp32")
 BPTT_BACKEND = "explicit_reverse_vjp"
 DISTRIBUTED_MODES = ("single", "data_parallel")
@@ -114,6 +114,8 @@ class V23IlyaTrainConfig:
     feedback_mode: str = "baseline"
     temporal_state_policy: str = "carry"
     loss_mode: str = "last_step"
+    supervised_horizons: tuple[int, ...] = ()
+    supervised_weights: tuple[float, ...] = ()
     weather_tape_precision: str = "bf16"
     max_steps: int = 50_000
     checkpoint_every: int = 2_000
@@ -174,6 +176,47 @@ class V23IlyaTrainConfig:
             raise ValueError(f"precision must be one of {PRECISIONS}")
         if self.loss_mode not in LOSS_MODES:
             raise ValueError(f"loss_mode must be one of {LOSS_MODES}")
+        if self.loss_mode == "sparse_steps":
+            horizons = tuple(self.supervised_horizons)
+            weights = tuple(self.supervised_weights)
+            if not horizons:
+                raise ValueError(
+                    "sparse_steps requires at least one supervised_horizon"
+                )
+            if len(horizons) != len(weights):
+                raise ValueError(
+                    "supervised_horizons and supervised_weights must have "
+                    "matching lengths"
+                )
+            if any(type(horizon) is not int for horizon in horizons):
+                raise ValueError("supervised_horizons must contain integers")
+            if any(horizon <= 0 for horizon in horizons):
+                raise ValueError("supervised_horizons must be positive")
+            if any(left >= right for left, right in zip(horizons, horizons[1:])):
+                raise ValueError(
+                    "supervised_horizons must be ordered and unique"
+                )
+            endpoint_horizon = self.ar_tail_k + 1
+            if horizons[-1] != endpoint_horizon:
+                raise ValueError(
+                    "sparse_steps must supervise the final AR endpoint "
+                    f"horizon {endpoint_horizon}"
+                )
+            if any(
+                not isinstance(weight, (int, float))
+                or isinstance(weight, bool)
+                or not math.isfinite(float(weight))
+                or float(weight) <= 0
+                for weight in weights
+            ):
+                raise ValueError(
+                    "supervised_weights must contain positive finite numbers"
+                )
+        elif self.supervised_horizons or self.supervised_weights:
+            raise ValueError(
+                "supervised_horizons and supervised_weights are only valid for "
+                "loss_mode='sparse_steps'"
+            )
         if self.weather_tape_precision not in WEATHER_TAPE_PRECISIONS:
             raise ValueError(
                 "weather_tape_precision must be one of "
@@ -193,6 +236,50 @@ class V23IlyaTrainConfig:
     @property
     def truth_prefix_steps(self) -> int:
         return self.bptt_steps - self.ar_tail_k
+
+    @property
+    def supervised_step_indices(self) -> tuple[int, ...]:
+        """Internal BPTT indices whose targets contribute to the objective."""
+
+        if self.loss_mode == "last_step":
+            return (self.bptt_steps - 1,)
+        if self.loss_mode == "all_steps":
+            return tuple(range(self.bptt_steps))
+        return tuple(
+            self.truth_prefix_steps + horizon - 2
+            for horizon in self.supervised_horizons
+        )
+
+    @property
+    def normalized_supervised_weights(self) -> tuple[float, ...]:
+        """Loss coefficients in the same order as ``supervised_step_indices``."""
+
+        if self.loss_mode == "last_step":
+            return (1.0,)
+        if self.loss_mode == "all_steps":
+            return (1.0 / self.bptt_steps,) * self.bptt_steps
+        total = math.fsum(float(weight) for weight in self.supervised_weights)
+        return tuple(float(weight) / total for weight in self.supervised_weights)
+
+    @property
+    def supervised_horizon_labels(self) -> tuple[int, ...]:
+        """Forecast-horizon labels corresponding to recorded component losses."""
+
+        if self.loss_mode == "sparse_steps":
+            return tuple(self.supervised_horizons)
+        return tuple(
+            index - self.truth_prefix_steps + 2
+            for index in self.supervised_step_indices
+        )
+
+    def _objective_dict(self) -> dict[str, Any]:
+        objective: dict[str, Any] = {"loss_mode": self.loss_mode}
+        if self.loss_mode == "sparse_steps":
+            objective.update(
+                supervised_horizons=list(self.supervised_horizons),
+                supervised_weights=list(self.supervised_weights),
+            )
+        return objective
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -217,9 +304,7 @@ class V23IlyaTrainConfig:
                 "feedback_mode": self.feedback_mode,
                 "temporal_state_policy": self.temporal_state_policy,
             },
-            "objective": {
-                "loss_mode": self.loss_mode,
-            },
+            "objective": self._objective_dict(),
             "memory": {
                 "weather_tape_precision": self.weather_tape_precision,
                 "bptt_backend": BPTT_BACKEND,
@@ -330,7 +415,11 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
         "optimizer",
         {"max_steps", "checkpoint_every", "learning_rate", "weight_decay", "warmup_steps", "grad_clip", "seed", "precision"},
     )
-    objective = _section(payload, "objective", {"loss_mode"})
+    objective = _section(
+        payload,
+        "objective",
+        {"loss_mode", "supervised_horizons", "supervised_weights"},
+    )
     memory = _section(
         payload,
         "memory",
@@ -382,6 +471,12 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
         if name in data:
             data[name] = Path(data[name])
     output["output_root"] = Path(output["output_root"])
+    for name in ("supervised_horizons", "supervised_weights"):
+        if name in objective:
+            value = objective[name]
+            if not isinstance(value, list):
+                raise ValueError(f"objective.{name} must be a JSON array")
+            objective[name] = tuple(value)
     return V23IlyaTrainConfig(
         **data,
         architecture=V23IlyaArchitectureConfig(**architecture_values),

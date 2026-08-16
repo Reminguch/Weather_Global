@@ -97,7 +97,9 @@ def _config() -> V23IlyaTrainConfig:
         bptt_steps=4,
         ar_tail_k=2,
         feedback_mode="closed_loop_sg",
-        loss_mode="last_step",
+        loss_mode="sparse_steps",
+        supervised_horizons=(1, 3),
+        supervised_weights=(1, 3),
         weather_tape_precision="fp32",
         distributed=V23IlyaDistributedConfig(
             mode="data_parallel",
@@ -129,7 +131,10 @@ def _lane_arguments(lane: int):
     return (
         (_input_frame(scale), _input_frame(2.0 * scale), _input_frame(3.0 * scale)),
         xr.Dataset(),
-        (_dataset(3.0 + 2.0 * scale, hour=6),),
+        (
+            _dataset(2.0 + scale, hour=6),
+            _dataset(3.0 + 2.0 * scale, hour=6),
+        ),
         tuple(_dataset(0.0, "forcing", 6) for _ in range(4)),
     )
 
@@ -178,6 +183,9 @@ def test_replica_group_cursor_advances_chronologically_and_drops_tail() -> None:
             "segment_steps": 120,
             "bptt_steps": 24,
             "ar_tail_k": 20,
+            "loss_mode": "last_step",
+            "supervised_horizons": (),
+            "supervised_weights": (),
         }
     )
     data = V23IlyaTrainingData(
@@ -270,7 +278,7 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
     serial_losses = []
     for lane in range(4):
         frames, static, truths, forcings = _lane_arguments(lane)
-        next_params, next_state, _, loss, _ = serial_step(
+        next_params, next_state, _, loss, _, loss_components = serial_step(
             params,
             initial_states[lane],
             optax.sgd(1.0).init(params),
@@ -285,6 +293,11 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
         )
         serial_states.append(next_state)
         serial_losses.append(float(loss))
+        np.testing.assert_allclose(
+            loss,
+            np.sum(np.asarray(loss_components) * np.asarray([0.25, 0.75])),
+            rtol=1e-6,
+        )
 
     clip_norm = 0.05
     optimizer = optax.chain(optax.clip_by_global_norm(clip_norm), optax.sgd(0.1))
@@ -312,6 +325,7 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
         mean_loss,
         gradient_norm,
         lane_losses,
+        lane_loss_components,
     ) = parallel_step(
         replicated_params,
         replica_states,
@@ -337,6 +351,7 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
     )
     _tree_allclose(actual_params, expected_params)
     np.testing.assert_allclose(lane_losses, serial_losses, rtol=1e-6, atol=1e-6)
+    assert np.asarray(lane_loss_components).shape == (2, 4)
     np.testing.assert_allclose(mean_loss, np.mean(serial_losses), rtol=1e-6)
     np.testing.assert_allclose(gradient_norm, optax.global_norm(mean_gradient), rtol=1e-6)
 

@@ -706,6 +706,7 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 mean_loss,
                 averaged_gradient_norm,
                 lane_losses,
+                lane_loss_components,
             ) = train_step(
                 replicated_params,
                 replica_states,
@@ -723,6 +724,9 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             has_consumed_update = True
 
             lane_losses = np.asarray(lane_losses, dtype=np.float64)
+            lane_loss_components = np.asarray(
+                lane_loss_components, dtype=np.float64
+            )
             loss_value = float(jax.device_get(mean_loss))
             gradient_norm_value = float(jax.device_get(averaged_gradient_norm))
             parameter_divergence = replica_max_abs_difference(replicated_params)
@@ -756,6 +760,19 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 "max_parameter_replica_divergence": parameter_divergence,
                 "max_optimizer_replica_divergence": optimizer_divergence,
             }
+            if config.loss_mode == "sparse_steps":
+                record["loss_by_horizon"] = {
+                    str(horizon): float(np.mean(lane_loss_components[position]))
+                    for position, horizon in enumerate(
+                        config.supervised_horizon_labels
+                    )
+                }
+                record["lane_loss_by_horizon"] = {
+                    str(horizon): lane_loss_components[position].tolist()
+                    for position, horizon in enumerate(
+                        config.supervised_horizon_labels
+                    )
+                }
             if device_memory is not None:
                 record["device_memory"] = device_memory
                 if memory_profile_pending:
@@ -765,6 +782,15 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                     atomic_json_dump(run_metadata, run_config_path)
                     memory_profile_pending = False
             _append_jsonl(metrics_path, record)
+            horizon_text = (
+                " loss_by_horizon="
+                + ",".join(
+                    f"{horizon}:{value:.5f}"
+                    for horizon, value in record["loss_by_horizon"].items()
+                )
+                if config.loss_mode == "sparse_steps"
+                else ""
+            )
             print(
                 f"step {step}/{config.max_steps} mean_loss {loss_value:.5f} "
                 f"lane_loss_min/max/std {np.min(lane_losses):.5f}/"
@@ -773,7 +799,7 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 f"segments={list(chunk.segment_ids)} offset={consumed_cursor.segment_offset} "
                 f"anchors_seen={step * anchors_per_update} "
                 f"replica_divergence={parameter_divergence:.3e} "
-                f"step_time={step_seconds:.2f}s",
+                f"step_time={step_seconds:.2f}s{horizon_text}",
                 flush=True,
             )
             should_validate = config.validation.enabled and (
@@ -853,6 +879,7 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             optimizer_state,
             loss,
             gradient_norm,
+            loss_components,
         ) = train_step(
             residual_params,
             residual_state,
@@ -870,6 +897,7 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
         has_consumed_update = True
         loss_value = float(jax.device_get(loss))
         gradient_norm_value = float(jax.device_get(gradient_norm))
+        loss_components = np.asarray(loss_components, dtype=np.float64)
         device_memory = _device_memory_snapshot()
         record = {
             "step": step,
@@ -881,6 +909,11 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             "segment_index": consumed_cursor.segment_index,
             "segment_offset": consumed_cursor.segment_offset,
         }
+        if config.loss_mode == "sparse_steps":
+            record["loss_by_horizon"] = {
+                str(horizon): float(loss_components[position])
+                for position, horizon in enumerate(config.supervised_horizon_labels)
+            }
         if device_memory is not None:
             record["device_memory"] = device_memory
             if memory_profile_pending:
@@ -891,9 +924,19 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 memory_profile_pending = False
         _append_jsonl(metrics_path, record)
         if step <= 5 or step % 10 == 0:
+            horizon_text = (
+                " loss_by_horizon="
+                + ",".join(
+                    f"{horizon}:{value:.5f}"
+                    for horizon, value in record["loss_by_horizon"].items()
+                )
+                if config.loss_mode == "sparse_steps"
+                else ""
+            )
             print(
                 f"step {step}/{config.max_steps} loss {loss_value:.5f} "
-                f"grad_norm {gradient_norm_value:.4f} step_time {step_seconds:.2f}s",
+                f"grad_norm {gradient_norm_value:.4f} "
+                f"step_time {step_seconds:.2f}s{horizon_text}",
                 flush=True,
             )
         should_validate = config.validation.enabled and (

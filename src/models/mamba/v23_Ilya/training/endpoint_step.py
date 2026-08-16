@@ -274,6 +274,12 @@ def make_bptt_objective(
         else jnp.float32
     )
     final_index = config.bptt_steps - 1
+    supervised_indices = config.supervised_step_indices
+    supervised_positions = {
+        index: position for position, index in enumerate(supervised_indices)
+    }
+    supervised_weights = config.normalized_supervised_weights
+    expected_truths = len(supervised_indices)
 
     def baseline_step(key, inputs, template, forcing):
         prediction, _ = transforms.baseline_predict.apply(
@@ -331,7 +337,6 @@ def make_bptt_objective(
         *,
         save_tape: bool,
     ):
-        expected_truths = 1 if config.loss_mode == "last_step" else config.bptt_steps
         if len(input_frames) != config.truth_prefix_steps + 1:
             raise ValueError(
                 f"Expected {config.truth_prefix_steps + 1} unique teacher frames, "
@@ -374,7 +379,8 @@ def make_bptt_objective(
             )
             key = keys[index]
             forcing = forcings[index]
-            supervised = config.loss_mode == "all_steps" or index == final_index
+            supervised_position = supervised_positions.get(index)
+            supervised = supervised_position is not None
             needs_feedback = (
                 index >= config.truth_prefix_steps - 1 and index < final_index
             )
@@ -384,7 +390,7 @@ def make_bptt_objective(
             )
 
             if supervised:
-                truth = truths[index] if config.loss_mode == "all_steps" else truths[0]
+                truth = truths[supervised_position]
                 baseline_prediction = baseline_step(
                     key,
                     current_inputs,
@@ -440,7 +446,11 @@ def make_bptt_objective(
                     _tree_stop(_cast_floating(frame, tape_dtype))
                 )
 
-        loss = losses[-1] if config.loss_mode == "last_step" else jnp.stack(losses).mean()
+        loss_components = jnp.stack(losses)
+        loss = jnp.sum(
+            loss_components
+            * jnp.asarray(supervised_weights, dtype=loss_components.dtype)
+        )
         final_state = zero_state if reset_state else state
         tape = (
             residual_params,
@@ -606,11 +616,11 @@ def make_bptt_objective(
                 key = tape_keys[index]
                 forcing = forcing_values[index]
                 state_in = state_tape[index]
-                supervised = config.loss_mode == "all_steps" or index == final_index
+                supervised_position = supervised_positions.get(index)
+                supervised = supervised_position is not None
 
                 if supervised:
-                    target_index = index if config.loss_mode == "all_steps" else 0
-                    target = residual_targets[target_index]
+                    target = residual_targets[supervised_position]
 
                     def supervised_step(params, state):
                         loss, _prediction, next_state = residual_supervised_step(
@@ -628,13 +638,9 @@ def make_bptt_objective(
                         tape_params,
                         state_in,
                     )
-                    weight = (
-                        jnp.asarray(
-                            1.0 / config.bptt_steps,
-                            dtype=loss_cotangent.dtype,
-                        )
-                        if config.loss_mode == "all_steps"
-                        else jnp.asarray(1.0, dtype=loss_cotangent.dtype)
+                    weight = jnp.asarray(
+                        supervised_weights[supervised_position],
+                        dtype=loss_cotangent.dtype,
                     )
                     step_param_cotangent, step_state_cotangent = pullback(
                         (loss_cotangent * weight, state_cotangent)
@@ -782,7 +788,7 @@ def make_train_step(
     config: V23IlyaTrainConfig,
     time_step,
     input_steps: int,
-) -> Callable[..., tuple[Any, Any, Any, Any, Any]]:
+) -> Callable[..., tuple[Any, Any, Any, Any, Any, Any]]:
     """Build host-orchestrated BPTT with device-resident one-step kernels."""
 
     if input_steps != 2:
@@ -797,6 +803,14 @@ def make_train_step(
     )
     final_index = config.bptt_steps - 1
     reset_state = config.temporal_state_policy == "reset_every_anchor"
+    supervised_indices = config.supervised_step_indices
+    supervised_positions = {
+        index: position for position, index in enumerate(supervised_indices)
+    }
+    supervised_weights = np.asarray(
+        config.normalized_supervised_weights, dtype=np.float32
+    )
+    expected_truths = len(supervised_indices)
 
     def to_host(tree):
         return jax.device_get(_tree_stop(tree))
@@ -924,7 +938,6 @@ def make_train_step(
         truths,
         forcings,
     ):
-        expected_truths = 1 if config.loss_mode == "last_step" else config.bptt_steps
         if len(input_frames) != config.truth_prefix_steps + 1:
             raise ValueError(
                 f"Expected {config.truth_prefix_steps + 1} teacher frames, "
@@ -971,7 +984,8 @@ def make_train_step(
             )
             key = host_keys[index]
             forcing = host_forcings[index]
-            supervised = config.loss_mode == "all_steps" or index == final_index
+            supervised_position = supervised_positions.get(index)
+            supervised = supervised_position is not None
             needs_feedback = (
                 index >= config.truth_prefix_steps - 1 and index < final_index
             )
@@ -981,11 +995,7 @@ def make_train_step(
             )
 
             if supervised:
-                truth = (
-                    host_truths[index]
-                    if config.loss_mode == "all_steps"
-                    else host_truths[0]
-                )
+                truth = host_truths[supervised_position]
                 baseline_prediction = baseline_forward(
                     key,
                     current_inputs,
@@ -1053,12 +1063,6 @@ def make_train_step(
 
         parameter_cotangent = _tree_zeros_like(residual_params)
         state_cotangent = _tree_zeros_like(residual_state)
-        loss_weight = (
-            1.0 / config.bptt_steps
-            if config.loss_mode == "all_steps"
-            else 1.0
-        )
-
         for index in range(final_index, -1, -1):
             current_inputs = input_window_from_frames(
                 weather_frames[index],
@@ -1071,18 +1075,20 @@ def make_train_step(
             key = host_keys[index]
             forcing = host_forcings[index]
             state_in_host = state_tape[index]
-            supervised = config.loss_mode == "all_steps" or index == final_index
+            supervised_position = supervised_positions.get(index)
+            supervised = supervised_position is not None
 
             if supervised:
-                target_index = index if config.loss_mode == "all_steps" else 0
                 step_parameter_cotangent, step_state_cotangent = supervised_pullback(
                     residual_params,
                     state_in_host,
                     key,
                     current_inputs,
-                    residual_targets[target_index],
+                    residual_targets[supervised_position],
                     forcing,
-                    jnp.asarray(loss_weight, dtype=jnp.float32),
+                    jnp.asarray(
+                        supervised_weights[supervised_position], dtype=jnp.float32
+                    ),
                     state_cotangent,
                 )
             else:
@@ -1115,17 +1121,15 @@ def make_train_step(
             parameter_cotangent,
         )
         jax.block_until_ready(next_params)
-        loss_value = (
-            host_losses[-1]
-            if config.loss_mode == "last_step"
-            else np.asarray(host_losses, dtype=np.float32).mean()
-        )
+        loss_components = np.asarray(host_losses, dtype=np.float32)
+        loss_value = np.sum(loss_components * supervised_weights)
         return (
             next_params,
             jax.tree_util.tree_map(jnp.asarray, state_host),
             next_optimizer_state,
             jnp.asarray(loss_value, dtype=jnp.float32),
             gradient_norm,
+            loss_components,
         )
 
     return train_step
@@ -1141,7 +1145,7 @@ def make_data_parallel_train_step(
     time_step,
     input_steps: int,
     devices,
-) -> Callable[..., tuple[Any, Any, Any, Any, Any, Any]]:
+) -> Callable[..., tuple[Any, Any, Any, Any, Any, Any, Any]]:
     """Build replicated host-tape BPTT with pmap one-step kernels."""
 
     if input_steps != 2:
@@ -1162,6 +1166,14 @@ def make_data_parallel_train_step(
     )
     final_index = config.bptt_steps - 1
     reset_state = config.temporal_state_policy == "reset_every_anchor"
+    supervised_indices = config.supervised_step_indices
+    supervised_positions = {
+        index: position for position, index in enumerate(supervised_indices)
+    }
+    supervised_weights = np.asarray(
+        config.normalized_supervised_weights, dtype=np.float32
+    )
+    expected_truths = len(supervised_indices)
     replicated_baseline_params = replicate_tree(baseline_params, devices)
     kernel_caches = {}
 
@@ -1394,7 +1406,6 @@ def make_data_parallel_train_step(
             raise ValueError(
                 f"Expected {num_replicas} input-frame lanes, got {len(input_frames)}"
             )
-        expected_truths = 1 if config.loss_mode == "last_step" else config.bptt_steps
         for replica in range(num_replicas):
             if len(input_frames[replica]) != config.truth_prefix_steps + 1:
                 raise ValueError("Replica teacher-frame count is incorrect")
@@ -1443,7 +1454,8 @@ def make_data_parallel_train_step(
             forcing = tuple(
                 host_forcings[replica][index] for replica in range(num_replicas)
             )
-            supervised = config.loss_mode == "all_steps" or index == final_index
+            supervised_position = supervised_positions.get(index)
+            supervised = supervised_position is not None
             needs_feedback = (
                 index >= config.truth_prefix_steps - 1 and index < final_index
             )
@@ -1473,9 +1485,7 @@ def make_data_parallel_train_step(
             baseline_prediction = None
             if supervised:
                 truth = tuple(
-                    host_truths[replica][index]
-                    if config.loss_mode == "all_steps"
-                    else host_truths[replica][0]
+                    host_truths[replica][supervised_position]
                     for replica in range(num_replicas)
                 )
                 truth_leaves = pack_expected(truth, kernels["target_treedef"])
@@ -1555,12 +1565,6 @@ def make_data_parallel_train_step(
 
         parameter_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_params)
         state_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_state)
-        loss_weight = (
-            1.0 / config.bptt_steps
-            if config.loss_mode == "all_steps"
-            else 1.0
-        )
-
         for index in range(final_index, -1, -1):
             current_inputs = tuple(
                 input_window_from_frames(
@@ -1584,12 +1588,12 @@ def make_data_parallel_train_step(
             input_leaves = pack_expected(current_inputs, kernels["input_treedef"])
             forcing_leaves = pack_expected(forcing, kernels["forcing_treedef"])
             key = host_keys[:, index]
-            supervised = config.loss_mode == "all_steps" or index == final_index
+            supervised_position = supervised_positions.get(index)
+            supervised = supervised_position is not None
 
             if supervised:
-                target_index = index if config.loss_mode == "all_steps" else 0
                 target_leaves = pack_expected(
-                    residual_targets[target_index],
+                    residual_targets[supervised_position],
                     kernels["target_treedef"],
                 )
                 step_parameter_cotangent, step_state_cotangent = (
@@ -1600,7 +1604,11 @@ def make_data_parallel_train_step(
                         input_leaves,
                         target_leaves,
                         forcing_leaves,
-                        np.full((num_replicas,), loss_weight, dtype=np.float32),
+                        np.full(
+                            (num_replicas,),
+                            supervised_weights[supervised_position],
+                            dtype=np.float32,
+                        ),
                         state_cotangent,
                     )
                 )
@@ -1636,10 +1644,9 @@ def make_data_parallel_train_step(
             )
             jax.block_until_ready(parameter_cotangent)
 
-        lane_losses = (
-            host_losses[-1]
-            if config.loss_mode == "last_step"
-            else np.asarray(host_losses, dtype=np.float32).mean(axis=0)
+        lane_loss_components = np.asarray(host_losses, dtype=np.float32)
+        lane_losses = np.sum(
+            lane_loss_components * supervised_weights[:, None], axis=0
         )
         (
             next_params,
@@ -1660,6 +1667,7 @@ def make_data_parallel_train_step(
             mean_loss[0],
             gradient_norm[0],
             np.asarray(lane_losses, dtype=np.float32),
+            lane_loss_components,
         )
 
     return train_step

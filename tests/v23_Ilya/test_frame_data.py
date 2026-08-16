@@ -81,3 +81,25 @@ def test_all_steps_materializes_every_truth() -> None:
         6.0,
     ]
 
+
+def test_sparse_steps_materializes_only_exact_horizon_targets() -> None:
+    batch = load_endpoint_frame_batch(
+        store=FakeStore(),
+        raw_anchor_indices=np.arange(2, 26),
+        input_steps=2,
+        truth_prefix_steps=5,
+        loss_mode="sparse_steps",
+        supervised_step_indices=(4, 7, 11, 15, 19, 23),
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+    )
+    assert len(batch.input_frames) == 6
+    assert batch.report.truth_target_steps == 6
+    assert [float(value["x"].values[0, 0, 0]) for value in batch.truths] == [
+        7.0,
+        10.0,
+        14.0,
+        18.0,
+        22.0,
+        26.0,
+    ]
