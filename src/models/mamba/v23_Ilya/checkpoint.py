@@ -20,6 +20,7 @@ from .config import ARCHITECTURE_ID, SCHEMA_VERSION
 
 CHECKPOINT_FORMAT = "legacy_v22_pickle"
 TRAINING_CHECKPOINT_FORMAT = "v23_Ilya_training_pickle"
+DATA_PARALLEL_TRAINING_CHECKPOINT_FORMAT = "v23_Ilya_data_parallel_training_pickle"
 SWA_CHECKPOINT_FORMAT = "v23_Ilya_swa_pickle"
 LEGACY_ARCHITECTURE_IDS = {None, "v22_final", ARCHITECTURE_ID}
 WARM_START_FORMATS = {
@@ -27,9 +28,105 @@ WARM_START_FORMATS = {
     "v22_final_training_pickle",
     "v22_final_swa_pickle",
     TRAINING_CHECKPOINT_FORMAT,
+    DATA_PARALLEL_TRAINING_CHECKPOINT_FORMAT,
     SWA_CHECKPOINT_FORMAT,
 }
 
+
+
+@dataclass(frozen=True)
+class FrozenBaselineOverlayStats:
+    """Audit information for loading a frozen baseline checkpoint."""
+
+    copied: int
+    ignored_source: tuple[str, ...]
+
+
+def overlay_frozen_baseline_params(
+    initialized: Mapping[str, Mapping[str, Any]],
+    source: Mapping[str, Mapping[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], FrozenBaselineOverlayStats]:
+    """Load every locally required baseline parameter and ignore source-only leaves.
+
+    GraphCast checkpoints can contain auxiliary output heads that are not created by
+    the local forward graph. Those source-only leaves are safe to ignore, but every
+    parameter created by the local graph must be present with the exact same shape.
+    """
+
+    if not isinstance(initialized, Mapping) or not isinstance(source, Mapping):
+        raise ValueError("Frozen GraphCast parameter trees must be mappings")
+
+    loaded: dict[str, dict[str, Any]] = {}
+    missing_modules: list[str] = []
+    missing_params: list[str] = []
+    mismatched_shapes: list[str] = []
+
+    for module_name, initialized_module in initialized.items():
+        if not isinstance(initialized_module, Mapping):
+            raise ValueError(
+                f"Invalid initialized GraphCast module {module_name!r}: expected a mapping"
+            )
+        source_module = source.get(module_name)
+        if source_module is None:
+            missing_modules.append(str(module_name))
+            continue
+        if not isinstance(source_module, Mapping):
+            raise ValueError(
+                f"Invalid checkpoint GraphCast module {module_name!r}: expected a mapping"
+            )
+        loaded_module: dict[str, Any] = {}
+        for parameter_name, initialized_leaf in initialized_module.items():
+            path = f"{module_name}/{parameter_name}"
+            if parameter_name not in source_module:
+                missing_params.append(path)
+                continue
+            source_leaf = source_module[parameter_name]
+            initialized_shape = getattr(initialized_leaf, "shape", None)
+            source_shape = getattr(source_leaf, "shape", None)
+            if initialized_shape != source_shape:
+                mismatched_shapes.append(
+                    f"{path}: expected={initialized_shape}, loaded={source_shape}"
+                )
+                continue
+            loaded_module[parameter_name] = source_leaf
+        loaded[str(module_name)] = loaded_module
+
+    if missing_modules or missing_params or mismatched_shapes:
+        details = []
+        if missing_modules:
+            details.append(f"missing_modules={sorted(missing_modules)[:8]}")
+        if missing_params:
+            details.append(f"missing_params={sorted(missing_params)[:8]}")
+        if mismatched_shapes:
+            details.append(f"mismatched_shapes={sorted(mismatched_shapes)[:8]}")
+        raise ValueError(
+            "Frozen GraphCast checkpoint does not cover the initialized baseline: "
+            + "; ".join(details)
+        )
+
+    ignored_source: list[str] = []
+    for module_name, source_module in source.items():
+        if not isinstance(source_module, Mapping):
+            raise ValueError(
+                f"Invalid checkpoint GraphCast module {module_name!r}: expected a mapping"
+            )
+        initialized_module = initialized.get(module_name)
+        if initialized_module is None:
+            ignored_source.extend(
+                f"{module_name}/{parameter_name}" for parameter_name in source_module
+            )
+            continue
+        ignored_source.extend(
+            f"{module_name}/{parameter_name}"
+            for parameter_name in source_module
+            if parameter_name not in initialized_module
+        )
+
+    copied = sum(len(module) for module in loaded.values())
+    return loaded, FrozenBaselineOverlayStats(
+        copied=copied,
+        ignored_source=tuple(sorted(ignored_source)),
+    )
 
 
 @dataclass(frozen=True)
@@ -182,6 +279,110 @@ def load_v23_Ilya_training_checkpoint(path: Path) -> V23IlyaTrainingCheckpoint:
     )
 
 
+@dataclass(frozen=True)
+class V23IlyaDataParallelTrainingCheckpoint:
+    completed_step: int
+    residual_params: Mapping[str, Mapping[str, Any]]
+    replica_states: Mapping[str, Mapping[str, Any]]
+    optimizer_state: Any
+    rng_key: Any
+    replica_group_cursor: Mapping[str, int]
+    active_segment_ids: tuple[int, ...]
+    num_devices: int
+    resolved_training_config: Mapping[str, Any]
+    baseline_checkpoint_path: str
+    baseline_checkpoint_fingerprint: str
+    anchor_manifest_fingerprint: str
+    parameter_overlay_metadata: Mapping[str, Any]
+
+
+def load_v23_Ilya_data_parallel_training_checkpoint(
+    path: Path,
+) -> V23IlyaDataParallelTrainingCheckpoint:
+    if not path.is_file():
+        raise FileNotFoundError(f"v23_Ilya training checkpoint not found: {path}")
+    try:
+        with path.open("rb") as handle:
+            payload = pickle.load(handle)
+    except Exception as exc:
+        raise ValueError(
+            f"Could not read v23_Ilya data-parallel checkpoint {path}: {exc}"
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"Malformed data-parallel checkpoint {path}: expected mapping")
+    if payload.get("architecture_id") != ARCHITECTURE_ID:
+        raise ValueError(f"{path} is not a {ARCHITECTURE_ID} checkpoint")
+    if payload.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported v23_Ilya checkpoint schema "
+            f"{payload.get('schema_version')!r} in {path}"
+        )
+    if payload.get("checkpoint_format") != DATA_PARALLEL_TRAINING_CHECKPOINT_FORMAT:
+        raise ValueError(f"{path} is not a data-parallel exact-resume checkpoint")
+    if payload.get("checkpoint_kind") != "training":
+        raise ValueError(f"Cannot resume from checkpoint_kind={payload.get('checkpoint_kind')!r}")
+    required = (
+        "completed_step",
+        "residual_params",
+        "replica_states",
+        "optimizer_state",
+        "rng_key",
+        "replica_group_cursor",
+        "active_segment_ids",
+        "num_devices",
+        "resolved_training_config",
+        "baseline_checkpoint_path",
+        "baseline_checkpoint_fingerprint",
+        "anchor_manifest_fingerprint",
+        "parameter_overlay_metadata",
+    )
+    missing = [name for name in required if name not in payload]
+    if missing:
+        raise ValueError(f"Malformed data-parallel checkpoint {path}: missing {missing}")
+    completed_step = int(payload["completed_step"])
+    num_devices = int(payload["num_devices"])
+    active_segment_ids = tuple(int(value) for value in payload["active_segment_ids"])
+    if completed_step < 0:
+        raise ValueError(f"Malformed completed_step={completed_step} in {path}")
+    if num_devices < 2:
+        raise ValueError(f"Malformed num_devices={num_devices} in {path}")
+    if len(active_segment_ids) != num_devices:
+        raise ValueError(
+            f"Expected {num_devices} active_segment_ids, got {len(active_segment_ids)}"
+        )
+    for name in (
+        "residual_params",
+        "replica_states",
+        "replica_group_cursor",
+        "resolved_training_config",
+        "parameter_overlay_metadata",
+    ):
+        if not isinstance(payload[name], Mapping):
+            raise ValueError(f"Malformed {name} in {path}")
+    if not payload["residual_params"]:
+        raise ValueError(f"Malformed residual_params in {path}")
+    if payload["optimizer_state"] is None or payload["rng_key"] is None:
+        raise ValueError(f"Malformed optimizer_state or rng_key in {path}")
+    for name in ("baseline_checkpoint_fingerprint", "anchor_manifest_fingerprint"):
+        if not isinstance(payload[name], str) or not payload[name]:
+            raise ValueError(f"Malformed {name} in {path}")
+    return V23IlyaDataParallelTrainingCheckpoint(
+        completed_step=completed_step,
+        residual_params=payload["residual_params"],
+        replica_states=payload["replica_states"],
+        optimizer_state=payload["optimizer_state"],
+        rng_key=payload["rng_key"],
+        replica_group_cursor=payload["replica_group_cursor"],
+        active_segment_ids=active_segment_ids,
+        num_devices=num_devices,
+        resolved_training_config=payload["resolved_training_config"],
+        baseline_checkpoint_path=str(payload["baseline_checkpoint_path"]),
+        baseline_checkpoint_fingerprint=str(payload["baseline_checkpoint_fingerprint"]),
+        anchor_manifest_fingerprint=str(payload["anchor_manifest_fingerprint"]),
+        parameter_overlay_metadata=payload["parameter_overlay_metadata"],
+    )
+
+
 def atomic_pickle_dump(payload: Mapping[str, Any], path: Path) -> None:
     """Write a host-backed pickle and publish it with an atomic rename."""
 
@@ -264,6 +465,45 @@ def training_checkpoint_payload(
         "optimizer_state": optimizer_state,
         "rng_key": rng_key,
         "training_cursor": dict(training_cursor),
+        "resolved_training_config": dict(resolved_training_config),
+        "baseline_checkpoint_path": baseline_checkpoint_path,
+        "baseline_checkpoint_fingerprint": baseline_checkpoint_fingerprint,
+        "anchor_manifest_fingerprint": anchor_manifest_fingerprint,
+        "parameter_overlay_metadata": dict(parameter_overlay_metadata),
+    }
+
+
+def data_parallel_training_checkpoint_payload(
+    *,
+    completed_step: int,
+    residual_params,
+    replica_states,
+    optimizer_state,
+    rng_key,
+    replica_group_cursor: Mapping[str, int],
+    active_segment_ids: tuple[int, ...],
+    num_devices: int,
+    resolved_training_config: Mapping[str, Any],
+    baseline_checkpoint_path: str,
+    baseline_checkpoint_fingerprint: str,
+    anchor_manifest_fingerprint: str,
+    parameter_overlay_metadata: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "architecture_id": ARCHITECTURE_ID,
+        "schema_version": SCHEMA_VERSION,
+        "checkpoint_format": DATA_PARALLEL_TRAINING_CHECKPOINT_FORMAT,
+        "checkpoint_kind": "training",
+        "completed_step": int(completed_step),
+        "residual_params": residual_params,
+        # No single lane state is canonical for generic evaluation/warm start.
+        "residual_state": None,
+        "replica_states": replica_states,
+        "optimizer_state": optimizer_state,
+        "rng_key": rng_key,
+        "replica_group_cursor": dict(replica_group_cursor),
+        "active_segment_ids": [int(value) for value in active_segment_ids],
+        "num_devices": int(num_devices),
         "resolved_training_config": dict(resolved_training_config),
         "baseline_checkpoint_path": baseline_checkpoint_path,
         "baseline_checkpoint_fingerprint": baseline_checkpoint_fingerprint,

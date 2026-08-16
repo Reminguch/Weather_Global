@@ -22,6 +22,10 @@ def build_anchor_manifest(
     output_root: Path,
     train_end_year: int = 2021,
     validation_year: int = 2022,
+    time_start: str | None = None,
+    time_end: str | None = None,
+    allow_incomplete_prepared_store: bool = False,
+    allow_empty_validation: bool = False,
 ) -> dict:
     """Create deterministic contiguous anchors without residual-array placeholders."""
 
@@ -30,7 +34,13 @@ def build_anchor_manifest(
     checkpoint = load_graphcast_checkpoint(baseline_checkpoint)
     task_config = checkpoint.task_config
     model_config = checkpoint.model_config
-    store = PreparedArrayStore(prepared_root, label="v23-Ilya-anchor-builder")
+    store = PreparedArrayStore(
+        prepared_root,
+        time_start=time_start,
+        time_end=time_end,
+        allow_incomplete=allow_incomplete_prepared_store,
+        label="v23-Ilya-anchor-builder",
+    )
     store.validate(resolution=model_config.resolution, task_cfg=task_config)
     time_values = np.asarray(store.time.values).astype("datetime64[ns]")
     time_step = pd.Timedelta(time_values[1] - time_values[0])
@@ -47,11 +57,13 @@ def build_anchor_manifest(
     years = pd.DatetimeIndex(anchor_times).year.to_numpy()
     train_split = np.flatnonzero(years <= train_end_year).astype(np.int64)
     val_split = np.flatnonzero(years == validation_year).astype(np.int64)
-    if train_split.size == 0 or val_split.size == 0:
+    if train_split.size == 0:
         raise ValueError(
-            f"Empty train/validation split: train={train_split.size}, val={val_split.size}"
+            f"Empty training split: train={train_split.size}, val={val_split.size}"
         )
-    if train_split[-1] + 1 != val_split[0]:
+    if val_split.size == 0 and not allow_empty_validation:
+        raise ValueError("Empty validation split requires allow_empty_validation=True")
+    if val_split.size and train_split[-1] + 1 != val_split[0]:
         raise ValueError("Train and validation anchors must form adjacent chronological splits")
 
     output_root.mkdir(parents=True)
@@ -80,6 +92,11 @@ def build_anchor_manifest(
         "n_anchors_val": int(val_split.size),
         "train_end_year": int(train_end_year),
         "validation_year": int(validation_year),
+        "allow_empty_validation": bool(allow_empty_validation),
+        "source_time_start": store.selection_metadata["time_start"],
+        "source_time_end": store.selection_metadata["time_end"],
+        "source_prepared_store_selection": store.selection_metadata,
+        "allow_incomplete_prepared_store": bool(allow_incomplete_prepared_store),
         "pressure_levels": [int(value) for value in task_config.pressure_levels],
         "target_variables": list(task_config.target_variables),
         "anchor_indices_file": "anchors/anchor_indices.npy",

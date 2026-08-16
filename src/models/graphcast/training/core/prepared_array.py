@@ -31,14 +31,21 @@ class _PreparedArrayShard:
 class PreparedShardedArray:
     """A time-axis array assembled lazily from consecutive memmap shards."""
 
-    def __init__(self, shards: list[_PreparedArrayShard], shape: tuple[int, ...], dtype: np.dtype) -> None:
+    def __init__(
+        self,
+        shards: list[_PreparedArrayShard],
+        shape: tuple[int, ...],
+        dtype: np.dtype,
+        *,
+        require_full_coverage: bool = True,
+    ) -> None:
         if not shards:
             raise ValueError("Prepared sharded array requires at least one shard.")
         self.shards = tuple(shards)
         self.shape = tuple(int(value) for value in shape)
         self.dtype = np.dtype(dtype)
         self.nbytes = int(np.prod(self.shape, dtype=np.int64)) * int(self.dtype.itemsize)
-        expected_start = 0
+        expected_start = 0 if require_full_coverage else shards[0].start
         for shard in self.shards:
             if shard.start != expected_start:
                 raise ValueError(
@@ -58,7 +65,7 @@ class PreparedShardedArray:
                     f"Prepared array shard dtype mismatch: expected {self.dtype}, found {shard.data.dtype}."
                 )
             expected_start = shard.stop
-        if expected_start != self.shape[0]:
+        if require_full_coverage and expected_start != self.shape[0]:
             raise ValueError(
                 f"Prepared array shards cover {expected_start} time steps, expected {self.shape[0]}."
             )
@@ -122,6 +129,9 @@ class PreparedArrayStore:
         root: str | Path,
         *,
         time_indices: np.ndarray | None = None,
+        time_start: str | np.datetime64 | pd.Timestamp | None = None,
+        time_end: str | np.datetime64 | pd.Timestamp | None = None,
+        allow_incomplete: bool = False,
         label: str = "prepared-array",
     ) -> None:
         self.root = Path(root)
@@ -129,8 +139,15 @@ class PreparedArrayStore:
         metadata_path = self.root / "metadata.json"
         if not metadata_path.exists():
             raise FileNotFoundError(f"Prepared array metadata not found: {metadata_path}")
-        if (self.root / ".incomplete").exists():
+        source_incomplete = (self.root / ".incomplete").exists()
+        if source_incomplete and not allow_incomplete:
             raise RuntimeError(f"Prepared array store is incomplete: {self.root}")
+        if (time_start is None) != (time_end is None):
+            raise ValueError("Provide both time_start and time_end, or neither.")
+        if allow_incomplete and time_start is None:
+            raise ValueError(
+                "allow_incomplete=True requires explicit time_start and time_end bounds."
+            )
         self.metadata = json.loads(metadata_path.read_text())
         version = int(self.metadata.get("prepared_array_format_version", -1))
         if version not in SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS:
@@ -141,6 +158,98 @@ class PreparedArrayStore:
         self.coords = {
             path.stem: np.load(path, mmap_mode="r")
             for path in sorted((self.root / "coords").glob("*.npy"))
+        }
+        if "time" not in self.coords:
+            raise ValueError(f"Prepared array store has no time coordinate: {self.root}")
+        full_time_values = np.asarray(self.coords["time"]).astype("datetime64[ns]")
+        full_time_size = int(full_time_values.shape[0])
+        selected_by_range = np.arange(full_time_size, dtype=np.int64)
+        normalized_start = None
+        normalized_end = None
+        if time_start is not None:
+            normalized_start = np.datetime64(pd.Timestamp(time_start), "ns")
+            normalized_end = np.datetime64(pd.Timestamp(time_end), "ns")
+            if normalized_end < normalized_start:
+                raise ValueError("time_end must be on or after time_start.")
+            selected_by_range = np.flatnonzero(
+                (full_time_values >= normalized_start)
+                & (full_time_values <= normalized_end)
+            ).astype(np.int64)
+            if selected_by_range.size == 0:
+                raise ValueError(
+                    f"Prepared array time range {normalized_start}..{normalized_end} is empty."
+                )
+            if (
+                full_time_values[selected_by_range[0]] != normalized_start
+                or full_time_values[selected_by_range[-1]] != normalized_end
+            ):
+                raise ValueError(
+                    "time_start and time_end must exactly match prepared time coordinates."
+                )
+
+        if time_indices is None:
+            self._time_indices = selected_by_range
+        else:
+            requested_indices = np.asarray(time_indices, dtype=np.int64)
+            if requested_indices.ndim != 1:
+                raise ValueError("time_indices must be one-dimensional.")
+            if requested_indices.size and (
+                requested_indices.min() < 0 or requested_indices.max() >= full_time_size
+            ):
+                raise IndexError(f"time_indices must lie within 0:{full_time_size}.")
+            if time_start is not None and not np.all(
+                np.isin(requested_indices, selected_by_range)
+            ):
+                raise ValueError("time_indices must lie within time_start..time_end.")
+            self._time_indices = requested_indices
+        if self._time_indices.size == 0:
+            raise ValueError("Prepared array selection contains no time steps.")
+
+        completed_months: dict[str, str] = {}
+        build_manifest_path = self.root / "build_manifest.json"
+        if source_incomplete:
+            if not build_manifest_path.is_file():
+                raise FileNotFoundError(
+                    "Incomplete prepared store is missing build_manifest.json: "
+                    f"{build_manifest_path}"
+                )
+            build_manifest = json.loads(build_manifest_path.read_text(encoding="utf-8"))
+            month_records = build_manifest.get("months")
+            if not isinstance(month_records, dict):
+                raise ValueError(
+                    f"Malformed prepared build manifest months: {build_manifest_path}"
+                )
+            selected_months = sorted(
+                set(
+                    pd.DatetimeIndex(full_time_values[selected_by_range]).strftime("%Y-%m")
+                )
+            )
+            for month in selected_months:
+                record = month_records.get(month)
+                status = record.get("status") if isinstance(record, dict) else None
+                completed_months[month] = str(status)
+                if status != "complete":
+                    raise RuntimeError(
+                        f"Prepared month {month} is not complete in {build_manifest_path}: "
+                        f"status={status!r}"
+                    )
+
+        self._requested_time_start = (
+            str(normalized_start) if normalized_start is not None else None
+        )
+        self._requested_time_end = (
+            str(normalized_end) if normalized_end is not None else None
+        )
+        self._allow_incomplete = bool(allow_incomplete)
+        selected_times = full_time_values[self._time_indices]
+        self.selection_metadata = {
+            "time_start": str(selected_times[0]),
+            "time_end": str(selected_times[-1]),
+            "selected_time_steps": int(selected_times.size),
+            "source_incomplete": bool(source_incomplete),
+            "allow_incomplete": bool(allow_incomplete),
+            "completed_months": completed_months,
+            "build_manifest": str(build_manifest_path) if source_incomplete else None,
         }
         self._vars: dict[str, PreparedArrayVar] = {}
         for name, info in self.metadata["variables"].items():
@@ -154,13 +263,23 @@ class PreparedArrayStore:
                 for shard_info in self.metadata.get("time_shards", []):
                     start = int(shard_info["start"])
                     stop = int(shard_info["stop"])
+                    if not np.any(
+                        (self._time_indices >= start) & (self._time_indices < stop)
+                    ):
+                        continue
                     shard_root = self.root / str(shard_info["path"])
-                    shard_data = np.load(shard_root / "vars" / f"{name}.npy", mmap_mode="r")
+                    shard_path = shard_root / "vars" / f"{name}.npy"
+                    if not shard_path.is_file():
+                        raise FileNotFoundError(
+                            f"Prepared array selection requires missing shard: {shard_path}"
+                        )
+                    shard_data = np.load(shard_path, mmap_mode="r")
                     shards.append(_PreparedArrayShard(start=start, stop=stop, data=shard_data))
                 data = PreparedShardedArray(
                     shards,
                     shape=tuple(int(value) for value in info["shape"]),
                     dtype=np.dtype(info["dtype"]),
+                    require_full_coverage=(time_start is None and time_indices is None),
                 )
             else:
                 data = np.load(self.root / "vars" / f"{name}.npy", mmap_mode="r")
@@ -170,12 +289,6 @@ class PreparedArrayStore:
                 if dim in self.coords
             }
             self._vars[name] = PreparedArrayVar(data=data, dims=dims, coords=coords)
-        full_time_size = int(np.asarray(self.coords["time"]).shape[0])
-        self._time_indices = (
-            np.arange(full_time_size, dtype=np.int64)
-            if time_indices is None
-            else np.asarray(time_indices, dtype=np.int64)
-        )
         self.sizes = {
             "time": int(self._time_indices.size),
             **{
@@ -194,6 +307,9 @@ class PreparedArrayStore:
         return PreparedArrayStore(
             self.root,
             time_indices=np.asarray(self._time_indices)[np.asarray(time_indices, dtype=np.int64)],
+            time_start=self._requested_time_start,
+            time_end=self._requested_time_end,
+            allow_incomplete=self._allow_incomplete,
             label=label or self.label,
         )
 

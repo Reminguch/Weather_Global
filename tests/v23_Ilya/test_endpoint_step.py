@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
+import optax
 import xarray as xr
 from graphcast import xarray_jax
 
@@ -15,6 +16,7 @@ from src.models.mamba.v23_Ilya.training.config import V23IlyaTrainConfig
 from src.models.mamba.v23_Ilya.training.endpoint_step import (
     V23IlyaTrainingTransforms,
     make_bptt_objective,
+    make_train_step,
     memory_contract,
 )
 
@@ -183,6 +185,63 @@ def test_explicit_reverse_matches_naive_unroll(
     assert baseline.calls == expected_baseline_calls
 
 
+
+def test_host_tape_train_step_matches_naive_parameter_update() -> None:
+    baseline = FrozenBaseline()
+    residual = StatefulResidual()
+    residual_loss = StatefulResidualLoss()
+    config = _config("last_step")
+    transforms = V23IlyaTrainingTransforms(
+        baseline,
+        residual,
+        residual_loss,
+        residual_loss,
+    )
+    optimizer = optax.sgd(0.01)
+    train_step = make_train_step(
+        transforms=transforms,
+        optimizer=optimizer,
+        baseline_params={},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+    )
+    params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
+    state = {"s": jnp.asarray(0.0)}
+    keys, frames, static, truths, forcings = _arguments("last_step")
+
+    next_params, next_state, _optimizer_state, loss, gradient_norm = train_step(
+        params,
+        state,
+        optimizer.init(params),
+        keys,
+        frames,
+        static,
+        truths,
+        forcings,
+    )
+    (expected_loss, expected_state), expected_gradient = jax.value_and_grad(
+        lambda value: _naive_reference(value, state["s"], "last_step"),
+        has_aux=True,
+    )(params)
+    expected_params = jax.tree_util.tree_map(
+        lambda value, gradient: value - 0.01 * gradient,
+        params,
+        expected_gradient,
+    )
+
+    np.testing.assert_allclose(loss, expected_loss, rtol=1e-6)
+    np.testing.assert_allclose(next_state["s"], expected_state, rtol=1e-6)
+    for name in params:
+        np.testing.assert_allclose(
+            next_params[name],
+            expected_params[name],
+            rtol=1e-6,
+            atol=1e-6,
+        )
+    assert float(gradient_norm) > 0.0
+
 def test_explicit_reverse_jits() -> None:
     baseline = FrozenBaseline()
     residual = StatefulResidual()
@@ -235,3 +294,76 @@ def test_memory_contract_is_unique_frame_bf16_tape() -> None:
     assert report["truth_targets_loaded"] == 1
     assert report["weather_tape_precision"] == "bf16"
     assert report["graphcast_backward_calls"] == 0
+
+
+class Bf16StatefulResidual(StatefulResidual):
+    def apply(self, params, state, key, inputs, template, forcing):
+        prediction, next_state = super().apply(
+            params,
+            state,
+            key,
+            inputs,
+            template,
+            forcing,
+        )
+        return prediction, jax.tree_util.tree_map(
+            lambda value: value.astype(jnp.bfloat16),
+            next_state,
+        )
+
+
+class Bf16StatefulResidualLoss:
+    def apply(self, params, state, key, inputs, target, forcing):
+        prediction, next_state = Bf16StatefulResidual().apply(
+            params,
+            state,
+            key,
+            inputs,
+            target,
+            forcing,
+        )
+        error = (
+            xarray_jax.unwrap_data(prediction["x"])
+            - xarray_jax.unwrap_data(target["x"])
+        )
+        loss = xr.DataArray(
+            jnp.mean(error**2)[None],
+            dims=("batch",),
+            coords={"batch": [0]},
+        )
+        return ((loss, {}), prediction), next_state
+
+
+def test_actual_recurrent_state_boundaries_are_fp32() -> None:
+    baseline = FrozenBaseline()
+    residual = Bf16StatefulResidual()
+    residual_loss = Bf16StatefulResidualLoss()
+    config = _config("last_step", tape_precision="bf16")
+    objective = make_bptt_objective(
+        transforms=V23IlyaTrainingTransforms(
+            baseline,
+            residual,
+            residual_loss,
+            residual_loss,
+        ),
+        baseline_params={},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+    )
+    keys, frames, static, truths, forcings = _arguments("last_step")
+    _, final_state = objective(
+        {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)},
+        {"s": jnp.asarray(0.0, dtype=jnp.bfloat16)},
+        keys,
+        frames,
+        static,
+        truths,
+        forcings,
+    )
+
+    assert all(
+        leaf.dtype == jnp.float32
+        for leaf in jax.tree_util.tree_leaves(final_state)
+    )

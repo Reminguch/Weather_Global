@@ -48,7 +48,7 @@ DEFAULT_TEMP_ROOT = Path("data/graphcast/graphcast/dataset/.tmp_graphcast37_stag
 RESOLUTION = 0.25
 RESOLUTION_TAG = "res0p25"
 EXPECTED_STEP = pd.Timedelta(hours=6)
-BUILDER_VERSION = 1
+BUILDER_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -293,6 +293,7 @@ class PreparedStoreV2Writer:
         checkpoint_sha256: str,
         source_uri: str,
         resume: bool,
+        extend_existing: bool = False,
     ) -> None:
         self.root = root
         self.expected_times = expected_times
@@ -300,6 +301,7 @@ class PreparedStoreV2Writer:
         self.checkpoint_path = checkpoint_path
         self.checkpoint_sha256 = checkpoint_sha256
         self.source_uri = source_uri
+        self.extend_existing = extend_existing
         self.shards = _time_shards(expected_times)
         self.metadata_path = root / "metadata.json"
         self.incomplete_path = root / ".incomplete"
@@ -326,12 +328,102 @@ class PreparedStoreV2Writer:
             raise ValueError("Existing prepared store is not format v2.")
         if metadata.get("checkpoint_sha256") != self.checkpoint_sha256:
             raise ValueError("Existing prepared store was created for a different checkpoint.")
-        stored_times = np.load(self.root / "coords" / "time.npy", mmap_mode="r")
+        if metadata.get("source_data_path") != self.source_uri:
+            raise ValueError("Existing prepared store was created from a different source dataset.")
+        stored_times = np.asarray(np.load(self.root / "coords" / "time.npy", mmap_mode="r"))
         expected = self.expected_times.values.astype("datetime64[ns]")
-        if not np.array_equal(stored_times, expected):
-            raise ValueError("Existing prepared store time coordinate does not match this build.")
-        if metadata.get("time_shards") != self.shards:
-            raise ValueError("Existing prepared store year shards do not match this build.")
+        stored_shards = metadata.get("time_shards")
+        if np.array_equal(stored_times, expected) and stored_shards == self.shards:
+            return
+        if not self.extend_existing:
+            raise ValueError(
+                "Existing prepared store time coordinate does not match this build. "
+                "Use --extend-existing only when the requested range is a strict year-sharded superset."
+            )
+
+        stored_index = pd.DatetimeIndex(pd.to_datetime(stored_times))
+        requested_index = pd.DatetimeIndex(pd.to_datetime(expected))
+        positions = requested_index.get_indexer(stored_index)
+        if (
+            len(stored_index) == 0
+            or np.any(positions < 0)
+            or not np.array_equal(positions, np.arange(positions[0], positions[0] + len(positions)))
+            or len(requested_index) <= len(stored_index)
+        ):
+            raise ValueError(
+                "Existing prepared store is not a contiguous strict subset of the requested extension."
+            )
+        if not isinstance(stored_shards, list) or not stored_shards:
+            raise ValueError("Existing prepared store has no year-shard metadata to extend.")
+
+        requested_by_year = {int(shard["year"]): shard for shard in self.shards}
+        for stored_shard in stored_shards:
+            year = int(stored_shard["year"])
+            requested_shard = requested_by_year.get(year)
+            identity_keys = ("year", "path", "time_start", "time_end")
+            stored_count = int(stored_shard["stop"]) - int(stored_shard["start"])
+            requested_count = (
+                -1
+                if requested_shard is None
+                else int(requested_shard["stop"]) - int(requested_shard["start"])
+            )
+            if (
+                requested_shard is None
+                or any(stored_shard.get(key) != requested_shard.get(key) for key in identity_keys)
+                or stored_count != requested_count
+            ):
+                raise ValueError(
+                    f"Existing year shard {year} would change boundaries during extension; "
+                    "only whole, unchanged annual shards may be preserved."
+                )
+
+        # Validate every preserved shard before publishing broader global metadata.
+        for stored_shard in stored_shards:
+            year = int(stored_shard["year"])
+            year_count = int(stored_shard["stop"]) - int(stored_shard["start"])
+            validity_path = self.root / str(stored_shard["path"]) / "validity.json"
+            if not validity_path.exists():
+                raise FileNotFoundError(f"Existing year {year} has no validity record: {validity_path}")
+            validity = json.loads(validity_path.read_text())
+            if len(validity.get("written_time_mask", [])) != year_count or not all(
+                validity["written_time_mask"]
+            ):
+                raise ValueError(f"Existing year {year} is not fully written and cannot be extended.")
+            for name, info in metadata.get("variables", {}).items():
+                if "time" not in info["dims"]:
+                    continue
+                path = self.root / str(stored_shard["path"]) / "vars" / f"{name}.npy"
+                if not path.exists():
+                    raise FileNotFoundError(f"Existing year {year} is missing prepared variable: {path}")
+                array = np.load(path, mmap_mode="r")
+                expected_shape = (year_count, *tuple(int(value) for value in info["shape"])[1:])
+                if tuple(array.shape) != expected_shape or np.dtype(array.dtype) != np.dtype(info["dtype"]):
+                    raise ValueError(f"Existing year array is incompatible with extension: {path}")
+
+        old_time_start = metadata.get("time_start")
+        old_time_end = metadata.get("time_end")
+        old_time_count = len(stored_index)
+        self.incomplete_path.touch(exist_ok=True)
+        _write_npy_atomic(self.root / "coords" / "time.npy", expected)
+        metadata["time_shards"] = self.shards
+        metadata["time_start"] = str(self.expected_times[0].to_datetime64())
+        metadata["time_end"] = str(self.expected_times[-1].to_datetime64())
+        metadata["builder_version"] = BUILDER_VERSION
+        for info in metadata.get("variables", {}).values():
+            if "time" in info["dims"]:
+                info["shape"][0] = len(self.expected_times)
+        metadata.setdefault("extensions", []).append(
+            {
+                "extended_at": _utc_now(),
+                "previous_time_start": old_time_start,
+                "previous_time_end": old_time_end,
+                "previous_time_count": old_time_count,
+                "requested_time_start": metadata["time_start"],
+                "requested_time_end": metadata["time_end"],
+                "requested_time_count": len(self.expected_times),
+            }
+        )
+        _write_json_atomic(self.metadata_path, metadata)
 
     def _initialize_from_window(self, prepared: xr.Dataset) -> None:
         missing = [name for name in _task_vars(self.task_cfg) if name not in prepared.data_vars]
@@ -560,17 +652,98 @@ def _new_manifest(
     }
 
 
-def _validate_manifest(manifest: dict, *, args: argparse.Namespace, times: pd.DatetimeIndex, sha256: str) -> None:
-    expected = {
-        "source_uri": args.source_uri,
-        "checkpoint_sha256": sha256,
-        "time_start": str(times[0].to_datetime64()),
-        "time_end": str(times[-1].to_datetime64()),
-        "expected_time_count": len(times),
+def _validate_manifest(
+    manifest: dict,
+    *,
+    args: argparse.Namespace,
+    times: pd.DatetimeIndex,
+    sha256: str,
+    windows: list[MonthWindow],
+    space_report: dict[str, object] | None,
+) -> bool:
+    identity = {"source_uri": args.source_uri, "checkpoint_sha256": sha256}
+    identity_mismatches = {
+        key: (manifest.get(key), value)
+        for key, value in identity.items()
+        if manifest.get(key) != value
     }
-    mismatches = {key: (manifest.get(key), value) for key, value in expected.items() if manifest.get(key) != value}
-    if mismatches:
-        raise ValueError(f"Existing build manifest does not match requested build: {mismatches}")
+    if identity_mismatches:
+        raise ValueError(f"Existing build manifest does not match requested build: {identity_mismatches}")
+
+    requested_start = str(times[0].to_datetime64())
+    requested_end = str(times[-1].to_datetime64())
+    same_range = (
+        manifest.get("time_start") == requested_start
+        and manifest.get("time_end") == requested_end
+        and manifest.get("expected_time_count") == len(times)
+    )
+    if same_range:
+        return False
+    if not getattr(args, "extend_existing", False):
+        raise ValueError(
+            "Existing build manifest has a different time range. "
+            "Use --extend-existing only to add whole years around the completed range."
+        )
+
+    old_start = pd.Timestamp(manifest["time_start"])
+    old_end = pd.Timestamp(manifest["time_end"])
+    old_times = pd.date_range(old_start, old_end, freq="6h")
+    positions = times.get_indexer(old_times)
+    if (
+        len(old_times) == 0
+        or manifest.get("expected_time_count") != len(old_times)
+        or np.any(positions < 0)
+        or not np.array_equal(positions, np.arange(positions[0], positions[0] + len(positions)))
+        or len(times) <= len(old_times)
+    ):
+        raise ValueError("Existing build range is not a contiguous strict subset of the requested extension.")
+
+    old_months = manifest.get("months", {})
+    if not old_months or any(state.get("status") != "complete" for state in old_months.values()):
+        raise ValueError("Only a fully completed build may be extended to additional years.")
+    requested_windows = {window.key: window for window in windows}
+    if any(key not in requested_windows for key in old_months):
+        raise ValueError("Requested extension does not preserve every completed month.")
+
+    merged_months = {}
+    for window in windows:
+        expected_state = {
+            "status": "pending",
+            "start": str(window.start.to_datetime64()),
+            "end": str(window.end.to_datetime64()),
+            "time_count": window.count,
+        }
+        if window.key in old_months:
+            state = old_months[window.key]
+            for key in ("start", "end", "time_count"):
+                if state.get(key) != expected_state[key]:
+                    raise ValueError(f"Completed month {window.key} changes boundaries during extension.")
+            merged_months[window.key] = state
+        else:
+            merged_months[window.key] = expected_state
+
+    manifest.setdefault("extensions", []).append(
+        {
+            "extended_at": _utc_now(),
+            "previous_time_start": manifest["time_start"],
+            "previous_time_end": manifest["time_end"],
+            "previous_time_count": manifest["expected_time_count"],
+            "requested_time_start": requested_start,
+            "requested_time_end": requested_end,
+            "requested_time_count": len(times),
+        }
+    )
+    manifest.update(
+        {
+            "status": "incomplete",
+            "time_start": requested_start,
+            "time_end": requested_end,
+            "expected_time_count": len(times),
+            "space_report": space_report,
+            "months": merged_months,
+        }
+    )
+    return True
 
 
 def _prepare_staged_dataset(path: Path, task_cfg) -> tuple[xr.Dataset, xr.Dataset]:
@@ -635,7 +808,14 @@ def _run_build_inner(args: argparse.Namespace) -> Path:
             if not args.resume:
                 raise FileExistsError(f"Build manifest already exists: {manifest_path}. Use --resume.")
             manifest = json.loads(manifest_path.read_text())
-            _validate_manifest(manifest, args=args, times=expected_times, sha256=checkpoint_sha256)
+            manifest_changed = _validate_manifest(
+                manifest,
+                args=args,
+                times=expected_times,
+                sha256=checkpoint_sha256,
+                windows=windows,
+                space_report=space_report,
+            )
         else:
             manifest = _new_manifest(
                 args=args,
@@ -647,6 +827,7 @@ def _run_build_inner(args: argparse.Namespace) -> Path:
             )
             resolution_root.mkdir(parents=True, exist_ok=True)
             _write_json_atomic(manifest_path, manifest)
+            manifest_changed = False
 
         writer = PreparedStoreV2Writer(
             root=resolution_root,
@@ -656,7 +837,10 @@ def _run_build_inner(args: argparse.Namespace) -> Path:
             checkpoint_sha256=checkpoint_sha256,
             source_uri=args.source_uri,
             resume=args.resume,
+            extend_existing=args.extend_existing,
         )
+        if manifest_changed:
+            _write_json_atomic(manifest_path, manifest)
         args.temp_root.mkdir(parents=True, exist_ok=True)
         build_started = time.time()
         for window in windows:
@@ -737,6 +921,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--staging-chunk-time", type=int, default=16)
     parser.add_argument("--max-workers", type=int, choices=range(1, 9), default=8)
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--extend-existing",
+        action="store_true",
+        help="Safely add whole annual shards around an existing completed v2 store.",
+    )
     parser.add_argument("--delete-staged", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--min-free-tib", type=float, default=3.0)
     parser.add_argument("--skip-space-check", action="store_true")

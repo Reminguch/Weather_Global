@@ -96,6 +96,25 @@ def _select_6h_window(ds: xr.Dataset, start: str, end: str, stride_hours: int) -
     return ds.sel(time=wanted)
 
 
+def _validate_hourly_source_time(
+    time_values: np.ndarray,
+    *,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> None:
+    actual = pd.DatetimeIndex(pd.to_datetime(time_values))
+    expected = pd.date_range(start, end, freq="1h")
+    if actual.equals(expected):
+        return
+    missing = [str(value) for value in expected.difference(actual)[:8]]
+    extra = [str(value) for value in actual.difference(expected)[:8]]
+    raise ValueError(
+        "Hourly precipitation source is incomplete or out of order: "
+        f"expected={len(expected)} actual={len(actual)} missing={missing} extra={extra} "
+        f"duplicates={int(actual.duplicated().sum())}."
+    )
+
+
 def validate_graphcast37_layout(ds: xr.Dataset) -> None:
     if ds.sizes.get("lat") != 721 or ds.sizes.get("lon") != 1440:
         raise ValueError(
@@ -157,6 +176,12 @@ def prepare_graphcast37_window(
     precip_pad_start = pd.Timestamp(start_time) - pd.Timedelta(hours=5)
     raw_start = precip_pad_start if DERIVED_PRECIP_SOURCE in source else pd.Timestamp(start_time)
     source = source.sel(time=slice(raw_start, pd.Timestamp(end_time)))
+    if DERIVED_PRECIP_SOURCE in source:
+        _validate_hourly_source_time(
+            source.time.values,
+            start=raw_start,
+            end=pd.Timestamp(end_time),
+        )
     source = _derive_total_precipitation_6hr(source)
     window = _select_6h_window(source, start_time, end_time, time_stride_hours)
     if "level" in window.coords:

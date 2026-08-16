@@ -23,9 +23,12 @@ from src.models.mamba.training.param_utils import overlay_matching_params
 from ..checkpoint import (
     atomic_json_dump,
     atomic_pickle_dump,
+    data_parallel_training_checkpoint_payload,
     file_sha256,
     load_v23_Ilya_checkpoint,
+    load_v23_Ilya_data_parallel_training_checkpoint,
     load_v23_Ilya_training_checkpoint,
+    overlay_frozen_baseline_params,
     training_checkpoint_payload,
     validate_param_tree_compatible,
 )
@@ -35,10 +38,21 @@ from .config import (
     V23IlyaTrainInvocation,
     validate_resume_config,
 )
-from .data import TrainingCursor, open_training_data
+from .data import ReplicaGroupCursor, TrainingCursor, open_training_data
+from .data_parallel import (
+    derive_replica_step_keys,
+    replica_max_abs_difference,
+    replica_tree_to_host,
+    replicate_tree,
+    shard_replica_tree,
+    unreplicate_tree,
+    validate_data_parallel_runtime,
+)
 from .step import (
     build_optimizer,
     build_training_transforms,
+    cast_state_boundary_fp32,
+    make_data_parallel_train_step,
     make_train_step,
     make_validation_step,
     memory_contract,
@@ -89,6 +103,28 @@ def _validate_tree_shapes(reference, candidate, label: str) -> None:
             )
 
 
+def _validate_replica_tree_shapes(reference, candidate, replicas: int, label: str) -> None:
+    if jax.tree_util.tree_structure(reference) != jax.tree_util.tree_structure(candidate):
+        raise ValueError(f"{label} tree structure is incompatible")
+    for index, (expected, actual) in enumerate(
+        zip(
+            jax.tree_util.tree_leaves(reference),
+            jax.tree_util.tree_leaves(candidate),
+            strict=True,
+        )
+    ):
+        expected_shape = getattr(expected, "shape", None)
+        actual_shape = getattr(actual, "shape", None)
+        replica_shape = (
+            (replicas, *expected_shape) if expected_shape is not None else None
+        )
+        if actual_shape != replica_shape:
+            raise ValueError(
+                f"{label} leaf {index} shape mismatch: "
+                f"expected={replica_shape} actual={actual_shape}"
+            )
+
+
 def _learning_rate_value(schedule, update_index: int) -> float:
     if callable(schedule):
         return float(jax.device_get(schedule(update_index)))
@@ -115,7 +151,9 @@ def _prepare_run_directory(invocation: V23IlyaTrainInvocation) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
 
 
-def _device_memory_snapshot() -> dict[str, Any] | None:
+def _device_memory_snapshot(
+    reference_peak_limit_bytes: int = 27 * 1024**3,
+) -> dict[str, Any] | None:
     devices = []
     for device in jax.local_devices():
         try:
@@ -134,12 +172,11 @@ def _device_memory_snapshot() -> dict[str, Any] | None:
     if not devices:
         return None
     peak = max(int(item.get("peak_bytes_in_use", 0)) for item in devices)
-    reference_limit = 27 * 1024**3
     return {
         "devices": devices,
         "max_peak_bytes_in_use": peak,
-        "reference_peak_limit_bytes": reference_limit,
-        "within_reference_peak_limit": peak <= reference_limit,
+        "reference_peak_limit_bytes": reference_peak_limit_bytes,
+        "within_reference_peak_limit": peak <= reference_peak_limit_bytes,
     }
 
 
@@ -178,6 +215,44 @@ def _save_checkpoint(
     return path
 
 
+def _save_data_parallel_checkpoint(
+    *,
+    config: V23IlyaTrainConfig,
+    completed_step: int,
+    residual_params,
+    replica_states,
+    optimizer_state,
+    rng_key,
+    cursor: ReplicaGroupCursor,
+    active_segment_ids: tuple[int, ...],
+    baseline_fingerprint: str,
+    manifest_fingerprint: str,
+    overlay_metadata: Mapping[str, Any],
+) -> Path:
+    path = config.run_dir / "checkpoints" / f"checkpoint_step{completed_step:08d}.pkl"
+    payload = data_parallel_training_checkpoint_payload(
+        completed_step=completed_step,
+        residual_params=residual_params,
+        replica_states=replica_states,
+        optimizer_state=optimizer_state,
+        rng_key=rng_key,
+        replica_group_cursor=cursor.to_dict(),
+        active_segment_ids=active_segment_ids,
+        num_devices=config.distributed.num_devices,
+        resolved_training_config=config.to_dict(),
+        baseline_checkpoint_path=str(config.baseline_checkpoint),
+        baseline_checkpoint_fingerprint=baseline_fingerprint,
+        anchor_manifest_fingerprint=manifest_fingerprint,
+        parameter_overlay_metadata=overlay_metadata,
+    )
+    atomic_pickle_dump(payload, path)
+    atomic_json_dump(
+        {"completed_step": completed_step, "checkpoint": str(path)},
+        config.run_dir / "latest_checkpoint.json",
+    )
+    return path
+
+
 def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
     config = invocation.config
     validate_input_paths(config)
@@ -186,6 +261,12 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
         print(f"run_dir={config.run_dir}")
         print(f"resume={invocation.resume} init_from={invocation.init_from}")
         return None
+
+    data_parallel = config.distributed.mode == "data_parallel"
+    devices = None
+    if data_parallel:
+        devices = validate_data_parallel_runtime(config.distributed.num_devices)
+        print(f"[v23_Ilya] data_parallel devices={[str(device) for device in devices]}")
 
     _prepare_run_directory(invocation)
     baseline_fingerprint = file_sha256(config.baseline_checkpoint)
@@ -240,6 +321,8 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
         sample_forcings,
     )
     validate_param_tree_compatible(residual_params, prediction_params)
+    zero_residual_state = cast_state_boundary_fp32(zero_residual_state)
+    prediction_state = cast_state_boundary_fp32(prediction_state)
     _validate_tree_shapes(zero_residual_state, prediction_state, "residual state")
     residual_params, residual_overlay = overlay_matching_params(
         residual_params,
@@ -254,26 +337,78 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
         sample_targets,
         sample_forcings,
     )
-    baseline_params, baseline_overlay = overlay_matching_params(
+    baseline_params, baseline_overlay = overlay_frozen_baseline_params(
         baseline_params,
         baseline_checkpoint.params,
-        strict=True,
     )
+    del sample_inputs, sample_targets, sample_forcings
     optimizer, learning_rate = build_optimizer(config)
     initial_optimizer_state = optimizer.init(residual_params)
     residual_state = zero_residual_state
     optimizer_state = initial_optimizer_state
     cursor = TrainingCursor()
+    replica_cursor = ReplicaGroupCursor()
+    checkpoint_replica_states = None
     completed_step = 0
     resume_checkpoint_was_final = False
     overlay_metadata = {
         "residual_copied": residual_overlay.copied,
         "residual_fresh": residual_overlay.initialized,
         "baseline_copied": baseline_overlay.copied,
-        "baseline_fresh": baseline_overlay.initialized,
+        "baseline_fresh": 0,
+        "baseline_ignored_source_count": len(baseline_overlay.ignored_source),
+        "baseline_ignored_source": list(baseline_overlay.ignored_source),
     }
 
-    if invocation.resume is not None:
+    if invocation.resume is not None and data_parallel:
+        checkpoint = load_v23_Ilya_data_parallel_training_checkpoint(invocation.resume)
+        if checkpoint.num_devices != config.distributed.num_devices:
+            raise ValueError(
+                f"Resume checkpoint has {checkpoint.num_devices} devices, expected "
+                f"{config.distributed.num_devices}"
+            )
+        validate_resume_config(
+            config,
+            checkpoint.resolved_training_config,
+            completed_step=checkpoint.completed_step,
+        )
+        if checkpoint.baseline_checkpoint_fingerprint != baseline_fingerprint:
+            raise ValueError("Baseline checkpoint fingerprint differs from resume checkpoint")
+        if checkpoint.anchor_manifest_fingerprint != training_data.manifest_fingerprint:
+            raise ValueError("Anchor manifest fingerprint differs from resume checkpoint")
+        validate_param_tree_compatible(residual_params, checkpoint.residual_params)
+        _validate_replica_tree_shapes(
+            zero_residual_state,
+            checkpoint.replica_states,
+            config.distributed.num_devices,
+            "replica states",
+        )
+        _validate_tree_shapes(initial_optimizer_state, checkpoint.optimizer_state, "optimizer state")
+        residual_params = checkpoint.residual_params
+        checkpoint_replica_states = cast_state_boundary_fp32(checkpoint.replica_states)
+        optimizer_state = checkpoint.optimizer_state
+        rng_key = checkpoint.rng_key
+        replica_cursor = ReplicaGroupCursor.from_mapping(checkpoint.replica_group_cursor)
+        training_data.validate_replica_cursor(replica_cursor, config)
+        expected_ids = training_data.active_replica_segment_ids(
+            replica_cursor, config.distributed.num_devices
+        )
+        if checkpoint.active_segment_ids != expected_ids:
+            raise ValueError(
+                "Checkpoint active segment IDs do not match its replica cursor: "
+                f"saved={checkpoint.active_segment_ids} expected={expected_ids}"
+            )
+        completed_step = checkpoint.completed_step
+        try:
+            saved_max_steps = int(
+                checkpoint.resolved_training_config["optimizer"]["max_steps"]
+            )
+        except (KeyError, TypeError, ValueError):
+            saved_max_steps = -1
+        resume_checkpoint_was_final = saved_max_steps == completed_step
+        overlay_metadata = dict(checkpoint.parameter_overlay_metadata)
+        print(f"[v23_Ilya] exact resume from {invocation.resume} at step {completed_step}")
+    elif invocation.resume is not None:
         checkpoint = load_v23_Ilya_training_checkpoint(invocation.resume)
         validate_resume_config(
             config,
@@ -286,13 +421,9 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             raise ValueError("Anchor manifest fingerprint differs from resume checkpoint")
         validate_param_tree_compatible(residual_params, checkpoint.residual_params)
         _validate_tree_shapes(zero_residual_state, checkpoint.residual_state, "residual state")
-        _validate_tree_shapes(
-            initial_optimizer_state,
-            checkpoint.optimizer_state,
-            "optimizer state",
-        )
+        _validate_tree_shapes(initial_optimizer_state, checkpoint.optimizer_state, "optimizer state")
         residual_params = checkpoint.residual_params
-        residual_state = checkpoint.residual_state
+        residual_state = cast_state_boundary_fp32(checkpoint.residual_state)
         optimizer_state = checkpoint.optimizer_state
         rng_key = checkpoint.rng_key
         cursor = TrainingCursor.from_mapping(checkpoint.training_cursor)
@@ -314,14 +445,18 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             print(f"[v23_Ilya] warm-starting from SWA checkpoint {invocation.init_from}")
         validate_param_tree_compatible(residual_params, checkpoint.residual_params)
         residual_params = checkpoint.residual_params
-        if checkpoint.has_residual_state:
+        if checkpoint.has_residual_state and not data_parallel:
             assert checkpoint.residual_state is not None
             _validate_tree_shapes(
                 zero_residual_state,
                 checkpoint.residual_state,
                 "legacy residual state",
             )
-            residual_state = checkpoint.residual_state
+            residual_state = cast_state_boundary_fp32(checkpoint.residual_state)
+        elif checkpoint.has_residual_state:
+            print(
+                "[v23_Ilya] ignoring warm-start lane state in data-parallel mode"
+            )
         print(f"[v23_Ilya] warm start from {invocation.init_from}; optimizer reset")
 
     n_residual_parameters = sum(
@@ -344,6 +479,20 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
         config=config,
     )
     memory_metadata["selective_data"] = dataclasses.asdict(memory_sample.data_report)
+    del memory_sample
+    anchors_per_update = config.bptt_steps * config.distributed.global_batch_size
+    if data_parallel:
+        replica_group_count = training_data.replica_group_count(
+            config.distributed.num_devices
+        )
+        if replica_group_count == 0:
+            raise ValueError(
+                "Data parallelism has no complete replica group: "
+                f"segments={len(training_data.segments)} "
+                f"devices={config.distributed.num_devices}"
+            )
+    else:
+        replica_group_count = None
 
     run_metadata = {
         **config.to_dict(),
@@ -366,6 +515,7 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 else None
             ),
             "chunks_per_segment": config.segment_steps // config.bptt_steps,
+            "prepared_store_selection": training_data.store.selection_metadata,
             "residual_parameters": n_residual_parameters,
             "baseline_parameters_frozen": n_baseline_parameters,
             "baseline_checkpoint_fingerprint": baseline_fingerprint,
@@ -374,7 +524,16 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             "residual_target": "truth_minus_live_frozen_baseline",
             "loss_mode": config.loss_mode,
             "memory_contract": memory_metadata,
-            "batch_size": 1,
+            "batch_size": config.distributed.global_batch_size,
+            "global_batch_size": config.distributed.global_batch_size,
+            "per_device_batch_size": config.distributed.per_device_batch_size,
+            "anchors_per_update": anchors_per_update,
+            "replica_group_count": replica_group_count,
+            "dropped_replica_segments": (
+                training_data.dropped_replica_segments(config.distributed.num_devices)
+                if data_parallel
+                else 0
+            ),
         },
     }
     run_config_path = config.run_dir / "run_config.json"
@@ -383,15 +542,28 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
     elif not run_config_path.is_file():
         raise FileNotFoundError(f"Resume run is missing {run_config_path}")
 
-    train_step = make_train_step(
-        transforms=transforms,
-        optimizer=optimizer,
-        baseline_params=baseline_params,
-        baseline_state=baseline_state,
-        config=config,
-        time_step=training_data.time_step,
-        input_steps=training_data.input_steps,
-    )
+    if data_parallel:
+        assert devices is not None
+        train_step = make_data_parallel_train_step(
+            transforms=transforms,
+            optimizer=optimizer,
+            baseline_params=baseline_params,
+            baseline_state=baseline_state,
+            config=config,
+            time_step=training_data.time_step,
+            input_steps=training_data.input_steps,
+            devices=devices,
+        )
+    else:
+        train_step = make_train_step(
+            transforms=transforms,
+            optimizer=optimizer,
+            baseline_params=baseline_params,
+            baseline_state=baseline_state,
+            config=config,
+            time_step=training_data.time_step,
+            input_steps=training_data.input_steps,
+        )
     metrics_path = config.run_dir / "train_metrics.jsonl"
     validation_metrics_path = config.run_dir / "validation_metrics.jsonl"
     validation_step = None
@@ -477,6 +649,173 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
         flush=True,
     )
     memory_profile_pending = completed_step == 0
+
+    if data_parallel:
+        assert devices is not None
+        replicated_params = replicate_tree(residual_params, devices)
+        replicated_optimizer_state = replicate_tree(optimizer_state, devices)
+        if checkpoint_replica_states is None:
+            replica_states = replicate_tree(zero_residual_state, devices)
+        else:
+            replica_states = shard_replica_tree(checkpoint_replica_states, devices)
+
+        print(
+            f"[v23_Ilya] global_batch_size={config.distributed.global_batch_size} "
+            f"anchors_per_update={anchors_per_update} "
+            f"replica_groups={replica_group_count} "
+            f"dropped_segments={training_data.dropped_replica_segments(config.distributed.num_devices)}",
+            flush=True,
+        )
+        last_checkpoint: Path | None = invocation.resume
+        has_consumed_update = completed_step > 0
+        if (
+            config.validation.enabled
+            and completed_step > 0
+            and (
+                completed_step % config.validation.every_steps == 0
+                or resume_checkpoint_was_final
+            )
+        ):
+            residual_params = unreplicate_tree(replicated_params)
+            perform_validation(
+                step=completed_step,
+                segment_ids=training_data.fixed_validation_segment_ids,
+                role="fixed_checkpoint",
+                subset_policy=training_data.validation_subset_policy,
+            )
+
+        for step in range(completed_step + 1, config.max_steps + 1):
+            if replica_cursor.segment_offset == 0 and has_consumed_update:
+                replica_states = replicate_tree(zero_residual_state, devices)
+            consumed_cursor = replica_cursor
+            chunk = training_data.build_replica_chunk(
+                replica_cursor,
+                config,
+                task_config,
+            )
+            rng_key, keys = derive_replica_step_keys(
+                rng_key,
+                num_replicas=config.distributed.num_devices,
+                bptt_steps=config.bptt_steps,
+            )
+            started = time.monotonic()
+            (
+                replicated_params,
+                replica_states,
+                replicated_optimizer_state,
+                mean_loss,
+                averaged_gradient_norm,
+                lane_losses,
+            ) = train_step(
+                replicated_params,
+                replica_states,
+                replicated_optimizer_state,
+                keys,
+                chunk.input_frames,
+                chunk.static_inputs,
+                chunk.truths,
+                chunk.forcings,
+            )
+            mean_loss = jax.block_until_ready(mean_loss)
+            averaged_gradient_norm = jax.block_until_ready(averaged_gradient_norm)
+            step_seconds = time.monotonic() - started
+            replica_cursor = chunk.next_cursor
+            has_consumed_update = True
+
+            lane_losses = np.asarray(lane_losses, dtype=np.float64)
+            loss_value = float(jax.device_get(mean_loss))
+            gradient_norm_value = float(jax.device_get(averaged_gradient_norm))
+            parameter_divergence = replica_max_abs_difference(replicated_params)
+            optimizer_divergence = replica_max_abs_difference(
+                replicated_optimizer_state
+            )
+            device_memory = _device_memory_snapshot(72 * 1024**3)
+            record = {
+                "step": step,
+                "loss": loss_value,
+                "mean_loss": loss_value,
+                "lane_losses": lane_losses.tolist(),
+                "lane_loss_min": float(np.min(lane_losses)),
+                "lane_loss_max": float(np.max(lane_losses)),
+                "lane_loss_std": float(np.std(lane_losses)),
+                "gradient_norm": gradient_norm_value,
+                "averaged_gradient_norm": gradient_norm_value,
+                "learning_rate": _learning_rate_value(learning_rate, step - 1),
+                "step_seconds": step_seconds,
+                "seconds_per_anchor": step_seconds / anchors_per_update,
+                "global_batch_size": config.distributed.global_batch_size,
+                "anchors_per_update": anchors_per_update,
+                "cumulative_anchors_seen": step * anchors_per_update,
+                "epoch": consumed_cursor.epoch,
+                "group_index": consumed_cursor.group_index,
+                "chunk_offset": consumed_cursor.segment_offset,
+                "segment_ids": list(chunk.segment_ids),
+                "raw_anchor_indices": [
+                    values.tolist() for values in chunk.raw_anchor_indices
+                ],
+                "max_parameter_replica_divergence": parameter_divergence,
+                "max_optimizer_replica_divergence": optimizer_divergence,
+            }
+            if device_memory is not None:
+                record["device_memory"] = device_memory
+                if memory_profile_pending:
+                    run_metadata["derived"]["memory_contract"][
+                        "observed_device_profile"
+                    ] = device_memory
+                    atomic_json_dump(run_metadata, run_config_path)
+                    memory_profile_pending = False
+            _append_jsonl(metrics_path, record)
+            print(
+                f"step {step}/{config.max_steps} mean_loss {loss_value:.5f} "
+                f"lane_loss_min/max/std {np.min(lane_losses):.5f}/"
+                f"{np.max(lane_losses):.5f}/{np.std(lane_losses):.5f} "
+                f"avg_grad_norm {gradient_norm_value:.4f} "
+                f"segments={list(chunk.segment_ids)} offset={consumed_cursor.segment_offset} "
+                f"anchors_seen={step * anchors_per_update} "
+                f"replica_divergence={parameter_divergence:.3e} "
+                f"step_time={step_seconds:.2f}s",
+                flush=True,
+            )
+            should_validate = config.validation.enabled and (
+                step % config.validation.every_steps == 0
+                or step == config.max_steps
+            )
+            should_checkpoint = (
+                step % config.checkpoint_every == 0
+                or step == config.max_steps
+                or should_validate
+            )
+            if should_checkpoint:
+                residual_params = unreplicate_tree(replicated_params)
+                optimizer_state = unreplicate_tree(replicated_optimizer_state)
+                last_checkpoint = _save_data_parallel_checkpoint(
+                    config=config,
+                    completed_step=step,
+                    residual_params=residual_params,
+                    replica_states=replica_tree_to_host(replica_states),
+                    optimizer_state=optimizer_state,
+                    rng_key=rng_key,
+                    cursor=replica_cursor,
+                    active_segment_ids=training_data.active_replica_segment_ids(
+                        replica_cursor, config.distributed.num_devices
+                    ),
+                    baseline_fingerprint=baseline_fingerprint,
+                    manifest_fingerprint=training_data.manifest_fingerprint,
+                    overlay_metadata=overlay_metadata,
+                )
+                print(f"[v23_Ilya] saved {last_checkpoint}", flush=True)
+            if should_validate:
+                perform_validation(
+                    step=step,
+                    segment_ids=training_data.fixed_validation_segment_ids,
+                    role="fixed_checkpoint",
+                    subset_policy=training_data.validation_subset_policy,
+                )
+
+        if last_checkpoint is None:
+            raise RuntimeError("Data-parallel training completed without a checkpoint")
+        print(f"[v23_Ilya] training complete at step {config.max_steps}")
+        return last_checkpoint
 
     last_checkpoint: Path | None = invocation.resume
     has_consumed_update = completed_step > 0

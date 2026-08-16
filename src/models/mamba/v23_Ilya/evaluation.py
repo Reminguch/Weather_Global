@@ -10,10 +10,10 @@ import jax
 import numpy as np
 
 from src.models.graphcast.training.core.model import load_graphcast_checkpoint, load_stats
-from src.models.mamba.training.param_utils import overlay_matching_params
 
 from .checkpoint import (
     load_v23_Ilya_checkpoint,
+    overlay_frozen_baseline_params,
     resolve_residual_state,
     validate_param_tree_compatible,
 )
@@ -103,10 +103,9 @@ def evaluate_v23_Ilya(config: V23IlyaEvalConfig) -> dict:
         one_step_targets,
         one_step_forcings,
     )
-    baseline_params, _overlay_stats = overlay_matching_params(
+    baseline_params, _overlay_stats = overlay_frozen_baseline_params(
         baseline_params,
         baseline_checkpoint.params,
-        strict=True,
     )
     residual_params_init, zero_residual_state = predictors.residual.init(
         residual_key,

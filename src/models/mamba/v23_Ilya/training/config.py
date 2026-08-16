@@ -24,6 +24,47 @@ TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
 LOSS_MODES = ("last_step", "all_steps")
 WEATHER_TAPE_PRECISIONS = ("bf16", "fp32")
 BPTT_BACKEND = "explicit_reverse_vjp"
+DISTRIBUTED_MODES = ("single", "data_parallel")
+
+
+@dataclass(frozen=True)
+class V23IlyaDistributedConfig:
+    mode: str = "single"
+    num_devices: int = 1
+    per_device_batch_size: int = 1
+    drop_incomplete_replica_group: bool = True
+
+    def __post_init__(self) -> None:
+        if self.mode not in DISTRIBUTED_MODES:
+            raise ValueError(
+                f"distributed.mode must be one of {DISTRIBUTED_MODES}, got {self.mode!r}"
+            )
+        if type(self.num_devices) is not int or self.num_devices <= 0:
+            raise ValueError("distributed.num_devices must be a positive integer")
+        if self.mode == "single" and self.num_devices != 1:
+            raise ValueError("distributed.mode='single' requires num_devices=1")
+        if self.mode == "data_parallel" and self.num_devices < 2:
+            raise ValueError("distributed.mode='data_parallel' requires num_devices>=2")
+        if self.per_device_batch_size != 1:
+            raise ValueError(
+                "v23_Ilya data parallelism requires per_device_batch_size=1"
+            )
+        if not isinstance(self.drop_incomplete_replica_group, bool):
+            raise ValueError(
+                "distributed.drop_incomplete_replica_group must be boolean"
+            )
+        if self.mode == "data_parallel" and not self.drop_incomplete_replica_group:
+            raise ValueError(
+                "v23_Ilya data parallelism currently requires "
+                "drop_incomplete_replica_group=true"
+            )
+
+    @property
+    def global_batch_size(self) -> int:
+        return self.num_devices * self.per_device_batch_size
+
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
 
 
 @dataclass(frozen=True)
@@ -64,6 +105,9 @@ class V23IlyaTrainConfig:
     stats_dir: Path = Path(DEFAULT_STATS_DIR)
     input_duration: str = "12h"
     target_steps: int = 1
+    time_start: str | None = None
+    time_end: str | None = None
+    allow_incomplete_prepared_store: bool = False
     segment_steps: int = 64
     bptt_steps: int = 16
     ar_tail_k: int = 12
@@ -79,6 +123,9 @@ class V23IlyaTrainConfig:
     grad_clip: float = 1.0
     seed: int = 18
     precision: str = "bf16"
+    distributed: V23IlyaDistributedConfig = field(
+        default_factory=V23IlyaDistributedConfig
+    )
     validation: V23IlyaValidationConfig = field(
         default_factory=V23IlyaValidationConfig
     )
@@ -90,6 +137,19 @@ class V23IlyaTrainConfig:
             raise ValueError("run_name must not contain directory separators")
         if self.target_steps != 1:
             raise ValueError("target_steps must be 1 for v23_Ilya BPTT training")
+        if (self.time_start is None) != (self.time_end is None):
+            raise ValueError("data.time_start and data.time_end must be provided together")
+        for name in ("time_start", "time_end"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"data.{name} must be a non-empty string or null")
+        if not isinstance(self.allow_incomplete_prepared_store, bool):
+            raise ValueError("data.allow_incomplete_prepared_store must be boolean")
+        if self.allow_incomplete_prepared_store and self.time_start is None:
+            raise ValueError(
+                "data.allow_incomplete_prepared_store=true requires data.time_start "
+                "and data.time_end"
+            )
         for name in ("segment_steps", "bptt_steps", "max_steps", "checkpoint_every"):
             value = int(getattr(self, name))
             if value <= 0:
@@ -145,6 +205,9 @@ class V23IlyaTrainConfig:
                 "stats_dir": str(self.stats_dir),
                 "input_duration": self.input_duration,
                 "target_steps": self.target_steps,
+                "time_start": self.time_start,
+                "time_end": self.time_end,
+                "allow_incomplete_prepared_store": self.allow_incomplete_prepared_store,
             },
             "architecture": dataclasses.asdict(self.architecture),
             "sequence": {
@@ -171,6 +234,7 @@ class V23IlyaTrainConfig:
                 "seed": self.seed,
                 "precision": self.precision,
             },
+            "distributed": self.distributed.to_dict(),
             "validation": self.validation.to_dict(),
             "output": {
                 "output_root": str(self.output_root),
@@ -218,6 +282,7 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
             "optimizer",
             "objective",
             "memory",
+            "distributed",
             "validation",
             "output",
         }
@@ -232,7 +297,17 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
     data = _section(
         payload,
         "data",
-        {"prepared_root", "anchor_manifest_root", "baseline_checkpoint", "stats_dir", "input_duration", "target_steps"},
+        {
+            "prepared_root",
+            "anchor_manifest_root",
+            "baseline_checkpoint",
+            "stats_dir",
+            "input_duration",
+            "target_steps",
+            "time_start",
+            "time_end",
+            "allow_incomplete_prepared_store",
+        },
     )
     architecture_values = _section(
         payload,
@@ -266,6 +341,19 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
         raise ValueError(
             f"memory.bptt_backend must be {BPTT_BACKEND!r}, got {backend!r}"
         )
+    if "distributed" in payload:
+        distributed_values = _section(
+            payload,
+            "distributed",
+            {
+                "mode",
+                "num_devices",
+                "per_device_batch_size",
+                "drop_incomplete_replica_group",
+            },
+        )
+    else:
+        distributed_values = {}
     if "validation" in payload:
         validation_values = _section(
             payload,
@@ -297,6 +385,7 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
     return V23IlyaTrainConfig(
         **data,
         architecture=V23IlyaArchitectureConfig(**architecture_values),
+        distributed=V23IlyaDistributedConfig(**distributed_values),
         validation=V23IlyaValidationConfig(**validation_values),
         **sequence,
         **objective,
@@ -367,7 +456,14 @@ def validate_resume_config(
 ) -> None:
     candidate = current.to_dict()
     saved_copy = json.loads(json.dumps(saved))
+    saved_copy.setdefault("distributed", V23IlyaDistributedConfig().to_dict())
     saved_architecture = saved_copy.get("architecture")
+    saved_data = saved_copy.get("data")
+    if isinstance(saved_data, dict):
+        saved_data.setdefault("time_start", None)
+        saved_data.setdefault("time_end", None)
+        saved_data.setdefault("allow_incomplete_prepared_store", False)
+
     if isinstance(saved_architecture, dict):
         # This no-op field was recorded by early v23_Ilya checkpoints but was
         # never consumed by the full-Mamba implementation.

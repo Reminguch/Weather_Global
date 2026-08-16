@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the standalone res1 anchor manifest for v23_Ilya."""
+"""Create a standalone anchor manifest for v23_Ilya."""
 
 from __future__ import annotations
 
@@ -39,6 +39,10 @@ def main() -> None:
     )
     parser.add_argument("--train-end-year", type=int, default=2021)
     parser.add_argument("--validation-year", type=int, default=2022)
+    parser.add_argument("--time-start")
+    parser.add_argument("--time-end")
+    parser.add_argument("--allow-incomplete-prepared-store", action="store_true")
+    parser.add_argument("--allow-empty-validation", action="store_true")
     args = parser.parse_args()
     metadata = build_anchor_manifest(
         prepared_root=args.prepared_root,
@@ -46,6 +50,10 @@ def main() -> None:
         output_root=args.output_root,
         train_end_year=args.train_end_year,
         validation_year=args.validation_year,
+        time_start=args.time_start,
+        time_end=args.time_end,
+        allow_incomplete_prepared_store=args.allow_incomplete_prepared_store,
+        allow_empty_validation=args.allow_empty_validation,
     )
     print(
         f"wrote {metadata['n_anchors_total']} anchors "

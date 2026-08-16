@@ -1,0 +1,68 @@
+{
+  "architecture_id": "v23_Ilya",
+  "schema_version": 1,
+  "data": {
+    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream_graphcast37/res0p25",
+    "anchor_manifest_root": "data/graphcast/graphcast/dataset/anchor_manifests/v23_Ilya_res0p25_2021_01",
+    "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast - ERA5 1979-2017 - resolution 0.25 - pressure levels 37 - mesh 2to6 - precipitation input and output.npz",
+    "stats_dir": "data/graphcast/graphcast/stats",
+    "input_duration": "12h",
+    "target_steps": 1,
+    "time_start": "2021-01-01T00:00:00",
+    "time_end": "2021-01-31T18:00:00",
+    "allow_incomplete_prepared_store": true
+  },
+  "architecture": {
+    "resolution": 0.25,
+    "mesh_size": 6,
+    "width": 512,
+    "baseline_msg_steps": 16,
+    "residual_msg_steps": 2,
+    "temporal_location": "mesh_processor_interleaved",
+    "temporal_d_inner": 16,
+    "temporal_bc_groups": 1,
+    "temporal_d_state": 16,
+    "temporal_d_conv": 4,
+    "temporal_dt_rank": "auto",
+    "temporal_layers": 2,
+    "temporal_conv_bias": true,
+    "temporal_stateful": true,
+    "temporal_zero_init_out": true,
+    "temporal_bias": false,
+    "temporal_dropout": 0.0
+  },
+  "sequence": {
+    "segment_steps": 120,
+    "bptt_steps": 24,
+    "ar_tail_k": 20,
+    "feedback_mode": "closed_loop_sg",
+    "temporal_state_policy": "carry"
+  },
+  "objective": {
+    "loss_mode": "last_step"
+  },
+  "memory": {
+    "weather_tape_precision": "bf16",
+    "bptt_backend": "explicit_reverse_vjp"
+  },
+  "optimizer": {
+    "max_steps": 5,
+    "checkpoint_every": 1,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "warmup_steps": 200,
+    "grad_clip": 1.0,
+    "seed": 22,
+    "precision": "bf16"
+  },
+  "validation": {
+    "enabled": false,
+    "every_steps": 1,
+    "num_segments": 1,
+    "final_num_segments": null
+  },
+  "output": {
+    "output_root": "artifacts/checkpoints/v23_Ilya/res0p25_january2021_endpoint_k24_smoke_20260814_retry2",
+    "run_name": "di16_bcg1_last_step_closed_sg_stateful_5step"
+  }
+}

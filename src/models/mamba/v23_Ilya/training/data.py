@@ -47,6 +47,33 @@ class TrainingCursor:
 
 
 @dataclass(frozen=True)
+class ReplicaGroupCursor:
+    """Location of the next synchronized data-parallel BPTT group."""
+
+    epoch: int = 0
+    group_index: int = 0
+    segment_offset: int = 0
+
+    def __post_init__(self) -> None:
+        for name in ("epoch", "group_index", "segment_offset"):
+            if getattr(self, name) < 0:
+                raise ValueError(f"{name} must be non-negative")
+
+    def to_dict(self) -> dict[str, int]:
+        return asdict(self)
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ReplicaGroupCursor":
+        expected = {"epoch", "group_index", "segment_offset"}
+        if set(value) != expected:
+            raise ValueError(
+                f"replica_group_cursor requires exactly {sorted(expected)}, "
+                f"got {sorted(value)}"
+            )
+        return cls(**{name: int(value[name]) for name in expected})
+
+
+@dataclass(frozen=True)
 class BPTTChunk:
     input_frames: tuple[Any, ...]
     static_inputs: Any
@@ -65,6 +92,18 @@ class TrainingChunk:
     raw_anchor_indices: np.ndarray
     data_report: FrameDataReport
     next_cursor: TrainingCursor
+
+
+@dataclass(frozen=True)
+class ReplicaTrainingChunk:
+    input_frames: tuple[tuple[Any, ...], ...]
+    static_inputs: tuple[Any, ...]
+    truths: tuple[tuple[Any, ...], ...]
+    forcings: tuple[tuple[Any, ...], ...]
+    raw_anchor_indices: tuple[np.ndarray, ...]
+    data_reports: tuple[FrameDataReport, ...]
+    segment_ids: tuple[int, ...]
+    next_cursor: ReplicaGroupCursor
 
 
 @dataclass(frozen=True)
@@ -155,6 +194,84 @@ class V23IlyaTrainingData:
             next_cursor=advance_cursor(cursor, config, len(self.segments)),
         )
 
+    def replica_group_count(self, num_devices: int) -> int:
+        if num_devices <= 0:
+            raise ValueError("num_devices must be positive")
+        return len(self.segments) // num_devices
+
+    def dropped_replica_segments(self, num_devices: int) -> int:
+        if num_devices <= 0:
+            raise ValueError("num_devices must be positive")
+        return len(self.segments) % num_devices
+
+    def active_replica_segment_ids(
+        self,
+        cursor: ReplicaGroupCursor,
+        num_devices: int,
+    ) -> tuple[int, ...]:
+        group_count = self.replica_group_count(num_devices)
+        if group_count <= 0:
+            raise ValueError(
+                f"Data parallelism requires at least {num_devices} complete segments, "
+                f"found {len(self.segments)}"
+            )
+        if cursor.group_index >= group_count:
+            raise ValueError(
+                f"group_index={cursor.group_index} exceeds {group_count} replica groups"
+            )
+        start = cursor.group_index * num_devices
+        return tuple(range(start, start + num_devices))
+
+    def validate_replica_cursor(
+        self,
+        cursor: ReplicaGroupCursor,
+        config: V23IlyaTrainConfig,
+    ) -> None:
+        self.active_replica_segment_ids(cursor, config.distributed.num_devices)
+        if cursor.segment_offset >= config.segment_steps:
+            raise ValueError(
+                f"segment_offset={cursor.segment_offset} must be below "
+                f"{config.segment_steps}"
+            )
+        if cursor.segment_offset % config.bptt_steps:
+            raise ValueError(
+                f"segment_offset={cursor.segment_offset} is not aligned to "
+                f"bptt_steps={config.bptt_steps}"
+            )
+
+    def build_replica_chunk(
+        self,
+        cursor: ReplicaGroupCursor,
+        config: V23IlyaTrainConfig,
+        task_config,
+    ) -> ReplicaTrainingChunk:
+        self.validate_replica_cursor(cursor, config)
+        num_devices = config.distributed.num_devices
+        segment_ids = self.active_replica_segment_ids(cursor, num_devices)
+        loaded = tuple(
+            self.load_segment_chunk(
+                self.segments[segment_id],
+                cursor.segment_offset,
+                config,
+                task_config,
+            )
+            for segment_id in segment_ids
+        )
+        return ReplicaTrainingChunk(
+            input_frames=tuple(chunk.input_frames for chunk in loaded),
+            static_inputs=tuple(chunk.static_inputs for chunk in loaded),
+            truths=tuple(chunk.truths for chunk in loaded),
+            forcings=tuple(chunk.forcings for chunk in loaded),
+            raw_anchor_indices=tuple(chunk.raw_anchor_indices for chunk in loaded),
+            data_reports=tuple(chunk.data_report for chunk in loaded),
+            segment_ids=segment_ids,
+            next_cursor=advance_replica_group_cursor(
+                cursor,
+                config,
+                self.replica_group_count(num_devices),
+            ),
+        )
+
     def validation_segment_metadata(self, segment_ids: np.ndarray) -> list[dict[str, Any]]:
         metadata = []
         for segment_id in np.asarray(segment_ids, dtype=np.int64):
@@ -213,6 +330,22 @@ def advance_cursor(
     return TrainingCursor(cursor.epoch + 1, 0, 0)
 
 
+def advance_replica_group_cursor(
+    cursor: ReplicaGroupCursor,
+    config: V23IlyaTrainConfig,
+    group_count: int,
+) -> ReplicaGroupCursor:
+    if group_count <= 0:
+        raise ValueError("group_count must be positive")
+    next_offset = cursor.segment_offset + config.bptt_steps
+    if next_offset < config.segment_steps:
+        return ReplicaGroupCursor(cursor.epoch, cursor.group_index, next_offset)
+    next_group = cursor.group_index + 1
+    if next_group < group_count:
+        return ReplicaGroupCursor(cursor.epoch, next_group, 0)
+    return ReplicaGroupCursor(cursor.epoch + 1, 0, 0)
+
+
 def _load_index_array(path: Path) -> np.ndarray:
     if not path.is_file():
         raise FileNotFoundError(f"Missing anchor manifest file: {path}")
@@ -226,17 +359,33 @@ def open_training_data(
     config: V23IlyaTrainConfig,
     task_config,
 ) -> V23IlyaTrainingData:
-    store = PreparedArrayStore(config.prepared_root, label="v23-Ilya-training")
+    store = PreparedArrayStore(
+        config.prepared_root,
+        time_start=config.time_start,
+        time_end=config.time_end,
+        allow_incomplete=config.allow_incomplete_prepared_store,
+        label="v23-Ilya-training",
+    )
     store.validate(resolution=config.architecture.resolution, task_cfg=task_config)
     time_step = pd.Timedelta(
         np.diff(np.asarray(store.time.values).astype("datetime64[ns]"))[0]
     )
     input_steps = input_steps_from_duration(task_config.input_duration, time_step)
-
     metadata_path = config.anchor_manifest_root / "metadata.json"
     if not metadata_path.is_file():
         raise FileNotFoundError(f"Missing anchor manifest metadata: {metadata_path}")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if config.time_start is not None:
+        if metadata.get("source_time_start") != store.selection_metadata["time_start"]:
+            raise ValueError("Anchor manifest time_start does not match training data")
+        if metadata.get("source_time_end") != store.selection_metadata["time_end"]:
+            raise ValueError("Anchor manifest time_end does not match training data")
+        if bool(metadata.get("allow_incomplete_prepared_store", False)) != bool(
+            config.allow_incomplete_prepared_store
+        ):
+            raise ValueError(
+                "Anchor manifest incomplete-store policy does not match training data"
+            )
     if not np.isclose(float(metadata.get("resolution", -1)), config.architecture.resolution):
         raise ValueError("Anchor manifest resolution does not match training architecture")
     if int(metadata.get("input_steps", -1)) != input_steps:
