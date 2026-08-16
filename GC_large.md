@@ -2,9 +2,21 @@
 
 This note describes the current tree as of 2026-08-16. Lianghong, please compare it directly with your tree (in particular `/home/lm8598/Weather_Global_experiments`) and tell me if anything below is broken, wrong, or incompatible with your implementation/checkpoints. Please do not assume the directory unification preserved behavior: check the model construction, parameter names, sparse-loss definition, state carry/reset behavior, data splits, and resume behavior against yours.
 
-## Start from the Git `minimalistic_code` branch
+## Required Git branch and code baseline
 
-The intended Git branch for this work is `minimalistic_code` in `git@github.com:Reminguch/Weather_Global.git`.
+Use the `minimalistic_code` branch from `git@github.com:Reminguch/Weather_Global.git`. The required sparse-training code baseline is:
+
+```text
+752c11b Add v23 res0.25 sparse-loss training
+```
+
+The first committed version of this handoff note (originally named `LH.md`) is:
+
+```text
+e62d154 Document v23 sparse training for Lianghong
+```
+
+Later edits to this note may move the branch tip, so use `752c11b` as the stable code requirement rather than assuming that a particular documentation commit must remain `HEAD`.
 
 For a new checkout:
 
@@ -14,7 +26,7 @@ git clone --branch minimalistic_code --single-branch \
 cd Weather_global
 ```
 
-For an existing checkout, first make sure you do not have local changes that would be overwritten, then update and switch branches:
+For an existing checkout, first make sure you do not have local changes that would be overwritten, then fetch and switch branches:
 
 ```bash
 git status --short
@@ -23,23 +35,20 @@ git switch minimalistic_code
 git pull --ff-only origin minimalistic_code
 ```
 
-Verify that the checkout is on the intended branch before using any command in this note:
+### Verify before running
+
+Verify the branch and confirm that the required code commit is present before using any training command in this note:
 
 ```bash
 git branch --show-current
 git rev-parse --short HEAD
-```
-
-`git branch --show-current` must print `minimalistic_code`. The res0.25 sparse-loss implementation, configs, launchers, tests, analysis helper, and removal of the old `Ilya_code` gitlink are commit `752c11b` (`Add v23 res0.25 sparse-loss training`). Commit `4d4a5fe` and older do **not** contain everything documented below. Do not start the sparse run unless commit `752c11b` is an ancestor of your checkout:
-
-```bash
 git merge-base --is-ancestor 752c11b HEAD
 ```
 
-That command must exit successfully. The branch also needs the later documentation commit containing this `LH.md`. If `origin/minimalistic_code` has not received those commits yet, ask me to push them before cloning or pulling. Verify that the checkout contains at least these files:
+The first command must print `minimalistic_code`; the ancestry check must exit successfully. Commit `4d4a5fe` and older do **not** contain the sparse-training work. Also verify that the checkout contains at least these files:
 
 ```text
-LH.md
+GC_large.md
 configs/experiments/v23_Ilya/res0p25_2019_2022_sparse_h20_lr3em6_smoke.json
 configs/experiments/v23_Ilya/res0p25_2019_2022_sparse_h20_lr3em6_dp4_8k.json
 scripts/experiments/train_v23_Ilya_res0p25_sparse_h20_lr_sweep.slurm
@@ -49,12 +58,12 @@ scripts/experiments/train_v23_Ilya_res0p25_sparse_h20_lr3em6_dp4_8k.slurm
 Quick check:
 
 ```bash
-test -f LH.md \
+test -f GC_large.md \
   && test -f configs/experiments/v23_Ilya/res0p25_2019_2022_sparse_h20_lr3em6_dp4_8k.json \
   && test -f scripts/experiments/train_v23_Ilya_res0p25_sparse_h20_lr3em6_dp4_8k.slurm
 ```
 
-Lianghong, please record the exact commit returned by `git rev-parse HEAD` when you verify this against your version so we do not compare two different working trees.
+Lianghong, please record the exact full commit returned by `git rev-parse HEAD` when you verify this against your version so we do not compare two different working trees.
 
 ## What the res0.25 training does
 
