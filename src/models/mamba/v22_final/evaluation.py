@@ -140,6 +140,7 @@ def evaluate_v22_final(config: V22FinalEvalConfig) -> dict:
     metrics = V22FinalMetricAccumulator(
         config.target_steps,
         eval_data.dataset["lat"].values,
+        diffs_stddev_by_level=stats["diffs_stddev_by_level"],
     )
     for sample_number, index in enumerate(chosen_indices, start=1):
         inputs, targets, forcings = build_eval_batch(

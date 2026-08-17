@@ -6,12 +6,32 @@ from typing import Any
 
 import numpy as np
 import xarray as xr
+from graphcast import losses as graphcast_losses
+from graphcast import normalization as graphcast_normalization
+
+
+# These are the per-variable weights in DeepMind GraphCast's original
+# ``GraphCast.loss_and_predictions`` objective. Variables not listed here have
+# unit weight.
+ORIGINAL_GRAPHCAST_VARIABLE_WEIGHTS = {
+    "2m_temperature": 1.0,
+    "10m_u_component_of_wind": 0.1,
+    "10m_v_component_of_wind": 0.1,
+    "mean_sea_level_pressure": 0.1,
+    "total_precipitation_6hr": 0.1,
+}
 
 
 class V22FinalMetricAccumulator:
     """Accumulate the metric schema emitted by eval_v22_clean.py."""
 
-    def __init__(self, target_steps: int, latitudes: np.ndarray):
+    def __init__(
+        self,
+        target_steps: int,
+        latitudes: np.ndarray,
+        *,
+        diffs_stddev_by_level: xr.Dataset | None = None,
+    ):
         if target_steps <= 0:
             raise ValueError(f"target_steps must be positive, got {target_steps}")
         self.target_steps = target_steps
@@ -20,6 +40,11 @@ class V22FinalMetricAccumulator:
             raise ValueError(f"Expected a non-empty 1-D latitude coordinate, got {cos_lat.shape}")
         self._cos_lat = cos_lat / cos_lat.mean()
         self._cos_lat_da = xr.DataArray(self._cos_lat, dims="lat")
+        self._diffs_stddev_by_level = diffs_stddev_by_level
+
+        self._graphcast_loss_sum_baseline = np.zeros(target_steps, dtype=np.float64)
+        self._graphcast_loss_sum_full = np.zeros(target_steps, dtype=np.float64)
+        self._graphcast_loss_count = np.zeros(target_steps, dtype=np.int64)
 
         self.sum_sq_b: dict[str, np.ndarray] = {}
         self.sum_sq_f: dict[str, np.ndarray] = {}
@@ -58,6 +83,13 @@ class V22FinalMetricAccumulator:
                     f"{label} has {dataset.sizes.get('time', 0)} time steps; "
                     f"expected {expected_steps}"
                 )
+
+        if self._diffs_stddev_by_level is not None:
+            self._update_original_graphcast_loss(
+                truth_dataset.astype("float32"),
+                baseline_dataset.astype("float32"),
+                full_dataset.astype("float32"),
+            )
 
         for variable in truth_dataset.data_vars:
             if variable not in baseline_dataset or variable not in full_dataset:
@@ -162,6 +194,9 @@ class V22FinalMetricAccumulator:
             "residual_diagnostics_per_variable": {},
         }
 
+        if self._diffs_stddev_by_level is not None:
+            output["original_graphcast_loss"] = self._finalize_original_graphcast_loss()
+
         for variable in sorted(self.n_per_var):
             count = self.n_per_var[variable]
             baseline_rmse = np.sqrt(self.sum_sq_b[variable] / count)
@@ -209,6 +244,83 @@ class V22FinalMetricAccumulator:
                 output["per_channel_per_step"][variable] = entry
 
         return output
+
+    def _update_original_graphcast_loss(
+        self,
+        truth: xr.Dataset,
+        baseline: xr.Dataset,
+        full: xr.Dataset,
+    ) -> None:
+        """Accumulate DeepMind GraphCast's original normalized weighted MSE.
+
+        GraphCast trains on residual-normalized fields. Applying its loss to
+        ``(prediction - truth) / diffs_stddev_by_level`` and zero is
+        algebraically identical, while allowing evaluation of arbitrary
+        rollout predictions without reconstructing the preceding input frame.
+        """
+        assert self._diffs_stddev_by_level is not None
+        missing = sorted(set(truth.data_vars) - set(self._diffs_stddev_by_level.data_vars))
+        if missing:
+            raise ValueError(
+                "Original GraphCast loss is missing difference scales for "
+                f"target variables: {missing}"
+            )
+
+        scales = self._diffs_stddev_by_level
+        normalized_errors = {
+            "baseline": graphcast_normalization.normalize(baseline - truth, scales, None),
+            "full": graphcast_normalization.normalize(full - truth, scales, None),
+        }
+        for step_index in range(self.target_steps):
+            losses_by_branch: dict[str, np.ndarray] = {}
+            for branch, error in normalized_errors.items():
+                step_error = error.isel(time=slice(step_index, step_index + 1))
+                loss, _diagnostics = graphcast_losses.weighted_mse_per_level(
+                    step_error,
+                    xr.zeros_like(step_error),
+                    per_variable_weights={
+                        variable: weight
+                        for variable, weight in ORIGINAL_GRAPHCAST_VARIABLE_WEIGHTS.items()
+                        if variable in step_error
+                    },
+                )
+                values = np.asarray(loss.values, dtype=np.float64)
+                if not np.all(np.isfinite(values)):
+                    raise ValueError(
+                        f"Non-finite original GraphCast {branch} loss at step {step_index}"
+                    )
+                losses_by_branch[branch] = values
+
+            if losses_by_branch["baseline"].shape != losses_by_branch["full"].shape:
+                raise ValueError("Baseline and full original GraphCast loss shapes differ")
+            count = losses_by_branch["baseline"].size
+            self._graphcast_loss_sum_baseline[step_index] += float(
+                losses_by_branch["baseline"].sum()
+            )
+            self._graphcast_loss_sum_full[step_index] += float(
+                losses_by_branch["full"].sum()
+            )
+            self._graphcast_loss_count[step_index] += count
+
+    def _finalize_original_graphcast_loss(self) -> dict[str, Any]:
+        if np.any(self._graphcast_loss_count <= 0):
+            raise ValueError("Original GraphCast loss has no samples for one or more leads")
+        baseline = self._graphcast_loss_sum_baseline / self._graphcast_loss_count
+        full = self._graphcast_loss_sum_full / self._graphcast_loss_count
+        if np.any(baseline <= 0.0):
+            raise ValueError("Original GraphCast baseline loss must be positive")
+        improvement = 100.0 * (1.0 - full / baseline)
+        baseline_rollout = float(np.mean(baseline))
+        full_rollout = float(np.mean(full))
+        return {
+            "definition": "DeepMind GraphCast normalized latitude- and pressure-level-weighted MSE",
+            "baseline_per_step": baseline.tolist(),
+            "full_per_step": full.tolist(),
+            "improvement_pct_per_step": improvement.tolist(),
+            "baseline_rollout": baseline_rollout,
+            "full_rollout": full_rollout,
+            "improvement_pct_rollout": 100.0 * (1.0 - full_rollout / baseline_rollout),
+        }
 
     def _pressure_level_entry(self, variable: str, level: int) -> dict[str, Any]:
         count = self.n_per_pl[variable][level]
