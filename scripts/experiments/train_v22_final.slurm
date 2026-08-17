@@ -35,8 +35,10 @@ CMD=(python -u scripts/training/train_v22_final.py --config "${CONFIG}")
 [[ -n "${INIT_FROM:-}" ]] && CMD+=(--init-from "${INIT_FROM}")
 [[ -n "${MAX_STEPS:-}" ]] && CMD+=(--max-steps "${MAX_STEPS}")
 [[ -n "${CHECKPOINT_EVERY:-}" ]] && CMD+=(--checkpoint-every "${CHECKPOINT_EVERY}")
+[[ -n "${LEARNING_RATE:-}" ]] && CMD+=(--learning-rate "${LEARNING_RATE}")
 [[ -n "${OUTPUT_ROOT:-}" ]] && CMD+=(--output-root "${OUTPUT_ROOT}")
 [[ -n "${RUN_NAME:-}" ]] && CMD+=(--run-name "${RUN_NAME}")
+[[ "${ZERO_STATE_ON_INIT:-0}" == "1" ]] && CMD+=(--zero-state-on-init)
 [[ "${DRY_RUN:-0}" == "1" ]] && CMD+=(--dry-run)
 
 printf 'Resolved command:'

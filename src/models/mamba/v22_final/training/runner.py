@@ -285,7 +285,7 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
             print(f"[v22_final] warm-starting from SWA checkpoint {invocation.init_from}")
         validate_param_tree_compatible(residual_params, checkpoint.residual_params)
         residual_params = checkpoint.residual_params
-        if checkpoint.has_residual_state:
+        if checkpoint.has_residual_state and not invocation.zero_state_on_init:
             assert checkpoint.residual_state is not None
             _validate_tree_shapes(
                 zero_residual_state,
@@ -293,6 +293,8 @@ def run_training(invocation: V22FinalTrainInvocation) -> Path | None:
                 "legacy residual state",
             )
             residual_state = checkpoint.residual_state
+        elif invocation.zero_state_on_init:
+            print("[v22_final] warm start recurrent state reset to zero")
         print(f"[v22_final] warm start from {invocation.init_from}; optimizer reset")
 
     n_residual_parameters = sum(

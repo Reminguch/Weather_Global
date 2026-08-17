@@ -166,6 +166,7 @@ class V22FinalTrainInvocation:
     config_path: Path
     resume: Path | None = None
     init_from: Path | None = None
+    zero_state_on_init: bool = False
     dry_run: bool = False
 
 
@@ -277,6 +278,7 @@ def apply_operational_overrides(
     checkpoint_every: int | None,
     output_root: Path | None,
     run_name: str | None,
+    learning_rate: float | None = None,
 ) -> V22FinalTrainConfig:
     replacements: dict[str, Any] = {}
     for name, value in (
@@ -284,6 +286,7 @@ def apply_operational_overrides(
         ("checkpoint_every", checkpoint_every),
         ("output_root", output_root),
         ("run_name", run_name),
+        ("learning_rate", learning_rate),
     ):
         if value is not None:
             replacements[name] = value
@@ -296,8 +299,14 @@ def build_cli_parser() -> argparse.ArgumentParser:
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--resume", type=Path)
     source.add_argument("--init-from", type=Path)
+    parser.add_argument(
+        "--zero-state-on-init",
+        action="store_true",
+        help="Use freshly initialized recurrent state when warm-starting parameters.",
+    )
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--checkpoint-every", type=int)
+    parser.add_argument("--learning-rate", type=float)
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--run-name")
     parser.add_argument("--dry-run", action="store_true")
@@ -305,7 +314,10 @@ def build_cli_parser() -> argparse.ArgumentParser:
 
 
 def parse_cli(argv: Sequence[str] | None = None) -> V22FinalTrainInvocation:
-    args = build_cli_parser().parse_args(argv)
+    parser = build_cli_parser()
+    args = parser.parse_args(argv)
+    if args.zero_state_on_init and args.init_from is None:
+        parser.error("--zero-state-on-init requires --init-from")
     config = load_training_config(args.config)
     config = apply_operational_overrides(
         config,
@@ -313,12 +325,14 @@ def parse_cli(argv: Sequence[str] | None = None) -> V22FinalTrainInvocation:
         checkpoint_every=args.checkpoint_every,
         output_root=args.output_root,
         run_name=args.run_name,
+        learning_rate=args.learning_rate,
     )
     return V22FinalTrainInvocation(
         config=config,
         config_path=args.config,
         resume=args.resume,
         init_from=args.init_from,
+        zero_state_on_init=args.zero_state_on_init,
         dry_run=args.dry_run,
     )
 

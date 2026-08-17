@@ -12,6 +12,7 @@ from src.models.mamba.v22_final.training.config import (
     V22FinalValidationConfig,
     apply_operational_overrides,
     load_training_config,
+    parse_cli,
     validate_resume_config,
 )
 from src.models.mamba.v22_final.training.data import (
@@ -52,10 +53,29 @@ def test_reference_config_and_operational_overrides() -> None:
         checkpoint_every=10,
         output_root=Path("smoke"),
         run_name="open",
+        learning_rate=3e-5,
     )
     assert overridden.max_steps == 20
     assert overridden.checkpoint_every == 10
+    assert overridden.learning_rate == 3e-5
     assert overridden.run_dir == Path("smoke/open")
+
+
+def test_warm_start_cli_can_zero_state_and_override_learning_rate() -> None:
+    invocation = parse_cli(
+        [
+            "--config",
+            str(REFERENCE_CONFIG),
+            "--init-from",
+            "average.pkl",
+            "--zero-state-on-init",
+            "--learning-rate",
+            "1e-5",
+        ]
+    )
+    assert invocation.init_from == Path("average.pkl")
+    assert invocation.zero_state_on_init
+    assert invocation.config.learning_rate == 1e-5
 
 
 def test_full_mamba_state_ablation_configs_differ_only_by_policy_and_run_name() -> None:
