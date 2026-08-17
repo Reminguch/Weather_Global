@@ -2,16 +2,19 @@
   "architecture_id": "v23_Ilya",
   "schema_version": 1,
   "data": {
-    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream/res1",
-    "anchor_manifest_root": "data/graphcast/graphcast/dataset/anchor_manifests/v23_Ilya_res1",
-    "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream_graphcast37/res0p25",
+    "anchor_manifest_root": "data/graphcast/graphcast/dataset/anchor_manifests/v23_Ilya_res0p25_2021_01",
+    "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast - ERA5 1979-2017 - resolution 0.25 - pressure levels 37 - mesh 2to6 - precipitation input and output.npz",
     "stats_dir": "data/graphcast/graphcast/stats",
     "input_duration": "12h",
-    "target_steps": 1
+    "target_steps": 1,
+    "time_start": "2021-01-01T00:00:00",
+    "time_end": "2021-01-31T18:00:00",
+    "allow_incomplete_prepared_store": true
   },
   "architecture": {
-    "resolution": 1.0,
-    "mesh_size": 5,
+    "resolution": 0.25,
+    "mesh_size": 6,
     "width": 512,
     "baseline_msg_steps": 16,
     "residual_msg_steps": 2,
@@ -42,25 +45,24 @@
     "weather_tape_precision": "bf16",
     "bptt_backend": "explicit_reverse_vjp"
   },
-
   "optimizer": {
-    "max_steps": 20000,
-    "checkpoint_every": 2000,
-    "learning_rate": 0.0001,
-    "weight_decay": 0.0001,
-    "warmup_steps": 200,
+    "max_steps": 5,
+    "checkpoint_every": 5,
+    "learning_rate": 0.0,
+    "weight_decay": 0.0,
+    "warmup_steps": 0,
     "grad_clip": 1.0,
     "seed": 22,
     "precision": "bf16"
   },
   "validation": {
     "enabled": false,
-    "every_steps": 2000,
-    "num_segments": 16,
+    "every_steps": 1,
+    "num_segments": 1,
     "final_num_segments": null
   },
   "output": {
-    "output_root": "artifacts/checkpoints/v23_Ilya/res1_endpoint_k24_20k_20260814",
-    "run_name": "di16_bcg1_last_step_closed_sg_stateful_20k"
+    "output_root": "artifacts/evaluations/v23_Ilya/res0p25_january2021_endpoint_k24_official_gc",
+    "run_name": "official_gc_closed_loop_20step_loss"
   }
 }

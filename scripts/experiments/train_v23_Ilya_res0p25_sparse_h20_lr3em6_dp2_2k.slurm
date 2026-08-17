@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Four-A100 data-parallel v23 sparse-loss training. Submit as two exact-resume
-# stages because 8,000 measured res0.25 sparse updates exceed one 6-day window.
-# Four single-GPU smokes peaked at the 128G CPU limit; 640G leaves 1.25x
-# aggregate headroom on the 1TB four-A100 nodes.
-#SBATCH --job-name=v23-r025-sp3e6-dp4
+# Two-A100 preliminary data-parallel run. A 24-hour allocation is expected to
+# produce partial progress toward 2,000 updates; exact-resume checkpoints are
+# written every 100 updates and fixed-subset validation runs every 250 updates.
+# Two single-GPU lanes reached the 128G CPU limit; 320G provides 1.25x aggregate
+# headroom on the high-memory A100-80GB nodes.
+#SBATCH --job-name=v23-r025-sp-dp2
 #SBATCH --account=dabanin
 #SBATCH --qos=gpu
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --constraint=gpu80
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=640G
-#SBATCH --time=5-00:00:00
-#SBATCH --output=logs/v23_r025_sparse_lr3em6_dp4_8k_%j.out
-#SBATCH --error=logs/v23_r025_sparse_lr3em6_dp4_8k_%j.err
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=320G
+#SBATCH --time=1-00:00:00
+#SBATCH --output=logs/v23_r025_sparse_lr3em6_dp2_2k_%j.out
+#SBATCH --error=logs/v23_r025_sparse_lr3em6_dp2_2k_%j.err
 
 set -euo pipefail
 
@@ -20,15 +21,15 @@ ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "${ROOT}"
 mkdir -p logs
 
-CONFIG="${CONFIG:-configs/experiments/v23_Ilya/res0p25_2019_2022_sparse_h20_lr3em6_dp4_8k.json}"
-MAX_STEPS="${MAX_STEPS:-4000}"
-CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-1000}"
+CONFIG="${CONFIG:-configs/experiments/v23_Ilya/res0p25_2019_2022_sparse_h20_lr3em6_dp2_2k.json}"
+MAX_STEPS="${MAX_STEPS:-2000}"
+CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-100}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-}"
 RUN_NAME="${RUN_NAME:-}"
 RESUME="${RESUME:-}"
-GPU_TELEMETRY="logs/v23_r025_sparse_lr3em6_dp4_8k_${SLURM_JOB_ID}_gpu.csv"
+GPU_TELEMETRY="logs/v23_r025_sparse_lr3em6_dp2_2k_${SLURM_JOB_ID}_gpu.csv"
 
-export MPLCONFIGDIR="/tmp/mpl-v23-r025-sp3e6-dp4-${SLURM_JOB_ID}"
+export MPLCONFIGDIR="/tmp/mpl-v23-r025-sp-dp2-${SLURM_JOB_ID}"
 mkdir -p "${MPLCONFIGDIR}"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_PYTHON_CLIENT_ALLOCATOR=platform
@@ -62,10 +63,10 @@ print(f"jax_process_count={jax.process_count()}")
 print(f"jax_local_device_count={len(devices)}")
 for index, device in enumerate(devices):
     print(f"jax_device[{index}]={device} platform={device.platform} kind={device.device_kind}")
-if jax.process_count() != 1 or len(devices) != 4:
-    raise SystemExit("expected one JAX process with exactly four local devices")
+if jax.process_count() != 1 or len(devices) != 2:
+    raise SystemExit("expected one JAX process with exactly two local devices")
 if any(device.platform != "gpu" for device in devices):
-    raise SystemExit("all four JAX devices must be GPUs")
+    raise SystemExit("both JAX devices must be GPUs")
 PY
 
 monitor_gpu() {

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Standalone v23_Ilya endpoint-only res1 reference run.
-# Matches v22-r1-di-bcg task 0 resources and model width while using the
-# last-step-only objective and BF16 unique-frame weather tape.
+# Matches the validated res0.25 K=24 trajectory: four teacher-prefix steps,
+# 20 closed-loop steps, five chunks per carried-state segment, last-step loss,
+# and staged 8,000-step exact-resume operation.
 #SBATCH --job-name=v23-r1-end-di16
 #SBATCH --account=dabanin
 #SBATCH --qos=gpu
@@ -20,6 +21,8 @@ cd "${ROOT}"
 mkdir -p logs
 
 CONFIG="configs/experiments/v23_Ilya/res1_endpoint_k24_di16_bcg1_closed_sg_stateful_20k.json"
+MAX_STEPS="${MAX_STEPS:-8000}"
+CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-2000}"
 GPU_MEMORY_LOG="logs/v23_r1_endpoint_di16_${SLURM_JOB_ID}_gpu_memory.csv"
 
 export MPLCONFIGDIR="/tmp/mpl-v23-r1-endpoint-${SLURM_JOB_ID}"
@@ -30,17 +33,19 @@ export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false"
 source scripts/graphcast_env.sh
 
 echo "config=${CONFIG}"
+echo "max_steps=${MAX_STEPS}"
+echo "checkpoint_every=${CHECKPOINT_EVERY}"
 echo "gpu_memory_log=${GPU_MEMORY_LOG}"
 echo "git_commit=$(git rev-parse HEAD)"
 git status --short
 sha256sum \
   "${CONFIG}" \
-  src/models/mamba/modules/temporal_mesh_mamba_Ilya.py \
-  src/models/mamba/v23_Ilya/config.py \
-  src/models/mamba/v23_Ilya/model.py \
+  src/models/graphcast/training/core/prepared_array.py \
+  src/models/mamba/v23_Ilya/anchor_manifest.py \
+  src/models/mamba/v23_Ilya/checkpoint.py \
   src/models/mamba/v23_Ilya/training/config.py \
-  src/models/mamba/v23_Ilya/training/endpoint_bptt.py \
-  src/models/mamba/v23_Ilya/training/step.py \
+  src/models/mamba/v23_Ilya/training/data.py \
+  src/models/mamba/v23_Ilya/training/endpoint_step.py \
   src/models/mamba/v23_Ilya/training/runner.py
 
 monitor_gpu() {
@@ -61,4 +66,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-python -u scripts/training/train_v23_Ilya.py --config "${CONFIG}"
+python -u scripts/training/train_v23_Ilya.py \
+  --config "${CONFIG}" \
+  --max-steps "${MAX_STEPS}" \
+  --checkpoint-every "${CHECKPOINT_EVERY}"

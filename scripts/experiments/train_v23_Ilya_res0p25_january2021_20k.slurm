@@ -24,7 +24,7 @@ CONFIG="configs/experiments/v23_Ilya/res0p25_january2021_endpoint_k24_di16_bcg1_
 RUN_DIR="artifacts/checkpoints/v23_Ilya/res0p25_january2021_endpoint_k24_smoke_20260814_retry2/di16_bcg1_last_step_closed_sg_stateful_5step"
 RESUME="${RESUME:-${RUN_DIR}/checkpoints/checkpoint_step00000005.pkl}"
 MAX_STEPS="${MAX_STEPS:-8000}"
-CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-100}"
+CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-2000}"
 GPU_MEMORY_LOG="logs/v23_r025_jan_20k_${SLURM_JOB_ID}_gpu_memory.csv"
 
 if [[ ! -f "${RESUME}" ]]; then
