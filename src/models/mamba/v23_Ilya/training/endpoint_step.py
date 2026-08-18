@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 from typing import Any, Callable
 
 import haiku as hk
@@ -23,10 +24,10 @@ from ..model import (
 from .config import BPTT_BACKEND, V23IlyaTrainConfig
 from .data_parallel import (
     pack_replica_trees,
-    replica_tree_to_host,
     replicate_tree,
     shard_replica_tree,
-    unpack_replica_trees,
+    start_tree_to_host,
+    unpack_device_replica_trees,
 )
 
 
@@ -1145,8 +1146,8 @@ def make_data_parallel_train_step(
     time_step,
     input_steps: int,
     devices,
-) -> Callable[..., tuple[Any, Any, Any, Any, Any, Any, Any]]:
-    """Build replicated host-tape BPTT with pmap one-step kernels."""
+) -> Callable[..., tuple[Any, Any, Any, Any, Any, Any, Any, dict[str, float]]]:
+    """Build hybrid DP BPTT with device-live rollout and bounded host tape."""
 
     if input_steps != 2:
         raise ValueError("v23_Ilya streaming BPTT requires input_steps=2")
@@ -1178,87 +1179,107 @@ def make_data_parallel_train_step(
     kernel_caches = {}
 
     def host_cast(tree, dtype):
+        host_tree = jax.device_get(tree)
         return jax.tree_util.tree_map(
-            lambda value: np.asarray(jax.device_get(value)).astype(dtype),
-            tree,
+            lambda value: np.asarray(value).astype(dtype),
+            host_tree,
         )
 
-    def host_zeros_like(tree):
-        return jax.tree_util.tree_map(
-            lambda value: np.zeros_like(np.asarray(jax.device_get(value))),
-            tree,
-        )
+    def host_template_like(tree, dtype):
+        def zeros(value):
+            value = np.asarray(value)
+            if np.issubdtype(value.dtype, np.inexact):
+                return np.zeros(value.shape, dtype=np.dtype(dtype))
+            return np.zeros_like(value)
 
-    def host_residual_target(truth, baseline_prediction):
-        return jax.tree_util.tree_map(
-            lambda target, baseline: (
-                np.asarray(jax.device_get(target))
-                - np.asarray(jax.device_get(baseline))
-            ),
-            truth,
-            baseline_prediction,
-        )
+        return jax.tree_util.tree_map(zeros, tree)
 
-    def host_feedback(baseline_prediction, residual_prediction):
-        if config.feedback_mode == "baseline":
-            return baseline_prediction
-        if config.feedback_mode == "closed_loop_sg":
-            return jax.tree_util.tree_map(
-                lambda baseline, residual: (
-                    np.asarray(jax.device_get(baseline))
-                    + np.asarray(jax.device_get(residual))
-                ),
-                baseline_prediction,
-                residual_prediction,
+    def unpack_host_replicas(treedef, packed_leaves):
+        return tuple(
+            jax.tree_util.tree_unflatten(
+                treedef,
+                [np.asarray(value[replica]) for value in packed_leaves],
             )
-        raise ValueError(f"Unsupported feedback mode: {config.feedback_mode!r}")
+            for replica in range(num_replicas)
+        )
 
-    def build_kernel_cache(input_treedef, target_treedef, forcing_treedef):
+    def build_kernel_cache(
+        previous_frame_tree,
+        current_frame_tree,
+        static_tree,
+        target_tree,
+        forcing_tree,
+        step_index,
+    ):
+        previous_frame_treedef = jax.tree_util.tree_structure(previous_frame_tree)
+        current_frame_treedef = jax.tree_util.tree_structure(current_frame_tree)
+        static_treedef = jax.tree_util.tree_structure(static_tree)
+        target_treedef = jax.tree_util.tree_structure(target_tree)
+        forcing_treedef = jax.tree_util.tree_structure(forcing_tree)
+        input_tree = input_window_from_frames(
+            previous_frame_tree,
+            current_frame_tree,
+            static_tree,
+            step_index=step_index,
+            truth_prefix_steps=config.truth_prefix_steps,
+            time_step=time_step,
+        )
+        frame_treedef = jax.tree_util.tree_structure(
+            next_dynamic_frame(
+                input_tree,
+                target_tree,
+                forcing_tree,
+                time_step=time_step,
+            )
+        )
+
         def unpack(treedef, leaves):
             return jax.tree_util.tree_unflatten(treedef, leaves)
 
         def pack(tree):
             return tuple(jax.tree_util.tree_leaves(tree))
 
-        def baseline_local(local_baseline_params, key, input_leaves, target_leaves, forcing_leaves):
-            inputs = unpack(input_treedef, input_leaves)
-            target = unpack(target_treedef, target_leaves)
+        def build_inputs(
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+        ):
+            return input_window_from_frames(
+                unpack(previous_frame_treedef, previous_frame_leaves),
+                unpack(current_frame_treedef, current_frame_leaves),
+                unpack(static_treedef, static_leaves),
+                step_index=step_index,
+                truth_prefix_steps=config.truth_prefix_steps,
+                time_step=time_step,
+            )
+
+        def supervised_rollout_local(
+            local_baseline_params,
+            params,
+            state,
+            key,
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+            truth_leaves,
+            forcing_leaves,
+        ):
+            inputs = build_inputs(
+                previous_frame_leaves,
+                current_frame_leaves,
+                static_leaves,
+            )
+            truth = unpack(target_treedef, truth_leaves)
             forcing = unpack(forcing_treedef, forcing_leaves)
-            prediction, _ = transforms.baseline_predict.apply(
+            baseline_prediction, _ = transforms.baseline_predict.apply(
                 local_baseline_params,
                 baseline_state,
                 key,
                 _tree_stop(inputs),
-                target,
+                truth,
                 forcing,
             )
-            return pack(_tree_stop(prediction))
-
-        def residual_local(params, state, key, input_leaves, target_leaves, forcing_leaves):
-            inputs = unpack(input_treedef, input_leaves)
-            target = unpack(target_treedef, target_leaves)
-            forcing = unpack(forcing_treedef, forcing_leaves)
-            prediction, next_state = transforms.residual_predict.apply(
-                params,
-                state,
-                key,
-                inputs,
-                target,
-                forcing,
-            )
-            return pack(prediction), cast_state_boundary_fp32(next_state)
-
-        def supervised_local(
-            params,
-            state,
-            key,
-            input_leaves,
-            target_leaves,
-            forcing_leaves,
-        ):
-            inputs = unpack(input_treedef, input_leaves)
-            target = unpack(target_treedef, target_leaves)
-            forcing = unpack(forcing_treedef, forcing_leaves)
+            target = residual_target(truth, baseline_prediction)
             output, next_state = transforms.residual_loss_and_predictions.apply(
                 params,
                 state,
@@ -1268,22 +1289,157 @@ def make_data_parallel_train_step(
                 forcing,
             )
             (loss_array, _diagnostics), prediction = output
+            frame = next_dynamic_frame(
+                inputs,
+                feedback_field(
+                    config.feedback_mode,
+                    baseline_prediction,
+                    prediction,
+                ),
+                forcing,
+                time_step=time_step,
+            )
             return (
                 scalarize_loss(loss_array),
-                pack(prediction),
+                pack(_tree_stop(_cast_floating(frame, tape_dtype))),
+                cast_state_boundary_fp32(next_state),
+                pack(_tree_stop(target)),
+            )
+
+        def supervised_no_feedback_local(
+            local_baseline_params,
+            params,
+            state,
+            key,
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+            truth_leaves,
+            forcing_leaves,
+        ):
+            inputs = build_inputs(
+                previous_frame_leaves,
+                current_frame_leaves,
+                static_leaves,
+            )
+            truth = unpack(target_treedef, truth_leaves)
+            forcing = unpack(forcing_treedef, forcing_leaves)
+            baseline_prediction, _ = transforms.baseline_predict.apply(
+                local_baseline_params,
+                baseline_state,
+                key,
+                _tree_stop(inputs),
+                truth,
+                forcing,
+            )
+            target = residual_target(truth, baseline_prediction)
+            output, next_state = transforms.residual_loss_and_predictions.apply(
+                params,
+                state,
+                key,
+                inputs,
+                target,
+                forcing,
+            )
+            (loss_array, _diagnostics), _prediction = output
+            return (
+                scalarize_loss(loss_array),
+                cast_state_boundary_fp32(next_state),
+                pack(_tree_stop(target)),
+            )
+
+        def residual_rollout_local(
+            local_baseline_params,
+            params,
+            state,
+            key,
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+            template_leaves,
+            forcing_leaves,
+        ):
+            inputs = build_inputs(
+                previous_frame_leaves,
+                current_frame_leaves,
+                static_leaves,
+            )
+            template = unpack(target_treedef, template_leaves)
+            forcing = unpack(forcing_treedef, forcing_leaves)
+            baseline_prediction, _ = transforms.baseline_predict.apply(
+                local_baseline_params,
+                baseline_state,
+                key,
+                _tree_stop(inputs),
+                template,
+                forcing,
+            )
+            prediction, next_state = transforms.residual_predict.apply(
+                params,
+                state,
+                key,
+                inputs,
+                template,
+                forcing,
+            )
+            frame = next_dynamic_frame(
+                inputs,
+                feedback_field(
+                    config.feedback_mode,
+                    baseline_prediction,
+                    prediction,
+                ),
+                forcing,
+                time_step=time_step,
+            )
+            return (
+                pack(_tree_stop(_cast_floating(frame, tape_dtype))),
                 cast_state_boundary_fp32(next_state),
             )
+
+        def residual_no_feedback_local(
+            params,
+            state,
+            key,
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+            template_leaves,
+            forcing_leaves,
+        ):
+            inputs = build_inputs(
+                previous_frame_leaves,
+                current_frame_leaves,
+                static_leaves,
+            )
+            template = unpack(target_treedef, template_leaves)
+            forcing = unpack(forcing_treedef, forcing_leaves)
+            _prediction, next_state = transforms.residual_predict.apply(
+                params,
+                state,
+                key,
+                inputs,
+                template,
+                forcing,
+            )
+            return cast_state_boundary_fp32(next_state)
 
         def state_pullback_local(
             params,
             state,
             key,
-            input_leaves,
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
             target_leaves,
             forcing_leaves,
             state_cotangent,
         ):
-            inputs = unpack(input_treedef, input_leaves)
+            inputs = build_inputs(
+                previous_frame_leaves,
+                current_frame_leaves,
+                static_leaves,
+            )
             target = unpack(target_treedef, target_leaves)
             forcing = unpack(forcing_treedef, forcing_leaves)
 
@@ -1309,13 +1465,19 @@ def make_data_parallel_train_step(
             params,
             state,
             key,
-            input_leaves,
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
             target_leaves,
             forcing_leaves,
             loss_cotangent,
             state_cotangent,
         ):
-            inputs = unpack(input_treedef, input_leaves)
+            inputs = build_inputs(
+                previous_frame_leaves,
+                current_frame_leaves,
+                static_leaves,
+            )
             target = unpack(target_treedef, target_leaves)
             forcing = unpack(forcing_treedef, forcing_leaves)
 
@@ -1361,12 +1523,28 @@ def make_data_parallel_train_step(
 
         pmap_kwargs = {"axis_name": "data", "devices": list(devices)}
         return {
-            "input_treedef": input_treedef,
+            "previous_frame_treedef": previous_frame_treedef,
+            "current_frame_treedef": current_frame_treedef,
+            "static_treedef": static_treedef,
             "target_treedef": target_treedef,
             "forcing_treedef": forcing_treedef,
-            "baseline": jax.pmap(baseline_local, **pmap_kwargs),
-            "residual": jax.pmap(residual_local, **pmap_kwargs),
-            "supervised": jax.pmap(supervised_local, **pmap_kwargs),
+            "frame_treedef": frame_treedef,
+            "supervised_rollout": jax.pmap(
+                supervised_rollout_local,
+                **pmap_kwargs,
+            ),
+            "supervised_no_feedback": jax.pmap(
+                supervised_no_feedback_local,
+                **pmap_kwargs,
+            ),
+            "residual_rollout": jax.pmap(
+                residual_rollout_local,
+                **pmap_kwargs,
+            ),
+            "residual_no_feedback": jax.pmap(
+                residual_no_feedback_local,
+                **pmap_kwargs,
+            ),
             "state_pullback": jax.pmap(state_pullback_local, **pmap_kwargs),
             "supervised_pullback": jax.pmap(
                 supervised_pullback_local,
@@ -1376,14 +1554,31 @@ def make_data_parallel_train_step(
             "optimizer": jax.pmap(optimizer_local, **pmap_kwargs),
         }
 
-    def get_kernel_cache(input_tree, target_tree, forcing_tree):
+    def get_kernel_cache(
+        previous_frame_tree,
+        current_frame_tree,
+        static_tree,
+        target_tree,
+        forcing_tree,
+        step_index,
+    ):
         cache_key = (
-            jax.tree_util.tree_structure(input_tree),
+            jax.tree_util.tree_structure(previous_frame_tree),
+            jax.tree_util.tree_structure(current_frame_tree),
+            jax.tree_util.tree_structure(static_tree),
             jax.tree_util.tree_structure(target_tree),
             jax.tree_util.tree_structure(forcing_tree),
+            step_index,
         )
         if cache_key not in kernel_caches:
-            kernel_caches[cache_key] = build_kernel_cache(*cache_key)
+            kernel_caches[cache_key] = build_kernel_cache(
+                previous_frame_tree,
+                current_frame_tree,
+                static_tree,
+                target_tree,
+                forcing_tree,
+                step_index,
+            )
         return kernel_caches[cache_key]
 
     def pack_expected(trees, expected_treedef):
@@ -1414,6 +1609,7 @@ def make_data_parallel_train_step(
             if len(forcings[replica]) != config.bptt_steps:
                 raise ValueError("Replica forcing count is incorrect")
 
+        setup_started = time.monotonic()
         host_keys = np.asarray(jax.device_get(keys))
         host_static = tuple(host_cast(value, jnp.float32) for value in static_inputs)
         host_truths = tuple(
@@ -1428,29 +1624,86 @@ def make_data_parallel_train_step(
             [host_cast(frame, tape_dtype) for frame in replica_frames]
             for replica_frames in input_frames
         ]
-        state_host = replica_tree_to_host(cast_state_boundary_fp32(residual_state))
-        zero_state_host = host_zeros_like(state_host)
-        if reset_state:
-            state_host = zero_state_host
+        host_templates_bf16 = tuple(
+            host_template_like(host_truths[replica][-1], tape_dtype)
+            for replica in range(num_replicas)
+        )
+        host_templates_fp32 = tuple(
+            host_template_like(host_truths[replica][-1], jnp.float32)
+            for replica in range(num_replicas)
+        )
 
+        static_treedef, static_leaves = pack_replica_trees(host_static, devices)
+        device_static = unpack_device_replica_trees(
+            static_treedef,
+            static_leaves,
+            num_replicas,
+        )
+        template_treedef, template_bf16_leaves = pack_replica_trees(
+            host_templates_bf16,
+            devices,
+        )
+        template_fp32_treedef, template_fp32_leaves = pack_replica_trees(
+            host_templates_fp32,
+            devices,
+        )
+        if template_treedef != template_fp32_treedef:
+            raise ValueError("FP32 and BF16 target templates have different structures")
+
+        previous_treedef, previous_leaves = pack_replica_trees(
+            tuple(weather_frames[replica][0] for replica in range(num_replicas)),
+            devices,
+        )
+        current_treedef, current_leaves = pack_replica_trees(
+            tuple(weather_frames[replica][1] for replica in range(num_replicas)),
+            devices,
+        )
+        device_previous_frames = unpack_device_replica_trees(
+            previous_treedef,
+            previous_leaves,
+            num_replicas,
+        )
+        device_current_frames = unpack_device_replica_trees(
+            current_treedef,
+            current_leaves,
+            num_replicas,
+        )
+
+        device_state = cast_state_boundary_fp32(residual_state)
+        zero_state = jax.tree_util.tree_map(jnp.zeros_like, device_state)
         state_tape = []
         residual_targets = []
-        host_losses = []
+        loss_arrays = []
+        pending_boundary = None
+        forward_offload_wait_seconds = 0.0
+        host_setup_seconds = time.monotonic() - setup_started
 
-        for index in range(config.bptt_steps):
-            state_in_host = zero_state_host if reset_state else state_host
-            state_tape.append(state_in_host)
-            current_inputs = tuple(
-                input_window_from_frames(
-                    weather_frames[replica][index],
-                    weather_frames[replica][index + 1],
-                    host_static[replica],
-                    step_index=index,
-                    truth_prefix_steps=config.truth_prefix_steps,
-                    time_step=time_step,
+        def consume_pending(boundary):
+            nonlocal forward_offload_wait_seconds
+            if boundary is None:
+                return
+            wait_started = time.monotonic()
+            snapshot = boundary["copy"].materialize()
+            forward_offload_wait_seconds += time.monotonic() - wait_started
+            state_tape.append(snapshot["state"])
+            if boundary["frame_treedef"] is not None:
+                replica_frames = unpack_host_replicas(
+                    boundary["frame_treedef"],
+                    snapshot["frame_leaves"],
                 )
-                for replica in range(num_replicas)
-            )
+                for replica, frame in enumerate(replica_frames):
+                    weather_frames[replica].append(frame)
+            if boundary["target_treedef"] is not None:
+                residual_targets.append(
+                    unpack_host_replicas(
+                        boundary["target_treedef"],
+                        snapshot["target_leaves"],
+                    )
+                )
+
+        forward_started = time.monotonic()
+        for index in range(config.bptt_steps):
+            state_in = zero_state if reset_state else device_state
             forcing = tuple(
                 host_forcings[replica][index] for replica in range(num_replicas)
             )
@@ -1459,22 +1712,18 @@ def make_data_parallel_train_step(
             needs_feedback = (
                 index >= config.truth_prefix_steps - 1 and index < final_index
             )
-            templates = tuple(
-                _template_like(
-                    host_truths[replica][-1],
-                    tape_dtype if index < final_index else jnp.float32,
-                )
-                for replica in range(num_replicas)
+            templates = (
+                host_templates_bf16
+                if index < final_index
+                else host_templates_fp32
             )
-
             kernels = get_kernel_cache(
-                current_inputs[0],
+                device_previous_frames[0],
+                device_current_frames[0],
+                device_static[0],
                 templates[0],
                 forcing[0],
-            )
-            input_leaves = pack_expected(
-                current_inputs,
-                kernels["input_treedef"],
+                index,
             )
             forcing_leaves = pack_expected(
                 forcing,
@@ -1482,128 +1731,192 @@ def make_data_parallel_train_step(
             )
             key = host_keys[:, index]
 
-            baseline_prediction = None
+            next_frame_leaves = ()
+            target_leaves = ()
             if supervised:
                 truth = tuple(
                     host_truths[replica][supervised_position]
                     for replica in range(num_replicas)
                 )
                 truth_leaves = pack_expected(truth, kernels["target_treedef"])
-                baseline_leaves = kernels["baseline"](
-                    replicated_baseline_params,
-                    key,
-                    input_leaves,
-                    truth_leaves,
-                    forcing_leaves,
-                )
-                baseline_prediction = unpack_replica_trees(
-                    kernels["target_treedef"],
-                    baseline_leaves,
-                    num_replicas,
-                )
-                target = tuple(
-                    host_residual_target(truth[replica], baseline_prediction[replica])
-                    for replica in range(num_replicas)
-                )
-                target_leaves = pack_expected(target, kernels["target_treedef"])
-                loss, prediction_leaves, next_state = kernels["supervised"](
-                    residual_params,
-                    state_in_host,
-                    key,
-                    input_leaves,
-                    target_leaves,
-                    forcing_leaves,
-                )
-                host_losses.append(np.asarray(jax.device_get(loss)))
-                residual_targets.append(target)
+                if needs_feedback:
+                    (
+                        loss,
+                        next_frame_leaves,
+                        next_state,
+                        target_leaves,
+                    ) = kernels["supervised_rollout"](
+                        replicated_baseline_params,
+                        residual_params,
+                        state_in,
+                        key,
+                        previous_leaves,
+                        current_leaves,
+                        static_leaves,
+                        truth_leaves,
+                        forcing_leaves,
+                    )
+                else:
+                    loss, next_state, target_leaves = kernels[
+                        "supervised_no_feedback"
+                    ](
+                        replicated_baseline_params,
+                        residual_params,
+                        state_in,
+                        key,
+                        previous_leaves,
+                        current_leaves,
+                        static_leaves,
+                        truth_leaves,
+                        forcing_leaves,
+                    )
+                loss_arrays.append(loss)
             else:
-                template_leaves = pack_expected(
-                    templates,
-                    kernels["target_treedef"],
+                template_leaves = (
+                    template_bf16_leaves
+                    if index < final_index
+                    else template_fp32_leaves
                 )
                 if needs_feedback:
-                    baseline_leaves = kernels["baseline"](
+                    next_frame_leaves, next_state = kernels["residual_rollout"](
                         replicated_baseline_params,
+                        residual_params,
+                        state_in,
                         key,
-                        input_leaves,
+                        previous_leaves,
+                        current_leaves,
+                        static_leaves,
                         template_leaves,
                         forcing_leaves,
                     )
-                    baseline_prediction = unpack_replica_trees(
-                        kernels["target_treedef"],
-                        baseline_leaves,
-                        num_replicas,
+                else:
+                    next_state = kernels["residual_no_feedback"](
+                        residual_params,
+                        state_in,
+                        key,
+                        previous_leaves,
+                        current_leaves,
+                        static_leaves,
+                        template_leaves,
+                        forcing_leaves,
                     )
-                prediction_leaves, next_state = kernels["residual"](
-                    residual_params,
-                    state_in_host,
-                    key,
-                    input_leaves,
-                    template_leaves,
-                    forcing_leaves,
+
+            # Launch the next kernel before materializing the previous boundary.
+            # This overlaps one boundary's D2H copy with useful device work while
+            # retaining at most one pending device snapshot.
+            consume_pending(pending_boundary)
+            pending_boundary = {
+                "copy": start_tree_to_host(
+                    {
+                        "state": state_in,
+                        "frame_leaves": tuple(next_frame_leaves),
+                        "target_leaves": tuple(target_leaves),
+                    }
+                ),
+                "frame_treedef": kernels["frame_treedef"] if needs_feedback else None,
+                "target_treedef": (
+                    kernels["target_treedef"] if supervised else None
+                ),
+            }
+
+            device_state = zero_state if reset_state else next_state
+            if index < config.truth_prefix_steps - 1:
+                next_teacher_treedef, next_teacher_leaves = pack_replica_trees(
+                    tuple(
+                        weather_frames[replica][index + 2]
+                        for replica in range(num_replicas)
+                    ),
+                    devices,
+                )
+                device_previous_frames = device_current_frames
+                previous_leaves = current_leaves
+                current_leaves = next_teacher_leaves
+                device_current_frames = unpack_device_replica_trees(
+                    next_teacher_treedef,
+                    current_leaves,
+                    num_replicas,
+                )
+            elif needs_feedback:
+                device_previous_frames = device_current_frames
+                previous_leaves = current_leaves
+                current_leaves = next_frame_leaves
+                device_current_frames = unpack_device_replica_trees(
+                    kernels["frame_treedef"],
+                    current_leaves,
+                    num_replicas,
                 )
 
-            residual_prediction = unpack_replica_trees(
-                kernels["target_treedef"],
-                prediction_leaves,
-                num_replicas,
-            )
-            state_host = zero_state_host if reset_state else replica_tree_to_host(next_state)
-            if needs_feedback:
-                assert baseline_prediction is not None
-                for replica in range(num_replicas):
-                    frame = next_dynamic_frame(
-                        current_inputs[replica],
-                        host_feedback(
-                            baseline_prediction[replica],
-                            residual_prediction[replica],
-                        ),
-                        forcing[replica],
-                        time_step=time_step,
-                    )
-                    weather_frames[replica].append(host_cast(frame, tape_dtype))
+        consume_pending(pending_boundary)
+        forward_seconds = time.monotonic() - forward_started
 
-        parameter_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_params)
-        state_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_state)
-        for index in range(final_index, -1, -1):
-            current_inputs = tuple(
-                input_window_from_frames(
-                    weather_frames[replica][index],
-                    weather_frames[replica][index + 1],
-                    host_static[replica],
-                    step_index=index,
-                    truth_prefix_steps=config.truth_prefix_steps,
-                    time_step=time_step,
-                )
-                for replica in range(num_replicas)
-            )
+        def prepare_backward(index):
+            prepare_started = time.monotonic()
             forcing = tuple(
                 host_forcings[replica][index] for replica in range(num_replicas)
             )
             kernels = get_kernel_cache(
-                current_inputs[0],
-                host_truths[0][-1],
+                weather_frames[0][index],
+                weather_frames[0][index + 1],
+                host_static[0],
+                host_templates_bf16[0],
                 forcing[0],
+                index,
             )
-            input_leaves = pack_expected(current_inputs, kernels["input_treedef"])
-            forcing_leaves = pack_expected(forcing, kernels["forcing_treedef"])
-            key = host_keys[:, index]
+            prepared = {
+                "index": index,
+                "kernels": kernels,
+                "previous_frame_leaves": pack_expected(
+                    tuple(
+                        weather_frames[replica][index]
+                        for replica in range(num_replicas)
+                    ),
+                    kernels["previous_frame_treedef"],
+                ),
+                "current_frame_leaves": pack_expected(
+                    tuple(
+                        weather_frames[replica][index + 1]
+                        for replica in range(num_replicas)
+                    ),
+                    kernels["current_frame_treedef"],
+                ),
+                "static_leaves": static_leaves,
+                "forcing_leaves": pack_expected(
+                    forcing,
+                    kernels["forcing_treedef"],
+                ),
+                "state": shard_replica_tree(state_tape[index], devices),
+                "key": host_keys[:, index],
+            }
+            supervised_position = supervised_positions.get(index)
+            if supervised_position is not None:
+                prepared["target_leaves"] = pack_expected(
+                    residual_targets[supervised_position],
+                    kernels["target_treedef"],
+                )
+            else:
+                prepared["template_leaves"] = template_bf16_leaves
+            return prepared, time.monotonic() - prepare_started
+
+        parameter_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_params)
+        state_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_state)
+        prepared, backward_prepare_seconds = prepare_backward(final_index)
+        backward_started = time.monotonic()
+        for index in range(final_index, -1, -1):
+            kernels = prepared["kernels"]
             supervised_position = supervised_positions.get(index)
             supervised = supervised_position is not None
 
             if supervised:
-                target_leaves = pack_expected(
-                    residual_targets[supervised_position],
-                    kernels["target_treedef"],
-                )
                 step_parameter_cotangent, step_state_cotangent = (
                     kernels["supervised_pullback"](
                         residual_params,
-                        state_tape[index],
-                        key,
-                        input_leaves,
-                        target_leaves,
-                        forcing_leaves,
+                        prepared["state"],
+                        prepared["key"],
+                        prepared["previous_frame_leaves"],
+                        prepared["current_frame_leaves"],
+                        prepared["static_leaves"],
+                        prepared["target_leaves"],
+                        prepared["forcing_leaves"],
                         np.full(
                             (num_replicas,),
                             supervised_weights[supervised_position],
@@ -1613,26 +1926,24 @@ def make_data_parallel_train_step(
                     )
                 )
             else:
-                templates = tuple(
-                    _template_like(host_truths[replica][-1], tape_dtype)
-                    for replica in range(num_replicas)
-                )
-                template_leaves = pack_expected(
-                    templates,
-                    kernels["target_treedef"],
-                )
                 step_parameter_cotangent, step_state_cotangent = (
                     kernels["state_pullback"](
                         residual_params,
-                        state_tape[index],
-                        key,
-                        input_leaves,
-                        template_leaves,
-                        forcing_leaves,
+                        prepared["state"],
+                        prepared["key"],
+                        prepared["previous_frame_leaves"],
+                        prepared["current_frame_leaves"],
+                        prepared["static_leaves"],
+                        prepared["template_leaves"],
+                        prepared["forcing_leaves"],
                         state_cotangent,
                     )
                 )
 
+            next_prepared = None
+            if index > 0:
+                next_prepared, prepare_seconds = prepare_backward(index - 1)
+                backward_prepare_seconds += prepare_seconds
             parameter_cotangent = kernels["accumulate"](
                 parameter_cotangent,
                 step_parameter_cotangent,
@@ -1643,11 +1954,20 @@ def make_data_parallel_train_step(
                 else step_state_cotangent
             )
             jax.block_until_ready(parameter_cotangent)
+            prepared = next_prepared
 
-        lane_loss_components = np.asarray(host_losses, dtype=np.float32)
+        backward_seconds = time.monotonic() - backward_started
+
+        loss_started = time.monotonic()
+        lane_loss_components = np.asarray(
+            jax.device_get(tuple(loss_arrays)),
+            dtype=np.float32,
+        )
         lane_losses = np.sum(
             lane_loss_components * supervised_weights[:, None], axis=0
         )
+        loss_materialize_seconds = time.monotonic() - loss_started
+        optimizer_started = time.monotonic()
         (
             next_params,
             next_optimizer_state,
@@ -1660,14 +1980,25 @@ def make_data_parallel_train_step(
             lane_losses,
         )
         jax.block_until_ready(next_params)
+        optimizer_seconds = time.monotonic() - optimizer_started
+        phase_seconds = {
+            "host_setup": host_setup_seconds,
+            "forward": forward_seconds,
+            "forward_offload_wait": forward_offload_wait_seconds,
+            "backward": backward_seconds,
+            "backward_prepare": backward_prepare_seconds,
+            "loss_materialize": loss_materialize_seconds,
+            "optimizer": optimizer_seconds,
+        }
         return (
             next_params,
-            shard_replica_tree(state_host, devices),
+            device_state,
             next_optimizer_state,
             mean_loss[0],
             gradient_norm[0],
             np.asarray(lane_losses, dtype=np.float32),
             lane_loss_components,
+            phase_seconds,
         )
 
     return train_step

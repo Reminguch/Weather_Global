@@ -707,6 +707,7 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 averaged_gradient_norm,
                 lane_losses,
                 lane_loss_components,
+                phase_seconds,
             ) = train_step(
                 replicated_params,
                 replica_states,
@@ -729,10 +730,29 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             )
             loss_value = float(jax.device_get(mean_loss))
             gradient_norm_value = float(jax.device_get(averaged_gradient_norm))
-            parameter_divergence = replica_max_abs_difference(replicated_params)
-            optimizer_divergence = replica_max_abs_difference(
-                replicated_optimizer_state
+            should_validate = config.validation.enabled and (
+                step % config.validation.every_steps == 0
+                or step == config.max_steps
             )
+            should_checkpoint = (
+                step % config.checkpoint_every == 0
+                or step == config.max_steps
+                or should_validate
+            )
+            replica_divergence_checked = step == 1 or should_checkpoint
+            diagnostics_started = time.monotonic()
+            if replica_divergence_checked:
+                parameter_divergence = replica_max_abs_difference(replicated_params)
+                optimizer_divergence = replica_max_abs_difference(
+                    replicated_optimizer_state
+                )
+            else:
+                parameter_divergence = None
+                optimizer_divergence = None
+            phase_seconds = {
+                **phase_seconds,
+                "diagnostics": time.monotonic() - diagnostics_started,
+            }
             device_memory = _device_memory_snapshot(72 * 1024**3)
             record = {
                 "step": step,
@@ -759,6 +779,8 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 ],
                 "max_parameter_replica_divergence": parameter_divergence,
                 "max_optimizer_replica_divergence": optimizer_divergence,
+                "replica_divergence_checked": replica_divergence_checked,
+                "phase_seconds": phase_seconds,
             }
             if config.loss_mode == "sparse_steps":
                 record["loss_by_horizon"] = {
@@ -791,6 +813,11 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 if config.loss_mode == "sparse_steps"
                 else ""
             )
+            divergence_text = (
+                f"{parameter_divergence:.3e}"
+                if parameter_divergence is not None
+                else "not_checked"
+            )
             print(
                 f"step {step}/{config.max_steps} mean_loss {loss_value:.5f} "
                 f"lane_loss_min/max/std {np.min(lane_losses):.5f}/"
@@ -798,18 +825,9 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
                 f"avg_grad_norm {gradient_norm_value:.4f} "
                 f"segments={list(chunk.segment_ids)} offset={consumed_cursor.segment_offset} "
                 f"anchors_seen={step * anchors_per_update} "
-                f"replica_divergence={parameter_divergence:.3e} "
+                f"replica_divergence={divergence_text} "
                 f"step_time={step_seconds:.2f}s{horizon_text}",
                 flush=True,
-            )
-            should_validate = config.validation.enabled and (
-                step % config.validation.every_steps == 0
-                or step == config.max_steps
-            )
-            should_checkpoint = (
-                step % config.checkpoint_every == 0
-                or step == config.max_steps
-                or should_validate
             )
             if should_checkpoint:
                 residual_params = unreplicate_tree(replicated_params)

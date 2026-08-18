@@ -29,12 +29,15 @@ from src.models.mamba.v23_Ilya.training.data import (
 )
 from src.models.mamba.v23_Ilya.training.data_parallel import (
     derive_replica_step_keys,
+    pack_device_replica_trees,
     pack_replica_trees,
     replica_max_abs_difference,
     replica_tree_to_host,
     replicate_tree,
     shard_replica_tree,
+    start_tree_to_host,
     unreplicate_tree,
+    unpack_device_replica_trees,
     unpack_replica_trees,
     validate_data_parallel_runtime,
 )
@@ -252,6 +255,41 @@ def test_xarray_replica_pack_roundtrip() -> None:
         xr.testing.assert_identical(actual, expected)
 
 
+def test_device_replica_pack_and_pending_host_copy_preserve_dtype() -> None:
+    devices = _require_four_cpu_devices()
+    trees = tuple(
+        xr.Dataset(
+            {
+                "x": (
+                    ("batch", "time"),
+                    jnp.asarray([[replica + 0.5]], dtype=jnp.bfloat16),
+                )
+            },
+            coords={"batch": [0], "time": [np.timedelta64(0, "h")]},
+        )
+        for replica in range(4)
+    )
+    treedef, packed = pack_replica_trees(trees, devices)
+    device_trees = unpack_device_replica_trees(treedef, packed, 4)
+    incremented = tuple(tree.assign(x=tree.x + 1) for tree in device_trees)
+    result_treedef, result_packed = pack_device_replica_trees(
+        incremented,
+        devices,
+    )
+
+    pending = start_tree_to_host({"values": result_packed})
+    first = pending.materialize()
+    second = pending.materialize()
+    assert first is second
+    restored = unpack_replica_trees(result_treedef, first["values"], 4)
+    for replica, value in enumerate(restored):
+        assert value.x.dtype == jnp.bfloat16
+        np.testing.assert_allclose(
+            np.asarray(value.x.data, dtype=np.float32),
+            np.asarray([[replica + 1.5]], dtype=np.float32),
+        )
+
+
 def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
     devices = _require_four_cpu_devices()
     config = _config()
@@ -326,6 +364,7 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
         gradient_norm,
         lane_losses,
         lane_loss_components,
+        phase_seconds,
     ) = parallel_step(
         replicated_params,
         replica_states,
@@ -352,6 +391,16 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
     _tree_allclose(actual_params, expected_params)
     np.testing.assert_allclose(lane_losses, serial_losses, rtol=1e-6, atol=1e-6)
     assert np.asarray(lane_loss_components).shape == (2, 4)
+    assert set(phase_seconds) == {
+        "host_setup",
+        "forward",
+        "forward_offload_wait",
+        "backward",
+        "backward_prepare",
+        "loss_materialize",
+        "optimizer",
+    }
+    assert all(value >= 0.0 for value in phase_seconds.values())
     np.testing.assert_allclose(mean_loss, np.mean(serial_losses), rtol=1e-6)
     np.testing.assert_allclose(gradient_norm, optax.global_norm(mean_gradient), rtol=1e-6)
 
@@ -389,6 +438,200 @@ def test_data_parallel_gradient_state_and_replicas_match_serial() -> None:
             strict=True,
         )
     )
+
+
+def test_data_parallel_multiple_carried_updates_match_serial() -> None:
+    devices = _require_four_cpu_devices()
+    config = _config()
+    transforms = _transforms()
+    gradient_optimizer = optax.sgd(1.0)
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(0.05),
+        optax.sgd(0.1),
+    )
+    serial_step = make_train_step(
+        transforms=transforms,
+        optimizer=gradient_optimizer,
+        baseline_params={},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+    )
+    parallel_step = make_data_parallel_train_step(
+        transforms=transforms,
+        optimizer=optimizer,
+        baseline_params={},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+        devices=devices,
+    )
+
+    serial_params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
+    serial_states = tuple(
+        {"s": jnp.asarray(0.05 * lane, dtype=jnp.float32)} for lane in range(4)
+    )
+    serial_optimizer_state = optimizer.init(serial_params)
+    replicated_params = replicate_tree(serial_params, devices)
+    replicated_optimizer = replicate_tree(serial_optimizer_state, devices)
+    replica_states = shard_replica_tree(
+        jax.tree_util.tree_map(lambda *values: np.stack(values), *serial_states),
+        devices,
+    )
+    lane_args = tuple(_lane_arguments(lane) for lane in range(4))
+    master = jax.random.PRNGKey(17)
+
+    for _ in range(3):
+        master, keys = derive_replica_step_keys(
+            master,
+            num_replicas=4,
+            bptt_steps=4,
+        )
+        gradients = []
+        next_serial_states = []
+        serial_losses = []
+        for lane in range(4):
+            frames, static, truths, forcings = lane_args[lane]
+            next_lane_params, next_lane_state, _, loss, _, _ = serial_step(
+                serial_params,
+                serial_states[lane],
+                gradient_optimizer.init(serial_params),
+                keys[lane],
+                frames,
+                static,
+                truths,
+                forcings,
+            )
+            gradients.append(
+                jax.tree_util.tree_map(
+                    lambda before, after: before - after,
+                    serial_params,
+                    next_lane_params,
+                )
+            )
+            next_serial_states.append(next_lane_state)
+            serial_losses.append(float(loss))
+
+        mean_gradient = jax.tree_util.tree_map(
+            lambda *values: jnp.stack(values).mean(axis=0),
+            *gradients,
+        )
+        updates, serial_optimizer_state = optimizer.update(
+            mean_gradient,
+            serial_optimizer_state,
+            serial_params,
+        )
+        serial_params = optax.apply_updates(serial_params, updates)
+        serial_states = tuple(next_serial_states)
+
+        (
+            replicated_params,
+            replica_states,
+            replicated_optimizer,
+            mean_loss,
+            gradient_norm,
+            lane_losses,
+            _lane_loss_components,
+            _phase_seconds,
+        ) = parallel_step(
+            replicated_params,
+            replica_states,
+            replicated_optimizer,
+            keys,
+            tuple(value[0] for value in lane_args),
+            tuple(value[1] for value in lane_args),
+            tuple(value[2] for value in lane_args),
+            tuple(value[3] for value in lane_args),
+        )
+
+        _tree_allclose(unreplicate_tree(replicated_params), serial_params)
+        _tree_allclose(
+            unreplicate_tree(replicated_optimizer),
+            serial_optimizer_state,
+        )
+        actual_states = replica_tree_to_host(replica_states)
+        for lane, expected_state in enumerate(serial_states):
+            _tree_allclose(
+                jax.tree_util.tree_map(lambda value: value[lane], actual_states),
+                expected_state,
+            )
+        np.testing.assert_allclose(lane_losses, serial_losses, rtol=1e-6, atol=1e-6)
+        np.testing.assert_allclose(mean_loss, np.mean(serial_losses), rtol=1e-6)
+        np.testing.assert_allclose(
+            gradient_norm,
+            optax.global_norm(mean_gradient),
+            rtol=1e-6,
+        )
+        assert replica_max_abs_difference(replicated_params) == 0.0
+        assert replica_max_abs_difference(replicated_optimizer) == 0.0
+
+
+def test_repaired_step_accepts_existing_data_parallel_checkpoint_layout(
+    tmp_path: Path,
+) -> None:
+    devices = _require_four_cpu_devices()
+    config = _config()
+    optimizer = optax.adam(0.01)
+    params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
+    states = tuple(
+        {"s": np.asarray(0.05 * lane, dtype=np.float32)} for lane in range(4)
+    )
+    replica_state_host = jax.tree_util.tree_map(
+        lambda *values: np.stack(values),
+        *states,
+    )
+    path = tmp_path / "pre_repair_checkpoint.pkl"
+    atomic_pickle_dump(
+        data_parallel_training_checkpoint_payload(
+            completed_step=1,
+            residual_params=params,
+            replica_states=replica_state_host,
+            optimizer_state=optimizer.init(params),
+            rng_key=jax.random.PRNGKey(29),
+            replica_group_cursor={"epoch": 0, "group_index": 0, "segment_offset": 1},
+            active_segment_ids=(0, 1, 2, 3),
+            num_devices=4,
+            resolved_training_config=config.to_dict(),
+            baseline_checkpoint_path="baseline.npz",
+            baseline_checkpoint_fingerprint="baseline-sha",
+            anchor_manifest_fingerprint="manifest-sha",
+            parameter_overlay_metadata={},
+        ),
+        path,
+    )
+    checkpoint = load_v23_Ilya_data_parallel_training_checkpoint(path)
+    _, keys = derive_replica_step_keys(
+        checkpoint.rng_key,
+        num_replicas=4,
+        bptt_steps=4,
+    )
+    step = make_data_parallel_train_step(
+        transforms=_transforms(),
+        optimizer=optimizer,
+        baseline_params={},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+        devices=devices,
+    )
+    lane_args = tuple(_lane_arguments(lane) for lane in range(4))
+    result = step(
+        replicate_tree(checkpoint.residual_params, devices),
+        shard_replica_tree(checkpoint.replica_states, devices),
+        replicate_tree(checkpoint.optimizer_state, devices),
+        keys,
+        tuple(value[0] for value in lane_args),
+        tuple(value[1] for value in lane_args),
+        tuple(value[2] for value in lane_args),
+        tuple(value[3] for value in lane_args),
+    )
+    assert np.isfinite(float(result[3]))
+    assert np.isfinite(float(result[4]))
+    assert replica_max_abs_difference(result[0]) == 0.0
+    assert replica_max_abs_difference(result[2]) == 0.0
 
 
 def test_data_parallel_checkpoint_resume_matches_uninterrupted(tmp_path: Path) -> None:

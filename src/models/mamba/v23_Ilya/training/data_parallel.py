@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import jax
@@ -62,11 +63,60 @@ def derive_replica_step_keys(
     return next_master_key, keys
 
 
+def _numpy_tree(tree):
+    return jax.tree_util.tree_map(np.asarray, tree)
+
+
 def _host_tree(tree):
-    return jax.tree_util.tree_map(
-        lambda value: np.asarray(jax.device_get(value)),
-        tree,
-    )
+    """Materialize a complete PyTree with one container-level device_get.
+
+    Passing the whole container to JAX lets independent leaf and device copies be
+    scheduled together.  Mapping ``device_get`` leaf by leaf serializes those
+    synchronization points and is especially expensive for pmap-sharded weather
+    trees.
+    """
+
+    return _numpy_tree(jax.device_get(tree))
+
+
+def _start_host_copy(tree) -> None:
+    """Start copies for all addressable shards without materializing the tree."""
+
+    for leaf in jax.tree_util.tree_leaves(tree):
+        if not isinstance(leaf, jax.Array):
+            continue
+        shards = leaf.addressable_shards
+        if shards:
+            for shard in shards:
+                shard.data.copy_to_host_async()
+        else:
+            leaf.copy_to_host_async()
+
+
+@dataclass
+class PendingHostTree:
+    """A bounded asynchronous device-to-host PyTree copy.
+
+    The object deliberately retains its device tree until ``materialize`` is
+    called.  DP training keeps at most one pending tape boundary so this cannot
+    grow into a device-resident BPTT tape.
+    """
+
+    _tree: Any
+    _materialized: Any | None = None
+
+    def materialize(self):
+        if self._materialized is None:
+            self._materialized = _host_tree(self._tree)
+            self._tree = None
+        return self._materialized
+
+
+def start_tree_to_host(tree) -> PendingHostTree:
+    """Start an asynchronous copy and return a later materialization handle."""
+
+    _start_host_copy(tree)
+    return PendingHostTree(tree)
 
 
 def replicate_tree(tree, devices: Sequence[jax.Device]):
@@ -104,10 +154,8 @@ def shard_replica_tree(tree, devices: Sequence[jax.Device]):
 def unreplicate_tree(tree):
     """Return the canonical first replica without transferring all replicas."""
 
-    return jax.tree_util.tree_map(
-        lambda value: np.asarray(jax.device_get(value[0])),
-        tree,
-    )
+    first_replica = jax.tree_util.tree_map(lambda value: value[0], tree)
+    return _host_tree(first_replica)
 
 
 def replica_tree_to_host(tree):
@@ -143,12 +191,53 @@ def pack_replica_trees(
         if candidate != treedef:
             raise ValueError(f"Replica {replica} PyTree structure differs")
         replica_leaves.append(jax.tree_util.tree_leaves(tree))
+    leaf_count = len(replica_leaves[0])
+    flat_host_leaves = _numpy_tree(
+        jax.device_get(
+            tuple(
+                replica_leaves[replica][leaf_index]
+                for replica in range(len(devices))
+                for leaf_index in range(leaf_count)
+            )
+        )
+    )
+    host_replica_leaves = tuple(
+        flat_host_leaves[
+            replica * leaf_count : (replica + 1) * leaf_count
+        ]
+        for replica in range(len(devices))
+    )
     packed = tuple(
         jax.device_put_sharded(
             [
-                np.asarray(jax.device_get(replica_leaves[replica][leaf_index]))
+                host_replica_leaves[replica][leaf_index]
                 for replica in range(len(devices))
             ],
+            list(devices),
+        )
+        for leaf_index in range(leaf_count)
+    )
+    return treedef, packed
+
+
+def pack_device_replica_trees(
+    trees: Sequence[Any],
+    devices: Sequence[jax.Device],
+) -> tuple[jax.tree_util.PyTreeDef, tuple[Any, ...]]:
+    """Pack matching trees whose leaves already live on their lane devices."""
+
+    if len(trees) != len(devices):
+        raise ValueError(f"Expected {len(devices)} replica trees, got {len(trees)}")
+    treedef = jax.tree_util.tree_structure(trees[0])
+    replica_leaves = []
+    for replica, tree in enumerate(trees):
+        candidate = jax.tree_util.tree_structure(tree)
+        if candidate != treedef:
+            raise ValueError(f"Replica {replica} PyTree structure differs")
+        replica_leaves.append(jax.tree_util.tree_leaves(tree))
+    packed = tuple(
+        jax.device_put_sharded(
+            [replica_leaves[replica][leaf_index] for replica in range(len(devices))],
             list(devices),
         )
         for leaf_index in range(len(replica_leaves[0]))
@@ -156,12 +245,36 @@ def pack_replica_trees(
     return treedef, packed
 
 
+def unpack_device_replica_trees(
+    treedef: jax.tree_util.PyTreeDef,
+    packed_leaves: Sequence[Any],
+    num_replicas: int,
+) -> tuple[Any, ...]:
+    """Expose local pmap shards as per-device trees without a host transfer."""
+
+    per_leaf_shards = []
+    for value in packed_leaves:
+        shards = value.addressable_shards
+        if len(shards) != num_replicas:
+            raise ValueError(
+                f"Expected {num_replicas} addressable shards, got {len(shards)}"
+            )
+        per_leaf_shards.append(tuple(shard.data[0] for shard in shards))
+    return tuple(
+        jax.tree_util.tree_unflatten(
+            treedef,
+            [value[replica] for value in per_leaf_shards],
+        )
+        for replica in range(num_replicas)
+    )
+
+
 def unpack_replica_trees(
     treedef: jax.tree_util.PyTreeDef,
     packed_leaves: Sequence[Any],
     num_replicas: int,
 ) -> tuple[Any, ...]:
-    host_leaves = [np.asarray(jax.device_get(value)) for value in packed_leaves]
+    host_leaves = _numpy_tree(jax.device_get(tuple(packed_leaves)))
     return tuple(
         jax.tree_util.tree_unflatten(
             treedef,
