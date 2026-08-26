@@ -25,6 +25,7 @@ LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
 WEATHER_TAPE_PRECISIONS = ("bf16", "fp32")
 BPTT_BACKEND = "explicit_reverse_vjp"
 DISTRIBUTED_MODES = ("single", "data_parallel")
+WEIGHT_DECAY_POLICIES = ("all", "mamba_standard")
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,7 @@ class V23IlyaTrainConfig:
     checkpoint_every: int = 2_000
     learning_rate: float = 1e-4
     weight_decay: float = 1e-4
+    weight_decay_policy: str = "all"
     warmup_steps: int = 200
     grad_clip: float = 1.0
     seed: int = 18
@@ -228,6 +230,11 @@ class V23IlyaTrainConfig:
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative, got {value}")
+        if self.weight_decay_policy not in WEIGHT_DECAY_POLICIES:
+            raise ValueError(
+                "weight_decay_policy must be one of "
+                f"{WEIGHT_DECAY_POLICIES}, got {self.weight_decay_policy!r}"
+            )
 
     @property
     def run_dir(self) -> Path:
@@ -314,6 +321,7 @@ class V23IlyaTrainConfig:
                 "checkpoint_every": self.checkpoint_every,
                 "learning_rate": self.learning_rate,
                 "weight_decay": self.weight_decay,
+                "weight_decay_policy": self.weight_decay_policy,
                 "warmup_steps": self.warmup_steps,
                 "grad_clip": self.grad_clip,
                 "seed": self.seed,
@@ -335,6 +343,8 @@ class V23IlyaTrainInvocation:
     resume: Path | None = None
     init_from: Path | None = None
     dry_run: bool = False
+    baseline_validation_only: bool = False
+    validation_compare: Path | None = None
 
 
 def _section(payload: Mapping[str, Any], name: str, allowed: set[str]) -> dict[str, Any]:
@@ -413,7 +423,7 @@ def load_training_config(path: Path) -> V23IlyaTrainConfig:
     optimizer = _section(
         payload,
         "optimizer",
-        {"max_steps", "checkpoint_every", "learning_rate", "weight_decay", "warmup_steps", "grad_clip", "seed", "precision"},
+        {"max_steps", "checkpoint_every", "learning_rate", "weight_decay", "weight_decay_policy", "warmup_steps", "grad_clip", "seed", "precision"},
     )
     objective = _section(
         payload,
@@ -521,6 +531,24 @@ def build_cli_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--run-name")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--baseline-validation-only",
+        action="store_true",
+        help=(
+            "Run the fixed validation protocol once with freshly initialized "
+            "zero-output residual parameters, write baseline_validation.json, "
+            "and exit without an optimizer update."
+        ),
+    )
+    parser.add_argument(
+        "--validation-compare",
+        type=Path,
+        metavar="CHECKPOINT",
+        help=(
+            "Run fixed validation for both the fresh zero-output baseline and "
+            "CHECKPOINT, write validation_comparison.json, and exit."
+        ),
+    )
     return parser
 
 
@@ -540,6 +568,8 @@ def parse_cli(argv: Sequence[str] | None = None) -> V23IlyaTrainInvocation:
         resume=args.resume,
         init_from=args.init_from,
         dry_run=args.dry_run,
+        baseline_validation_only=args.baseline_validation_only,
+        validation_compare=args.validation_compare,
     )
 
 
@@ -564,12 +594,21 @@ def validate_resume_config(
         # never consumed by the full-Mamba implementation.
         saved_architecture.pop("temporal_hidden_size", None)
         saved_architecture.setdefault("temporal_bc_groups", 1)
+        saved_architecture.setdefault("temporal_init_scheme", "legacy_haiku")
+        saved_architecture.setdefault("temporal_dt_init", "random")
+        saved_architecture.setdefault("temporal_dt_min", 0.001)
+        saved_architecture.setdefault("temporal_dt_max", 0.1)
+        saved_architecture.setdefault("temporal_dt_scale", 1.0)
+        saved_architecture.setdefault("temporal_dt_init_floor", 1e-4)
     saved_sequence = saved_copy.get("sequence")
     if isinstance(saved_sequence, dict):
         # Checkpoints written before the explicit state-policy field always
         # used the legacy carry behavior.  For stateless architectures this
         # carried an empty Haiku state tree and was therefore a no-op.
         saved_sequence.setdefault("temporal_state_policy", "carry")
+    saved_optimizer = saved_copy.get("optimizer")
+    if isinstance(saved_optimizer, dict):
+        saved_optimizer.setdefault("weight_decay_policy", "all")
     # Validation is operational and must not perturb exact-resume training.
     # Older checkpoints predate this optional section, and resumed runs may
     # safely change its cadence or subset size.

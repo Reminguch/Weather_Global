@@ -76,6 +76,9 @@ def run_fixed_validation(
 
     started = time.monotonic()
     total_loss = 0.0
+    total_loss_components = np.zeros(
+        len(config.supervised_horizon_labels), dtype=np.float64
+    )
     total_anchors = 0
     chunks_per_segment = config.segment_steps // config.bptt_steps
     for segment_id_np in selected:
@@ -100,7 +103,7 @@ def run_fixed_validation(
                 chunk_index=chunk_index,
                 bptt_steps=config.bptt_steps,
             )
-            loss, validation_state = validation_step(
+            loss, validation_state, loss_components = validation_step(
                 residual_params,
                 validation_state,
                 keys,
@@ -110,12 +113,22 @@ def run_fixed_validation(
                 chunk.forcings,
             )
             loss = jax.block_until_ready(loss)
+            loss_components = jax.block_until_ready(loss_components)
             total_loss += float(jax.device_get(loss)) * config.bptt_steps
+            total_loss_components += (
+                np.asarray(jax.device_get(loss_components), dtype=np.float64)
+                * config.bptt_steps
+            )
             total_anchors += config.bptt_steps
 
+    loss_by_horizon = {
+        str(horizon): float(total_loss_components[position] / total_anchors)
+        for position, horizon in enumerate(config.supervised_horizon_labels)
+    }
     return {
         "step": int(step),
         "loss": total_loss / total_anchors,
+        "loss_by_horizon": loss_by_horizon,
         "duration_seconds": time.monotonic() - started,
         "role": role,
         "available_segments": len(training_data.validation_segments),

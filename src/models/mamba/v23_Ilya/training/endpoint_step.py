@@ -96,9 +96,40 @@ def build_optimizer(config: V23IlyaTrainConfig):
     transforms = []
     if config.grad_clip > 0:
         transforms.append(optax.clip_by_global_norm(config.grad_clip))
-    transforms.append(optax.adamw(learning_rate, weight_decay=config.weight_decay))
+    decay_mask = (
+        mamba_standard_weight_decay_mask
+        if config.weight_decay_policy == "mamba_standard"
+        else None
+    )
+    transforms.append(
+        optax.adamw(
+            learning_rate,
+            weight_decay=config.weight_decay,
+            mask=decay_mask,
+        )
+    )
     optimizer = optax.chain(*transforms) if len(transforms) > 1 else transforms[0]
     return optimizer, learning_rate
+
+
+def mamba_standard_weight_decay_mask(params):
+    """Decay matrices except Mamba dynamics, normalization, and all biases."""
+
+    def should_decay(module_name, param_name, _value):
+        module_path = module_name.lower()
+        if param_name in ("A_log", "D", "b", "offset", "scale"):
+            return False
+        if "layer_norm" in module_path:
+            return False
+        return True
+
+    return {
+        module_name: {
+            param_name: should_decay(module_name, param_name, value)
+            for param_name, value in module_params.items()
+        }
+        for module_name, module_params in params.items()
+    }
 
 
 def _tree_stop(tree):
@@ -260,7 +291,8 @@ def make_bptt_objective(
     config: V23IlyaTrainConfig,
     time_step,
     input_steps: int,
-) -> Callable[..., tuple[Any, Any]]:
+    return_loss_components: bool = False,
+) -> Callable[..., tuple[Any, ...]]:
     """Build an objective whose custom VJP rematerializes residual steps only."""
 
     if input_steps != 2:
@@ -462,7 +494,7 @@ def make_bptt_objective(
             static_inputs,
             forcings,
         )
-        return loss, _tree_stop(final_state), tape
+        return loss, _tree_stop(final_state), _tree_stop(loss_components), tape
 
     def objective(
         residual_params,
@@ -522,7 +554,7 @@ def make_bptt_objective(
                 truth_leaves,
                 forcing_leaves,
             )
-            loss, final_state, _ = run_forward(
+            loss, final_state, loss_components, _ = run_forward(
                 params,
                 state,
                 step_keys,
@@ -532,6 +564,8 @@ def make_bptt_objective(
                 forcing_values,
                 save_tape=False,
             )
+            if return_loss_components:
+                return loss, final_state, loss_components
             return loss, final_state
 
         def flat_objective_fwd(
@@ -549,7 +583,7 @@ def make_bptt_objective(
                 truth_leaves,
                 forcing_leaves,
             )
-            loss, final_state, tape = run_forward(
+            loss, final_state, loss_components, tape = run_forward(
                 params,
                 state,
                 step_keys,
@@ -577,7 +611,12 @@ def make_bptt_objective(
                 pack(tape_static),
                 tuple(pack(forcing) for forcing in tape_forcings),
             )
-            return (loss, final_state), packed_tape
+            output = (
+                (loss, final_state, loss_components)
+                if return_loss_components
+                else (loss, final_state)
+            )
+            return output, packed_tape
 
         def flat_objective_bwd(packed_tape, output_cotangents):
             (
@@ -600,7 +639,7 @@ def make_bptt_objective(
                 unpack(forcing_treedef, leaves) for leaves in forcing_leaves
             )
             tape_initial_state = state_tape[0]
-            loss_cotangent, _final_state_cotangent = output_cotangents
+            loss_cotangent = output_cotangents[0]
             reset_state = config.temporal_state_policy == "reset_every_anchor"
             parameter_cotangent = _tree_zeros_like(tape_params)
             state_cotangent = _tree_zeros_like(tape_initial_state)
@@ -2020,6 +2059,7 @@ def make_validation_step(
         config=config,
         time_step=time_step,
         input_steps=input_steps,
+        return_loss_components=True,
     )
 
     @jax.jit
@@ -2032,7 +2072,7 @@ def make_validation_step(
         truths,
         forcings,
     ):
-        loss, next_residual_state = bptt_objective(
+        loss, next_residual_state, loss_components = bptt_objective(
             residual_params,
             residual_state,
             keys,
@@ -2041,6 +2081,6 @@ def make_validation_step(
             truths,
             forcings,
         )
-        return loss, _tree_stop(next_residual_state)
+        return loss, _tree_stop(next_residual_state), _tree_stop(loss_components)
 
     return validation_step

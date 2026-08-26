@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Two-A100 preliminary data-parallel run. A 24-hour allocation is expected to
 # produce partial progress toward 2,000 updates; exact-resume checkpoints are
-# written every 100 updates and fixed-subset validation runs every 250 updates.
+# written every 50 updates and fixed-subset validation runs every 200 updates.
 # Two single-GPU lanes reached the 128G CPU limit; 320G provides 1.25x aggregate
 # headroom on the high-memory A100-80GB nodes.
 #SBATCH --job-name=v23-r025-sp-dp2
@@ -23,10 +23,11 @@ mkdir -p logs
 
 CONFIG="${CONFIG:-configs/experiments/v23_Ilya/res0p25_2019_2022_sparse_h20_lr3em6_dp2_2k.json}"
 MAX_STEPS="${MAX_STEPS:-2000}"
-CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-100}"
+CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-50}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-}"
 RUN_NAME="${RUN_NAME:-}"
 RESUME="${RESUME:-}"
+SMOKE_GATE="${SMOKE_GATE:-0}"
 GPU_TELEMETRY="logs/v23_r025_sparse_lr3em6_dp2_2k_${SLURM_JOB_ID}_gpu.csv"
 
 export MPLCONFIGDIR="/tmp/mpl-v23-r025-sp-dp2-${SLURM_JOB_ID}"
@@ -42,6 +43,7 @@ echo "checkpoint_every=${CHECKPOINT_EVERY}"
 echo "output_root=${OUTPUT_ROOT:-from_config}"
 echo "run_name=${RUN_NAME:-from_config}"
 echo "resume=${RESUME:-fresh_initialization}"
+echo "smoke_gate=${SMOKE_GATE}"
 echo "gpu_telemetry=${GPU_TELEMETRY}"
 echo "git_commit=$(git rev-parse HEAD)"
 git status --short
@@ -111,3 +113,91 @@ python -u scripts/training/train_v23_Ilya.py "${TRAIN_ARGS[@]}"
 GPU_PEAK_MIB="$(awk -F',' 'BEGIN { peak=0 } { gsub(/ /, "", $4); if (($4 + 0) > peak) peak=$4 + 0 } END { print peak }' "${GPU_TELEMETRY}")"
 CPU_MAX_RSS="$(sstat -j "${SLURM_JOB_ID}.batch" --noheader --format=MaxRSS -P 2>/dev/null | tail -n 1 || true)"
 echo "resource_summary sampled_gpu_peak_mib=${GPU_PEAK_MIB} cpu_max_rss=${CPU_MAX_RSS}"
+
+if [[ "${SMOKE_GATE}" == "1" ]]; then
+  if [[ -z "${OUTPUT_ROOT}" || -z "${RUN_NAME}" ]]; then
+    echo "SMOKE_GATE=1 requires explicit OUTPUT_ROOT and RUN_NAME" >&2
+    exit 3
+  fi
+  V23_SMOKE_STDERR="logs/v23_r025_sparse_lr3em6_dp2_2k_${SLURM_JOB_ID}.err"
+  if [[ -s "${V23_SMOKE_STDERR}" ]]; then
+    echo "Smoke gate failed: stderr is not empty (${V23_SMOKE_STDERR})" >&2
+    exit 3
+  fi
+  export V23_SMOKE_METRICS="${OUTPUT_ROOT}/${RUN_NAME}/train_metrics.jsonl"
+  export V23_SMOKE_CHECKPOINT="${OUTPUT_ROOT}/${RUN_NAME}/checkpoints/checkpoint_step00000005.pkl"
+  export V23_SMOKE_GPU_PEAK_MIB="${GPU_PEAK_MIB}"
+  python - <<'PY'
+import json
+import math
+import os
+import statistics
+from pathlib import Path
+
+metrics_path = Path(os.environ["V23_SMOKE_METRICS"])
+checkpoint_path = Path(os.environ["V23_SMOKE_CHECKPOINT"])
+records = [
+    json.loads(line)
+    for line in metrics_path.read_text(encoding="utf-8").splitlines()
+    if line.strip()
+]
+if [record.get("step") for record in records] != [1, 2, 3, 4, 5]:
+    raise SystemExit("Smoke gate failed: expected metric steps 1..5")
+
+median_seconds = statistics.median(
+    float(record["step_seconds"]) for record in records[1:]
+)
+if median_seconds > 85.0:
+    raise SystemExit(
+        f"Smoke gate failed: steps 2-5 median {median_seconds:.2f}s exceeds 85s"
+    )
+
+gpu_peak_mib = int(os.environ["V23_SMOKE_GPU_PEAK_MIB"])
+if gpu_peak_mib > 72 * 1024:
+    raise SystemExit(
+        f"Smoke gate failed: sampled GPU peak {gpu_peak_mib} MiB exceeds 72 GiB"
+    )
+
+def assert_finite(value, label):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            assert_finite(child, f"{label}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            assert_finite(child, f"{label}[{index}]")
+    elif isinstance(value, (int, float)) and not math.isfinite(float(value)):
+        raise SystemExit(f"Smoke gate failed: non-finite {label}={value}")
+
+for record in records:
+    for field in (
+        "mean_loss",
+        "lane_losses",
+        "averaged_gradient_norm",
+        "loss_by_horizon",
+        "lane_loss_by_horizon",
+        "phase_seconds",
+    ):
+        assert_finite(record[field], f"step{record['step']}.{field}")
+    if not record["phase_seconds"]:
+        raise SystemExit(
+            f"Smoke gate failed: step {record['step']} has no phase timings"
+        )
+    if record["replica_divergence_checked"]:
+        for field in (
+            "max_parameter_replica_divergence",
+            "max_optimizer_replica_divergence",
+        ):
+            if float(record[field]) != 0.0:
+                raise SystemExit(
+                    f"Smoke gate failed: step {record['step']} {field}={record[field]}"
+                )
+
+if not checkpoint_path.is_file():
+    raise SystemExit(f"Smoke gate failed: missing checkpoint {checkpoint_path}")
+print(
+    "smoke_gate_passed "
+    f"median_steps_2_5_seconds={median_seconds:.2f} "
+    f"sampled_gpu_peak_mib={gpu_peak_mib}"
+)
+PY
+fi

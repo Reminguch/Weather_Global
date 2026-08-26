@@ -21,6 +21,7 @@ from ..config import (
 FEEDBACK_MODES = ("baseline", "closed_loop_sg")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
+LEARNING_RATE_SCHEDULES = ("constant", "cosine")
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,9 @@ class V22FinalTrainConfig:
     max_steps: int = 50_000
     checkpoint_every: int = 2_000
     learning_rate: float = 1e-4
+    learning_rate_schedule: str = "constant"
+    decay_start_step: int | None = None
+    end_learning_rate: float | None = None
     weight_decay: float = 1e-4
     warmup_steps: int = 200
     grad_clip: float = 1.0
@@ -107,12 +111,43 @@ class V22FinalTrainConfig:
             )
         if self.precision not in PRECISIONS:
             raise ValueError(f"precision must be one of {PRECISIONS}")
+        if self.learning_rate_schedule not in LEARNING_RATE_SCHEDULES:
+            raise ValueError(
+                "learning_rate_schedule must be one of "
+                f"{LEARNING_RATE_SCHEDULES}, got {self.learning_rate_schedule!r}"
+            )
         if self.warmup_steps < 0:
             raise ValueError(f"warmup_steps must be non-negative, got {self.warmup_steps}")
         for name in ("learning_rate", "weight_decay", "grad_clip"):
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative, got {value}")
+        if self.learning_rate_schedule == "constant":
+            if self.decay_start_step is not None or self.end_learning_rate is not None:
+                raise ValueError(
+                    "constant learning_rate_schedule requires decay_start_step and "
+                    "end_learning_rate to be null or omitted"
+                )
+        else:
+            if self.learning_rate <= 0:
+                raise ValueError("cosine learning_rate_schedule requires learning_rate > 0")
+            if self.decay_start_step is None:
+                raise ValueError("cosine learning_rate_schedule requires decay_start_step")
+            if not self.warmup_steps <= self.decay_start_step < self.max_steps:
+                raise ValueError(
+                    "decay_start_step must be between warmup_steps and max_steps-1, "
+                    f"got {self.decay_start_step}"
+                )
+            if self.end_learning_rate is None:
+                raise ValueError("cosine learning_rate_schedule requires end_learning_rate")
+            if (
+                not math.isfinite(float(self.end_learning_rate))
+                or not 0 <= self.end_learning_rate <= self.learning_rate
+            ):
+                raise ValueError(
+                    "end_learning_rate must be finite and between zero and "
+                    f"learning_rate={self.learning_rate}, got {self.end_learning_rate}"
+                )
 
     @property
     def run_dir(self) -> Path:
@@ -146,6 +181,9 @@ class V22FinalTrainConfig:
                 "max_steps": self.max_steps,
                 "checkpoint_every": self.checkpoint_every,
                 "learning_rate": self.learning_rate,
+                "learning_rate_schedule": self.learning_rate_schedule,
+                "decay_start_step": self.decay_start_step,
+                "end_learning_rate": self.end_learning_rate,
                 "weight_decay": self.weight_decay,
                 "warmup_steps": self.warmup_steps,
                 "grad_clip": self.grad_clip,
@@ -233,7 +271,19 @@ def load_training_config(path: Path) -> V22FinalTrainConfig:
     optimizer = _section(
         payload,
         "optimizer",
-        {"max_steps", "checkpoint_every", "learning_rate", "weight_decay", "warmup_steps", "grad_clip", "seed", "precision"},
+        {
+            "max_steps",
+            "checkpoint_every",
+            "learning_rate",
+            "learning_rate_schedule",
+            "decay_start_step",
+            "end_learning_rate",
+            "weight_decay",
+            "warmup_steps",
+            "grad_clip",
+            "seed",
+            "precision",
+        },
     )
     if "validation" in payload:
         validation_values = _section(
@@ -357,6 +407,13 @@ def validate_resume_config(
         # used the legacy carry behavior.  For stateless architectures this
         # carried an empty Haiku state tree and was therefore a no-op.
         saved_sequence.setdefault("temporal_state_policy", "carry")
+    saved_optimizer = saved_copy.get("optimizer")
+    if isinstance(saved_optimizer, dict):
+        # Checkpoints written before configurable decay used warmup followed by
+        # a constant learning rate.
+        saved_optimizer.setdefault("learning_rate_schedule", "constant")
+        saved_optimizer.setdefault("decay_start_step", None)
+        saved_optimizer.setdefault("end_learning_rate", None)
     # Validation is operational and must not perturb exact-resume training.
     # Older checkpoints predate this optional section, and resumed runs may
     # safely change its cadence or subset size.

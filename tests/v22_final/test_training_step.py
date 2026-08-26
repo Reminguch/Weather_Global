@@ -15,6 +15,7 @@ from graphcast import xarray_jax
 
 from src.models.mamba.v22_final.training.config import load_training_config
 from src.models.mamba.v22_final.training.step import (
+    build_optimizer,
     feedback_field,
     make_train_step,
     make_validation_step,
@@ -24,6 +25,24 @@ from src.models.mamba.v22_final.training.step import (
 
 ROOT = Path(__file__).resolve().parents[2]
 REFERENCE_CONFIG = ROOT / "configs/experiments/v22_final/res2_gc500k_k12_open.json"
+
+
+def test_held_cosine_learning_rate_schedule() -> None:
+    config = dataclasses.replace(
+        load_training_config(REFERENCE_CONFIG),
+        max_steps=8_000,
+        learning_rate=1e-4,
+        learning_rate_schedule="cosine",
+        warmup_steps=200,
+        decay_start_step=2_000,
+        end_learning_rate=3e-6,
+    )
+    _optimizer, schedule = build_optimizer(config)
+    assert float(schedule(0)) == pytest.approx(0.0)
+    assert float(schedule(200)) == pytest.approx(1e-4)
+    assert float(schedule(1_999)) == pytest.approx(1e-4)
+    assert float(schedule(2_000)) == pytest.approx(1e-4)
+    assert float(schedule(7_999)) == pytest.approx(3e-6, rel=1e-3)
 
 
 def test_residual_target_stops_baseline_gradient() -> None:

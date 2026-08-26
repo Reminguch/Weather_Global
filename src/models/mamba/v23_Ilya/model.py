@@ -25,6 +25,12 @@ def attach_temporal(
     predictor._temporal_d_state = config.temporal_d_state
     predictor._temporal_d_conv = config.temporal_d_conv
     predictor._temporal_dt_rank = config.temporal_dt_rank
+    predictor._temporal_init_scheme = config.temporal_init_scheme
+    predictor._temporal_dt_init = config.temporal_dt_init
+    predictor._temporal_dt_min = config.temporal_dt_min
+    predictor._temporal_dt_max = config.temporal_dt_max
+    predictor._temporal_dt_scale = config.temporal_dt_scale
+    predictor._temporal_dt_init_floor = config.temporal_dt_init_floor
     predictor._temporal_bias = config.temporal_bias
     predictor._temporal_conv_bias = config.temporal_conv_bias
     predictor._temporal_layers = config.temporal_layers

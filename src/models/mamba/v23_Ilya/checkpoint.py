@@ -527,18 +527,32 @@ def build_v23_Ilya_swa(
         raise ValueError("source_steps must be unique and sorted ascending")
     if any(step < 0 for step in source_steps):
         raise ValueError("source_steps must be non-negative")
-    raw_checkpoints = []
-    training_checkpoints = []
+    training_checkpoints: list[
+        V23IlyaTrainingCheckpoint | V23IlyaDataParallelTrainingCheckpoint
+    ] = []
+    checkpoint_formats: list[str] = []
     for path, expected_step in zip(inputs, source_steps, strict=True):
-        checkpoint = load_v23_Ilya_training_checkpoint(path)
+        try:
+            with path.open("rb") as handle:
+                checkpoint_format = pickle.load(handle).get("checkpoint_format")
+        except Exception as exc:
+            raise ValueError(f"Could not inspect SWA checkpoint {path}: {exc}") from exc
+        if checkpoint_format == TRAINING_CHECKPOINT_FORMAT:
+            checkpoint = load_v23_Ilya_training_checkpoint(path)
+        elif checkpoint_format == DATA_PARALLEL_TRAINING_CHECKPOINT_FORMAT:
+            checkpoint = load_v23_Ilya_data_parallel_training_checkpoint(path)
+        else:
+            raise ValueError(
+                f"SWA input {path} has unsupported checkpoint_format="
+                f"{checkpoint_format!r}"
+            )
         if checkpoint.completed_step != expected_step:
             raise ValueError(
                 f"Checkpoint {path} has completed_step={checkpoint.completed_step}, "
                 f"expected {expected_step}"
             )
-        with path.open("rb") as handle:
-            raw_checkpoints.append(pickle.load(handle))
         training_checkpoints.append(checkpoint)
+        checkpoint_formats.append(str(checkpoint_format))
     first = training_checkpoints[0]
     signature = jax.tree_util.tree_structure(first.residual_params)
     first_leaves = jax.tree_util.tree_leaves(first.residual_params)
@@ -556,9 +570,7 @@ def build_v23_Ilya_swa(
         return normalized
 
     first_config_signature = swa_config_signature(first.resolved_training_config)
-    for raw_checkpoint, path, checkpoint in zip(
-        raw_checkpoints[1:], inputs[1:], training_checkpoints[1:], strict=True
-    ):
+    for path, checkpoint in zip(inputs[1:], training_checkpoints[1:], strict=True):
         if jax.tree_util.tree_structure(checkpoint.residual_params) != signature:
             raise ValueError(f"Residual parameter tree differs in {path}")
         for leaf_index, (expected, candidate) in enumerate(
@@ -571,7 +583,7 @@ def build_v23_Ilya_swa(
         if swa_config_signature(checkpoint.resolved_training_config) != first_config_signature:
             raise ValueError(f"SWA checkpoints disagree on resolved_training_config in {path}")
         for field in ("baseline_checkpoint_fingerprint", "anchor_manifest_fingerprint"):
-            if raw_checkpoints[0][field] != raw_checkpoint[field]:
+            if getattr(first, field) != getattr(checkpoint, field):
                 raise ValueError(f"SWA checkpoints disagree on {field}")
 
     def average_leaf(*leaves):
@@ -593,7 +605,13 @@ def build_v23_Ilya_swa(
         "checkpoint_format": SWA_CHECKPOINT_FORMAT,
         "checkpoint_kind": "swa",
         "residual_params": averaged,
-        "residual_state": first.residual_state,
+        # Data-parallel checkpoints contain distinct lane states and therefore
+        # have no canonical recurrent state for SWA evaluation or warm start.
+        "residual_state": (
+            first.residual_state
+            if all(value == TRAINING_CHECKPOINT_FORMAT for value in checkpoint_formats)
+            else None
+        ),
         "swa_source_steps": list(source_steps),
         "swa_source_ckpts": [str(path) for path in inputs],
         "resolved_training_config": first.resolved_training_config,

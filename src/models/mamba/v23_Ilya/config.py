@@ -28,6 +28,7 @@ EVAL_MODES = (
     "warm_bp_reset_state",
     "warm_full_reset_state",
 )
+METRIC_BACKENDS = ("auto", "cpu", "device")
 RESIDUAL_STATE_INIT_MODES = ("zero", "ckpt", "warm24")
 
 
@@ -46,6 +47,12 @@ class V23IlyaArchitectureConfig:
     temporal_d_state: int = 16
     temporal_d_conv: int = 4
     temporal_dt_rank: str = "auto"
+    temporal_init_scheme: str = "legacy_haiku"
+    temporal_dt_init: str = "random"
+    temporal_dt_min: float = 0.001
+    temporal_dt_max: float = 0.1
+    temporal_dt_scale: float = 1.0
+    temporal_dt_init_floor: float = 1e-4
     temporal_layers: int = 2
     temporal_conv_bias: bool = True
     temporal_stateful: bool = True
@@ -103,6 +110,32 @@ class V23IlyaArchitectureConfig:
             raise ValueError(
                 f"temporal_dropout must be in [0, 1), got {self.temporal_dropout}"
             )
+        if self.temporal_init_scheme not in ("legacy_haiku", "mamba1"):
+            raise ValueError(
+                "temporal_init_scheme must be 'legacy_haiku' or 'mamba1', got "
+                f"{self.temporal_init_scheme!r}"
+            )
+        if self.temporal_dt_init not in ("random", "constant"):
+            raise ValueError(
+                "temporal_dt_init must be 'random' or 'constant', got "
+                f"{self.temporal_dt_init!r}"
+            )
+        if not math.isfinite(self.temporal_dt_min) or self.temporal_dt_min <= 0:
+            raise ValueError("temporal_dt_min must be positive and finite")
+        if (
+            not math.isfinite(self.temporal_dt_max)
+            or self.temporal_dt_max < self.temporal_dt_min
+        ):
+            raise ValueError("temporal_dt_max must be finite and at least temporal_dt_min")
+        if not math.isfinite(self.temporal_dt_scale) or self.temporal_dt_scale <= 0:
+            raise ValueError("temporal_dt_scale must be positive and finite")
+        if (
+            not math.isfinite(self.temporal_dt_init_floor)
+            or self.temporal_dt_init_floor <= 0
+        ):
+            raise ValueError("temporal_dt_init_floor must be positive and finite")
+        if self.temporal_dt_init_floor > self.temporal_dt_max:
+            raise ValueError("temporal_dt_init_floor must not exceed temporal_dt_max")
 
 
 @dataclass(frozen=True)
@@ -126,12 +159,22 @@ class V23IlyaEvalConfig:
     input_duration: str | None = "12h"
     target_steps: int = 40
     warmup_steps: int = 24
+    anchor_history_steps: int | None = None
+    stream_block_steps: int = 4
+    omit_rms_bias: bool = False
+    metric_backend: str = "auto"
     temporal_location: str = "mesh_processor_interleaved"
     temporal_d_inner: int | None = None
     temporal_bc_groups: int = 1
     temporal_d_state: int = 16
     temporal_d_conv: int = 4
     temporal_dt_rank: str = "auto"
+    temporal_init_scheme: str = "legacy_haiku"
+    temporal_dt_init: str = "random"
+    temporal_dt_min: float = 0.001
+    temporal_dt_max: float = 0.1
+    temporal_dt_scale: float = 1.0
+    temporal_dt_init_floor: float = 1e-4
     temporal_layers: int = 2
     temporal_conv_bias: bool = True
     temporal_stateful: bool = True
@@ -144,6 +187,9 @@ class V23IlyaEvalConfig:
     seed: int = 0
     residual_alpha: float = 1.0
     force_idx: int | None = None
+    anchor_shard_count: int = 1
+    anchor_shard_index: int = 0
+    merge_state_out: Path | None = None
 
     def __post_init__(self) -> None:
         # Preserve the flat legacy evaluator interface while validating its
@@ -156,19 +202,48 @@ class V23IlyaEvalConfig:
                 "residual_state_init must be one of "
                 f"{RESIDUAL_STATE_INIT_MODES}, got {self.residual_state_init!r}"
             )
+        if self.metric_backend not in METRIC_BACKENDS:
+            raise ValueError(
+                f"metric_backend must be one of {METRIC_BACKENDS}, "
+                f"got {self.metric_backend!r}"
+            )
+        if self.metric_backend == "device" and not self.omit_rms_bias:
+            raise ValueError(
+                "metric_backend='device' requires omit_rms_bias=True"
+            )
         positive = {
             "target_steps": self.target_steps,
             "n_samples": self.n_samples,
+            "anchor_shard_count": self.anchor_shard_count,
+            "stream_block_steps": self.stream_block_steps,
         }
         for name, value in positive.items():
             if value <= 0:
                 raise ValueError(f"{name} must be positive, got {value}")
         if self.warmup_steps < 0:
             raise ValueError(f"warmup_steps must be non-negative, got {self.warmup_steps}")
+        if self.anchor_history_steps is not None:
+            if self.anchor_history_steps < 0:
+                raise ValueError(
+                    "anchor_history_steps must be non-negative or None, got "
+                    f"{self.anchor_history_steps}"
+                )
+            if self.anchor_history_steps < self.effective_warmup_steps:
+                raise ValueError(
+                    "anchor_history_steps must be at least the effective warmup, got "
+                    f"{self.anchor_history_steps} < {self.effective_warmup_steps}"
+                )
         if not math.isfinite(self.residual_alpha):
             raise ValueError(f"residual_alpha must be finite, got {self.residual_alpha}")
         if self.force_idx is not None and self.force_idx < 0:
             raise ValueError(f"force_idx must be non-negative, got {self.force_idx}")
+        if not 0 <= self.anchor_shard_index < self.anchor_shard_count:
+            raise ValueError(
+                "anchor_shard_index must be in [0, anchor_shard_count), got "
+                f"{self.anchor_shard_index} for count {self.anchor_shard_count}"
+            )
+        if self.force_idx is not None and self.anchor_shard_count != 1:
+            raise ValueError("force_idx cannot be combined with anchor sharding")
         if (
             self.train_start_year is not None
             and self.train_end_year is not None
@@ -193,6 +268,12 @@ class V23IlyaEvalConfig:
             temporal_d_state=self.temporal_d_state,
             temporal_d_conv=self.temporal_d_conv,
             temporal_dt_rank=self.temporal_dt_rank,
+            temporal_init_scheme=self.temporal_init_scheme,
+            temporal_dt_init=self.temporal_dt_init,
+            temporal_dt_min=self.temporal_dt_min,
+            temporal_dt_max=self.temporal_dt_max,
+            temporal_dt_scale=self.temporal_dt_scale,
+            temporal_dt_init_floor=self.temporal_dt_init_floor,
             temporal_layers=self.temporal_layers,
             temporal_conv_bias=self.temporal_conv_bias,
             temporal_stateful=self.temporal_stateful,
@@ -227,6 +308,22 @@ class V23IlyaEvalConfig:
 
         return self.warmup_steps + self.target_steps
 
+    @property
+    def effective_anchor_history_steps(self) -> int:
+        """History reserved when selecting matched scored forecast anchors."""
+
+        if self.anchor_history_steps is None:
+            return self.effective_warmup_steps
+        return self.anchor_history_steps
+
+    @property
+    def resolved_metric_backend(self) -> str:
+        """Resolve the automatic backend without changing metric semantics."""
+
+        if self.metric_backend == "auto":
+            return "device" if self.omit_rms_bias else "cpu"
+        return self.metric_backend
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Evaluate the frozen v23_Ilya residual-Mamba model.")
@@ -245,6 +342,40 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input-duration", default="12h")
     parser.add_argument("--target-steps", type=int, default=40, help="Metric horizon.")
     parser.add_argument("--warmup-steps", type=int, default=24)
+    parser.add_argument(
+        "--anchor-history-steps",
+        type=int,
+        default=None,
+        help=(
+            "Select anchors by the scored H1 origin after reserving this many "
+            "truth-history steps. Use the same value across a warmup sweep to "
+            "score identical dates. Defaults to the effective warmup."
+        ),
+    )
+    parser.add_argument(
+        "--stream-block-steps",
+        type=int,
+        default=4,
+        help="Load truth and forcing data in bounded blocks of this many steps.",
+    )
+    parser.add_argument(
+        "--omit-rms-bias",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip large spatial bias accumulators while retaining exact GraphCast "
+            "loss and per-variable/per-level RMSE and MAE."
+        ),
+    )
+    parser.add_argument(
+        "--metric-backend",
+        choices=METRIC_BACKENDS,
+        default="auto",
+        help=(
+            "Metric execution backend. auto uses device reductions when "
+            "--omit-rms-bias is set and otherwise preserves the CPU path."
+        ),
+    )
     parser.add_argument("--eval-mode", choices=EVAL_MODES, required=True)
     parser.add_argument("--temporal-location", default="mesh_processor_interleaved")
     parser.add_argument("--temporal-d-inner", type=int, default=None)
@@ -252,6 +383,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--temporal-d-state", type=int, default=16)
     parser.add_argument("--temporal-d-conv", type=int, default=4)
     parser.add_argument("--temporal-dt-rank", default="auto")
+    parser.add_argument(
+        "--temporal-init-scheme",
+        choices=("legacy_haiku", "mamba1"),
+        default="legacy_haiku",
+    )
+    parser.add_argument(
+        "--temporal-dt-init",
+        choices=("random", "constant"),
+        default="random",
+    )
+    parser.add_argument("--temporal-dt-min", type=float, default=0.001)
+    parser.add_argument("--temporal-dt-max", type=float, default=0.1)
+    parser.add_argument("--temporal-dt-scale", type=float, default=1.0)
+    parser.add_argument("--temporal-dt-init-floor", type=float, default=1e-4)
     parser.add_argument("--temporal-layers", type=int, default=2)
     parser.add_argument(
         "--no-temporal-conv-bias",
@@ -290,6 +435,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-alpha", type=float, default=1.0)
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--force-idx", type=int, default=None)
+    parser.add_argument(
+        "--anchor-shard-count",
+        type=int,
+        default=1,
+        help="Split the deterministically selected anchors into this many shards.",
+    )
+    parser.add_argument(
+        "--anchor-shard-index",
+        type=int,
+        default=0,
+        help="Zero-based round-robin anchor shard to evaluate.",
+    )
+    parser.add_argument(
+        "--merge-state-out",
+        type=Path,
+        default=None,
+        help="Optional host accumulator state used for exact cross-shard merging.",
+    )
     return parser
 
 

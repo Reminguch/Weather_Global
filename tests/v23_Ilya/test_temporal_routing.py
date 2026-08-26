@@ -23,6 +23,8 @@ def test_v22_uses_full_mamba_for_both_persistence_modes() -> None:
             temporal_d_inner=4,
             temporal_bc_groups=2,
             temporal_stateful=stateful,
+            temporal_init_scheme="mamba1",
+            temporal_dt_init="constant",
         )
 
         attach_temporal(predictor, config)
@@ -30,6 +32,8 @@ def test_v22_uses_full_mamba_for_both_persistence_modes() -> None:
         assert predictor._temporal_stateful is stateful
         assert predictor._temporal_use_full_mamba is True
         assert predictor._temporal_bc_groups == 2
+        assert predictor._temporal_init_scheme == "mamba1"
+        assert predictor._temporal_dt_init == "constant"
         assert gc._get_temporal_block_cls(
             stateful,
             use_full_mamba=predictor._temporal_use_full_mamba,

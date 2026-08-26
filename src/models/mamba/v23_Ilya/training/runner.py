@@ -255,6 +255,34 @@ def _save_data_parallel_checkpoint(
 
 def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
     config = invocation.config
+    if invocation.baseline_validation_only and invocation.validation_compare is not None:
+        raise ValueError(
+            "--baseline-validation-only and --validation-compare are mutually exclusive"
+        )
+    if invocation.validation_compare is not None and (
+        invocation.resume is not None or invocation.init_from is not None
+    ):
+        raise ValueError("--validation-compare cannot be combined with resume or init-from")
+    if invocation.validation_compare is not None:
+        if not config.validation.enabled:
+            raise ValueError("--validation-compare requires validation.enabled=true")
+        if not config.architecture.temporal_zero_init_out:
+            raise ValueError(
+                "--validation-compare requires temporal_zero_init_out=true"
+            )
+    if invocation.baseline_validation_only:
+        if invocation.resume is not None or invocation.init_from is not None:
+            raise ValueError(
+                "--baseline-validation-only requires fresh initialization"
+            )
+        if not config.validation.enabled:
+            raise ValueError(
+                "--baseline-validation-only requires validation.enabled=true"
+            )
+        if not config.architecture.temporal_zero_init_out:
+            raise ValueError(
+                "--baseline-validation-only requires temporal_zero_init_out=true"
+            )
     validate_input_paths(config)
     if invocation.dry_run:
         print(json.dumps(config.to_dict(), indent=2, sort_keys=True))
@@ -459,6 +487,17 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             )
         print(f"[v23_Ilya] warm start from {invocation.init_from}; optimizer reset")
 
+    comparison_params = None
+    if invocation.validation_compare is not None:
+        comparison_checkpoint = load_v23_Ilya_checkpoint(
+            invocation.validation_compare
+        )
+        validate_param_tree_compatible(
+            residual_params,
+            comparison_checkpoint.residual_params,
+        )
+        comparison_params = comparison_checkpoint.residual_params
+
     n_residual_parameters = sum(
         int(leaf.size) for leaf in jax.tree_util.tree_leaves(residual_params)
     )
@@ -576,6 +615,99 @@ def run_training(invocation: V23IlyaTrainInvocation) -> Path | None:
             time_step=training_data.time_step,
             input_steps=training_data.input_steps,
         )
+
+    if invocation.validation_compare is not None:
+        assert validation_step is not None
+        assert comparison_params is not None
+        common = {
+            "validation_step": validation_step,
+            "zero_residual_state": zero_residual_state,
+            "training_data": training_data,
+            "task_config": task_config,
+            "config": config,
+            "segment_ids": training_data.fixed_validation_segment_ids,
+            "step": 0,
+            "subset_policy": training_data.validation_subset_policy,
+        }
+        baseline_record = run_fixed_validation(
+            residual_params=residual_params,
+            role="zero_residual_baseline",
+            **common,
+        )
+        checkpoint_record = run_fixed_validation(
+            residual_params=comparison_params,
+            role="checkpoint",
+            **common,
+        )
+        baseline_by_horizon = baseline_record["loss_by_horizon"]
+        checkpoint_by_horizon = checkpoint_record["loss_by_horizon"]
+        improvement_by_horizon = {
+            horizon: 100.0
+            * (
+                1.0
+                - float(checkpoint_by_horizon[horizon])
+                / float(baseline_by_horizon[horizon])
+            )
+            for horizon in baseline_by_horizon
+        }
+        baseline_loss = float(baseline_record["loss"])
+        checkpoint_loss = float(checkpoint_record["loss"])
+        payload = {
+            "definition": (
+                "Exact v23_Ilya fixed-validation sparse loss comparison using "
+                "identical anchors, RNG keys, recurrent-state protocol, and "
+                "horizon weights"
+            ),
+            "source_checkpoint": str(invocation.validation_compare),
+            "baseline": baseline_record,
+            "checkpoint": checkpoint_record,
+            "improvement_pct": 100.0 * (1.0 - checkpoint_loss / baseline_loss),
+            "improvement_pct_by_horizon": improvement_by_horizon,
+        }
+        output_path = config.run_dir / "validation_comparison.json"
+        atomic_json_dump(payload, output_path)
+        print(
+            f"[v23_Ilya] fixed-validation comparison "
+            f"baseline={baseline_loss:.6f} checkpoint={checkpoint_loss:.6f} "
+            f"improvement={payload['improvement_pct']:.3f}% "
+            f"by_horizon={improvement_by_horizon} output={output_path}",
+            flush=True,
+        )
+        return output_path
+
+    if invocation.baseline_validation_only:
+        assert validation_step is not None
+        record = run_fixed_validation(
+            validation_step=validation_step,
+            residual_params=residual_params,
+            zero_residual_state=zero_residual_state,
+            training_data=training_data,
+            task_config=task_config,
+            config=config,
+            segment_ids=training_data.fixed_validation_segment_ids,
+            step=0,
+            role="zero_residual_baseline",
+            subset_policy=training_data.validation_subset_policy,
+        )
+        record = {
+            **record,
+            "definition": (
+                "Frozen GraphCast loss under the exact v23_Ilya fixed-validation "
+                "protocol, produced by the freshly initialized zero-output "
+                "residual model"
+            ),
+        }
+        output_path = config.run_dir / "baseline_validation.json"
+        atomic_json_dump(record, output_path)
+        print(
+            f"[v23_Ilya] zero-residual baseline validation "
+            f"loss={float(record['loss']):.6f} "
+            f"segments={int(record['selected_segments'])} "
+            f"time={float(record['duration_seconds']):.1f}s "
+            f"output={output_path}",
+            flush=True,
+        )
+        return output_path
 
     def checkpoint_for_step(step: int) -> Path:
         return config.run_dir / "checkpoints" / f"checkpoint_step{step:08d}.pkl"

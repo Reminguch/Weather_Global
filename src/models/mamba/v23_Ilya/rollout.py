@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,12 +15,14 @@ PredictStep = Callable[
     [Mapping[str, Any], Mapping[str, Any], jax.Array, xr.Dataset, xr.Dataset, xr.Dataset],
     tuple[xr.Dataset, Mapping[str, Any]],
 ]
+PredictionConsumer = Callable[[int, xr.Dataset, xr.Dataset, xr.Dataset], None]
+RolloutStep = tuple[xr.Dataset, xr.Dataset]
 
 
 @dataclass(frozen=True)
 class RolloutResult:
-    baseline_prediction: xr.Dataset
-    full_prediction: xr.Dataset
+    baseline_prediction: xr.Dataset | None
+    full_prediction: xr.Dataset | None
     baseline_state: Mapping[str, Any]
     residual_state: Mapping[str, Any]
 
@@ -68,8 +70,8 @@ def run_v23_Ilya_rollout(
     *,
     rng: jax.Array,
     inputs: xr.Dataset,
-    all_targets: xr.Dataset,
-    all_forcings: xr.Dataset,
+    all_targets: xr.Dataset | None,
+    all_forcings: xr.Dataset | None,
     baseline_step: PredictStep,
     residual_step: PredictStep,
     baseline_params: Mapping[str, Any],
@@ -84,6 +86,10 @@ def run_v23_Ilya_rollout(
     reset_state_after_warmup: bool,
     residual_alpha: float,
     reset_state_every_step: bool = False,
+    prediction_consumer: PredictionConsumer | None = None,
+    retain_predictions: bool = True,
+    step_data: Iterable[RolloutStep] | None = None,
+    skip_baseline_warmup: bool = False,
 ) -> RolloutResult:
     """Run truth warmup followed by baseline- or full-feedback evaluation."""
 
@@ -92,33 +98,60 @@ def run_v23_Ilya_rollout(
         raise ValueError(f"target_steps must be positive, got {target_steps}")
     if warmup_steps < 0:
         raise ValueError(f"warmup_steps must be non-negative, got {warmup_steps}")
-    if all_targets.sizes.get("time", 0) < required_steps:
-        raise ValueError(
-            f"Targets provide {all_targets.sizes.get('time', 0)} steps, "
-            f"but rollout requires {required_steps}"
-        )
-    if all_forcings.sizes.get("time", 0) < required_steps:
-        raise ValueError(
-            f"Forcings provide {all_forcings.sizes.get('time', 0)} steps, "
-            f"but rollout requires {required_steps}"
-        )
+    if step_data is None:
+        if all_targets is None or all_forcings is None:
+            raise ValueError(
+                "all_targets and all_forcings are required without step_data"
+            )
+        if all_targets.sizes.get("time", 0) < required_steps:
+            raise ValueError(
+                f"Targets provide {all_targets.sizes.get('time', 0)} steps, "
+                f"but rollout requires {required_steps}"
+            )
+        if all_forcings.sizes.get("time", 0) < required_steps:
+            raise ValueError(
+                f"Forcings provide {all_forcings.sizes.get('time', 0)} steps, "
+                f"but rollout requires {required_steps}"
+            )
+
+        def dataset_steps():
+            for index in range(required_steps):
+                selection = {"time": slice(index, index + 1)}
+                yield all_targets.isel(**selection), all_forcings.isel(**selection)
+
+        step_iterator = iter(dataset_steps())
+    else:
+        if all_targets is not None or all_forcings is not None:
+            raise ValueError(
+                "step_data cannot be combined with all_targets or all_forcings"
+            )
+        step_iterator = iter(step_data)
+
+    def next_step(step_index: int) -> RolloutStep:
+        try:
+            target, forcing = next(step_iterator)
+        except StopIteration as exc:
+            raise ValueError(
+                f"step_data ended after {step_index} of {required_steps} steps"
+            ) from exc
+        return target, forcing
 
     current_inputs = inputs
     baseline_state = baseline_state_init
     residual_state = residual_state_init
 
     for step_index in range(warmup_steps):
-        target = all_targets.isel(time=slice(step_index, step_index + 1))
-        forcing = all_forcings.isel(time=slice(step_index, step_index + 1))
+        target, forcing = next_step(step_index)
         rng, baseline_key, residual_key = jax.random.split(rng, 3)
-        _baseline_prediction, baseline_state = baseline_step(
-            baseline_params,
-            baseline_state,
-            baseline_key,
-            current_inputs,
-            target,
-            forcing,
-        )
+        if not skip_baseline_warmup:
+            _baseline_prediction, baseline_state = baseline_step(
+                baseline_params,
+                baseline_state,
+                baseline_key,
+                current_inputs,
+                target,
+                forcing,
+            )
         if reset_state_every_step:
             residual_state = residual_state_init
         _residual_prediction, residual_state = residual_step(
@@ -152,8 +185,7 @@ def run_v23_Ilya_rollout(
 
         for metric_index in range(target_steps):
             step_index = warmup_steps + metric_index
-            target = all_targets.isel(time=slice(step_index, step_index + 1))
-            forcing = all_forcings.isel(time=slice(step_index, step_index + 1))
+            target, forcing = next_step(step_index)
             rng, baseline_key, residual_key = jax.random.split(rng, 3)
             baseline_prediction, baseline_branch_state = baseline_step(
                 baseline_params,
@@ -186,8 +218,16 @@ def run_v23_Ilya_rollout(
                 residual_prediction,
                 residual_alpha,
             )
-            baseline_chunks.append(baseline_prediction)
-            full_chunks.append(full_prediction)
+            if prediction_consumer is not None:
+                prediction_consumer(
+                    metric_index,
+                    target,
+                    baseline_prediction,
+                    full_prediction,
+                )
+            if retain_predictions:
+                baseline_chunks.append(baseline_prediction)
+                full_chunks.append(full_prediction)
             if metric_index < target_steps - 1:
                 baseline_inputs = shift_inputs_with_field(
                     baseline_inputs,
@@ -209,8 +249,7 @@ def run_v23_Ilya_rollout(
     else:
         for metric_index in range(target_steps):
             step_index = warmup_steps + metric_index
-            target = all_targets.isel(time=slice(step_index, step_index + 1))
-            forcing = all_forcings.isel(time=slice(step_index, step_index + 1))
+            target, forcing = next_step(step_index)
             rng, baseline_key, residual_key = jax.random.split(rng, 3)
             baseline_prediction, baseline_state = baseline_step(
                 baseline_params,
@@ -235,8 +274,16 @@ def run_v23_Ilya_rollout(
                 residual_prediction,
                 residual_alpha,
             )
-            baseline_chunks.append(baseline_prediction)
-            full_chunks.append(full_prediction)
+            if prediction_consumer is not None:
+                prediction_consumer(
+                    metric_index,
+                    target,
+                    baseline_prediction,
+                    full_prediction,
+                )
+            if retain_predictions:
+                baseline_chunks.append(baseline_prediction)
+                full_chunks.append(full_prediction)
             if metric_index < target_steps - 1:
                 current_inputs = shift_inputs_with_field(
                     current_inputs,
@@ -247,8 +294,12 @@ def run_v23_Ilya_rollout(
                 )
 
     return RolloutResult(
-        baseline_prediction=xr.concat(baseline_chunks, dim="time"),
-        full_prediction=xr.concat(full_chunks, dim="time"),
+        baseline_prediction=(
+            xr.concat(baseline_chunks, dim="time") if retain_predictions else None
+        ),
+        full_prediction=(
+            xr.concat(full_chunks, dim="time") if retain_predictions else None
+        ),
         baseline_state=baseline_state,
         residual_state=residual_state,
     )

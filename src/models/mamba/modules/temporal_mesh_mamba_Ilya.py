@@ -34,6 +34,12 @@ class TemporalMeshConfig:
     conv_bias: bool = True
     dropout: float = 0.0
     zero_init_output: bool = False
+    init_scheme: str = "legacy_haiku"
+    dt_init: str = "random"
+    dt_min: float = 0.001
+    dt_max: float = 0.1
+    dt_scale: float = 1.0
+    dt_init_floor: float = 1e-4
 
 
 class TemporalLayerState(NamedTuple):
@@ -81,6 +87,68 @@ def _resolve_dt_rank(cfg: object, d_model: int) -> int:
     if dt_rank == "auto":
         return math.ceil(d_model / 16)
     return int(dt_rank)
+
+
+def _validate_initialization_config(cfg: object) -> None:
+    init_scheme = str(_cfg_value(cfg, "init_scheme", "legacy_haiku"))
+    if init_scheme not in ("legacy_haiku", "mamba1"):
+        raise ValueError(
+            "Temporal Mamba init_scheme must be 'legacy_haiku' or 'mamba1', "
+            f"got {init_scheme!r}."
+        )
+    dt_init = str(_cfg_value(cfg, "dt_init", "random"))
+    if dt_init not in ("random", "constant"):
+        raise ValueError(
+            "Temporal Mamba dt_init must be 'random' or 'constant', "
+            f"got {dt_init!r}."
+        )
+    dt_min = float(_cfg_value(cfg, "dt_min", 0.001))
+    dt_max = float(_cfg_value(cfg, "dt_max", 0.1))
+    dt_scale = float(_cfg_value(cfg, "dt_scale", 1.0))
+    dt_init_floor = float(_cfg_value(cfg, "dt_init_floor", 1e-4))
+    if not math.isfinite(dt_min) or dt_min <= 0.0:
+        raise ValueError(f"Temporal Mamba dt_min must be positive, got {dt_min}.")
+    if not math.isfinite(dt_max) or dt_max < dt_min:
+        raise ValueError(
+            "Temporal Mamba dt_max must be finite and at least dt_min, "
+            f"got dt_min={dt_min}, dt_max={dt_max}."
+        )
+    if not math.isfinite(dt_scale) or dt_scale <= 0.0:
+        raise ValueError(f"Temporal Mamba dt_scale must be positive, got {dt_scale}.")
+    if not math.isfinite(dt_init_floor) or dt_init_floor <= 0.0:
+        raise ValueError(
+            "Temporal Mamba dt_init_floor must be positive, "
+            f"got {dt_init_floor}."
+        )
+    if dt_init_floor > dt_max:
+        raise ValueError(
+            "Temporal Mamba dt_init_floor must not exceed dt_max, "
+            f"got dt_init_floor={dt_init_floor}, dt_max={dt_max}."
+        )
+
+
+def _mamba1_dt_weight_initializer(cfg: object, dt_rank: int):
+    scale = float(_cfg_value(cfg, "dt_scale", 1.0)) / math.sqrt(dt_rank)
+    if str(_cfg_value(cfg, "dt_init", "random")) == "constant":
+        return hk.initializers.Constant(scale)
+    return hk.initializers.RandomUniform(minval=-scale, maxval=scale)
+
+
+def _mamba1_dt_bias_initializer(cfg: object):
+    log_min = math.log(float(_cfg_value(cfg, "dt_min", 0.001)))
+    log_max = math.log(float(_cfg_value(cfg, "dt_max", 0.1)))
+    floor = float(_cfg_value(cfg, "dt_init_floor", 1e-4))
+
+    def initialize(shape: tuple[int, ...], dtype: jnp.dtype) -> jax.Array:
+        log_dt = hk.initializers.RandomUniform(
+            minval=log_min,
+            maxval=log_max,
+        )(shape, jnp.float32)
+        dt = jnp.maximum(jnp.exp(log_dt), jnp.asarray(floor, dtype=jnp.float32))
+        inverse_softplus = dt + jnp.log(-jnp.expm1(-dt))
+        return inverse_softplus.astype(dtype)
+
+    return initialize
 
 
 def init_temporal_state(
@@ -248,6 +316,7 @@ class _StatefulSSMBlock(hk.Module):
         del is_training
         d_model = x_btd.shape[-1]
         d_inner = _resolve_d_inner(self._cfg)
+        _validate_initialization_config(self._cfg)
         x_dtype = x_btd.dtype
 
         projected = hk.Linear(
@@ -330,8 +399,20 @@ class _StatefulSSMBlock(hk.Module):
             [dt_rank, dt_rank + bc_groups * d_state],
             axis=-1,
         )
+        if str(_cfg_value(self._cfg, "init_scheme", "legacy_haiku")) == "mamba1":
+            dt_weight_init = _mamba1_dt_weight_initializer(self._cfg, dt_rank)
+            dt_bias_init = _mamba1_dt_bias_initializer(self._cfg)
+        else:
+            dt_weight_init = None
+            dt_bias_init = None
         delta_btd = jax.nn.softplus(
-            hk.Linear(d_inner, with_bias=True, name="dt_proj")(delta_raw_btr)
+            hk.Linear(
+                d_inner,
+                with_bias=True,
+                w_init=dt_weight_init,
+                b_init=dt_bias_init,
+                name="dt_proj",
+            )(delta_raw_btr)
         )
 
         batch_size, time_steps = x_btd.shape[:2]

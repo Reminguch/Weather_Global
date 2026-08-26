@@ -40,6 +40,9 @@ def test_reference_config_and_operational_overrides() -> None:
     assert config.ar_tail_k == 12
     assert config.feedback_mode == "baseline"
     assert config.temporal_state_policy == "carry"
+    assert config.learning_rate_schedule == "constant"
+    assert config.decay_start_step is None
+    assert config.end_learning_rate is None
     assert config.to_dict()["sequence"]["temporal_state_policy"] == "carry"
     assert config.validation == V22FinalValidationConfig(
         enabled=True,
@@ -114,6 +117,32 @@ def test_config_rejects_unknown_and_invalid_values(tmp_path: Path) -> None:
         dataclasses.replace(config, segment_steps=65)
     with pytest.raises(ValueError, match="temporal_state_policy"):
         dataclasses.replace(config, temporal_state_policy="sometimes")
+    with pytest.raises(ValueError, match="learning_rate_schedule"):
+        dataclasses.replace(config, learning_rate_schedule="linear")
+    with pytest.raises(ValueError, match="requires decay_start_step"):
+        dataclasses.replace(config, learning_rate_schedule="cosine")
+    with pytest.raises(ValueError, match="learning_rate > 0"):
+        dataclasses.replace(
+            config,
+            learning_rate=0.0,
+            learning_rate_schedule="cosine",
+            decay_start_step=2_000,
+            end_learning_rate=0.0,
+        )
+    with pytest.raises(ValueError, match="between warmup_steps"):
+        dataclasses.replace(
+            config,
+            learning_rate_schedule="cosine",
+            decay_start_step=100,
+            end_learning_rate=3e-6,
+        )
+    cosine = dataclasses.replace(
+        config,
+        learning_rate_schedule="cosine",
+        decay_start_step=2_000,
+        end_learning_rate=3e-6,
+    )
+    assert cosine.to_dict()["optimizer"]["learning_rate_schedule"] == "cosine"
 
     with pytest.raises(ValueError, match="temporal_bc_groups"):
         dataclasses.replace(config.architecture, temporal_bc_groups=0)

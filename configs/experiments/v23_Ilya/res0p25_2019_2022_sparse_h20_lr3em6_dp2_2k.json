@@ -3,14 +3,14 @@
   "schema_version": 1,
   "data": {
     "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream_graphcast37/res0p25",
-    "anchor_manifest_root": "data/graphcast/graphcast/dataset/anchor_manifests/v23_Ilya_res0p25_2019_2022",
+    "anchor_manifest_root": "data/graphcast/graphcast/dataset/anchor_manifests/v23_Ilya_res0p25_2019_2022_incomplete_ok",
     "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast - ERA5 1979-2017 - resolution 0.25 - pressure levels 37 - mesh 2to6 - precipitation input and output.npz",
     "stats_dir": "data/graphcast/graphcast/stats",
     "input_duration": "12h",
     "target_steps": 1,
-    "time_start": null,
-    "time_end": null,
-    "allow_incomplete_prepared_store": false
+    "time_start": "2019-01-01T00:00:00",
+    "time_end": "2022-12-31T18:00:00",
+    "allow_incomplete_prepared_store": true
   },
   "architecture": {
     "resolution": 0.25,
@@ -49,7 +49,7 @@
   },
   "optimizer": {
     "max_steps": 2000,
-    "checkpoint_every": 100,
+    "checkpoint_every": 50,
     "learning_rate": 3e-6,
     "weight_decay": 1e-4,
     "warmup_steps": 20,
@@ -65,7 +65,7 @@
   },
   "validation": {
     "enabled": true,
-    "every_steps": 250,
+    "every_steps": 200,
     "num_segments": 1,
     "final_num_segments": 1
   },

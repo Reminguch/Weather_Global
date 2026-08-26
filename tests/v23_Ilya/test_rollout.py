@@ -61,6 +61,8 @@ def _run(
     warmup_steps: int = 0,
     reset: bool = False,
     reset_every_step: bool = False,
+    prediction_consumer=None,
+    retain_predictions: bool = True,
 ):
     target_values = [10.0] * warmup_steps + [0.0, 0.0, 0.0]
     return run_v23_Ilya_rollout(
@@ -82,6 +84,8 @@ def _run(
         reset_state_after_warmup=reset,
         residual_alpha=1.0,
         reset_state_every_step=reset_every_step,
+        prediction_consumer=prediction_consumer,
+        retain_predictions=retain_predictions,
     )
 
 
@@ -99,6 +103,117 @@ def test_full_feedback_uses_two_diverging_trajectories() -> None:
     result = _run(full_feedback=True)
     np.testing.assert_allclose(_values(result.baseline_prediction), [1.0, 2.0, 3.0])
     np.testing.assert_allclose(_values(result.full_prediction), [3.0, 6.0, 9.0])
+
+
+def test_streamed_predictions_match_retained_rollout() -> None:
+    for full_feedback in (False, True):
+        retained = _run(full_feedback=full_feedback)
+        streamed_baseline = []
+        streamed_full = []
+
+        def consume(step_index, truth, baseline, full):
+            assert truth.sizes["time"] == 1
+            assert step_index == len(streamed_baseline)
+            streamed_baseline.append(float(np.asarray(baseline["x"]).reshape(-1)[0]))
+            streamed_full.append(float(np.asarray(full["x"]).reshape(-1)[0]))
+
+        streamed = _run(
+            full_feedback=full_feedback,
+            prediction_consumer=consume,
+            retain_predictions=False,
+        )
+
+        assert streamed.baseline_prediction is None
+        assert streamed.full_prediction is None
+        np.testing.assert_allclose(streamed_baseline, _values(retained.baseline_prediction))
+        np.testing.assert_allclose(streamed_full, _values(retained.full_prediction))
+
+
+def test_streamed_step_data_matches_dataset_inputs() -> None:
+    targets = _dataset([10.0, 10.0, 0.0])
+    forcings = _forcings(3)
+    expected = run_v23_Ilya_rollout(
+        rng=jax.random.PRNGKey(0),
+        inputs=_inputs(),
+        all_targets=targets,
+        all_forcings=forcings,
+        baseline_step=_baseline_step,
+        residual_step=_residual_step,
+        baseline_params={},
+        residual_params={},
+        baseline_state_init={"count": 0},
+        residual_state_init={"count": 0},
+        time_step=TIME_STEP,
+        input_steps=2,
+        warmup_steps=2,
+        target_steps=1,
+        full_feedback=True,
+        reset_state_after_warmup=False,
+        residual_alpha=1.0,
+    )
+    steps = (
+        (
+            targets.isel(time=slice(index, index + 1)),
+            forcings.isel(time=slice(index, index + 1)),
+        )
+        for index in range(3)
+    )
+    actual = run_v23_Ilya_rollout(
+        rng=jax.random.PRNGKey(0),
+        inputs=_inputs(),
+        all_targets=None,
+        all_forcings=None,
+        baseline_step=_baseline_step,
+        residual_step=_residual_step,
+        baseline_params={},
+        residual_params={},
+        baseline_state_init={"count": 0},
+        residual_state_init={"count": 0},
+        time_step=TIME_STEP,
+        input_steps=2,
+        warmup_steps=2,
+        target_steps=1,
+        full_feedback=True,
+        reset_state_after_warmup=False,
+        residual_alpha=1.0,
+        step_data=steps,
+    )
+    np.testing.assert_allclose(
+        _values(actual.baseline_prediction),
+        _values(expected.baseline_prediction),
+    )
+    np.testing.assert_allclose(
+        _values(actual.full_prediction),
+        _values(expected.full_prediction),
+    )
+    assert actual.residual_state == expected.residual_state
+
+
+def test_truth_warmup_can_skip_stateless_baseline_calls() -> None:
+    targets = _dataset([10.0, 10.0, 0.0])
+    forcings = _forcings(3)
+    result = run_v23_Ilya_rollout(
+        rng=jax.random.PRNGKey(0),
+        inputs=_inputs(),
+        all_targets=targets,
+        all_forcings=forcings,
+        baseline_step=_baseline_step,
+        residual_step=_residual_step,
+        baseline_params={},
+        residual_params={},
+        baseline_state_init={"count": 0},
+        residual_state_init={"count": 0},
+        time_step=TIME_STEP,
+        input_steps=2,
+        warmup_steps=2,
+        target_steps=1,
+        full_feedback=True,
+        reset_state_after_warmup=False,
+        residual_alpha=1.0,
+        skip_baseline_warmup=True,
+    )
+    assert result.baseline_state["count"] == 1
+    assert result.residual_state["count"] == 3
 
 
 def test_truth_warmup_and_state_reset() -> None:

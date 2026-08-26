@@ -36,6 +36,106 @@ def _state_leaves(state):
     ]
 
 
+def _single_module_params(params, suffix: str):
+    matches = [
+        module_params
+        for module_name, module_params in params.items()
+        if module_name.endswith(suffix)
+    ]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def test_mamba1_dt_initialization_and_zero_output_preserve_identity() -> None:
+    cfg = TemporalMeshConfig(
+        backbone="mamba",
+        location="mesh_processor_interleaved",
+        d_inner=4,
+        d_state=3,
+        d_conv=2,
+        dt_rank=2,
+        layers=1,
+        init_scheme="mamba1",
+        dt_init="random",
+        dt_min=0.001,
+        dt_max=0.1,
+        dt_scale=1.0,
+        dt_init_floor=1e-4,
+        zero_init_output=True,
+    )
+    transformed = _transform(cfg)
+    rng = jax.random.PRNGKey(42)
+    x = jax.random.normal(rng, (3, 5, 2, 6))
+
+    params = transformed.init(rng, x, None)
+    output, state = transformed.apply(params, rng, x, None)
+    dt_proj = _single_module_params(params, "dt_proj")
+    out_proj = _single_module_params(params, "out_proj")
+
+    realized_dt = jax.nn.softplus(dt_proj["b"])
+    assert np.min(realized_dt) >= cfg.dt_min
+    assert np.max(realized_dt) <= cfg.dt_max
+    weight_bound = cfg.dt_scale / np.sqrt(cfg.dt_rank)
+    assert np.min(dt_proj["w"]) >= -weight_bound
+    assert np.max(dt_proj["w"]) <= weight_bound
+    np.testing.assert_array_equal(out_proj["w"], np.zeros_like(out_proj["w"]))
+    np.testing.assert_array_equal(output, x)
+    assert all(np.isfinite(value).all() for value in _state_leaves(state))
+
+
+def test_legacy_dt_initialization_retains_zero_bias() -> None:
+    cfg = TemporalMeshConfig(
+        backbone="mamba",
+        location="mesh_processor_interleaved",
+        d_inner=4,
+        d_state=3,
+        d_conv=2,
+        dt_rank=2,
+        layers=1,
+        init_scheme="legacy_haiku",
+    )
+    transformed = _transform(cfg)
+    rng = jax.random.PRNGKey(43)
+    x = jax.random.normal(rng, (2, 3, 1, 6))
+
+    params = transformed.init(rng, x, None)
+    dt_proj = _single_module_params(params, "dt_proj")
+    np.testing.assert_array_equal(dt_proj["b"], np.zeros_like(dt_proj["b"]))
+
+
+@pytest.mark.parametrize(
+    ("replacement", "message"),
+    [
+        ({"init_scheme": "unknown"}, "init_scheme"),
+        ({"dt_init": "unknown"}, "dt_init"),
+        ({"dt_min": 0.0}, "dt_min"),
+        ({"dt_min": 0.1, "dt_max": 0.01}, "dt_max"),
+        ({"dt_scale": 0.0}, "dt_scale"),
+        ({"dt_init_floor": 0.0}, "dt_init_floor"),
+        ({"dt_max": 0.01, "dt_init_floor": 0.02}, "dt_init_floor"),
+    ],
+)
+def test_mamba_initialization_rejects_invalid_values(
+    replacement: dict,
+    message: str,
+) -> None:
+    cfg = dataclasses.replace(
+        TemporalMeshConfig(
+            backbone="mamba",
+            location="mesh_processor_interleaved",
+            d_inner=4,
+            d_state=3,
+            d_conv=2,
+            dt_rank=2,
+        ),
+        **replacement,
+    )
+    transformed = _transform(cfg)
+    x = jnp.ones((2, 3, 1, 6), dtype=jnp.float32)
+    with pytest.raises(ValueError, match=message):
+        transformed.init(jax.random.PRNGKey(44), x, None)
+
+
 def test_grouped_bc_has_finite_outputs_and_preserves_external_state_shape() -> None:
     cfg = TemporalMeshConfig(
         backbone="mamba",
@@ -161,4 +261,3 @@ def test_grouped_bc_chunked_execution_matches_full_sequence() -> None:
         strict=True,
     ):
         np.testing.assert_allclose(chunked_leaf, full_leaf, rtol=1e-5, atol=1e-5)
-

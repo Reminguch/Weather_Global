@@ -122,6 +122,7 @@ def main() -> None:
     rows = []
     for label, path, value in available:
         baseline_mse, full_mse = weighted_allvars_mse(value, scales)
+        weighted_allvars_improvement = 100.0 * (1.0 - full_mse / baseline_mse)
         rmse_improvement = equal_variable_rmse(value)
         original = value.get("original_graphcast_loss")
         rows.append(
@@ -132,8 +133,20 @@ def main() -> None:
                 "weighted_allvars_mse_improvement_pct": float(
                     100.0 * (1.0 - np.mean(full_mse) / np.mean(baseline_mse))
                 ),
+                "day4_weighted_allvars_mse_improvement_pct": float(
+                    weighted_allvars_improvement[15]
+                ),
+                "day10_weighted_allvars_mse_improvement_pct": float(
+                    weighted_allvars_improvement[39]
+                ),
                 "original_graphcast_loss_improvement_pct": (
                     float(original["improvement_pct_rollout"]) if original else ""
+                ),
+                "day4_original_graphcast_loss_improvement_pct": (
+                    float(original["improvement_pct_per_step"][15]) if original else ""
+                ),
+                "day10_original_graphcast_loss_improvement_pct": (
+                    float(original["improvement_pct_per_step"][39]) if original else ""
                 ),
                 "mean_equal_variable_rmse_improvement_pct": float(
                     np.mean(rmse_improvement)

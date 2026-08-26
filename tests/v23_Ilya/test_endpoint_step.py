@@ -207,6 +207,36 @@ def test_explicit_reverse_matches_naive_unroll(
     assert baseline.calls == expected_baseline_calls
 
 
+def test_validation_objective_returns_sparse_horizon_components() -> None:
+    config = _config("sparse_steps")
+    residual = StatefulResidual()
+    residual_loss = StatefulResidualLoss()
+    objective = make_bptt_objective(
+        transforms=V23IlyaTrainingTransforms(
+            FrozenBaseline(),
+            residual,
+            residual_loss,
+            residual_loss,
+        ),
+        baseline_params={},
+        baseline_state={},
+        config=config,
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+        return_loss_components=True,
+    )
+    loss, _state, components = objective(
+        {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)},
+        {"s": jnp.asarray(0.0)},
+        *_arguments("sparse_steps"),
+    )
+    assert np.asarray(components).shape == (2,)
+    np.testing.assert_allclose(
+        loss,
+        np.sum(np.asarray(components) * np.asarray([0.25, 0.75])),
+        rtol=1e-6,
+    )
+
 
 def test_host_tape_train_step_matches_naive_parameter_update() -> None:
     baseline = FrozenBaseline()

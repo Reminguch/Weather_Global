@@ -70,7 +70,31 @@ def build_training_transforms(
 
 
 def build_optimizer(config: V22FinalTrainConfig):
-    if config.warmup_steps > 0:
+    if config.learning_rate_schedule == "cosine":
+        assert config.decay_start_step is not None
+        assert config.end_learning_rate is not None
+        schedules = []
+        boundaries = []
+        if config.warmup_steps > 0:
+            schedules.append(
+                optax.linear_schedule(
+                    init_value=0.0,
+                    end_value=config.learning_rate,
+                    transition_steps=config.warmup_steps,
+                )
+            )
+            boundaries.append(config.warmup_steps)
+        schedules.append(optax.constant_schedule(config.learning_rate))
+        boundaries.append(config.decay_start_step)
+        schedules.append(
+            optax.cosine_decay_schedule(
+                init_value=config.learning_rate,
+                decay_steps=config.max_steps - config.decay_start_step,
+                alpha=config.end_learning_rate / config.learning_rate,
+            )
+        )
+        learning_rate = optax.join_schedules(schedules, boundaries)
+    elif config.warmup_steps > 0:
         learning_rate = optax.warmup_constant_schedule(
             init_value=0.0,
             peak_value=config.learning_rate,
