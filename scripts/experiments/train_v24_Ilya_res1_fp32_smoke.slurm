@@ -53,5 +53,11 @@ python -u scripts/training/train_v24_Ilya.py --config "${CONFIG}"
 GPU_PEAK_MIB="$(awk -F',' 'BEGIN { peak=0 } { gsub(/ /, "", $4); if (($4 + 0) > peak) peak=$4 + 0 } END { print peak }' "${GPU_TELEMETRY}")"
 CPU_MAX_RSS="$(sstat -j "${SLURM_JOB_ID}.batch" --noheader --format=MaxRSS -P 2>/dev/null | tail -n 1 || true)"
 echo "resource_summary sampled_gpu_peak_mib=${GPU_PEAK_MIB} cpu_max_rss=${CPU_MAX_RSS}"
-[[ -f "${RUN_DIR}/checkpoints/checkpoint_step00000005.pkl" ]]
-
+python -u scripts/training/verify_v24_Ilya_smoke.py \
+  --metrics "${RUN_DIR}/train_metrics.jsonl" \
+  --checkpoint "${RUN_DIR}/checkpoints/checkpoint_step00000005.pkl" \
+  --expected-steps 5 \
+  --max-median-step-seconds 20 \
+  --gpu-peak-mib "${GPU_PEAK_MIB}" \
+  --max-gpu-peak-mib $((72 * 1024)) \
+  --require-loss-by-horizon
