@@ -14,6 +14,7 @@ from scripts.analyze_models.merge_v24_Ilya_eval_shards import (
 from src.models.mamba.v24_Ilya.evaluation import (
     build_evaluation_result,
     partial_result_path,
+    select_eval_indices,
     write_evaluation_snapshot,
 )
 from src.models.mamba.v24_Ilya.config import V24IlyaEvalConfig
@@ -132,6 +133,45 @@ def test_matched_warmup_history_selects_common_scored_dates(tmp_path) -> None:
         target_steps=40,
     )
     np.testing.assert_array_equal(indices, np.arange(61, 124))
+
+
+def test_cold_v22_reference_reserves_warmup_only_for_anchor_selection(tmp_path) -> None:
+    """Cold V24 rollouts retain V22's 64-step seeded anchor pool."""
+
+    config = V24IlyaEvalConfig(
+        ckpt=tmp_path / "checkpoint.pkl",
+        out_json=tmp_path / "output.json",
+        eval_mode="cold_full",
+        warmup_steps=24,
+        target_steps=40,
+        n_samples=32,
+        seed=0,
+    )
+    assert config.effective_warmup_steps == 0
+    assert config.sample_total_steps == 64
+
+    eval_data = EvalDataset(
+        dataset=xr.Dataset(coords={"time": np.arange(1460), "lat": [0.0]}),
+        time_step=pd.Timedelta("6h"),
+        input_steps=2,
+    )
+    candidates = valid_scored_eval_indices(
+        eval_data,
+        history_steps=config.effective_anchor_history_steps,
+        target_steps=config.sample_total_steps,
+    )
+    assert candidates[0] == 1
+    assert candidates[-1] == 1395
+    assert select_eval_indices(
+        candidates,
+        n_samples=config.n_samples,
+        seed=config.seed,
+        force_idx=None,
+    ) == [
+        4, 23, 47, 57, 104, 241, 246, 369, 384, 422, 548, 693, 699, 751,
+        771, 774, 836, 870, 873, 893, 930, 1006, 1017, 1065, 1117, 1130,
+        1161, 1181, 1191, 1256, 1294, 1338,
+    ]
 
 
 def test_eval_step_iterator_loads_bounded_blocks(monkeypatch) -> None:

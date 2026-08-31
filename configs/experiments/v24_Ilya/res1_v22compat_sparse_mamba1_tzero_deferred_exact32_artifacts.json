@@ -1,0 +1,32 @@
+[
+  {
+    "run_name": "v22compat_sparse_mamba1_di16_bcg1_tzero_fp32_lr1em4_10k",
+    "artifact_tag": "step4000",
+    "temporal_init_scheme": "mamba1",
+    "temporal_zero_init_out": true
+  },
+  {
+    "run_name": "v22compat_sparse_mamba1_di16_bcg1_tzero_fp32_lr1em4_10k",
+    "artifact_tag": "step6000",
+    "temporal_init_scheme": "mamba1",
+    "temporal_zero_init_out": true
+  },
+  {
+    "run_name": "v22compat_sparse_mamba1_di16_bcg1_tzero_fp32_lr1em4_10k",
+    "artifact_tag": "step8000",
+    "temporal_init_scheme": "mamba1",
+    "temporal_zero_init_out": true
+  },
+  {
+    "run_name": "v22compat_sparse_mamba1_di16_bcg1_tzero_fp32_lr1em4_10k",
+    "artifact_tag": "step10000",
+    "temporal_init_scheme": "mamba1",
+    "temporal_zero_init_out": true
+  },
+  {
+    "run_name": "v22compat_sparse_mamba1_di16_bcg1_tzero_fp32_lr1em4_10k",
+    "artifact_tag": "swa_step02000-08000",
+    "temporal_init_scheme": "mamba1",
+    "temporal_zero_init_out": true
+  }
+]

@@ -189,7 +189,12 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
     scored_candidates = valid_scored_eval_indices(
         eval_data,
         history_steps=config.effective_anchor_history_steps,
-        target_steps=config.target_steps,
+        # Reserve the full requested sample horizon, even for cold evaluation.
+        # Cold modes do not *roll out* the configured warmup, but V22 used it
+        # when constructing the anchor pool.  Keeping that reservation makes
+        # the seeded 32-anchor selection exactly comparable to the V22
+        # reference without changing the cold forecast trajectory.
+        target_steps=config.sample_total_steps,
     )
     all_chosen_indices = select_eval_indices(
         scored_candidates,
