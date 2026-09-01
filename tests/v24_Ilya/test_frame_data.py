@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.models.mamba.v24_Ilya.training.frame_data import (
+    EndpointFrameWorkspace,
     load_endpoint_frame_batch,
 )
 
@@ -103,3 +104,96 @@ def test_sparse_steps_materializes_only_exact_horizon_targets() -> None:
         22.0,
         26.0,
     ]
+
+
+def test_truth_workspace_reuses_owned_storage_without_mutating_source() -> None:
+    store = FakeStore()
+    source_before = np.array(store.data_vars["x"].data, copy=True)
+    workspace = EndpointFrameWorkspace()
+    first = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(2, 6),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+    )
+    first_leaf = first.truths[0]["x"].values
+    second = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(8, 12),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+    )
+    second_leaf = second.truths[0]["x"].values
+
+    assert np.shares_memory(first_leaf, second_leaf)
+    assert first_leaf.flags.writeable
+    np.testing.assert_array_equal(second_leaf[0, 0], [9.0, 109.0])
+    np.testing.assert_array_equal(store.data_vars["x"].data, source_before)
+
+
+def test_truth_workspace_keeps_replica_slots_independent() -> None:
+    store = FakeStore()
+    workspace = EndpointFrameWorkspace()
+    first = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(2, 6),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+        truth_workspace_slot=0,
+    )
+    second = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(8, 12),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+        truth_workspace_slot=1,
+    )
+    assert not np.shares_memory(
+        first.truths[0]["x"].values,
+        second.truths[0]["x"].values,
+    )
+
+
+def test_truth_workspace_converts_non_fp32_source_once() -> None:
+    store = FakeStore()
+    store.data_vars["x"].data = store.data_vars["x"].data.astype(np.float64)
+    workspace = EndpointFrameWorkspace()
+    first = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(2, 6),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+    )
+    first_leaf = first.truths[0]["x"].values
+    second = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(8, 12),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+    )
+    assert first_leaf.dtype == np.float32
+    assert np.shares_memory(first_leaf, second.truths[0]["x"].values)

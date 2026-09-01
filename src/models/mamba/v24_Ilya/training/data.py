@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -17,7 +17,11 @@ from src.models.graphcast.training.core.prepared_array import PreparedArrayStore
 
 from ..checkpoint import manifest_sha256
 from .config import V24IlyaTrainConfig
-from .frame_data import FrameDataReport, load_endpoint_frame_batch
+from .frame_data import (
+    EndpointFrameWorkspace,
+    FrameDataReport,
+    load_endpoint_frame_batch,
+)
 
 
 @dataclass(frozen=True)
@@ -120,6 +124,11 @@ class V24IlyaTrainingData:
     time_step: pd.Timedelta
     input_steps: int
     manifest_fingerprint: str
+    frame_workspace: EndpointFrameWorkspace = field(
+        default_factory=EndpointFrameWorkspace,
+        compare=False,
+        repr=False,
+    )
 
     def validate_cursor(self, cursor: TrainingCursor, config: V24IlyaTrainConfig) -> None:
         if cursor.segment_index >= len(self.segments):
@@ -142,6 +151,8 @@ class V24IlyaTrainingData:
         segment_offset: int,
         config: V24IlyaTrainConfig,
         task_config,
+        *,
+        workspace_slot: int = 0,
     ) -> BPTTChunk:
         if segment_offset < 0 or segment_offset % config.bptt_steps:
             raise ValueError(
@@ -166,6 +177,8 @@ class V24IlyaTrainingData:
             ),
             task_config=task_config,
             dt=self.time_step,
+            truth_workspace=self.frame_workspace,
+            truth_workspace_slot=workspace_slot,
         )
         return BPTTChunk(
             input_frames=frames.input_frames,
@@ -259,8 +272,9 @@ class V24IlyaTrainingData:
                 cursor.segment_offset,
                 config,
                 task_config,
+                workspace_slot=replica,
             )
-            for segment_id in segment_ids
+            for replica, segment_id in enumerate(segment_ids)
         )
         return ReplicaTrainingChunk(
             input_frames=tuple(chunk.input_frames for chunk in loaded),

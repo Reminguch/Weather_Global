@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 import numpy as np
@@ -32,6 +32,45 @@ class EndpointFrameBatch:
     report: FrameDataReport
 
 
+@dataclass
+class EndpointFrameWorkspace:
+    """Reusable owned FP32 truth slabs, one independent slot per replica."""
+
+    _truth_buffers: dict[tuple[int, str, tuple[int, ...], str], np.ndarray] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
+
+    def take_truth(
+        self,
+        *,
+        slot: int,
+        name: str,
+        source: Any,
+        indices: np.ndarray,
+        axis: int,
+    ) -> np.ndarray:
+        if slot < 0:
+            raise ValueError("truth workspace slot must be non-negative")
+        source_array = np.asarray(source)
+        shape = list(source_array.shape)
+        shape[axis] = int(indices.size)
+        output_shape = tuple(shape)
+        dtype = (
+            np.dtype(np.float32)
+            if np.issubdtype(source_array.dtype, np.inexact)
+            else np.dtype(source_array.dtype)
+        )
+        key = (slot, name, output_shape, dtype.str)
+        output = self._truth_buffers.get(key)
+        if output is None:
+            output = np.empty(output_shape, dtype=dtype)
+            self._truth_buffers[key] = output
+        np.take(source_array, indices, axis=axis, out=output)
+        return output
+
+
 def _take_time(source: Any, indices: np.ndarray) -> np.ndarray:
     axis = source.dims.index("time")
     data = source.data
@@ -50,6 +89,8 @@ def _temporal_dataset(
     local_indices: np.ndarray,
     *,
     dt: pd.Timedelta,
+    truth_workspace: EndpointFrameWorkspace | None = None,
+    truth_workspace_slot: int = 0,
 ) -> tuple[xr.Dataset, int]:
     local = np.asarray(local_indices, dtype=np.int64)
     if local.ndim != 1 or local.size == 0:
@@ -68,7 +109,19 @@ def _temporal_dataset(
         source = store.data_vars[name]
         if "time" not in source.dims:
             continue
-        values = _take_time(source, global_indices)
+        if truth_workspace is None:
+            values = _take_time(source, global_indices)
+        else:
+            axis = source.dims.index("time")
+            values = truth_workspace.take_truth(
+                slot=truth_workspace_slot,
+                name=name,
+                source=source.data,
+                indices=global_indices,
+                axis=axis,
+            )
+            if axis != 0:
+                values = np.moveaxis(values, axis, 0)
         bytes_loaded += int(values.nbytes)
         remaining_dims = tuple(dim for dim in source.dims if dim != "time")
         dims = ("batch", "time", *remaining_dims)
@@ -127,6 +180,8 @@ def load_endpoint_frame_batch(
     supervised_step_indices: tuple[int, ...] | None = None,
     task_config,
     dt: pd.Timedelta,
+    truth_workspace: EndpointFrameWorkspace | None = None,
+    truth_workspace_slot: int = 0,
 ) -> EndpointFrameBatch:
     """Read teacher inputs, forcings, and only the truth required by the loss."""
 
@@ -208,6 +263,8 @@ def load_endpoint_frame_batch(
         task_config.target_variables,
         truth_indices,
         dt=dt,
+        truth_workspace=truth_workspace,
+        truth_workspace_slot=truth_workspace_slot,
     )
     truths = _split_steps(truth_data, dt)
     return EndpointFrameBatch(

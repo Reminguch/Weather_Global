@@ -30,6 +30,24 @@ must be `"fp32"`. A raw BF16 setting is rejected. Teacher frames, predictions,
 feedback frames, reverse-recomputation frames, recurrent-state boundaries,
 parameters, optimizer state, residual targets, and losses use FP32 boundaries.
 
+## Reusable truth/target tape
+
+The production single-device and data-parallel explicit-reverse paths retain
+one FP32 truth/target tape per replica. Prepared truth frames are loaded into a
+writable owned slab. After a supervised forward step has computed
+`target = truth - frozen_GraphCast`, that completed target overwrites the same
+truth slot. Reverse recomputation consumes that slot with the same kernels and
+ordering as before. Only one temporary target frame may exist while a completed
+device result is staged back to its slot.
+
+Prepared memmaps are never mutated. Read-only, non-FP32, or memmap-backed input
+views are copied once into the reusable owned slab; matching writable prepared
+buffers are reused across updates. Run metadata records the logical tape bytes,
+one retained copy, and maximum one-frame staging bytes. This changes storage and
+transfer behavior only: targets, component losses, total loss, gradients,
+recurrent state, optimizer state, and parameter updates remain mathematically
+identical to the canonical `make_bptt_objective` reference.
+
 ## Initialization
 
 The final `temporal_residual_head` remains exactly zero-initialized, so the
@@ -80,6 +98,22 @@ Prepared Slurm launchers are:
 - `scripts/experiments/eval_v24_Ilya_res0p25_fixed_validation.slurm`
 - `scripts/experiments/train_v24_Ilya_res0p25_sparse_h20_lr3em6_dp2_200.slurm`
 - `scripts/experiments/eval_v24_Ilya_res0p25_sparse_h20_checkpoints.slurm`
+
+The res0.25 full-24 allocation ablation uses 24 equally weighted losses with
+`ar_tail_k=20`, checkpoints every 50 updates through step 500, and submits each
+exact evaluation independently when its checkpoint is complete:
+
+```bash
+source scripts/graphcast_env.sh
+python scripts/training/train_v24_Ilya.py \
+  --config configs/experiments/v24_Ilya/res0p25_v22compat_all24_legacy_di16_bcg1_fp32_sg500.json \
+  --dry-run
+```
+
+Its launchers are:
+
+- `scripts/experiments/train_v24_Ilya_res0p25_v22compat_all24_sg500.slurm`
+- `scripts/experiments/eval_v24_Ilya_res0p25_v22compat_all24_step_exact32.slurm`
 
 No launcher is submitted automatically.
 

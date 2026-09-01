@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import jax
@@ -15,6 +16,8 @@ from src.models.mamba.v24_Ilya.config import V24IlyaArchitectureConfig
 from src.models.mamba.v24_Ilya.training.config import V24IlyaTrainConfig
 from src.models.mamba.v24_Ilya.training.endpoint_step import (
     V24IlyaTrainingTransforms,
+    _overwrite_host_tree,
+    _reusable_fp32_host_tree,
     make_bptt_objective,
     make_train_step,
     memory_contract,
@@ -150,8 +153,9 @@ def _naive_reference(params, initial_state, loss_mode: str):
             losses.append((prediction - target) ** 2)
         if index >= 1 and index < 3:
             frames.append(jax.lax.stop_gradient(prediction))
-    loss = jnp.sum(jnp.stack(losses) * jnp.asarray(weights))
-    return loss, state
+    components = jnp.stack(losses)
+    loss = jnp.sum(components * jnp.asarray(weights))
+    return loss, (state, components)
 
 
 @pytest.mark.parametrize(
@@ -188,10 +192,12 @@ def test_explicit_reverse_matches_naive_unroll(
         lambda value: objective(value, state, *args),
         has_aux=True,
     )(params)
-    (expected_loss, expected_state), expected_gradient = jax.value_and_grad(
-        lambda value: _naive_reference(value, state["s"], loss_mode),
-        has_aux=True,
-    )(params)
+    (expected_loss, (expected_state, _expected_components)), expected_gradient = (
+        jax.value_and_grad(
+            lambda value: _naive_reference(value, state["s"], loss_mode),
+            has_aux=True,
+        )(params)
+    )
 
     np.testing.assert_allclose(actual_loss, expected_loss, rtol=1e-6)
     np.testing.assert_allclose(actual_state["s"], expected_state, rtol=1e-6)
@@ -238,18 +244,19 @@ def test_validation_objective_returns_sparse_horizon_components() -> None:
     )
 
 
-def test_host_tape_train_step_matches_naive_parameter_update() -> None:
+@pytest.mark.parametrize("loss_mode", ["last_step", "sparse_steps", "all_steps"])
+def test_host_tape_train_step_matches_naive_parameter_update(loss_mode: str) -> None:
     baseline = FrozenBaseline()
     residual = StatefulResidual()
     residual_loss = StatefulResidualLoss()
-    config = _config("sparse_steps")
+    config = _config(loss_mode)
     transforms = V24IlyaTrainingTransforms(
         baseline,
         residual,
         residual_loss,
         residual_loss,
     )
-    optimizer = optax.sgd(0.01)
+    optimizer = optax.adam(0.01)
     train_step = make_train_step(
         transforms=transforms,
         optimizer=optimizer,
@@ -261,42 +268,58 @@ def test_host_tape_train_step_matches_naive_parameter_update() -> None:
     )
     params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
     state = {"s": jnp.asarray(0.0)}
-    keys, frames, static, truths, forcings = _arguments("sparse_steps")
+    keys, frames, static, truths, forcings = _arguments(loss_mode)
 
+    initial_optimizer_state = optimizer.init(params)
     (
         next_params,
         next_state,
-        _optimizer_state,
+        next_optimizer_state,
         loss,
         gradient_norm,
         loss_components,
     ) = train_step(
         params,
         state,
-        optimizer.init(params),
+        initial_optimizer_state,
         keys,
         frames,
         static,
         truths,
         forcings,
     )
-    (expected_loss, expected_state), expected_gradient = jax.value_and_grad(
-        lambda value: _naive_reference(value, state["s"], "sparse_steps"),
+    (
+        expected_loss,
+        (expected_state, expected_loss_components),
+    ), expected_gradient = jax.value_and_grad(
+        lambda value: _naive_reference(value, state["s"], loss_mode),
         has_aux=True,
     )(params)
-    expected_params = jax.tree_util.tree_map(
-        lambda value, gradient: value - 0.01 * gradient,
-        params,
+    expected_updates, expected_optimizer_state = optimizer.update(
         expected_gradient,
+        initial_optimizer_state,
+        params,
     )
+    expected_params = optax.apply_updates(params, expected_updates)
 
     np.testing.assert_allclose(loss, expected_loss, rtol=1e-6)
     np.testing.assert_allclose(
         loss,
-        np.sum(np.asarray(loss_components) * np.asarray([0.25, 0.75])),
+        np.sum(
+            np.asarray(loss_components)
+            * np.asarray(config.normalized_supervised_weights)
+        ),
         rtol=1e-6,
     )
-    assert np.asarray(loss_components).shape == (2,)
+    assert np.asarray(loss_components).shape == (
+        len(config.supervised_step_indices),
+    )
+    np.testing.assert_allclose(
+        loss_components,
+        expected_loss_components,
+        rtol=1e-6,
+        atol=1e-6,
+    )
     np.testing.assert_allclose(next_state["s"], expected_state, rtol=1e-6)
     for name in params:
         np.testing.assert_allclose(
@@ -305,7 +328,67 @@ def test_host_tape_train_step_matches_naive_parameter_update() -> None:
             rtol=1e-6,
             atol=1e-6,
         )
+    for actual_leaf, expected_leaf in zip(
+        jax.tree_util.tree_leaves(next_optimizer_state),
+        jax.tree_util.tree_leaves(expected_optimizer_state),
+        strict=True,
+    ):
+        np.testing.assert_allclose(actual_leaf, expected_leaf, rtol=1e-6, atol=1e-6)
     assert float(gradient_norm) > 0.0
+
+
+def test_reusable_target_uses_writable_fp32_storage() -> None:
+    values = np.asarray([[3.0]], dtype=np.float32)
+    truth = xr.Dataset(
+        {"x": (("batch", "time"), values)},
+        coords={"batch": [0], "time": [np.timedelta64(6, "h")]},
+    )
+    reusable = _reusable_fp32_host_tree(truth)
+    assert np.shares_memory(reusable["x"].values, truth["x"].values)
+
+    target = truth.assign(x=(("batch", "time"), np.asarray([[1.5]], np.float32)))
+    _overwrite_host_tree(reusable, target)
+    np.testing.assert_array_equal(truth["x"].values, [[1.5]])
+
+
+def test_reusable_target_copies_read_only_storage() -> None:
+    values = np.asarray([[3.0]], dtype=np.float32)
+    values.flags.writeable = False
+    truth = xr.Dataset(
+        {"x": (("batch", "time"), values)},
+        coords={"batch": [0], "time": [np.timedelta64(6, "h")]},
+    )
+    reusable = _reusable_fp32_host_tree(truth)
+    assert not np.shares_memory(reusable["x"].values, truth["x"].values)
+    assert reusable["x"].values.flags.writeable
+
+    target = truth.assign(x=(("batch", "time"), np.asarray([[1.5]], np.float32)))
+    _overwrite_host_tree(reusable, target)
+    np.testing.assert_array_equal(truth["x"].values, [[3.0]])
+    np.testing.assert_array_equal(reusable["x"].values, [[1.5]])
+
+
+def test_reusable_target_never_mutates_memmap(tmp_path: Path) -> None:
+    path = tmp_path / "truth.bin"
+    source = np.memmap(path, mode="w+", dtype=np.float32, shape=(1, 1))
+    source[:] = 3.0
+    source.flush()
+    checksum_before = hashlib.sha256(path.read_bytes()).hexdigest()
+    truth = xr.Dataset(
+        {"x": (("batch", "time"), source)},
+        coords={"batch": [0], "time": [np.timedelta64(6, "h")]},
+    )
+    reusable = _reusable_fp32_host_tree(truth)
+    assert not np.shares_memory(reusable["x"].values, source)
+
+    target = truth.assign(x=(("batch", "time"), np.asarray([[1.5]], np.float32)))
+    _overwrite_host_tree(reusable, target)
+    source.flush()
+    checksum_after = hashlib.sha256(path.read_bytes()).hexdigest()
+    reloaded = np.memmap(path, mode="r", dtype=np.float32, shape=(1, 1))
+    assert checksum_after == checksum_before
+    np.testing.assert_array_equal(reloaded, [[3.0]])
+    np.testing.assert_array_equal(reusable["x"].values, [[1.5]])
 
 def test_explicit_reverse_jits() -> None:
     baseline = FrozenBaseline()
@@ -357,6 +440,11 @@ def test_memory_contract_is_unique_frame_fp32_tape() -> None:
     assert report["unique_weather_tape_frames"] == 5
     assert report["state_tape_boundaries"] == 4
     assert report["truth_targets_loaded"] == 1
+    assert report["truth_target_storage"] == "reuse_owned_fp32_truth_buffer"
+    assert report["truth_target_retained_copies"] == 1
+    assert report["truth_target_staging_frames"] == 1
+    assert report["truth_target_logical_bytes"] == report["truth_target_bytes"]
+    assert report["truth_target_staging_bytes"] == report["truth_target_bytes"]
     assert report["weather_tape_precision"] == "fp32"
     assert report["graphcast_backward_calls"] == 0
 

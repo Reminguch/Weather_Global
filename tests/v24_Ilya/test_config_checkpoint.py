@@ -219,6 +219,37 @@ def test_supported_objective_and_fp32_tape(loss_mode: str) -> None:
     assert config.weather_tape_precision == "fp32"
 
 
+def test_res0p25_full24_experiment_isolated_from_current_recipe() -> None:
+    candidate = load_training_config(
+        Path(
+            "configs/experiments/v24_Ilya/"
+            "res0p25_v22compat_all24_legacy_di16_bcg1_fp32_sg500.json"
+        )
+    )
+    control = load_training_config(
+        Path(
+            "configs/experiments/v24_Ilya/"
+            "res0p25_sparse_uniform_legacy_di16_bcg1_fp32_sg500.json"
+        )
+    )
+
+    assert candidate.loss_mode == "all_steps"
+    assert candidate.ar_tail_k == 20
+    assert candidate.supervised_step_indices == tuple(range(24))
+    assert candidate.normalized_supervised_weights == (1.0 / 24.0,) * 24
+    assert candidate.max_steps == 500
+    assert candidate.checkpoint_every == 50
+    assert candidate.architecture.temporal_zero_init_out is False
+
+    candidate_payload = candidate.to_dict()
+    control_payload = control.to_dict()
+    for payload in (candidate_payload, control_payload):
+        payload.pop("objective")
+        payload.pop("output")
+        payload["sequence"].pop("ar_tail_k")
+    assert candidate_payload == control_payload
+
+
 def test_raw_bf16_weather_tape_is_rejected() -> None:
     with pytest.raises(ValueError, match="raw physical BF16 weather trajectories"):
         V24IlyaTrainConfig(

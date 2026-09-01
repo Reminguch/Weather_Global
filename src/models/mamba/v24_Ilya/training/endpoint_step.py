@@ -154,6 +154,86 @@ def _cast_floating(tree, dtype):
     return jax.tree_util.tree_map(cast, tree)
 
 
+def _is_memmap_backed(value: np.ndarray) -> bool:
+    current: Any = value
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, np.memmap):
+            return True
+        current = getattr(current, "base", None)
+    return False
+
+
+def _host_cast_floating(tree, dtype):
+    """Cast host boundaries without routing existing NumPy data through JAX."""
+
+    host_tree = jax.device_get(tree)
+    target_dtype = np.dtype(dtype)
+
+    def cast(value):
+        array = np.asarray(value)
+        if np.issubdtype(array.dtype, np.inexact) and array.dtype != target_dtype:
+            return array.astype(target_dtype, copy=True)
+        return array
+
+    return jax.tree_util.tree_map(cast, host_tree)
+
+
+def _reusable_fp32_host_tree(tree):
+    """Return one safe mutable FP32 buffer tree for truth then target values."""
+
+    host_tree = jax.device_get(tree)
+
+    def prepare(value):
+        array = np.asarray(value)
+        target_dtype = np.dtype(np.float32) if np.issubdtype(
+            array.dtype, np.inexact
+        ) else array.dtype
+        unsafe = (
+            array.dtype != target_dtype
+            or not array.flags.writeable
+            or _is_memmap_backed(array)
+        )
+        if unsafe:
+            return np.array(array, dtype=target_dtype, copy=True)
+        return array
+
+    return jax.tree_util.tree_map(prepare, host_tree)
+
+
+def _overwrite_host_tree(destination, source):
+    """Copy an identically structured target into its reusable truth buffer."""
+
+    destination_leaves, destination_treedef = jax.tree_util.tree_flatten(destination)
+    source_leaves, source_treedef = jax.tree_util.tree_flatten(
+        jax.device_get(source)
+    )
+    if destination_treedef != source_treedef:
+        raise ValueError("Truth and residual-target tree structures differ")
+    for index, (destination_leaf, source_leaf) in enumerate(
+        zip(destination_leaves, source_leaves, strict=True)
+    ):
+        destination_array = np.asarray(destination_leaf)
+        source_array = np.asarray(source_leaf)
+        if destination_array.shape != source_array.shape:
+            raise ValueError(
+                f"Truth/target leaf {index} shape mismatch: "
+                f"{destination_array.shape} != {source_array.shape}"
+            )
+        if destination_array.dtype != source_array.dtype:
+            raise ValueError(
+                f"Truth/target leaf {index} dtype mismatch: "
+                f"{destination_array.dtype} != {source_array.dtype}"
+            )
+        if not destination_array.flags.writeable or _is_memmap_backed(
+            destination_array
+        ):
+            raise ValueError("Reusable truth target must be writable owned memory")
+        np.copyto(destination_array, source_array, casting="no")
+    return destination
+
+
 def cast_state_boundary_fp32(tree):
     """Keep recurrent carry/checkpoint boundaries in FP32."""
     return _cast_floating(tree, jnp.float32)
@@ -278,6 +358,8 @@ def memory_contract(
     # v24's defining invariant: physical weather frames are never quantized.
     tape_dtype = jnp.float32
     sample_frame = _cast_floating(input_frames[0], tape_dtype)
+    target_tape_bytes = sum(tree_nbytes(value) for value in truths)
+    target_staging_bytes = max((tree_nbytes(value) for value in truths), default=0)
     return {
         "bptt_backend": BPTT_BACKEND,
         "teacher_input_windows": config.truth_prefix_steps,
@@ -287,7 +369,12 @@ def memory_contract(
         "state_tape_boundaries": config.bptt_steps,
         "state_tape_bytes": tree_nbytes(residual_state) * config.bptt_steps,
         "truth_targets_loaded": len(truths),
-        "truth_target_bytes": sum(tree_nbytes(value) for value in truths),
+        "truth_target_bytes": target_tape_bytes,
+        "truth_target_logical_bytes": target_tape_bytes,
+        "truth_target_storage": "reuse_owned_fp32_truth_buffer",
+        "truth_target_retained_copies": 1,
+        "truth_target_staging_frames": 1,
+        "truth_target_staging_bytes": target_staging_bytes,
         "static_input_bytes": tree_nbytes(static_inputs),
         "graphcast_backward_calls": 0,
     }
@@ -770,68 +857,6 @@ def make_bptt_objective(
     return objective
 
 
-def _make_monolithic_train_step(
-    *,
-    transforms: V24IlyaTrainingTransforms,
-    optimizer,
-    baseline_params,
-    baseline_state,
-    config: V24IlyaTrainConfig,
-    time_step,
-    input_steps: int,
-) -> Callable[..., tuple[Any, Any, Any, Any, Any]]:
-    bptt_objective = make_bptt_objective(
-        transforms=transforms,
-        baseline_params=baseline_params,
-        baseline_state=baseline_state,
-        config=config,
-        time_step=time_step,
-        input_steps=input_steps,
-    )
-
-    def train_step(
-        residual_params,
-        residual_state,
-        optimizer_state,
-        keys,
-        input_frames,
-        static_inputs,
-        truths,
-        forcings,
-    ):
-        def train_objective(params):
-            return bptt_objective(
-                params,
-                residual_state,
-                keys,
-                input_frames,
-                static_inputs,
-                truths,
-                forcings,
-            )
-
-        (loss, next_residual_state), gradients = jax.value_and_grad(
-            train_objective,
-            has_aux=True,
-        )(residual_params)
-        gradient_norm = optax.global_norm(gradients)
-        updates, next_optimizer_state = optimizer.update(
-            gradients,
-            optimizer_state,
-            residual_params,
-        )
-        next_residual_params = optax.apply_updates(residual_params, updates)
-        return (
-            next_residual_params,
-            _tree_stop(next_residual_state),
-            next_optimizer_state,
-            loss,
-            gradient_norm,
-        )
-
-    return train_step
-
-
 def make_train_step(
     *,
     transforms: V24IlyaTrainingTransforms,
@@ -1003,15 +1028,15 @@ def make_train_step(
             )
 
         host_keys = to_host(keys)
-        host_static = to_host(_cast_floating(static_inputs, jnp.float32))
+        host_static = _host_cast_floating(static_inputs, np.float32)
         host_truths = tuple(
-            to_host(_cast_floating(value, jnp.float32)) for value in truths
+            _reusable_fp32_host_tree(value) for value in truths
         )
         host_forcings = tuple(
-            to_host(_cast_floating(value, jnp.float32)) for value in forcings
+            _host_cast_floating(value, np.float32) for value in forcings
         )
         weather_frames = [
-            to_host(_cast_floating(frame, tape_dtype))
+            _host_cast_floating(frame, np.float32)
             for frame in input_frames
         ]
         state_host = to_host(cast_state_boundary_fp32(residual_state))
@@ -1020,7 +1045,6 @@ def make_train_step(
             state_host = zero_state_host
 
         state_tape = []
-        residual_targets = []
         host_losses = []
         template_truth = host_truths[-1]
 
@@ -1065,7 +1089,7 @@ def make_train_step(
                     forcing,
                 )
                 host_losses.append(np.asarray(jax.device_get(loss)))
-                residual_targets.append(to_host(target))
+                _overwrite_host_tree(truth, target)
             else:
                 if needs_feedback:
                     baseline_prediction = baseline_forward(
@@ -1137,7 +1161,7 @@ def make_train_step(
                     state_in_host,
                     key,
                     current_inputs,
-                    residual_targets[supervised_position],
+                    host_truths[supervised_position],
                     forcing,
                     jnp.asarray(
                         supervised_weights[supervised_position], dtype=jnp.float32
@@ -1145,7 +1169,7 @@ def make_train_step(
                     state_cotangent,
                 )
             else:
-                template = _template_like(residual_targets[-1], tape_dtype)
+                template = _template_like(host_truths[-1], tape_dtype)
                 step_parameter_cotangent, step_state_cotangent = state_pullback(
                     residual_params,
                     state_in_host,
@@ -1227,11 +1251,7 @@ def make_data_parallel_train_step(
     kernel_caches = {}
 
     def host_cast(tree, dtype):
-        host_tree = jax.device_get(tree)
-        return jax.tree_util.tree_map(
-            lambda value: np.asarray(value).astype(dtype),
-            host_tree,
-        )
+        return _host_cast_floating(tree, np.dtype(dtype))
 
     def host_template_like(tree, dtype):
         def zeros(value):
@@ -1661,7 +1681,7 @@ def make_data_parallel_train_step(
         host_keys = np.asarray(jax.device_get(keys))
         host_static = tuple(host_cast(value, jnp.float32) for value in static_inputs)
         host_truths = tuple(
-            tuple(host_cast(value, jnp.float32) for value in replica_truths)
+            tuple(_reusable_fp32_host_tree(value) for value in replica_truths)
             for replica_truths in truths
         )
         host_forcings = tuple(
@@ -1672,12 +1692,8 @@ def make_data_parallel_train_step(
             [host_cast(frame, tape_dtype) for frame in replica_frames]
             for replica_frames in input_frames
         ]
-        host_templates_bf16 = tuple(
+        host_templates = tuple(
             host_template_like(host_truths[replica][-1], tape_dtype)
-            for replica in range(num_replicas)
-        )
-        host_templates_fp32 = tuple(
-            host_template_like(host_truths[replica][-1], jnp.float32)
             for replica in range(num_replicas)
         )
 
@@ -1687,16 +1703,10 @@ def make_data_parallel_train_step(
             static_leaves,
             num_replicas,
         )
-        template_treedef, template_bf16_leaves = pack_replica_trees(
-            host_templates_bf16,
+        template_treedef, template_leaves = pack_replica_trees(
+            host_templates,
             devices,
         )
-        template_fp32_treedef, template_fp32_leaves = pack_replica_trees(
-            host_templates_fp32,
-            devices,
-        )
-        if template_treedef != template_fp32_treedef:
-            raise ValueError("FP32 and BF16 target templates have different structures")
 
         previous_treedef, previous_leaves = pack_replica_trees(
             tuple(weather_frames[replica][0] for replica in range(num_replicas)),
@@ -1720,7 +1730,6 @@ def make_data_parallel_train_step(
         device_state = cast_state_boundary_fp32(residual_state)
         zero_state = jax.tree_util.tree_map(jnp.zeros_like, device_state)
         state_tape = []
-        residual_targets = []
         loss_arrays = []
         pending_boundary = None
         forward_offload_wait_seconds = 0.0
@@ -1742,12 +1751,18 @@ def make_data_parallel_train_step(
                 for replica, frame in enumerate(replica_frames):
                     weather_frames[replica].append(frame)
             if boundary["target_treedef"] is not None:
-                residual_targets.append(
-                    unpack_host_replicas(
-                        boundary["target_treedef"],
-                        snapshot["target_leaves"],
-                    )
+                target_replicas = unpack_host_replicas(
+                    boundary["target_treedef"],
+                    snapshot["target_leaves"],
                 )
+                supervised_position = boundary["supervised_position"]
+                if supervised_position is None:
+                    raise RuntimeError("Target offload is missing its supervised slot")
+                for replica, target in enumerate(target_replicas):
+                    _overwrite_host_tree(
+                        host_truths[replica][supervised_position],
+                        target,
+                    )
 
         forward_started = time.monotonic()
         for index in range(config.bptt_steps):
@@ -1760,16 +1775,11 @@ def make_data_parallel_train_step(
             needs_feedback = (
                 index >= config.truth_prefix_steps - 1 and index < final_index
             )
-            templates = (
-                host_templates_bf16
-                if index < final_index
-                else host_templates_fp32
-            )
             kernels = get_kernel_cache(
                 device_previous_frames[0],
                 device_current_frames[0],
                 device_static[0],
-                templates[0],
+                host_templates[0],
                 forcing[0],
                 index,
             )
@@ -1820,11 +1830,6 @@ def make_data_parallel_train_step(
                     )
                 loss_arrays.append(loss)
             else:
-                template_leaves = (
-                    template_bf16_leaves
-                    if index < final_index
-                    else template_fp32_leaves
-                )
                 if needs_feedback:
                     next_frame_leaves, next_state = kernels["residual_rollout"](
                         replicated_baseline_params,
@@ -1865,6 +1870,7 @@ def make_data_parallel_train_step(
                 "target_treedef": (
                     kernels["target_treedef"] if supervised else None
                 ),
+                "supervised_position": supervised_position,
             }
 
             device_state = zero_state if reset_state else next_state
@@ -1906,7 +1912,7 @@ def make_data_parallel_train_step(
                 weather_frames[0][index],
                 weather_frames[0][index + 1],
                 host_static[0],
-                host_templates_bf16[0],
+                host_templates[0],
                 forcing[0],
                 index,
             )
@@ -1938,11 +1944,14 @@ def make_data_parallel_train_step(
             supervised_position = supervised_positions.get(index)
             if supervised_position is not None:
                 prepared["target_leaves"] = pack_expected(
-                    residual_targets[supervised_position],
+                    tuple(
+                        host_truths[replica][supervised_position]
+                        for replica in range(num_replicas)
+                    ),
                     kernels["target_treedef"],
                 )
             else:
-                prepared["template_leaves"] = template_bf16_leaves
+                prepared["template_leaves"] = template_leaves
             return prepared, time.monotonic() - prepare_started
 
         parameter_cotangent = jax.tree_util.tree_map(jnp.zeros_like, residual_params)
