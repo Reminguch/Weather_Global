@@ -53,21 +53,30 @@ class EndpointFrameWorkspace:
     ) -> np.ndarray:
         if slot < 0:
             raise ValueError("truth workspace slot must be non-negative")
-        source_array = np.asarray(source)
-        shape = list(source_array.shape)
+        shape = list(source.shape)
         shape[axis] = int(indices.size)
         output_shape = tuple(shape)
+        source_dtype = np.dtype(source.dtype)
         dtype = (
             np.dtype(np.float32)
-            if np.issubdtype(source_array.dtype, np.inexact)
-            else np.dtype(source_array.dtype)
+            if np.issubdtype(source_dtype, np.inexact)
+            else source_dtype
         )
         key = (slot, name, output_shape, dtype.str)
         output = self._truth_buffers.get(key)
         if output is None:
             output = np.empty(output_shape, dtype=dtype)
             self._truth_buffers[key] = output
-        np.take(source_array, indices, axis=axis, out=output)
+        if hasattr(source, "take") and not isinstance(source, np.ndarray):
+            selected = np.asarray(source.take(indices, axis=axis))
+            if selected.shape != output_shape:
+                raise ValueError(
+                    f"Lazy truth selection for {name!r} returned shape "
+                    f"{selected.shape}, expected {output_shape}"
+                )
+            np.copyto(output, selected, casting="unsafe")
+        else:
+            np.take(np.asarray(source), indices, axis=axis, out=output)
         return output
 
 

@@ -36,6 +36,23 @@ class FakeStore:
         }
 
 
+class FakeLazyArray:
+    """Array-like source that must be read through its bounded take method."""
+
+    def __init__(self, values: np.ndarray) -> None:
+        self._values = values
+        self.shape = values.shape
+        self.dtype = values.dtype
+        self.take_calls: list[tuple[np.ndarray, int]] = []
+
+    def __array__(self, *args, **kwargs) -> np.ndarray:
+        raise AssertionError("lazy source must not be converted with np.asarray")
+
+    def take(self, indices: np.ndarray, *, axis: int = 0) -> np.ndarray:
+        self.take_calls.append((np.array(indices, copy=True), axis))
+        return np.take(self._values, indices, axis=axis)
+
+
 TASK = SimpleNamespace(
     input_variables=("x", "forcing", "static"),
     target_variables=("x",),
@@ -197,3 +214,38 @@ def test_truth_workspace_converts_non_fp32_source_once() -> None:
     )
     assert first_leaf.dtype == np.float32
     assert np.shares_memory(first_leaf, second.truths[0]["x"].values)
+
+
+def test_truth_workspace_reads_lazy_source_through_bounded_take() -> None:
+    store = FakeStore()
+    lazy_source = FakeLazyArray(store.data_vars["x"].data.astype(np.float64))
+    store.data_vars["x"].data = lazy_source
+    workspace = EndpointFrameWorkspace()
+
+    batch = load_endpoint_frame_batch(
+        store=store,
+        raw_anchor_indices=np.arange(2, 6),
+        input_steps=2,
+        truth_prefix_steps=2,
+        loss_mode="all_steps",
+        task_config=TASK,
+        dt=pd.Timedelta("6h"),
+        truth_workspace=workspace,
+    )
+
+    truth_values = np.concatenate(
+        [truth["x"].values[:, 0] for truth in batch.truths],
+        axis=0,
+    )
+    assert truth_values.dtype == np.float32
+    np.testing.assert_array_equal(
+        truth_values,
+        np.array(
+            [[3.0, 103.0], [4.0, 104.0], [5.0, 105.0], [6.0, 106.0]],
+            dtype=np.float32,
+        ),
+    )
+    assert any(
+        axis == 0 and np.array_equal(indices, np.arange(3, 7))
+        for indices, axis in lazy_source.take_calls
+    )
