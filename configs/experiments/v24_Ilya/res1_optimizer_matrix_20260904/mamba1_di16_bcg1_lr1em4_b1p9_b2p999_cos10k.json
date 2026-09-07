@@ -1,0 +1,82 @@
+{
+  "architecture_id": "v24_Ilya",
+  "schema_version": 1,
+  "data": {
+    "prepared_root": "data/graphcast/graphcast/dataset/prepared_stream/res1",
+    "anchor_manifest_root": "data/graphcast/graphcast/dataset/anchor_manifests/v24_Ilya_res1",
+    "baseline_checkpoint": "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "stats_dir": "data/graphcast/graphcast/stats",
+    "input_duration": "12h",
+    "target_steps": 1
+  },
+  "architecture": {
+    "resolution": 1.0,
+    "mesh_size": 5,
+    "width": 512,
+    "baseline_msg_steps": 16,
+    "residual_msg_steps": 2,
+    "temporal_location": "mesh_processor_interleaved",
+    "temporal_d_inner": 16,
+    "temporal_bc_groups": 1,
+    "temporal_d_state": 16,
+    "temporal_d_conv": 4,
+    "temporal_dt_rank": "auto",
+    "temporal_init_scheme": "mamba1",
+    "temporal_dt_init": "random",
+    "temporal_dt_min": 0.001,
+    "temporal_dt_max": 0.1,
+    "temporal_dt_scale": 1.0,
+    "temporal_dt_init_floor": 0.0001,
+    "temporal_layers": 2,
+    "temporal_conv_bias": true,
+    "temporal_stateful": true,
+    "temporal_zero_init_out": true,
+    "temporal_bias": false,
+    "temporal_dropout": 0.0
+  },
+  "sequence": {
+    "segment_steps": 96,
+    "bptt_steps": 24,
+    "ar_tail_k": 20,
+    "feedback_mode": "closed_loop_sg",
+    "temporal_state_policy": "carry"
+  },
+  "objective": {
+    "loss_mode": "all_steps"
+  },
+  "memory": {
+    "weather_tape_precision": "fp32",
+    "bptt_backend": "explicit_reverse_vjp"
+  },
+  "optimizer": {
+    "max_steps": 10000,
+    "checkpoint_every": 1000,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "weight_decay_policy": "all",
+    "warmup_steps": 200,
+    "grad_clip": 1.0,
+    "seed": 22,
+    "precision": "bf16",
+    "learning_rate_schedule": "cosine",
+    "end_learning_rate": 1e-05,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.999
+  },
+  "distributed": {
+    "mode": "single",
+    "num_devices": 1,
+    "per_device_batch_size": 1,
+    "drop_incomplete_replica_group": true
+  },
+  "validation": {
+    "enabled": false,
+    "every_steps": 2000,
+    "num_segments": 16,
+    "final_num_segments": null
+  },
+  "output": {
+    "output_root": "artifacts/checkpoints/v24_Ilya/res1_optimizer_matrix_20260904",
+    "run_name": "mamba1_di16_bcg1_lr1em4_b1p9_b2p999_cos10k"
+  }
+}

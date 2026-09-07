@@ -85,7 +85,26 @@ def build_training_transforms(
 
 
 def build_optimizer(config: V24IlyaTrainConfig):
-    if config.warmup_steps > 0:
+    if config.learning_rate_schedule == "cosine":
+        assert config.end_learning_rate is not None
+        cosine = optax.cosine_decay_schedule(
+            init_value=config.learning_rate,
+            decay_steps=config.max_steps - config.warmup_steps,
+            alpha=config.end_learning_rate / config.learning_rate,
+        )
+        if config.warmup_steps > 0:
+            warmup = optax.linear_schedule(
+                init_value=0.0,
+                end_value=config.learning_rate,
+                transition_steps=config.warmup_steps,
+            )
+            learning_rate = optax.join_schedules(
+                [warmup, cosine],
+                boundaries=[config.warmup_steps],
+            )
+        else:
+            learning_rate = cosine
+    elif config.warmup_steps > 0:
         learning_rate = optax.warmup_constant_schedule(
             init_value=0.0,
             peak_value=config.learning_rate,
@@ -104,6 +123,8 @@ def build_optimizer(config: V24IlyaTrainConfig):
     transforms.append(
         optax.adamw(
             learning_rate,
+            b1=config.adam_beta1,
+            b2=config.adam_beta2,
             weight_decay=config.weight_decay,
             mask=decay_mask,
         )

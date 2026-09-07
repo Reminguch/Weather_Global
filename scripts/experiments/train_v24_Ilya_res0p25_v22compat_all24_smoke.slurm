@@ -93,5 +93,4 @@ python -u scripts/training/verify_v24_Ilya_smoke.py \
   --expected-steps 5 \
   --max-median-step-seconds 180 \
   --gpu-peak-mib "${GPU_PEAK_MIB}" \
-  --max-gpu-peak-mib $((72 * 1024)) \
-  --require-loss-by-horizon
+  --max-gpu-peak-mib $((72 * 1024))

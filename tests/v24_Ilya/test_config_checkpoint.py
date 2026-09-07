@@ -28,6 +28,7 @@ from src.models.mamba.v24_Ilya.training.config import (
     parse_cli,
 )
 from src.models.mamba.v24_Ilya.training.endpoint_step import (
+    build_optimizer,
     mamba_standard_weight_decay_mask,
 )
 
@@ -52,6 +53,10 @@ def test_endpoint_defaults_and_roundtrip(tmp_path: Path) -> None:
     assert config.weather_tape_precision == "fp32"
     assert config.architecture.temporal_init_scheme == "legacy_haiku"
     assert config.weight_decay_policy == "all"
+    assert config.learning_rate_schedule == "constant"
+    assert config.end_learning_rate is None
+    assert config.adam_beta1 == 0.9
+    assert config.adam_beta2 == 0.999
     assert config.truth_prefix_steps == 4
     payload = config.to_dict()
     assert payload["objective"] == {"loss_mode": "last_step"}
@@ -59,6 +64,9 @@ def test_endpoint_defaults_and_roundtrip(tmp_path: Path) -> None:
         "weather_tape_precision": "fp32",
         "bptt_backend": BPTT_BACKEND,
     }
+    assert "learning_rate_schedule" not in payload["optimizer"]
+    assert "adam_beta1" not in payload["optimizer"]
+    assert "adam_beta2" not in payload["optimizer"]
     assert payload["distributed"] == {
         "mode": "single",
         "num_devices": 1,
@@ -68,6 +76,49 @@ def test_endpoint_defaults_and_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(json.dumps(payload))
     assert load_training_config(path) == config
+
+
+def test_cosine_schedule_and_adam_betas_roundtrip(tmp_path: Path) -> None:
+    config = V24IlyaTrainConfig(
+        **{
+            **_config().__dict__,
+            "max_steps": 10_000,
+            "learning_rate": 1e-4,
+            "learning_rate_schedule": "cosine",
+            "end_learning_rate": 1e-5,
+            "warmup_steps": 200,
+            "adam_beta1": 0.8,
+            "adam_beta2": 0.98,
+        }
+    )
+    path = tmp_path / "cosine.json"
+    payload = config.to_dict()
+    assert payload["optimizer"]["learning_rate_schedule"] == "cosine"
+    assert payload["optimizer"]["adam_beta1"] == 0.8
+    assert payload["optimizer"]["adam_beta2"] == 0.98
+    path.write_text(json.dumps(payload))
+    assert load_training_config(path) == config
+
+    _optimizer, schedule = build_optimizer(config)
+    assert float(schedule(0)) == pytest.approx(0.0)
+    assert float(schedule(200)) == pytest.approx(1e-4)
+    assert float(schedule(9_999)) == pytest.approx(1e-5, rel=1e-3)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"adam_beta1": -0.1},
+        {"adam_beta1": 1.0},
+        {"adam_beta2": float("nan")},
+        {"learning_rate_schedule": "linear"},
+        {"learning_rate_schedule": "cosine", "end_learning_rate": None},
+        {"learning_rate_schedule": "constant", "end_learning_rate": 1e-5},
+    ],
+)
+def test_optimizer_config_rejects_invalid_values(overrides: dict) -> None:
+    with pytest.raises(ValueError):
+        V24IlyaTrainConfig(**{**_config().__dict__, **overrides})
 
 
 def test_mamba1_initialization_and_decay_policy_roundtrip(tmp_path: Path) -> None:

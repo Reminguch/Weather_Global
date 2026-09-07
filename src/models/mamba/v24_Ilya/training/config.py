@@ -22,6 +22,7 @@ FEEDBACK_MODES = ("baseline", "closed_loop_sg")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
 LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
+LEARNING_RATE_SCHEDULES = ("constant", "cosine")
 WEATHER_TAPE_PRECISIONS = ("fp32",)
 BPTT_BACKEND = "explicit_reverse_vjp"
 DISTRIBUTED_MODES = ("single", "data_parallel")
@@ -121,6 +122,10 @@ class V24IlyaTrainConfig:
     max_steps: int = 50_000
     checkpoint_every: int = 2_000
     learning_rate: float = 1e-4
+    learning_rate_schedule: str = "constant"
+    end_learning_rate: float | None = None
+    adam_beta1: float = 0.9
+    adam_beta2: float = 0.999
     weight_decay: float = 1e-4
     weight_decay_policy: str = "all"
     warmup_steps: int = 200
@@ -231,6 +236,40 @@ class V24IlyaTrainConfig:
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative, got {value}")
+        if self.learning_rate_schedule not in LEARNING_RATE_SCHEDULES:
+            raise ValueError(
+                "learning_rate_schedule must be one of "
+                f"{LEARNING_RATE_SCHEDULES}, got {self.learning_rate_schedule!r}"
+            )
+        if self.learning_rate_schedule == "constant":
+            if self.end_learning_rate is not None:
+                raise ValueError(
+                    "constant learning_rate_schedule requires end_learning_rate "
+                    "to be null or omitted"
+                )
+        else:
+            if self.learning_rate <= 0:
+                raise ValueError("cosine learning_rate_schedule requires learning_rate > 0")
+            if self.warmup_steps >= self.max_steps:
+                raise ValueError(
+                    "cosine learning_rate_schedule requires warmup_steps < max_steps"
+                )
+            if self.end_learning_rate is None:
+                raise ValueError(
+                    "cosine learning_rate_schedule requires end_learning_rate"
+                )
+            if (
+                not math.isfinite(float(self.end_learning_rate))
+                or not 0 <= self.end_learning_rate <= self.learning_rate
+            ):
+                raise ValueError(
+                    "end_learning_rate must be finite and between zero and "
+                    f"learning_rate={self.learning_rate}, got {self.end_learning_rate}"
+                )
+        for name in ("adam_beta1", "adam_beta2"):
+            value = float(getattr(self, name))
+            if not math.isfinite(value) or not 0 <= value < 1:
+                raise ValueError(f"{name} must be finite and in [0, 1), got {value}")
         if self.weight_decay_policy not in WEIGHT_DECAY_POLICIES:
             raise ValueError(
                 "weight_decay_policy must be one of "
@@ -289,6 +328,33 @@ class V24IlyaTrainConfig:
             )
         return objective
 
+    def _optimizer_dict(self) -> dict[str, Any]:
+        optimizer = {
+            "max_steps": self.max_steps,
+            "checkpoint_every": self.checkpoint_every,
+            "learning_rate": self.learning_rate,
+            "weight_decay": self.weight_decay,
+            "weight_decay_policy": self.weight_decay_policy,
+            "warmup_steps": self.warmup_steps,
+            "grad_clip": self.grad_clip,
+            "seed": self.seed,
+            "precision": self.precision,
+        }
+        legacy_defaults = (
+            self.learning_rate_schedule == "constant"
+            and self.end_learning_rate is None
+            and self.adam_beta1 == 0.9
+            and self.adam_beta2 == 0.999
+        )
+        if not legacy_defaults:
+            optimizer.update(
+                learning_rate_schedule=self.learning_rate_schedule,
+                end_learning_rate=self.end_learning_rate,
+                adam_beta1=self.adam_beta1,
+                adam_beta2=self.adam_beta2,
+            )
+        return optimizer
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "architecture_id": ARCHITECTURE_ID,
@@ -317,17 +383,7 @@ class V24IlyaTrainConfig:
                 "weather_tape_precision": self.weather_tape_precision,
                 "bptt_backend": BPTT_BACKEND,
             },
-            "optimizer": {
-                "max_steps": self.max_steps,
-                "checkpoint_every": self.checkpoint_every,
-                "learning_rate": self.learning_rate,
-                "weight_decay": self.weight_decay,
-                "weight_decay_policy": self.weight_decay_policy,
-                "warmup_steps": self.warmup_steps,
-                "grad_clip": self.grad_clip,
-                "seed": self.seed,
-                "precision": self.precision,
-            },
+            "optimizer": self._optimizer_dict(),
             "distributed": self.distributed.to_dict(),
             "validation": self.validation.to_dict(),
             "output": {
@@ -424,7 +480,21 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
     optimizer = _section(
         payload,
         "optimizer",
-        {"max_steps", "checkpoint_every", "learning_rate", "weight_decay", "weight_decay_policy", "warmup_steps", "grad_clip", "seed", "precision"},
+        {
+            "max_steps",
+            "checkpoint_every",
+            "learning_rate",
+            "learning_rate_schedule",
+            "end_learning_rate",
+            "adam_beta1",
+            "adam_beta2",
+            "weight_decay",
+            "weight_decay_policy",
+            "warmup_steps",
+            "grad_clip",
+            "seed",
+            "precision",
+        },
     )
     objective = _section(
         payload,
@@ -610,6 +680,10 @@ def validate_resume_config(
     saved_optimizer = saved_copy.get("optimizer")
     if isinstance(saved_optimizer, dict):
         saved_optimizer.setdefault("weight_decay_policy", "all")
+        saved_optimizer.setdefault("learning_rate_schedule", "constant")
+        saved_optimizer.setdefault("end_learning_rate", None)
+        saved_optimizer.setdefault("adam_beta1", 0.9)
+        saved_optimizer.setdefault("adam_beta2", 0.999)
     # Validation is operational and must not perturb exact-resume training.
     # Older checkpoints predate this optional section, and resumed runs may
     # safely change its cadence or subset size.
