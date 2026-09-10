@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 from src.models.graphcast.training.core.batching import input_steps_from_duration
 from src.models.graphcast.training.core.eval_selection import select_eval_subset
@@ -196,6 +197,31 @@ class V24IlyaTrainingData:
         task_config,
     ) -> TrainingChunk:
         self.validate_cursor(cursor, config)
+        batch_size = config.distributed.per_device_batch_size
+        if batch_size > 1:
+            if cursor.segment_index % batch_size or cursor.segment_index + batch_size > len(self.segments):
+                raise ValueError("Batched cursor must address a complete aligned segment group")
+            lanes = tuple(self.load_segment_chunk(
+                self.segments[cursor.segment_index + lane], cursor.segment_offset,
+                config, task_config, workspace_slot=lane,
+            ) for lane in range(batch_size))
+            def combine(datasets):
+                return concatenate_batch(datasets)
+            return TrainingChunk(
+                input_frames=tuple(combine([lane.input_frames[t] for lane in lanes])
+                                   for t in range(len(lanes[0].input_frames))),
+                static_inputs=combine([lane.static_inputs for lane in lanes]),
+                truths=tuple(combine([lane.truths[t] for lane in lanes])
+                             for t in range(len(lanes[0].truths))),
+                forcings=tuple(combine([lane.forcings[t] for lane in lanes])
+                               for t in range(len(lanes[0].forcings))),
+                raw_anchor_indices=np.stack([lane.raw_anchor_indices for lane in lanes]),
+                data_report=FrameDataReport(**{
+                    key: sum(getattr(lane.data_report, key) for lane in lanes)
+                    for key in lanes[0].data_report.__dataclass_fields__
+                }),
+                next_cursor=advance_cursor(cursor, config, len(self.segments)),
+            )
         loaded = self.load_segment_chunk(
             self.segments[cursor.segment_index],
             cursor.segment_offset,
@@ -343,10 +369,18 @@ def advance_cursor(
     next_offset = cursor.segment_offset + config.bptt_steps
     if next_offset < config.segment_steps:
         return TrainingCursor(cursor.epoch, cursor.segment_index, next_offset)
-    next_segment = cursor.segment_index + 1
-    if next_segment < segment_count:
+    batch_size = config.distributed.per_device_batch_size
+    next_segment = cursor.segment_index + batch_size
+    if next_segment + batch_size <= segment_count:
         return TrainingCursor(cursor.epoch, next_segment, 0)
     return TrainingCursor(cursor.epoch + 1, 0, 0)
+
+
+def concatenate_batch(datasets):
+    """Concatenate independent streams, preserving relative times and spatial coordinates."""
+    result = xr.concat(datasets, dim="batch", data_vars="minimal", coords="minimal",
+                       compat="equals", join="exact")
+    return result.assign_coords(batch=np.arange(result.sizes["batch"]))
 
 
 def advance_replica_group_cursor(

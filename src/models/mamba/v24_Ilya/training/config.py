@@ -47,7 +47,9 @@ class V24IlyaDistributedConfig:
             raise ValueError("distributed.mode='single' requires num_devices=1")
         if self.mode == "data_parallel" and self.num_devices < 2:
             raise ValueError("distributed.mode='data_parallel' requires num_devices>=2")
-        if self.per_device_batch_size != 1:
+        if type(self.per_device_batch_size) is not int or self.per_device_batch_size <= 0:
+            raise ValueError("per_device_batch_size must be a positive integer")
+        if self.mode == "data_parallel" and self.per_device_batch_size != 1:
             raise ValueError(
                 "v24_Ilya data parallelism requires per_device_batch_size=1"
             )
@@ -55,6 +57,8 @@ class V24IlyaDistributedConfig:
             raise ValueError(
                 "distributed.drop_incomplete_replica_group must be boolean"
             )
+        if self.per_device_batch_size > 1 and not self.drop_incomplete_replica_group:
+            raise ValueError("Single-GPU batching requires drop_incomplete_replica_group=true")
         if self.mode == "data_parallel" and not self.drop_incomplete_replica_group:
             raise ValueError(
                 "v24_Ilya data parallelism currently requires "
@@ -122,6 +126,8 @@ class V24IlyaTrainConfig:
     max_steps: int = 50_000
     checkpoint_every: int = 2_000
     learning_rate: float = 1e-4
+    mamba_lr_multiplier: float = 1.0
+    spatial_lr_multiplier: float = 1.0
     learning_rate_schedule: str = "constant"
     end_learning_rate: float | None = None
     adam_beta1: float = 0.9
@@ -140,6 +146,9 @@ class V24IlyaTrainConfig:
     )
 
     def __post_init__(self) -> None:
+        for name in ("mamba_lr_multiplier", "spatial_lr_multiplier"):
+            if not math.isfinite(getattr(self, name)) or getattr(self, name) < 0:
+                raise ValueError(f"{name} must be finite and non-negative")
         if not self.run_name or self.run_name in {".", ".."}:
             raise ValueError("run_name must be a non-empty directory name")
         if Path(self.run_name).name != self.run_name:
@@ -340,6 +349,9 @@ class V24IlyaTrainConfig:
             "seed": self.seed,
             "precision": self.precision,
         }
+        if self.mamba_lr_multiplier != 1.0 or self.spatial_lr_multiplier != 1.0:
+            optimizer.update(mamba_lr_multiplier=self.mamba_lr_multiplier,
+                             spatial_lr_multiplier=self.spatial_lr_multiplier)
         legacy_defaults = (
             self.learning_rate_schedule == "constant"
             and self.end_learning_rate is None
@@ -484,6 +496,8 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
             "max_steps",
             "checkpoint_every",
             "learning_rate",
+            "mamba_lr_multiplier",
+            "spatial_lr_multiplier",
             "learning_rate_schedule",
             "end_learning_rate",
             "adam_beta1",
@@ -661,6 +675,8 @@ def validate_resume_config(
         saved_data.setdefault("allow_incomplete_prepared_store", False)
 
     if isinstance(saved_architecture, dict):
+        saved_architecture.setdefault("residual_width", None)
+        saved_architecture.setdefault("residual_initialization", "baseline_overlay")
         # This no-op field was recorded by early v24_Ilya checkpoints but was
         # never consumed by the full-Mamba implementation.
         saved_architecture.pop("temporal_hidden_size", None)

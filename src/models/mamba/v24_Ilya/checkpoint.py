@@ -590,6 +590,8 @@ def build_v24_Ilya_swa(
         normalized.pop("validation", None)
         architecture = normalized.get("architecture")
         if isinstance(architecture, dict):
+            architecture.setdefault("residual_width", None)
+            architecture.setdefault("residual_initialization", "baseline_overlay")
             # Normalize checkpoints written before the no-op field was removed.
             architecture.pop("temporal_hidden_size", None)
             architecture.setdefault("temporal_bc_groups", 1)

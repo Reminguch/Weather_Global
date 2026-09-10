@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import jax
 import jax.numpy as jnp
@@ -20,7 +22,12 @@ from src.models.mamba.v24_Ilya.training.endpoint_step import (
     _reusable_fp32_host_tree,
     make_bptt_objective,
     make_train_step,
+    make_validation_step,
     memory_contract,
+)
+from src.models.mamba.v24_Ilya.training.validation import (
+    run_fixed_validation,
+    validation_step_keys,
 )
 
 
@@ -520,3 +527,165 @@ def test_actual_recurrent_state_boundaries_are_fp32() -> None:
         leaf.dtype == jnp.float32
         for leaf in jax.tree_util.tree_leaves(final_state)
     )
+
+
+class ValidationBaseline:
+    """Nonzero, input-dependent baseline exercising live forecast feedback."""
+
+    def __init__(self, dtype):
+        self.dtype = dtype
+        self.calls = 0
+
+    def apply(self, params, state, key, inputs, template, forcing):
+        self.calls += 1
+        value = jnp.mean(xarray_jax.unwrap_data(inputs["x"]).astype(self.dtype))
+        prediction = params["scale"].astype(self.dtype) * value
+        return jax.tree_util.tree_map(
+            lambda target: jnp.ones(target.shape, self.dtype) * prediction, template,
+        ), state
+
+
+class ValidationResidual:
+    def __init__(self, dtype):
+        self.dtype = dtype
+
+    def apply(self, params, state, key, inputs, template, forcing):
+        dtype = self.dtype
+        value = jnp.mean(xarray_jax.unwrap_data(inputs["x"]).astype(dtype))
+        forcing_value = jnp.mean(xarray_jax.unwrap_data(forcing["forcing"]).astype(dtype))
+        next_value = (
+            jnp.asarray(0.7, dtype) * state["s"].astype(dtype)
+            + params["a"].astype(dtype) * value + forcing_value
+            + jax.random.uniform(key, (), dtype=dtype) * jnp.asarray(0.01, dtype)
+        )
+        prediction = jax.tree_util.tree_map(
+            lambda target: jnp.ones(target.shape, dtype) * params["b"].astype(dtype) * next_value,
+            template,
+        )
+        return prediction, {"s": next_value}
+
+
+class ValidationResidualLoss(ValidationResidual):
+    def apply(self, params, state, key, inputs, target, forcing):
+        prediction, next_state = super().apply(params, state, key, inputs, target, forcing)
+        error = (
+            xarray_jax.unwrap_data(prediction["x"]).astype(jnp.float32)
+            - xarray_jax.unwrap_data(target["x"]).astype(self.dtype).astype(jnp.float32)
+        )
+        loss = xr.DataArray(jnp.mean(error**2)[None], dims=("batch",), coords={"batch": [0]})
+        return ((loss, {}), prediction), next_state
+
+
+def _validation_builders(config, dtype=jnp.float32):
+    baseline = ValidationBaseline(dtype)
+    residual = ValidationResidual(dtype)
+    loss = ValidationResidualLoss(dtype)
+    kwargs = dict(
+        transforms=V24IlyaTrainingTransforms(baseline, residual, loss, loss),
+        baseline_params={"scale": jnp.asarray(0.3)},
+        baseline_state={}, config=config, time_step=pd.Timedelta("6h"), input_steps=2,
+    )
+    return kwargs, baseline
+
+
+@pytest.mark.parametrize("loss_mode", ["last_step", "sparse_steps", "all_steps"])
+@pytest.mark.parametrize("feedback_mode", ["closed_loop_sg", "baseline"])
+@pytest.mark.parametrize("state_policy", ["carry", "reset_every_anchor"])
+@pytest.mark.parametrize("precision", ["fp32", "bf16"])
+def test_streaming_validation_matches_objective(loss_mode, feedback_mode, state_policy, precision):
+    config = replace(_config(loss_mode), feedback_mode=feedback_mode,
+                     temporal_state_policy=state_policy, precision=precision)
+    dtype = jnp.bfloat16 if precision == "bf16" else jnp.float32
+    kwargs, baseline = _validation_builders(config, dtype)
+    reference = jax.jit(make_bptt_objective(**kwargs, return_loss_components=True))
+    validation = make_validation_step(**kwargs)
+    args = jax.device_get(_arguments(loss_mode))
+    before = jax.tree_util.tree_map(lambda x: np.array(x, copy=True), args)
+    params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
+    actual_state = expected_state = {"s": jnp.asarray(0.4, jnp.float32)}
+    rtol, atol = (1e-2, 1e-3) if precision == "bf16" else (1e-5, 1e-6)
+    for chunk in range(2):
+        # A second chunk checks state carry and runtime (not captured) parameters.
+        params = {**params, "a": jnp.asarray(0.1 + chunk * 0.03)}
+        actual_loss, actual_state, actual_components = validation(params, actual_state, *args)
+        expected_loss, expected_state, expected_components = reference(params, expected_state, *args)
+        for actual, expected in zip(
+            jax.tree_util.tree_leaves((actual_loss, actual_state, actual_components)),
+            jax.tree_util.tree_leaves((expected_loss, expected_state, expected_components)), strict=True,
+        ):
+            np.testing.assert_allclose(actual, expected, rtol=rtol, atol=atol)
+        assert actual_state["s"].dtype == jnp.float32
+        if chunk == 0:
+            traces = baseline.calls
+        else:
+            assert baseline.calls == traces, "identical chunk structures should reuse compiled kernels"
+    for actual, expected in zip(jax.tree_util.tree_leaves(args), jax.tree_util.tree_leaves(before), strict=True):
+        np.testing.assert_array_equal(actual, expected)
+
+
+def test_streaming_validation_full24_fixed_segments_and_state_isolation():
+    config = replace(_config("all_steps"), segment_steps=120, bptt_steps=24, ar_tail_k=19)
+    kwargs, _baseline = _validation_builders(config)
+    validation = make_validation_step(**kwargs)
+    reference = jax.jit(make_bptt_objective(**kwargs, return_loss_components=True))
+    chunk = SimpleNamespace(
+        input_frames=tuple(jax.device_get(_input_frame(float(i + 1))) for i in range(6)),
+        static_inputs=xr.Dataset(),
+        truths=tuple(jax.device_get(_dataset(float(i + 3), hour=6)) for i in range(24)),
+        forcings=tuple(jax.device_get(_dataset(0.01 * i, "forcing", 6)) for i in range(24)),
+    )
+    data = SimpleNamespace(
+        validation_segments=[np.arange(120) for _ in range(8)],
+        load_segment_chunk=lambda *args: chunk,
+        fingerprint_validation_subset=lambda ids: "fixed-test-subset",
+    )
+    params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
+    zero_state = {"s": jnp.asarray(0.0)}
+    observed_states = []
+
+    def observe(*args):
+        observed_states.append(float(args[1]["s"]))
+        return validation(*args)
+
+    record = run_fixed_validation(
+        validation_step=observe, residual_params=params, zero_residual_state=zero_state,
+        training_data=data, task_config=None, config=config, segment_ids=np.arange(8),
+        step=100, role="fixed_checkpoint", subset_policy="stratified_fixed",
+    )
+    expected_losses, expected_components = [], []
+    for segment in range(8):
+        state = zero_state
+        for index in range(5):
+            keys = validation_step_keys(seed=config.seed, segment_id=segment, chunk_index=index, bptt_steps=24)
+            loss, state, components = reference(
+                params, state, keys, chunk.input_frames, chunk.static_inputs, chunk.truths, chunk.forcings,
+            )
+            expected_losses.append(float(loss))
+            expected_components.append(np.asarray(components))
+    np.testing.assert_allclose(record["loss"], np.mean(expected_losses), rtol=1e-5, atol=1e-6)
+    np.testing.assert_allclose(list(record["loss_by_horizon"].values()),
+                               np.mean(expected_components, axis=0), rtol=1e-5, atol=1e-6)
+    assert record["num_anchors"] == 960
+    assert record["num_chunks"] == 40
+    assert record["subset_fingerprint"] == "fixed-test-subset"
+    assert observed_states[::5] == [0.0] * 8
+    assert all(value != 0.0 for i, value in enumerate(observed_states) if i % 5)
+    assert float(zero_state["s"]) == 0.0
+
+
+def test_streaming_validation_matches_training_forward_loss_and_state():
+    config = _config("all_steps")
+    kwargs, _baseline = _validation_builders(config)
+    validation = make_validation_step(**kwargs)
+    optimizer = optax.adam(0.01)
+    training = make_train_step(**kwargs, optimizer=optimizer)
+    params = {"a": jnp.asarray(0.1), "b": jnp.asarray(0.2)}
+    state = {"s": jnp.asarray(0.4)}
+    args = jax.device_get(_arguments("all_steps"))
+    loss, final_state, components = validation(params, state, *args)
+    _, train_state, _, train_loss, _, train_components = training(
+        params, state, optimizer.init(params), *args,
+    )
+    np.testing.assert_allclose(loss, train_loss, rtol=1e-5, atol=1e-6)
+    np.testing.assert_allclose(final_state["s"], train_state["s"], rtol=1e-5, atol=1e-6)
+    np.testing.assert_allclose(components, train_components, rtol=1e-5, atol=1e-6)

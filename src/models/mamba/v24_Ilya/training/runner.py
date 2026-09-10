@@ -67,6 +67,7 @@ from .validation import (
     update_best_validation,
     update_train_validation_plot,
 )
+from .endpoint_step import is_mamba_parameter
 
 
 def validate_input_paths(config: V24IlyaTrainConfig) -> None:
@@ -325,7 +326,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
     )
     sample_inputs, sample_targets, sample_forcings = (
         training_data.store.build_batch_from_indices(
-            indices=[sample_anchor],
+            indices=[sample_anchor] * config.distributed.per_device_batch_size,
             input_steps=training_data.input_steps,
             target_steps=config.target_steps,
             task_cfg=task_config,
@@ -358,7 +359,9 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
     _validate_tree_shapes(zero_residual_state, prediction_state, "residual state")
     residual_params, residual_overlay = overlay_matching_params(
         residual_params,
-        baseline_checkpoint.params,
+        (baseline_checkpoint.params
+         if config.architecture.residual_initialization == "baseline_overlay"
+         else {}),
         strict=False,
     )
 
@@ -384,6 +387,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
     completed_step = 0
     resume_checkpoint_was_final = False
     overlay_metadata = {
+        "residual_initialization": config.architecture.residual_initialization,
         "residual_copied": residual_overlay.copied,
         "residual_fresh": residual_overlay.initialized,
         "baseline_copied": baseline_overlay.copied,
@@ -477,7 +481,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             print(f"[v24_Ilya] warm-starting from SWA checkpoint {invocation.init_from}")
         validate_param_tree_compatible(residual_params, checkpoint.residual_params)
         residual_params = checkpoint.residual_params
-        if checkpoint.has_residual_state and not data_parallel:
+        if checkpoint.has_residual_state and not data_parallel and config.distributed.per_device_batch_size == 1:
             assert checkpoint.residual_state is not None
             _validate_tree_shapes(
                 zero_residual_state,
@@ -487,9 +491,11 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             residual_state = cast_state_boundary_fp32(checkpoint.residual_state)
         elif checkpoint.has_residual_state:
             print(
-                "[v24_Ilya] ignoring warm-start lane state in data-parallel mode"
+                "[v24_Ilya] resetting warm-start recurrent state for independent batch lanes"
             )
         print(f"[v24_Ilya] warm start from {invocation.init_from}; optimizer reset")
+        overlay_metadata["init_from"] = str(invocation.init_from)
+        overlay_metadata["init_from_sha256"] = file_sha256(invocation.init_from)
 
     comparison_params = None
     if invocation.validation_compare is not None:
@@ -508,12 +514,11 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
     n_baseline_parameters = sum(
         int(leaf.size) for leaf in jax.tree_util.tree_leaves(baseline_params)
     )
-    memory_sample = training_data.load_segment_chunk(
-        training_data.segments[0],
-        0,
-        config,
-        task_config,
-    )
+    mamba_parameter_count = sum(int(value.size) for module, values in residual_params.items()
+                                if is_mamba_parameter(module) for value in values.values())
+    if not mamba_parameter_count and (config.mamba_lr_multiplier != 1 or config.spatial_lr_multiplier != 1):
+        raise ValueError("No temporal parameters matched the optimizer grouping rule")
+    memory_sample = training_data.build_chunk(TrainingCursor(), config, task_config)
     memory_metadata = memory_contract(
         input_frames=memory_sample.input_frames,
         static_inputs=memory_sample.static_inputs,
@@ -560,6 +565,8 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             "chunks_per_segment": config.segment_steps // config.bptt_steps,
             "prepared_store_selection": training_data.store.selection_metadata,
             "residual_parameters": n_residual_parameters,
+            "mamba_parameters": mamba_parameter_count,
+            "spatial_parameters": n_residual_parameters - mamba_parameter_count,
             "baseline_parameters_frozen": n_baseline_parameters,
             "baseline_checkpoint_fingerprint": baseline_fingerprint,
             "anchor_manifest_fingerprint": training_data.manifest_fingerprint,
@@ -575,7 +582,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             "dropped_replica_segments": (
                 training_data.dropped_replica_segments(config.distributed.num_devices)
                 if data_parallel
-                else 0
+                else len(training_data.segments) % config.distributed.per_device_batch_size
             ),
         },
     }
@@ -610,6 +617,11 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
     metrics_path = config.run_dir / "train_metrics.jsonl"
     validation_metrics_path = config.run_dir / "validation_metrics.jsonl"
     validation_step = None
+    validation_zero_state = jax.tree_util.tree_map(
+        lambda value: value[:1] if getattr(value, "ndim", 0) > 0
+        and value.shape[0] == config.distributed.per_device_batch_size else value,
+        zero_residual_state,
+    )
     if config.validation.enabled:
         validation_step = make_validation_step(
             transforms=transforms,
@@ -625,7 +637,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         assert comparison_params is not None
         common = {
             "validation_step": validation_step,
-            "zero_residual_state": zero_residual_state,
+            "zero_residual_state": validation_zero_state,
             "training_data": training_data,
             "task_config": task_config,
             "config": config,
@@ -684,7 +696,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         record = run_fixed_validation(
             validation_step=validation_step,
             residual_params=residual_params,
-            zero_residual_state=zero_residual_state,
+            zero_residual_state=validation_zero_state,
             training_data=training_data,
             task_config=task_config,
             config=config,
@@ -741,7 +753,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         record = run_fixed_validation(
             validation_step=validation_step,
             residual_params=residual_params,
-            zero_residual_state=zero_residual_state,
+            zero_residual_state=validation_zero_state,
             training_data=training_data,
             task_config=task_config,
             config=config,
@@ -1062,6 +1074,10 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             "epoch": consumed_cursor.epoch,
             "segment_index": consumed_cursor.segment_index,
             "segment_offset": consumed_cursor.segment_offset,
+            "batch_size": config.distributed.global_batch_size,
+            "anchors_seen": step * anchors_per_update,
+            "mamba_learning_rate": _learning_rate_value(learning_rate, step - 1) * config.mamba_lr_multiplier,
+            "spatial_learning_rate": _learning_rate_value(learning_rate, step - 1) * config.spatial_lr_multiplier,
         }
         if config.loss_mode == "sparse_steps":
             record["loss_by_horizon"] = {

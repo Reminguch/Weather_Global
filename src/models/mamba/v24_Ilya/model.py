@@ -102,7 +102,9 @@ def build_model_configs(
             base_model_config,
             resolution=architecture.resolution,
             mesh_size=architecture.mesh_size,
-            latent_size=architecture.width,
+            latent_size=(architecture.residual_width
+                         if architecture.residual_width is not None
+                         else architecture.width),
             gnn_msg_steps=architecture.residual_msg_steps,
         ),
     )

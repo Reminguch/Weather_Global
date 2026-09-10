@@ -38,6 +38,8 @@ class V24IlyaArchitectureConfig:
     resolution: float = 1.0
     mesh_size: int = 5
     width: int = 512
+    residual_width: int | None = None
+    residual_initialization: str = "baseline_overlay"
     baseline_msg_steps: int = 16
     residual_msg_steps: int = 2
     temporal_location: str = "mesh_processor_interleaved"
@@ -60,6 +62,10 @@ class V24IlyaArchitectureConfig:
     temporal_dropout: float = 0.0
 
     def __post_init__(self) -> None:
+        if self.residual_width is not None and self.residual_width <= 0:
+            raise ValueError("residual_width must be positive or None")
+        if self.residual_initialization not in ("baseline_overlay", "fresh"):
+            raise ValueError("residual_initialization must be baseline_overlay or fresh")
         positive = {
             "mesh_size": self.mesh_size,
             "width": self.width,
@@ -150,6 +156,8 @@ class V24IlyaEvalConfig:
     resolution: float = 1.0
     mesh_size: int = 5
     width: int = 512
+    residual_width: int | None = None
+    residual_initialization: str = "baseline_overlay"
     baseline_msg_steps: int = 16
     residual_msg_steps: int = 2
     val_year: int = 2022
@@ -249,6 +257,8 @@ class V24IlyaEvalConfig:
             resolution=self.resolution,
             mesh_size=self.mesh_size,
             width=self.width,
+            residual_width=self.residual_width,
+            residual_initialization=self.residual_initialization,
             baseline_msg_steps=self.baseline_msg_steps,
             residual_msg_steps=self.residual_msg_steps,
             temporal_location=self.temporal_location,
@@ -315,6 +325,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resolution", type=float, default=1.0)
     parser.add_argument("--mesh-size", type=int, default=5)
     parser.add_argument("--width", type=int, default=512)
+    parser.add_argument("--residual-width", type=int, default=None)
+    parser.add_argument(
+        "--residual-initialization", choices=("baseline_overlay", "fresh"),
+        default="baseline_overlay",
+    )
     parser.add_argument("--baseline-msg-steps", type=int, default=16)
     parser.add_argument("--residual-msg-steps", type=int, default=2)
     parser.add_argument("--val-year", type=int, default=2022)

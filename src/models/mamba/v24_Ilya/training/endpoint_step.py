@@ -113,6 +113,15 @@ def build_optimizer(config: V24IlyaTrainConfig):
     else:
         learning_rate = config.learning_rate
     transforms = []
+    grouped = config.mamba_lr_multiplier != 1.0 or config.spatial_lr_multiplier != 1.0
+    if grouped:
+        # Frozen gradients must not affect clipping of the trainable block.
+        transforms.append(optax.masked(optax.set_to_zero(), lambda params: {
+            module: {name: (config.mamba_lr_multiplier if is_mamba_parameter(module)
+                            else config.spatial_lr_multiplier) == 0
+                     for name in values}
+            for module, values in params.items()
+        }))
     if config.grad_clip > 0:
         transforms.append(optax.clip_by_global_norm(config.grad_clip))
     decay_mask = (
@@ -120,17 +129,37 @@ def build_optimizer(config: V24IlyaTrainConfig):
         if config.weight_decay_policy == "mamba_standard"
         else None
     )
-    transforms.append(
-        optax.adamw(
-            learning_rate,
+    def adam(multiplier):
+        schedule = ((lambda step: learning_rate(step) * multiplier)
+                    if callable(learning_rate) else learning_rate * multiplier)
+        return optax.adamw(
+            schedule,
             b1=config.adam_beta1,
             b2=config.adam_beta2,
             weight_decay=config.weight_decay,
             mask=decay_mask,
         )
-    )
+    if grouped:
+        transforms.append(optax.multi_transform({
+            "mamba": adam(config.mamba_lr_multiplier) if config.mamba_lr_multiplier else optax.set_to_zero(),
+            "spatial": adam(config.spatial_lr_multiplier) if config.spatial_lr_multiplier else optax.set_to_zero(),
+        }, parameter_group_labels))
+    else:
+        transforms.append(adam(1.0))
     optimizer = optax.chain(*transforms) if len(transforms) > 1 else transforms[0]
     return optimizer, learning_rate
+
+
+def is_mamba_parameter(module_name: str) -> bool:
+    """The temporal backbone, including its norms; exclude the spatial output head."""
+    name = module_name.lower()
+    return name.startswith("mesh_interleaved_temporal_") or "temporal_mesh_mamba" in name
+
+
+def parameter_group_labels(params):
+    return {module: {name: "mamba" if is_mamba_parameter(module) else "spatial"
+                     for name in values}
+            for module, values in params.items()}
 
 
 def mamba_standard_weight_decay_mask(params):
@@ -1233,6 +1262,227 @@ def make_train_step(
     return train_step
 
 
+def _make_forward_kernels(
+    *,
+    transforms,
+    baseline_state,
+    config,
+    time_step,
+    step_index,
+    previous_frame_treedef,
+    current_frame_treedef,
+    static_treedef,
+    target_treedef,
+    forcing_treedef,
+    save_tape: bool,
+):
+    """Local forward kernels shared by DP training and streaming validation.
+
+    Parameters are runtime arguments; only metadata is captured. Disabling
+    save_tape removes residual targets from the supervised kernel outputs.
+    """
+    tape_dtype = jnp.float32
+
+    def unpack(treedef, leaves):
+        return jax.tree_util.tree_unflatten(treedef, leaves)
+
+    def pack(tree):
+        return tuple(jax.tree_util.tree_leaves(tree))
+
+    def build_inputs(
+        previous_frame_leaves,
+        current_frame_leaves,
+        static_leaves,
+    ):
+        return input_window_from_frames(
+            unpack(previous_frame_treedef, previous_frame_leaves),
+            unpack(current_frame_treedef, current_frame_leaves),
+            unpack(static_treedef, static_leaves),
+            step_index=step_index,
+            truth_prefix_steps=config.truth_prefix_steps,
+            time_step=time_step,
+        )
+
+    def supervised_rollout_local(
+        local_baseline_params,
+        params,
+        state,
+        key,
+        previous_frame_leaves,
+        current_frame_leaves,
+        static_leaves,
+        truth_leaves,
+        forcing_leaves,
+    ):
+        inputs = build_inputs(
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+        )
+        truth = unpack(target_treedef, truth_leaves)
+        forcing = unpack(forcing_treedef, forcing_leaves)
+        baseline_prediction, _ = transforms.baseline_predict.apply(
+            local_baseline_params,
+            baseline_state,
+            key,
+            _tree_stop(inputs),
+            truth,
+            forcing,
+        )
+        target = residual_target(truth, baseline_prediction)
+        output, next_state = transforms.residual_loss_and_predictions.apply(
+            params,
+            state,
+            key,
+            inputs,
+            target,
+            forcing,
+        )
+        (loss_array, _diagnostics), prediction = output
+        frame = next_dynamic_frame(
+            inputs,
+            feedback_field(
+                config.feedback_mode,
+                baseline_prediction,
+                prediction,
+            ),
+            forcing,
+            time_step=time_step,
+        )
+        return (
+            scalarize_loss(loss_array),
+            pack(_tree_stop(_cast_floating(frame, tape_dtype))),
+            cast_state_boundary_fp32(next_state),
+            pack(_tree_stop(target)) if save_tape else (),
+        )
+
+    def supervised_no_feedback_local(
+        local_baseline_params,
+        params,
+        state,
+        key,
+        previous_frame_leaves,
+        current_frame_leaves,
+        static_leaves,
+        truth_leaves,
+        forcing_leaves,
+    ):
+        inputs = build_inputs(
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+        )
+        truth = unpack(target_treedef, truth_leaves)
+        forcing = unpack(forcing_treedef, forcing_leaves)
+        baseline_prediction, _ = transforms.baseline_predict.apply(
+            local_baseline_params,
+            baseline_state,
+            key,
+            _tree_stop(inputs),
+            truth,
+            forcing,
+        )
+        target = residual_target(truth, baseline_prediction)
+        output, next_state = transforms.residual_loss_and_predictions.apply(
+            params,
+            state,
+            key,
+            inputs,
+            target,
+            forcing,
+        )
+        (loss_array, _diagnostics), _prediction = output
+        return (
+            scalarize_loss(loss_array),
+            cast_state_boundary_fp32(next_state),
+            pack(_tree_stop(target)) if save_tape else (),
+        )
+
+    def residual_rollout_local(
+        local_baseline_params,
+        params,
+        state,
+        key,
+        previous_frame_leaves,
+        current_frame_leaves,
+        static_leaves,
+        template_leaves,
+        forcing_leaves,
+    ):
+        inputs = build_inputs(
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+        )
+        template = unpack(target_treedef, template_leaves)
+        forcing = unpack(forcing_treedef, forcing_leaves)
+        baseline_prediction, _ = transforms.baseline_predict.apply(
+            local_baseline_params,
+            baseline_state,
+            key,
+            _tree_stop(inputs),
+            template,
+            forcing,
+        )
+        prediction, next_state = transforms.residual_predict.apply(
+            params,
+            state,
+            key,
+            inputs,
+            template,
+            forcing,
+        )
+        frame = next_dynamic_frame(
+            inputs,
+            feedback_field(
+                config.feedback_mode,
+                baseline_prediction,
+                prediction,
+            ),
+            forcing,
+            time_step=time_step,
+        )
+        return (
+            pack(_tree_stop(_cast_floating(frame, tape_dtype))),
+            cast_state_boundary_fp32(next_state),
+        )
+
+    def residual_no_feedback_local(
+        params,
+        state,
+        key,
+        previous_frame_leaves,
+        current_frame_leaves,
+        static_leaves,
+        template_leaves,
+        forcing_leaves,
+    ):
+        inputs = build_inputs(
+            previous_frame_leaves,
+            current_frame_leaves,
+            static_leaves,
+        )
+        template = unpack(target_treedef, template_leaves)
+        forcing = unpack(forcing_treedef, forcing_leaves)
+        _prediction, next_state = transforms.residual_predict.apply(
+            params,
+            state,
+            key,
+            inputs,
+            template,
+            forcing,
+        )
+        return cast_state_boundary_fp32(next_state)
+
+    return {
+        "build_inputs": build_inputs,
+        "supervised_rollout": supervised_rollout_local,
+        "supervised_no_feedback": supervised_no_feedback_local,
+        "residual_rollout": residual_rollout_local,
+        "residual_no_feedback": residual_no_feedback_local,
+    }
+
+
 def make_data_parallel_train_step(
     *,
     transforms: V24IlyaTrainingTransforms,
@@ -1325,193 +1575,20 @@ def make_data_parallel_train_step(
         def unpack(treedef, leaves):
             return jax.tree_util.tree_unflatten(treedef, leaves)
 
-        def pack(tree):
-            return tuple(jax.tree_util.tree_leaves(tree))
-
-        def build_inputs(
-            previous_frame_leaves,
-            current_frame_leaves,
-            static_leaves,
-        ):
-            return input_window_from_frames(
-                unpack(previous_frame_treedef, previous_frame_leaves),
-                unpack(current_frame_treedef, current_frame_leaves),
-                unpack(static_treedef, static_leaves),
-                step_index=step_index,
-                truth_prefix_steps=config.truth_prefix_steps,
-                time_step=time_step,
-            )
-
-        def supervised_rollout_local(
-            local_baseline_params,
-            params,
-            state,
-            key,
-            previous_frame_leaves,
-            current_frame_leaves,
-            static_leaves,
-            truth_leaves,
-            forcing_leaves,
-        ):
-            inputs = build_inputs(
-                previous_frame_leaves,
-                current_frame_leaves,
-                static_leaves,
-            )
-            truth = unpack(target_treedef, truth_leaves)
-            forcing = unpack(forcing_treedef, forcing_leaves)
-            baseline_prediction, _ = transforms.baseline_predict.apply(
-                local_baseline_params,
-                baseline_state,
-                key,
-                _tree_stop(inputs),
-                truth,
-                forcing,
-            )
-            target = residual_target(truth, baseline_prediction)
-            output, next_state = transforms.residual_loss_and_predictions.apply(
-                params,
-                state,
-                key,
-                inputs,
-                target,
-                forcing,
-            )
-            (loss_array, _diagnostics), prediction = output
-            frame = next_dynamic_frame(
-                inputs,
-                feedback_field(
-                    config.feedback_mode,
-                    baseline_prediction,
-                    prediction,
-                ),
-                forcing,
-                time_step=time_step,
-            )
-            return (
-                scalarize_loss(loss_array),
-                pack(_tree_stop(_cast_floating(frame, tape_dtype))),
-                cast_state_boundary_fp32(next_state),
-                pack(_tree_stop(target)),
-            )
-
-        def supervised_no_feedback_local(
-            local_baseline_params,
-            params,
-            state,
-            key,
-            previous_frame_leaves,
-            current_frame_leaves,
-            static_leaves,
-            truth_leaves,
-            forcing_leaves,
-        ):
-            inputs = build_inputs(
-                previous_frame_leaves,
-                current_frame_leaves,
-                static_leaves,
-            )
-            truth = unpack(target_treedef, truth_leaves)
-            forcing = unpack(forcing_treedef, forcing_leaves)
-            baseline_prediction, _ = transforms.baseline_predict.apply(
-                local_baseline_params,
-                baseline_state,
-                key,
-                _tree_stop(inputs),
-                truth,
-                forcing,
-            )
-            target = residual_target(truth, baseline_prediction)
-            output, next_state = transforms.residual_loss_and_predictions.apply(
-                params,
-                state,
-                key,
-                inputs,
-                target,
-                forcing,
-            )
-            (loss_array, _diagnostics), _prediction = output
-            return (
-                scalarize_loss(loss_array),
-                cast_state_boundary_fp32(next_state),
-                pack(_tree_stop(target)),
-            )
-
-        def residual_rollout_local(
-            local_baseline_params,
-            params,
-            state,
-            key,
-            previous_frame_leaves,
-            current_frame_leaves,
-            static_leaves,
-            template_leaves,
-            forcing_leaves,
-        ):
-            inputs = build_inputs(
-                previous_frame_leaves,
-                current_frame_leaves,
-                static_leaves,
-            )
-            template = unpack(target_treedef, template_leaves)
-            forcing = unpack(forcing_treedef, forcing_leaves)
-            baseline_prediction, _ = transforms.baseline_predict.apply(
-                local_baseline_params,
-                baseline_state,
-                key,
-                _tree_stop(inputs),
-                template,
-                forcing,
-            )
-            prediction, next_state = transforms.residual_predict.apply(
-                params,
-                state,
-                key,
-                inputs,
-                template,
-                forcing,
-            )
-            frame = next_dynamic_frame(
-                inputs,
-                feedback_field(
-                    config.feedback_mode,
-                    baseline_prediction,
-                    prediction,
-                ),
-                forcing,
-                time_step=time_step,
-            )
-            return (
-                pack(_tree_stop(_cast_floating(frame, tape_dtype))),
-                cast_state_boundary_fp32(next_state),
-            )
-
-        def residual_no_feedback_local(
-            params,
-            state,
-            key,
-            previous_frame_leaves,
-            current_frame_leaves,
-            static_leaves,
-            template_leaves,
-            forcing_leaves,
-        ):
-            inputs = build_inputs(
-                previous_frame_leaves,
-                current_frame_leaves,
-                static_leaves,
-            )
-            template = unpack(target_treedef, template_leaves)
-            forcing = unpack(forcing_treedef, forcing_leaves)
-            _prediction, next_state = transforms.residual_predict.apply(
-                params,
-                state,
-                key,
-                inputs,
-                template,
-                forcing,
-            )
-            return cast_state_boundary_fp32(next_state)
+        forward = _make_forward_kernels(
+            transforms=transforms,
+            baseline_state=baseline_state,
+            config=config,
+            time_step=time_step,
+            step_index=step_index,
+            previous_frame_treedef=previous_frame_treedef,
+            current_frame_treedef=current_frame_treedef,
+            static_treedef=static_treedef,
+            target_treedef=target_treedef,
+            forcing_treedef=forcing_treedef,
+            save_tape=True,
+        )
+        build_inputs = forward["build_inputs"]
 
         def state_pullback_local(
             params,
@@ -1619,19 +1696,19 @@ def make_data_parallel_train_step(
             "forcing_treedef": forcing_treedef,
             "frame_treedef": frame_treedef,
             "supervised_rollout": jax.pmap(
-                supervised_rollout_local,
+                forward["supervised_rollout"],
                 **pmap_kwargs,
             ),
             "supervised_no_feedback": jax.pmap(
-                supervised_no_feedback_local,
+                forward["supervised_no_feedback"],
                 **pmap_kwargs,
             ),
             "residual_rollout": jax.pmap(
-                residual_rollout_local,
+                forward["residual_rollout"],
                 **pmap_kwargs,
             ),
             "residual_no_feedback": jax.pmap(
-                residual_no_feedback_local,
+                forward["residual_no_feedback"],
                 **pmap_kwargs,
             ),
             "state_pullback": jax.pmap(state_pullback_local, **pmap_kwargs),
@@ -2090,18 +2167,71 @@ def make_validation_step(
     config: V24IlyaTrainConfig,
     time_step,
     input_steps: int,
-) -> Callable[..., tuple[Any, Any]]:
-    bptt_objective = make_bptt_objective(
-        transforms=transforms,
-        baseline_params=baseline_params,
-        baseline_state=baseline_state,
-        config=config,
-        time_step=time_step,
-        input_steps=input_steps,
-        return_loss_components=True,
-    )
+) -> Callable[..., tuple[Any, Any, Any]]:
+    """Evaluate a chunk with the training forward kernels and no GPU tape.
 
-    @jax.jit
+    The outer loop intentionally runs on the host. Compiling the whole rollout
+    makes the full-resolution all-steps objective exceed an 80 GB GPU even
+    without autodiff. Only the active weather pair and state survive each step.
+    """
+    if input_steps != 2:
+        raise ValueError("v24_Ilya streaming validation requires input_steps=2")
+    if jax.tree_util.tree_leaves(baseline_state):
+        raise ValueError("Frozen GraphCast must have empty recurrent state")
+
+    supervised_positions = {
+        index: position
+        for position, index in enumerate(config.supervised_step_indices)
+    }
+    reset_state = config.temporal_state_policy == "reset_every_anchor"
+    final_index = config.bptt_steps - 1
+    kernel_caches = {}
+
+    def pack(tree):
+        return tuple(jax.tree_util.tree_leaves(tree))
+
+    def get_kernels(previous, current, static, target, forcing, step_index):
+        trees = (previous, current, static, target, forcing)
+        treedefs = tuple(jax.tree_util.tree_structure(tree) for tree in trees)
+        cache_key = (*treedefs, step_index)
+        if cache_key not in kernel_caches:
+            forward = _make_forward_kernels(
+                transforms=transforms,
+                baseline_state=baseline_state,
+                config=config,
+                time_step=time_step,
+                step_index=step_index,
+                previous_frame_treedef=treedefs[0],
+                current_frame_treedef=treedefs[1],
+                static_treedef=treedefs[2],
+                target_treedef=treedefs[3],
+                forcing_treedef=treedefs[4],
+                save_tape=False,
+            )
+
+            def frame_shape(prev, curr, fixed, template, force):
+                inputs = input_window_from_frames(
+                    prev, curr, fixed,
+                    step_index=step_index,
+                    truth_prefix_steps=config.truth_prefix_steps,
+                    time_step=time_step,
+                )
+                return next_dynamic_frame(inputs, template, force, time_step=time_step)
+
+            # Infer xarray metadata without allocating a full weather frame.
+            frame_treedef = jax.tree_util.tree_structure(
+                jax.eval_shape(frame_shape, *trees)
+            )
+            kernel_caches[cache_key] = (
+                {
+                    name: jax.jit(fn)
+                    for name, fn in forward.items()
+                    if name != "build_inputs"
+                },
+                frame_treedef,
+            )
+        return kernel_caches[cache_key]
+
     def validation_step(
         residual_params,
         residual_state,
@@ -2111,15 +2241,88 @@ def make_validation_step(
         truths,
         forcings,
     ):
-        loss, next_residual_state, loss_components = bptt_objective(
-            residual_params,
-            residual_state,
-            keys,
-            input_frames,
-            static_inputs,
-            truths,
-            forcings,
+        if len(input_frames) != config.truth_prefix_steps + 1:
+            raise ValueError("Validation teacher-frame count is incorrect")
+        if len(truths) != len(supervised_positions):
+            raise ValueError("Validation truth count is incorrect")
+        if len(forcings) != config.bptt_steps:
+            raise ValueError("Validation forcing count is incorrect")
+
+        # The loader supplies CPU arrays. Do not convert the entire chunk to
+        # JAX arrays: stage truth/forcing leaves only when their step runs.
+        host_frames = _host_cast_floating(input_frames, np.float32)
+        host_truths = _host_cast_floating(truths, np.float32)
+        host_forcings = _host_cast_floating(forcings, np.float32)
+        template = (
+            jax.tree_util.tree_map(np.zeros_like, host_truths[-1])
+            if len(supervised_positions) < config.bptt_steps else None
         )
-        return loss, _tree_stop(next_residual_state), _tree_stop(loss_components)
+        host_keys = np.asarray(jax.device_get(keys))
+        static = _host_cast_floating(static_inputs, np.float32)
+        static_leaves = jax.device_put(pack(static))
+        previous = _cast_floating(host_frames[0], jnp.float32)
+        current = _cast_floating(host_frames[1], jnp.float32)
+        state = cast_state_boundary_fp32(residual_state)
+        zero_state = _tree_zeros_like(state)
+        if reset_state:
+            state = zero_state
+        losses = []
+
+        for index in range(config.bptt_steps):
+            position = supervised_positions.get(index)
+            supervised = position is not None
+            needs_feedback = config.truth_prefix_steps - 1 <= index < final_index
+            target = host_truths[position] if supervised else template
+            forcing = host_forcings[index]
+            kernels, frame_treedef = get_kernels(
+                previous, current, static, target, forcing, index,
+            )
+            args = (
+                residual_params, state, host_keys[index],
+                pack(previous), pack(current), static_leaves,
+                pack(target), pack(forcing),
+            )
+            if supervised:
+                name = (
+                    "supervised_rollout" if needs_feedback
+                    else "supervised_no_feedback"
+                )
+            else:
+                name = (
+                    "residual_rollout" if needs_feedback
+                    else "residual_no_feedback"
+                )
+            outputs = kernels[name](
+                *((baseline_params, *args) if supervised or needs_feedback else args)
+            )
+            jax.block_until_ready(outputs)
+            if supervised:
+                if needs_feedback:
+                    loss, frame_leaves, state, _empty_tape = outputs
+                else:
+                    loss, state, _empty_tape = outputs
+                losses.append(np.asarray(jax.device_get(loss)))
+            elif needs_feedback:
+                frame_leaves, state = outputs
+            else:
+                state = outputs
+            del args, outputs
+            if reset_state:
+                state = zero_state
+            if needs_feedback:
+                previous, current = current, jax.tree_util.tree_unflatten(
+                    frame_treedef, frame_leaves,
+                )
+                del frame_leaves
+            elif index < final_index:
+                previous, current = current, _cast_floating(
+                    host_frames[index + 2], jnp.float32,
+                )
+
+        loss_components = jnp.asarray(np.stack(losses))
+        loss = jnp.sum(loss_components * jnp.asarray(
+            config.normalized_supervised_weights, dtype=loss_components.dtype,
+        ))
+        return loss, _tree_stop(state), _tree_stop(loss_components)
 
     return validation_step
