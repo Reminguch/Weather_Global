@@ -2,6 +2,11 @@
 
 This project integrates a **Mamba-style selective state space model (SSM)** into the [GraphCast](https://github.com/google-deepmind/graphcast) weather forecasting architecture, exploring whether explicit temporal memory across autoregressive rollout steps can improve multi-step weather prediction.
 
+The [NeuralGCM residual pipeline specification](docs/experiments/neuralgcm_residual/README.md)
+describes the planned 2.8°/1.4° study: four width/inner-width configurations per
+resolution, cached one-step pretraining with recurrent carry, and twenty-step
+closed-loop fine-tuning. NeuralGCM integration is not implemented yet.
+
 ## Motivation
 
 GraphCast predicts weather by taking two consecutive time steps as input and producing the next step. For multi-day forecasts, predictions are fed back autoregressively. However, each prediction step is **memoryless** — the model only sees the two most recent frames and has no mechanism to remember earlier atmospheric states during a rollout.

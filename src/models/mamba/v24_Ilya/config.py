@@ -196,6 +196,8 @@ class V24IlyaEvalConfig:
     anchor_shard_count: int = 1
     anchor_shard_index: int = 0
     merge_state_out: Path | None = None
+    initialization_manifest: Path | None = None
+    model_id: str | None = None
 
     def __post_init__(self) -> None:
         # Preserve the flat legacy evaluator interface while validating its
@@ -241,6 +243,8 @@ class V24IlyaEvalConfig:
             )
         if self.force_idx is not None and self.anchor_shard_count != 1:
             raise ValueError("force_idx cannot be combined with anchor sharding")
+        if self.initialization_manifest is not None and self.force_idx is not None:
+            raise ValueError("force_idx cannot be combined with initialization_manifest")
         if (
             self.train_start_year is not None
             and self.train_end_year is not None
@@ -305,6 +309,10 @@ class V24IlyaEvalConfig:
     def sample_total_steps(self) -> int:
         """Anchor horizon shared by cold and warm modes."""
 
+        if self.initialization_manifest is not None:
+            # Manifest indices are scored origins. Warmup, if used, comes
+            # from the history preceding that origin, never future targets.
+            return self.target_steps
         return self.warmup_steps + self.target_steps
 
     @property
@@ -422,6 +430,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-alpha", type=float, default=1.0)
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--force-idx", type=int, default=None)
+    parser.add_argument(
+        "--initialization-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "JSON initializations with explicit UTC timestamps. Evaluate every "
+            "listed start (n-samples is ignored), preserve year-boundary context, "
+            "and export exact per-initialization losses."
+        ),
+    )
+    parser.add_argument("--model-id", default=None, help="Frozen protocol model identifier.")
     parser.add_argument(
         "--anchor-shard-count",
         type=int,

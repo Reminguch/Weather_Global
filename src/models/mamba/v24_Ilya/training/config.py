@@ -22,6 +22,7 @@ FEEDBACK_MODES = ("baseline", "closed_loop_sg")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
 LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
+LOSS_KINDS = ("mse", "mse_fp32", "amse")
 LEARNING_RATE_SCHEDULES = ("constant", "cosine")
 WEATHER_TAPE_PRECISIONS = ("fp32",)
 BPTT_BACKEND = "explicit_reverse_vjp"
@@ -120,6 +121,9 @@ class V24IlyaTrainConfig:
     feedback_mode: str = "baseline"
     temporal_state_policy: str = "carry"
     loss_mode: str = "last_step"
+    loss_kind: str = "mse"
+    amse_lmax: int | None = None
+    amse_power_epsilon: float = 1e-12
     supervised_horizons: tuple[int, ...] = ()
     supervised_weights: tuple[float, ...] = ()
     weather_tape_precision: str = "fp32"
@@ -192,6 +196,18 @@ class V24IlyaTrainConfig:
             raise ValueError(f"precision must be one of {PRECISIONS}")
         if self.loss_mode not in LOSS_MODES:
             raise ValueError(f"loss_mode must be one of {LOSS_MODES}")
+        if self.loss_kind not in LOSS_KINDS:
+            raise ValueError(f"loss_kind must be one of {LOSS_KINDS}")
+        if self.amse_lmax is not None and (
+            type(self.amse_lmax) is not int or self.amse_lmax < 0
+        ):
+            raise ValueError("amse_lmax must be a non-negative integer or null")
+        if not math.isfinite(self.amse_power_epsilon) or self.amse_power_epsilon <= 0:
+            raise ValueError("amse_power_epsilon must be positive and finite")
+        if self.loss_kind != "amse" and (
+            self.amse_lmax is not None or self.amse_power_epsilon != 1e-12
+        ):
+            raise ValueError("AMSE options require loss_kind='amse'")
         if self.loss_mode == "sparse_steps":
             horizons = tuple(self.supervised_horizons)
             weights = tuple(self.supervised_weights)
@@ -330,6 +346,14 @@ class V24IlyaTrainConfig:
 
     def _objective_dict(self) -> dict[str, Any]:
         objective: dict[str, Any] = {"loss_mode": self.loss_mode}
+        # Preserve the serialized legacy contract for existing checkpoints.
+        if self.loss_kind != "mse":
+            objective["loss_kind"] = self.loss_kind
+        if self.loss_kind == "amse":
+            objective.update(
+                amse_lmax=self.amse_lmax,
+                amse_power_epsilon=self.amse_power_epsilon,
+            )
         if self.loss_mode == "sparse_steps":
             objective.update(
                 supervised_horizons=list(self.supervised_horizons),
@@ -414,6 +438,14 @@ class V24IlyaTrainInvocation:
     dry_run: bool = False
     baseline_validation_only: bool = False
     validation_compare: Path | None = None
+    zero_state_on_init: bool = False
+
+    def __post_init__(self) -> None:
+        if self.zero_state_on_init and (
+            self.init_from is None or self.resume is not None
+            or self.baseline_validation_only or self.validation_compare is not None
+        ):
+            raise ValueError("--zero-state-on-init requires --init-from without resume or validation-only modes")
 
 
 def _section(payload: Mapping[str, Any], name: str, allowed: set[str]) -> dict[str, Any]:
@@ -513,7 +545,8 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
     objective = _section(
         payload,
         "objective",
-        {"loss_mode", "supervised_horizons", "supervised_weights"},
+        {"loss_mode", "loss_kind", "amse_lmax", "amse_power_epsilon",
+         "supervised_horizons", "supervised_weights"},
     )
     memory = _section(
         payload,
@@ -611,6 +644,11 @@ def build_cli_parser() -> argparse.ArgumentParser:
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--resume", type=Path)
     source.add_argument("--init-from", type=Path)
+    parser.add_argument(
+        "--zero-state-on-init",
+        action="store_true",
+        help="Start --init-from with zero recurrent state instead of checkpoint state.",
+    )
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--checkpoint-every", type=int)
     parser.add_argument("--output-root", type=Path)
@@ -655,6 +693,7 @@ def parse_cli(argv: Sequence[str] | None = None) -> V24IlyaTrainInvocation:
         dry_run=args.dry_run,
         baseline_validation_only=args.baseline_validation_only,
         validation_compare=args.validation_compare,
+        zero_state_on_init=args.zero_state_on_init,
     )
 
 

@@ -17,6 +17,20 @@ REFERENCE = Path("configs/experiments/v24_Ilya/res1_optimizer_matrix_20260904/"
                  "mamba1_di16_bcg1_lr1em4_b1p9_b2p98_cos10k.json")
 
 
+def test_baseline_comparison_allows_observed_drift_but_rejects_wrong_baseline():
+    from scripts.experiments.run_v24_res1_width128 import validate_baseline_reference
+    reference = {"ckpt_in": "baseline.npz", "original_graphcast_loss": {"baseline_per_step": [1.] * 40}}
+    candidate = {"ckpt_in": str(Path("baseline.npz").resolve()),
+                 "original_graphcast_loss": {"baseline_per_step": [1.0045] * 40}}
+    assert validate_baseline_reference(candidate, reference)["max_relative_difference"] == pytest.approx(.0045)
+    candidate["original_graphcast_loss"]["baseline_per_step"][39] = 1.02
+    with pytest.raises(AssertionError):
+        validate_baseline_reference(candidate, reference)
+    candidate["ckpt_in"] = "different.npz"
+    with pytest.raises(ValueError, match="checkpoint differs"):
+        validate_baseline_reference(candidate, reference)
+
+
 def test_width_changes_only_residual_model():
     base = gc.ModelConfig(resolution=1, mesh_size=5, latent_size=512,
                           gnn_msg_steps=16, hidden_layers=1,

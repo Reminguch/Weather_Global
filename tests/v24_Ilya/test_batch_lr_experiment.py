@@ -32,7 +32,7 @@ def config(**kwargs):
     )
 
 
-@pytest.mark.parametrize('spatial,mamba', [(1., .3), (0., 1.)])
+@pytest.mark.parametrize('spatial,mamba', [(1., .3), (0., 1.), (1., 3.), (.3, 1.)])
 def test_group_updates_and_exact_freeze(spatial, mamba):
     cfg = config(spatial_lr_multiplier=spatial, mamba_lr_multiplier=mamba, weight_decay=.1)
     params = {'mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0': {'w': jnp.ones(2)},

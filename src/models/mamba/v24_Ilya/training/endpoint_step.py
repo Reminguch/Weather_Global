@@ -37,6 +37,8 @@ class V24IlyaTrainingTransforms:
     residual_predict: hk.TransformedWithState
     residual_loss: hk.TransformedWithState
     residual_loss_and_predictions: hk.TransformedWithState
+    # Physical-field scoring lives outside mixed-precision predictor wrappers.
+    full_field_loss: Callable | None = None
 
 
 def build_training_transforms(
@@ -74,6 +76,14 @@ def build_training_transforms(
         ).loss_and_predictions(inputs, residual_targets, forcings)
 
     combined = hk.transform_with_state(residual_loss_and_predictions)
+    full_field_loss = None
+    if config.loss_kind != "mse":
+        from .spectral_loss import build_full_field_loss
+
+        full_field_loss = build_full_field_loss(
+            stats, config.loss_kind, lmax=config.amse_lmax,
+            power_epsilon=config.amse_power_epsilon,
+        )
     return V24IlyaTrainingTransforms(
         baseline_predict=hk.transform_with_state(baseline_prediction),
         residual_predict=hk.transform_with_state(residual_prediction),
@@ -81,6 +91,7 @@ def build_training_transforms(
         # residual_loss_and_predictions on supervised steps.
         residual_loss=combined,
         residual_loss_and_predictions=combined,
+        full_field_loss=full_field_loss,
     )
 
 
@@ -314,6 +325,48 @@ def residual_target(truth, baseline_prediction):
     )
 
 
+def supervision_target(transforms, truth, baseline_prediction):
+    """Store only the information required to rematerialize a supervised step.
+
+    Legacy MSE uses its residual target. Full-field objectives retain truth and
+    the frozen baseline, never another copy of the residual target. The baseline
+    is computed once in the forward rollout and has no reverse GraphCast call.
+    """
+    if transforms.full_field_loss is None:
+        return residual_target(truth, baseline_prediction)
+    return (_tree_stop(_cast_floating(truth, jnp.float32)),
+            _tree_stop(_cast_floating(baseline_prediction, jnp.float32)))
+
+
+def supervised_step(transforms, params, state, key, inputs, target, forcing):
+    if transforms.full_field_loss is None:
+        output, next_state = transforms.residual_loss_and_predictions.apply(
+            params, state, key, inputs, target, forcing,
+        )
+        (loss_array, _diagnostics), prediction = output
+        loss = scalarize_loss(loss_array)
+    else:
+        truth, baseline = target
+        prediction, next_state = transforms.residual_predict.apply(
+            params, state, key, inputs, _template_like(truth, jnp.float32), forcing,
+        )
+        full_prediction = jax.tree_util.tree_map(
+            lambda base, residual: jax.lax.stop_gradient(base) + residual,
+            _cast_floating(baseline, jnp.float32),
+            _cast_floating(prediction, jnp.float32),
+        )
+        loss_array, _diagnostics = transforms.full_field_loss(
+            full_prediction, _tree_stop(_cast_floating(truth, jnp.float32)),
+        )
+        loss = jnp.mean(loss_array)
+    return loss, prediction, cast_state_boundary_fp32(next_state)
+
+
+def _validate_loss_hook(transforms, config):
+    if (config.loss_kind != "mse") != (transforms.full_field_loss is not None):
+        raise ValueError("loss_kind and full_field_loss hook disagree; rebuild training transforms")
+
+
 def feedback_field(mode: str, baseline_prediction, residual_prediction):
     baseline_prediction = _tree_stop(
         _cast_floating(baseline_prediction, jnp.float32)
@@ -420,6 +473,9 @@ def memory_contract(
         "state_tape_bytes": tree_nbytes(residual_state) * config.bptt_steps,
         "truth_targets_loaded": len(truths),
         "truth_target_bytes": target_tape_bytes,
+        "frozen_baseline_target_bytes": (
+            target_tape_bytes if config.loss_kind != "mse" else 0
+        ),
         "truth_target_logical_bytes": target_tape_bytes,
         "truth_target_storage": "reuse_owned_fp32_truth_buffer",
         "truth_target_retained_copies": 1,
@@ -448,6 +504,7 @@ def make_bptt_objective(
         raise ValueError(
             "Endpoint GraphCast warmup skipping requires an empty frozen baseline state"
         )
+    _validate_loss_hook(transforms, config)
     tape_dtype = jnp.float32
     final_index = config.bptt_steps - 1
     supervised_indices = config.supervised_step_indices
@@ -487,20 +544,7 @@ def make_bptt_objective(
         target,
         forcing,
     ):
-        output, next_state = transforms.residual_loss_and_predictions.apply(
-            params,
-            state,
-            key,
-            inputs,
-            target,
-            forcing,
-        )
-        (loss_array, _diagnostics), prediction = output
-        return (
-            scalarize_loss(loss_array),
-            prediction,
-            cast_state_boundary_fp32(next_state),
-        )
+        return supervised_step(transforms, params, state, key, inputs, target, forcing)
 
     def run_forward(
         residual_params,
@@ -573,7 +617,7 @@ def make_bptt_objective(
                     truth,
                     forcing,
                 )
-                target = residual_target(truth, baseline_prediction)
+                target = supervision_target(transforms, truth, baseline_prediction)
                 loss, residual_prediction, next_state = residual_supervised_step(
                     residual_params,
                     state_in,
@@ -662,6 +706,9 @@ def make_bptt_objective(
         frame_treedef = jax.tree_util.tree_structure(input_frames[0])
         static_treedef = jax.tree_util.tree_structure(static_inputs)
         truth_treedef = jax.tree_util.tree_structure(truths[0])
+        supervision_treedef = jax.tree_util.tree_structure(
+            (truths[0], truths[0]) if transforms.full_field_loss is not None else truths[0]
+        )
         forcing_treedef = jax.tree_util.tree_structure(forcings[0])
 
         def pack(tree):
@@ -782,7 +829,7 @@ def make_bptt_objective(
                 unpack(frame_treedef, leaves) for leaves in weather_leaves
             )
             residual_targets = tuple(
-                unpack(truth_treedef, leaves) for leaves in residual_target_leaves
+                unpack(supervision_treedef, leaves) for leaves in residual_target_leaves
             )
             static = unpack(static_treedef, static_leaves)
             forcing_values = tuple(
@@ -836,7 +883,10 @@ def make_bptt_objective(
                         (loss_cotangent * weight, state_cotangent)
                     )
                 else:
-                    template = _template_like(residual_targets[-1], tape_dtype)
+                    template_target = (residual_targets[-1][0]
+                                       if transforms.full_field_loss is not None
+                                       else residual_targets[-1])
+                    template = _template_like(template_target, tape_dtype)
 
                     def state_step(params, state):
                         _prediction, next_state = residual_predict_step(
@@ -924,6 +974,7 @@ def make_train_step(
     if jax.tree_util.tree_leaves(baseline_state):
         raise ValueError("Frozen GraphCast must have empty recurrent state")
 
+    _validate_loss_hook(transforms, config)
     tape_dtype = jnp.float32
     final_index = config.bptt_steps - 1
     reset_state = config.temporal_state_policy == "reset_every_anchor"
@@ -965,20 +1016,7 @@ def make_train_step(
 
     @jax.jit
     def supervised_forward(params, state, key, inputs, target, forcing):
-        output, next_state = transforms.residual_loss_and_predictions.apply(
-            params,
-            state,
-            key,
-            inputs,
-            target,
-            forcing,
-        )
-        (loss_array, _diagnostics), prediction = output
-        return (
-            scalarize_loss(loss_array),
-            prediction,
-            cast_state_boundary_fp32(next_state),
-        )
+        return supervised_step(transforms, params, state, key, inputs, target, forcing)
 
     @jax.jit
     def state_pullback(
@@ -1096,6 +1134,7 @@ def make_train_step(
 
         state_tape = []
         host_losses = []
+        host_targets = list(host_truths)
         template_truth = host_truths[-1]
 
         for index in range(config.bptt_steps):
@@ -1129,7 +1168,7 @@ def make_train_step(
                     truth,
                     forcing,
                 )
-                target = residual_target(truth, baseline_prediction)
+                target = supervision_target(transforms, truth, baseline_prediction)
                 loss, residual_prediction, next_state = supervised_forward(
                     residual_params,
                     state_in_host,
@@ -1139,7 +1178,10 @@ def make_train_step(
                     forcing,
                 )
                 host_losses.append(np.asarray(jax.device_get(loss)))
-                _overwrite_host_tree(truth, target)
+                if transforms.full_field_loss is None:
+                    _overwrite_host_tree(truth, target)
+                else:
+                    host_targets[supervised_position] = (truth, to_host(target[1]))
             else:
                 if needs_feedback:
                     baseline_prediction = baseline_forward(
@@ -1211,7 +1253,7 @@ def make_train_step(
                     state_in_host,
                     key,
                     current_inputs,
-                    host_truths[supervised_position],
+                    host_targets[supervised_position],
                     forcing,
                     jnp.asarray(
                         supervised_weights[supervised_position], dtype=jnp.float32
@@ -1329,16 +1371,10 @@ def _make_forward_kernels(
             truth,
             forcing,
         )
-        target = residual_target(truth, baseline_prediction)
-        output, next_state = transforms.residual_loss_and_predictions.apply(
-            params,
-            state,
-            key,
-            inputs,
-            target,
-            forcing,
+        target = supervision_target(transforms, truth, baseline_prediction)
+        loss, prediction, next_state = supervised_step(
+            transforms, params, state, key, inputs, target, forcing,
         )
-        (loss_array, _diagnostics), prediction = output
         frame = next_dynamic_frame(
             inputs,
             feedback_field(
@@ -1350,10 +1386,11 @@ def _make_forward_kernels(
             time_step=time_step,
         )
         return (
-            scalarize_loss(loss_array),
+            loss,
             pack(_tree_stop(_cast_floating(frame, tape_dtype))),
             cast_state_boundary_fp32(next_state),
-            pack(_tree_stop(target)) if save_tape else (),
+            pack(_tree_stop(target[1] if transforms.full_field_loss is not None else target))
+            if save_tape else (),
         )
 
     def supervised_no_feedback_local(
@@ -1382,20 +1419,15 @@ def _make_forward_kernels(
             truth,
             forcing,
         )
-        target = residual_target(truth, baseline_prediction)
-        output, next_state = transforms.residual_loss_and_predictions.apply(
-            params,
-            state,
-            key,
-            inputs,
-            target,
-            forcing,
+        target = supervision_target(transforms, truth, baseline_prediction)
+        loss, _prediction, next_state = supervised_step(
+            transforms, params, state, key, inputs, target, forcing,
         )
-        (loss_array, _diagnostics), _prediction = output
         return (
-            scalarize_loss(loss_array),
+            loss,
             cast_state_boundary_fp32(next_state),
-            pack(_tree_stop(target)) if save_tape else (),
+            pack(_tree_stop(target[1] if transforms.full_field_loss is not None else target))
+            if save_tape else (),
         )
 
     def residual_rollout_local(
@@ -1507,6 +1539,7 @@ def make_data_parallel_train_step(
             f"Expected {num_replicas} data-parallel devices, got {len(devices)}"
         )
 
+    _validate_loss_hook(transforms, config)
     tape_dtype = jnp.float32
     final_index = config.bptt_steps - 1
     reset_state = config.temporal_state_policy == "reset_every_anchor"
@@ -1554,6 +1587,9 @@ def make_data_parallel_train_step(
         current_frame_treedef = jax.tree_util.tree_structure(current_frame_tree)
         static_treedef = jax.tree_util.tree_structure(static_tree)
         target_treedef = jax.tree_util.tree_structure(target_tree)
+        supervision_treedef = jax.tree_util.tree_structure(
+            (target_tree, target_tree) if transforms.full_field_loss is not None else target_tree
+        )
         forcing_treedef = jax.tree_util.tree_structure(forcing_tree)
         input_tree = input_window_from_frames(
             previous_frame_tree,
@@ -1644,23 +1680,14 @@ def make_data_parallel_train_step(
                 current_frame_leaves,
                 static_leaves,
             )
-            target = unpack(target_treedef, target_leaves)
+            target = unpack(supervision_treedef, target_leaves)
             forcing = unpack(forcing_treedef, forcing_leaves)
 
             def rematerialized_step(candidate_params, candidate_state):
-                output, next_state = transforms.residual_loss_and_predictions.apply(
-                    candidate_params,
-                    candidate_state,
-                    key,
-                    inputs,
-                    target,
-                    forcing,
+                loss, _prediction, next_state = supervised_step(
+                    transforms, candidate_params, candidate_state, key, inputs, target, forcing,
                 )
-                (loss_array, _diagnostics), _prediction = output
-                return (
-                    scalarize_loss(loss_array),
-                    cast_state_boundary_fp32(next_state),
-                )
+                return loss, next_state
 
             _, pullback = jax.vjp(
                 jax.checkpoint(rematerialized_step),
@@ -1693,6 +1720,7 @@ def make_data_parallel_train_step(
             "current_frame_treedef": current_frame_treedef,
             "static_treedef": static_treedef,
             "target_treedef": target_treedef,
+            "supervision_treedef": supervision_treedef,
             "forcing_treedef": forcing_treedef,
             "frame_treedef": frame_treedef,
             "supervised_rollout": jax.pmap(
@@ -1782,6 +1810,7 @@ def make_data_parallel_train_step(
             tuple(_reusable_fp32_host_tree(value) for value in replica_truths)
             for replica_truths in truths
         )
+        host_targets = [list(replica_truths) for replica_truths in host_truths]
         host_forcings = tuple(
             tuple(host_cast(value, jnp.float32) for value in replica_forcings)
             for replica_forcings in forcings
@@ -1857,10 +1886,11 @@ def make_data_parallel_train_step(
                 if supervised_position is None:
                     raise RuntimeError("Target offload is missing its supervised slot")
                 for replica, target in enumerate(target_replicas):
-                    _overwrite_host_tree(
-                        host_truths[replica][supervised_position],
-                        target,
-                    )
+                    truth = host_truths[replica][supervised_position]
+                    if transforms.full_field_loss is None:
+                        _overwrite_host_tree(truth, target)
+                    else:
+                        host_targets[replica][supervised_position] = (truth, target)
 
         forward_started = time.monotonic()
         for index in range(config.bptt_steps):
@@ -2043,10 +2073,10 @@ def make_data_parallel_train_step(
             if supervised_position is not None:
                 prepared["target_leaves"] = pack_expected(
                     tuple(
-                        host_truths[replica][supervised_position]
+                        host_targets[replica][supervised_position]
                         for replica in range(num_replicas)
                     ),
-                    kernels["target_treedef"],
+                    kernels["supervision_treedef"],
                 )
             else:
                 prepared["template_leaves"] = template_leaves
@@ -2178,6 +2208,7 @@ def make_validation_step(
         raise ValueError("v24_Ilya streaming validation requires input_steps=2")
     if jax.tree_util.tree_leaves(baseline_state):
         raise ValueError("Frozen GraphCast must have empty recurrent state")
+    _validate_loss_hook(transforms, config)
 
     supervised_positions = {
         index: position

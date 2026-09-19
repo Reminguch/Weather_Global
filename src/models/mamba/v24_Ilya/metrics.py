@@ -132,8 +132,13 @@ class V24IlyaMetricAccumulator:
         truth_dataset: xr.Dataset,
         baseline_dataset: xr.Dataset,
         full_dataset: xr.Dataset,
-    ) -> None:
-        """Accumulate one lead without retaining a complete rollout."""
+    ) -> dict[str, np.ndarray] | None:
+        """Accumulate one lead and return exact per-batch losses when available.
+
+        Returned values are the same ones accumulated into the original
+        GraphCast objective, enabling per-initialization exports without
+        rescoring fields or subtracting cumulative floating-point sums.
+        """
 
         if step_index < 0 or step_index >= self.target_steps:
             raise ValueError(
@@ -149,8 +154,9 @@ class V24IlyaMetricAccumulator:
                     f"{label} has {dataset.sizes.get('time', 0)} time steps; expected 1"
                 )
 
+        original_losses = None
         if self._diffs_stddev_by_level is not None:
-            self._update_original_graphcast_loss_step(
+            original_losses = self._update_original_graphcast_loss_step(
                 step_index,
                 truth_dataset.astype("float32"),
                 baseline_dataset.astype("float32"),
@@ -196,6 +202,7 @@ class V24IlyaMetricAccumulator:
                     baseline,
                     full,
                 )
+        return original_losses
 
     def _ensure_variable(self, variable: str) -> None:
         if variable in self.n_per_var:
@@ -474,7 +481,7 @@ class V24IlyaMetricAccumulator:
         truth: xr.Dataset,
         baseline: xr.Dataset,
         full: xr.Dataset,
-    ) -> None:
+    ) -> dict[str, np.ndarray]:
         """Accumulate the exact original GraphCast objective for one lead."""
 
         assert self._diffs_stddev_by_level is not None
@@ -522,6 +529,7 @@ class V24IlyaMetricAccumulator:
             losses_by_branch["full"].sum()
         )
         self._graphcast_loss_count[step_index] += count
+        return losses_by_branch
 
     def _finalize_original_graphcast_loss(self) -> dict[str, Any]:
         if np.any(self._graphcast_loss_count <= 0):

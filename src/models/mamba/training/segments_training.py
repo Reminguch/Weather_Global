@@ -19,6 +19,10 @@ class SegmentRunConfig:
     segment_prefetch_depth: int = 2
     use_segment_block_loader: bool = True
     filter_nan_segments: bool = True
+    eval_num_segments: int | None = 16
+    final_eval_num_segments: int | None = None
+    eval_subset_policy: str = "stratified_fixed"
+    eval_rotating_diagnostics: bool = False
 
 
 def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
@@ -187,6 +191,8 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         max_steps=args.max_steps,
         eval_every=args.eval_every,
         eval_batch_size=args.eval_batch_size,
+        eval_num_batches=None,
+        final_eval_num_batches=None,
         checkpoint_every=args.checkpoint_every,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -205,6 +211,7 @@ def parse_gc_mamba_args(argv: list[str] | None = None) -> SegmentRunConfig:
         temporal_layers=args.temporal_layers,
         temporal_dropout=args.temporal_dropout,
         temporal_stateful=args.temporal_stateful,
+        temporal_insert_count=None,
         target_steps=args.target_steps,
         sequential_segment_steps=None,
         data_cache_mode=args.data_cache_mode,
@@ -776,6 +783,9 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
                     chunk_load_workers=segment_cfg.chunk_load_workers,
                     load_executor=load_executor,
                     segment_loader=eval_segment_loader,
+                    max_segments=segment_cfg.eval_num_segments,
+                    subset_policy=segment_cfg.eval_subset_policy,
+                    subset_role="fixed_checkpoint",
                 )
                 eval_losses.append((step, eval_metrics["total"]))
                 maybe_save_best_checkpoint(step, float(eval_metrics["total"]))
@@ -827,6 +837,9 @@ def run_gc_mamba_training(segment_cfg: SegmentRunConfig) -> None:
         batch_builder=eval_batch_builder,
         chunk_load_workers=segment_cfg.chunk_load_workers,
         segment_loader=eval_segment_loader,
+        max_segments=segment_cfg.final_eval_num_segments,
+        subset_policy=segment_cfg.eval_subset_policy,
+        subset_role="final",
     )
     eval_losses.append((step, final_eval["total"]))
     maybe_save_best_checkpoint(step, float(final_eval["total"]))

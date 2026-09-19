@@ -76,13 +76,25 @@ def train(config, start=None, resume=None):
 
 
 def prepare_branch_start(entry):
-    """Run an independent, reproducibly configured warm-up in this allocation."""
+    """Run an independent warm-up, or reuse its verified completed checkpoint."""
     if 'warmup_config' not in entry:
         return
-    train(entry['warmup_config'])
-    from src.models.mamba.v24_Ilya.checkpoint import load_v24_Ilya_checkpoint
+    from src.models.mamba.v24_Ilya.checkpoint import load_v24_Ilya_training_checkpoint
+    from src.models.mamba.v24_Ilya.training.config import load_training_config
     import numpy as np
-    params = load_v24_Ilya_checkpoint(entry['init_from']).residual_params
+    start = Path(entry['init_from'])
+    warmup_config = load_training_config(Path(entry['warmup_config']))
+    reused = start.is_file()
+    if not reused:
+        train(entry['warmup_config'])
+    checkpoint = load_v24_Ilya_training_checkpoint(start)
+    if checkpoint.completed_step != warmup_config.max_steps:
+        raise ValueError(f'Warm-up checkpoint is incomplete: {start}')
+    if checkpoint.resolved_training_config != warmup_config.to_dict():
+        raise ValueError(f'Warm-up checkpoint configuration mismatch: {start}')
+    if reused:
+        print(f'Reusing completed warm-up: {start}', flush=True)
+    params = checkpoint.residual_params
     digest = hashlib.sha256()
     for module in sorted(params):
         for name in sorted(params[module]):
@@ -90,7 +102,8 @@ def prepare_branch_start(entry):
             digest.update(f'{module}/{name}:{value.dtype}:{value.shape}\n'.encode())
             digest.update(value.tobytes())
     write_json(EXPERIMENT / f"checks/start_{entry['name']}.json", dict(
-        checkpoint=entry['init_from'], residual_params_sha256=digest.hexdigest()))
+        checkpoint=str(start), residual_params_sha256=digest.hexdigest(),
+        completed_step=checkpoint.completed_step, reused_warmup=reused))
 
 
 def smoke(di):

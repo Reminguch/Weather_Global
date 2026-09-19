@@ -49,6 +49,8 @@ class CachedTrainingConfig:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "config_path", Path(self.config_path))
+        if self.common.loss_kind != "mse":
+            raise ValueError("Cached training only supports loss_kind='mse'; full-field objectives require live training")
         if self.common.feedback_mode != "baseline":
             raise ValueError("Cached training requires feedback_mode='baseline'")
         if self.common.loss_mode != "all_steps":

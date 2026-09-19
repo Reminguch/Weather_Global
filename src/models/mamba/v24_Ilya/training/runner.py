@@ -255,8 +255,13 @@ def _save_data_parallel_checkpoint(
     return path
 
 
-def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
+def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None) -> Path | None:
+    startup_started = time.monotonic()
     config = invocation.config
+    if validation_callback is not None and (
+        invocation.baseline_validation_only or invocation.validation_compare is not None
+    ):
+        raise ValueError("A validation callback cannot be combined with validation-only comparison modes")
     if invocation.baseline_validation_only and invocation.validation_compare is not None:
         raise ValueError(
             "--baseline-validation-only and --validation-compare are mutually exclusive"
@@ -290,6 +295,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         print(json.dumps(config.to_dict(), indent=2, sort_keys=True))
         print(f"run_dir={config.run_dir}")
         print(f"resume={invocation.resume} init_from={invocation.init_from}")
+        print(f"zero_state_on_init={invocation.zero_state_on_init}")
         return None
 
     data_parallel = config.distributed.mode == "data_parallel"
@@ -481,7 +487,10 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             print(f"[v24_Ilya] warm-starting from SWA checkpoint {invocation.init_from}")
         validate_param_tree_compatible(residual_params, checkpoint.residual_params)
         residual_params = checkpoint.residual_params
-        if checkpoint.has_residual_state and not data_parallel and config.distributed.per_device_batch_size == 1:
+        init_state_policy = "zero"
+        if invocation.zero_state_on_init:
+            print("[v24_Ilya] resetting warm-start recurrent state by request")
+        elif checkpoint.has_residual_state and not data_parallel and config.distributed.per_device_batch_size == 1:
             assert checkpoint.residual_state is not None
             _validate_tree_shapes(
                 zero_residual_state,
@@ -489,6 +498,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
                 "legacy residual state",
             )
             residual_state = cast_state_boundary_fp32(checkpoint.residual_state)
+            init_state_policy = "checkpoint"
         elif checkpoint.has_residual_state:
             print(
                 "[v24_Ilya] resetting warm-start recurrent state for independent batch lanes"
@@ -496,6 +506,8 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         print(f"[v24_Ilya] warm start from {invocation.init_from}; optimizer reset")
         overlay_metadata["init_from"] = str(invocation.init_from)
         overlay_metadata["init_from_sha256"] = file_sha256(invocation.init_from)
+        overlay_metadata["init_state_policy"] = init_state_policy
+        overlay_metadata["zero_state_on_init"] = invocation.zero_state_on_init
 
     comparison_params = None
     if invocation.validation_compare is not None:
@@ -546,6 +558,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         **config.to_dict(),
         "config_source": str(invocation.config_path),
         "derived": {
+            "startup_seconds": time.monotonic() - startup_started,
             "input_steps": training_data.input_steps,
             "train_anchors": int(training_data.train_split.size),
             "validation_anchors": int(training_data.val_split.size),
@@ -573,6 +586,12 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             "parameter_overlay": overlay_metadata,
             "residual_target": "truth_minus_live_frozen_baseline",
             "loss_mode": config.loss_mode,
+            "loss_kind": config.loss_kind,
+            "scored_field": (
+                "residual" if config.loss_kind == "mse"
+                else "live_frozen_baseline_plus_residual"
+            ),
+            "loss_precision": "predictor" if config.loss_kind == "mse" else "fp32",
             "memory_contract": memory_metadata,
             "batch_size": config.distributed.global_batch_size,
             "global_batch_size": config.distributed.global_batch_size,
@@ -622,7 +641,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         and value.shape[0] == config.distributed.per_device_batch_size else value,
         zero_residual_state,
     )
-    if config.validation.enabled:
+    if config.validation.enabled and validation_callback is None:
         validation_step = make_validation_step(
             transforms=transforms,
             baseline_params=baseline_params,
@@ -731,7 +750,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
     def perform_validation(
         *, step: int, segment_ids: np.ndarray, role: str, subset_policy: str
     ) -> Mapping[str, Any]:
-        if validation_step is None:
+        if validation_step is None and validation_callback is None:
             raise RuntimeError("Validation requested while disabled")
         expected_fingerprint = training_data.fingerprint_validation_subset(
             segment_ids
@@ -750,7 +769,8 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             raise FileNotFoundError(
                 f"Validation requires the completed checkpoint {checkpoint_path}"
             )
-        record = run_fixed_validation(
+        evaluate_fixed = run_fixed_validation if validation_callback is None else validation_callback
+        record = evaluate_fixed(
             validation_step=validation_step,
             residual_params=residual_params,
             zero_residual_state=validation_zero_state,
@@ -1029,13 +1049,16 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         )
 
     for step in range(completed_step + 1, config.max_steps + 1):
+        update_started = time.monotonic()
         if cursor.segment_offset == 0 and has_consumed_update:
             residual_state = jax.tree_util.tree_map(
                 jnp.zeros_like,
                 residual_state,
             )
         consumed_cursor = cursor
+        load_started = time.monotonic()
         chunk = training_data.build_chunk(cursor, config, task_config)
+        loaded = time.monotonic()
         rng_key, *step_keys = jax.random.split(rng_key, config.bptt_steps + 1)
         keys = jnp.stack(step_keys)
         started = time.monotonic()
@@ -1058,7 +1081,8 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
         )
         loss = jax.block_until_ready(loss)
         gradient_norm = jax.block_until_ready(gradient_norm)
-        step_seconds = time.monotonic() - started
+        update_finished = time.monotonic()
+        step_seconds = update_finished - started
         cursor = chunk.next_cursor
         has_consumed_update = True
         loss_value = float(jax.device_get(loss))
@@ -1071,6 +1095,8 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             "gradient_norm": gradient_norm_value,
             "learning_rate": _learning_rate_value(learning_rate, step - 1),
             "step_seconds": step_seconds,
+            "end_to_end_seconds": update_finished - update_started,
+            "data_wait_seconds": loaded - load_started,
             "epoch": consumed_cursor.epoch,
             "segment_index": consumed_cursor.segment_index,
             "segment_offset": consumed_cursor.segment_offset,
@@ -1118,6 +1144,7 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
             or should_validate
         )
         if should_checkpoint:
+            checkpoint_started = time.monotonic()
             last_checkpoint = _save_checkpoint(
                 config=config,
                 completed_step=step,
@@ -1130,6 +1157,10 @@ def run_training(invocation: V24IlyaTrainInvocation) -> Path | None:
                 manifest_fingerprint=training_data.manifest_fingerprint,
                 overlay_metadata=overlay_metadata,
             )
+            _append_jsonl(config.run_dir / "checkpoint_metrics.jsonl", {
+                "step": step, "checkpoint_seconds": time.monotonic() - checkpoint_started,
+                "checkpoint": str(last_checkpoint),
+            })
             print(f"[v24_Ilya] saved {last_checkpoint}", flush=True)
         if should_validate:
             fixed_record = perform_validation(

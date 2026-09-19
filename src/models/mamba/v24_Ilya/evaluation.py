@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import dataclasses
 import gc
+import hashlib
 import resource
 import time
 from pathlib import Path
@@ -28,6 +29,7 @@ from .data import (
     build_eval_batch,
     iter_eval_steps,
     open_eval_dataset,
+    resolve_initialization_manifest,
     valid_scored_eval_indices,
 )
 from .metrics import V24IlyaMetricAccumulator
@@ -89,6 +91,31 @@ def select_eval_indices(
         )
     rng = np.random.default_rng(seed)
     return sorted(int(index) for index in rng.choice(candidates, size=n_samples, replace=False))
+
+
+def initialization_rng_key(seed: int, initialization_time: str, *, stream: str):
+    """Use explicit stream labels and UTC identities, independent of selection."""
+
+    digest = hashlib.sha256(
+        f"v24_Ilya_manifest_rng_v1\0{stream}\0{initialization_time}".encode("utf-8")
+    ).digest()
+    key = jax.random.PRNGKey(seed)
+    for offset in range(0, len(digest), 4):
+        key = jax.random.fold_in(key, int.from_bytes(digest[offset:offset + 4], "big"))
+    return key
+
+
+def build_initialization_loss_record(metadata: Mapping[str, Any], losses: Mapping[str, Sequence[float]]) -> dict:
+    """Validate and retain exact sample losses alongside their verification dates."""
+
+    output = dict(metadata)
+    steps = len(output["valid_times"])
+    for branch in ("baseline", "full"):
+        values = np.asarray(losses[branch], dtype=np.float64)
+        if values.shape != (steps,) or not np.all(np.isfinite(values)) or np.any(values < 0):
+            raise ValueError(f"Incomplete or invalid per-initialization {branch} losses")
+        output[f"{branch}_per_step"] = values.tolist()
+    return output
 
 
 def partial_result_path(out_json: Path) -> Path:
@@ -161,9 +188,18 @@ def write_evaluation_snapshot(
     return output
 
 
-def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
-    """Evaluate one v24_Ilya or warm-start-compatible checkpoint."""
+def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) -> dict:
+    """Evaluate a checkpoint, optionally observing physical host fields.
 
+    An observer implements ``begin_sample(metadata)``, ``update_step(index,
+    truth, baseline, full)`` and ``finish_sample()``. Explicit initialization
+    dates are required so exported fields retain unambiguous valid times.
+    """
+
+    if prediction_observer is not None and config.initialization_manifest is None:
+        raise ValueError("Prediction observers require an initialization manifest")
+
+    evaluation_started = time.monotonic()
     warmup_steps = config.effective_warmup_steps
     print(
         f"[v24_Ilya] checkpoint={config.ckpt} mode={config.eval_mode} "
@@ -186,22 +222,32 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
         config,
     )
 
-    scored_candidates = valid_scored_eval_indices(
-        eval_data,
-        history_steps=config.effective_anchor_history_steps,
-        # Reserve the full requested sample horizon, even for cold evaluation.
-        # Cold modes do not *roll out* the configured warmup, but V22 used it
-        # when constructing the anchor pool.  Keeping that reservation makes
-        # the seeded 32-anchor selection exactly comparable to the V22
-        # reference without changing the cold forecast trajectory.
-        target_steps=config.sample_total_steps,
-    )
-    all_chosen_indices = select_eval_indices(
-        scored_candidates,
-        n_samples=config.n_samples,
-        seed=config.seed,
-        force_idx=config.force_idx,
-    )
+    initialization_records = None
+    if config.initialization_manifest is not None:
+        initialization_records = resolve_initialization_manifest(
+            eval_data,
+            config.initialization_manifest,
+            target_steps=config.target_steps,
+            history_steps=config.effective_anchor_history_steps,
+        )
+        scored_candidates = np.asarray(
+            [entry["dataset_index"] for entry in initialization_records], dtype=np.int64,
+        )
+        all_chosen_indices = scored_candidates.tolist()
+    else:
+        scored_candidates = valid_scored_eval_indices(
+            eval_data,
+            history_steps=config.effective_anchor_history_steps,
+            # Legacy cold modes retain V22's unused warmup reservation to
+            # reproduce the historical seeded 32-anchor evaluation exactly.
+            target_steps=config.sample_total_steps,
+        )
+        all_chosen_indices = select_eval_indices(
+            scored_candidates,
+            n_samples=config.n_samples,
+            seed=config.seed,
+            force_idx=config.force_idx,
+        )
     chosen_indices = all_chosen_indices[
         config.anchor_shard_index :: config.anchor_shard_count
     ]
@@ -273,9 +319,15 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
     )
 
     rollout_keys = {}
-    for selected_index in all_chosen_indices:
-        rng, rollout_key = jax.random.split(rng)
-        rollout_keys[selected_index] = rollout_key
+    if initialization_records is None:
+        for selected_index in all_chosen_indices:
+            rng, rollout_key = jax.random.split(rng)
+            rollout_keys[selected_index] = rollout_key
+    else:
+        for entry in initialization_records:
+            rollout_keys[entry["dataset_index"]] = initialization_rng_key(
+                config.seed, entry["initialization_time"], stream="rollout",
+            )
 
     @jax.jit
     def baseline_step(params, state, key, inputs, targets, forcings):
@@ -320,7 +372,7 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
         "metrics_omitted": (
             list(_INTERMEDIATE_OMITTED_METRICS) if config.omit_rms_bias else []
         ),
-        "n_samples": config.n_samples,
+        "n_samples": len(all_chosen_indices) if initialization_records is not None else config.n_samples,
         "anchor_shard_count": config.anchor_shard_count,
         "anchor_shard_index": config.anchor_shard_index,
         "global_chosen_idx": all_chosen_indices,
@@ -330,6 +382,24 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
         "ckpt": str(config.ckpt),
         "ckpt_in": str(config.ckpt_in),
     }
+    loss_records = []
+    sample_elapsed_seconds = []
+    base_output["sample_elapsed_seconds"] = sample_elapsed_seconds
+    metadata_by_index = {}
+    if initialization_records is not None:
+        metadata_by_index = {entry["dataset_index"]: entry for entry in initialization_records}
+        base_output.update(
+            model_id=config.model_id,
+            initialization_manifest=str(config.initialization_manifest),
+            initialization_manifest_sha256=hashlib.sha256(
+                config.initialization_manifest.read_bytes()
+            ).hexdigest(),
+            global_initialization_times=[entry["initialization_time"] for entry in initialization_records],
+            initialization_selection="explicit_utc_manifest",
+            rng_scheme="sha256_utc_stream_fold_in_v1",
+            original_graphcast_loss_per_initialization=loss_records,
+        )
+    base_output["setup_elapsed_seconds"] = time.monotonic() - evaluation_started
     partial_json = partial_result_path(config.out_json)
     write_evaluation_snapshot(
         partial_json,
@@ -343,6 +413,8 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
 
     for sample_number, index in enumerate(chosen_indices, start=1):
         sample_started = time.monotonic()
+        if prediction_observer is not None:
+            prediction_observer.begin_sample(metadata_by_index[index])
         rollout_start_index = index - warmup_steps
         inputs, _first_target, _first_forcing = build_eval_batch(
             eval_data,
@@ -359,23 +431,48 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
             task_config=task_config,
         )
         rollout_key = rollout_keys[index]
+        sample_losses = {
+            branch: np.full(config.target_steps, np.nan, dtype=np.float64)
+            for branch in ("baseline", "full")
+        }
+        previous_step_finished = time.monotonic()
         def consume_prediction(
             step_index,
             truth,
             baseline_prediction,
             full_prediction,
         ):
+            nonlocal previous_step_finished
             truth_host = _dataset_to_host(truth)
             baseline_host = _dataset_to_host(baseline_prediction)
             full_host = _dataset_to_host(full_prediction)
-            metrics.update_step(
+            host_ready = time.monotonic()
+            exact_losses = metrics.update_step(
                 step_index,
                 truth_host,
                 baseline_host,
                 full_host,
             )
+            if initialization_records is not None:
+                if exact_losses is None:
+                    raise ValueError("Manifest evaluation requires exact original GraphCast losses")
+                for branch, values in exact_losses.items():
+                    if values.size != 1 or np.isfinite(sample_losses[branch][step_index]):
+                        raise ValueError("Each initialization must provide exactly one loss per lead")
+                    sample_losses[branch][step_index] = float(values.reshape(-1)[0])
+            if prediction_observer is not None:
+                prediction_observer.update_step(step_index, truth_host, baseline_host, full_host)
             del truth_host, baseline_host, full_host
             _release_host_memory()
+            finished = time.monotonic()
+            if prediction_observer is not None and sample_number == 1 and step_index < 3:
+                print(
+                    f"[v24_Ilya] diagnostic lead={6 * (step_index + 1)}h "
+                    f"forecast_and_transfer_seconds={host_ready - previous_step_finished:.2f} "
+                    f"metrics_and_export_seconds={finished - host_ready:.2f}",
+                    flush=True,
+                )
+            previous_step_finished = finished
 
         run_v24_Ilya_rollout(
             rng=rollout_key,
@@ -401,8 +498,19 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
             step_data=step_data,
             skip_baseline_warmup=True,
         )
+        if initialization_records is not None:
+            loss_records.append(build_initialization_loss_record(metadata_by_index[index], sample_losses))
+        if prediction_observer is not None:
+            prediction_observer.finish_sample()
         del inputs, step_data
         _release_host_memory()
+        sample_elapsed = time.monotonic() - sample_started
+        sample_elapsed_seconds.append(sample_elapsed)
+        base_output["first_sample_elapsed_seconds"] = sample_elapsed_seconds[0]
+        base_output["steady_sample_elapsed_seconds_mean"] = (
+            float(np.mean(sample_elapsed_seconds[1:])) if sample_number > 1 else None
+        )
+        base_output["evaluation_elapsed_seconds"] = time.monotonic() - evaluation_started
 
         if sample_number < len(chosen_indices):
             partial_output = write_evaluation_snapshot(
@@ -429,7 +537,7 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig) -> dict:
             peak_rss_gib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2
             print(
                 f"[v24_Ilya] sample {sample_number}/{len(chosen_indices)} index={index} "
-                f"time={time.monotonic() - sample_started:.1f}s "
+                f"time={sample_elapsed:.1f}s "
                 f"current_rss={_current_rss_gib():.2f}GiB "
                 f"peak_rss={peak_rss_gib:.2f}GiB",
                 flush=True,
