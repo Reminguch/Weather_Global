@@ -1,0 +1,77 @@
+\begin{thebibliography}{8}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[De~Wit et~al.(2026)De~Wit, Gabbana, Woodward, Lin, Toschi, and
+  Livescu]{de2026data}
+Xander~M De~Wit, Alessandro Gabbana, Michael Woodward, Yen~Ting Lin, Federico
+  Toschi, and Daniel Livescu.
+\newblock Data-driven mori--zwanzig modeling of lagrangian particle dynamics in
+  turbulent flows.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 123\penalty0
+  (13):\penalty0 e2525390123, 2026.
+
+\bibitem[Donzis et~al.(2008)Donzis, Yeung, and
+  Sreenivasan]{DonzisResolutionEffects}
+D.~A. Donzis, P.~K. Yeung, and K.~R. Sreenivasan.
+\newblock Dissipation and enstrophy in isotropic turbulence: Resolution effects
+  and scaling in direct numerical simulations.
+\newblock \emph{Physics of Fluids}, 20\penalty0 (4):\penalty0 045108, 04 2008.
+\newblock ISSN 1070-6631.
+\newblock \doi{10.1063/1.2907227}.
+\newblock URL \url{https://doi.org/10.1063/1.2907227}.
+
+\bibitem[Gu and Dao(2023)]{gu2023Mamba}
+Albert Gu and Tri Dao.
+\newblock Mamba: Linear-time sequence modeling with selective state spaces.
+\newblock \emph{arXiv preprint arXiv:2312.00752}, 2023.
+
+\bibitem[Izmailov et~al.(2019)Izmailov, Podoprikhin, Garipov, Vetrov, and
+  Wilson]{izmailov2019averagingweightsleadswider}
+Pavel Izmailov, Dmitrii Podoprikhin, Timur Garipov, Dmitry Vetrov, and
+  Andrew~Gordon Wilson.
+\newblock Averaging weights leads to wider optima and better generalization,
+  2019.
+\newblock URL \url{https://arxiv.org/abs/1803.05407}.
+
+\bibitem[Lam et~al.(2023)Lam, Sanchez-Gonzalez, Willson, Wirnsberger,
+  Fortunato, Alet, Ravuri, Ewalds, Eaton-Rosen, Hu, Merose, Hoyer, Holland,
+  Vinyals, Stott, Pritzel, Mohamed, and Battaglia]{lam2023graphcast}
+Remi Lam, Alvaro Sanchez-Gonzalez, Matthew Willson, Peter Wirnsberger, Meire
+  Fortunato, Ferran Alet, Suman Ravuri, Timo Ewalds, Zach Eaton-Rosen, Weihua
+  Hu, Alexander Merose, Stephan Hoyer, George Holland, Oriol Vinyals, Jacklynn
+  Stott, Alexander Pritzel, Shakir Mohamed, and Peter Battaglia.
+\newblock Learning skillful medium-range global weather forecasting.
+\newblock \emph{Science}, 382\penalty0 (6677):\penalty0 1416--1421, 2023.
+\newblock \doi{10.1126/science.adi2336}.
+\newblock URL \url{https://doi.org/10.1126/science.adi2336}.
+
+\bibitem[Lin et~al.(2021)Lin, Tian, Livescu, and Anghel]{YenTingLinMZ2021}
+Yen~Ting Lin, Yifeng Tian, Daniel Livescu, and Marian Anghel.
+\newblock Data-driven learning for the mori--zwanzig formalism: A
+  generalization of the koopman learning framework.
+\newblock \emph{SIAM Journal on Applied Dynamical Systems}, 20\penalty0
+  (4):\penalty0 2558--2601, 2021.
+\newblock \doi{10.1137/21M1401759}.
+\newblock URL \url{https://doi.org/10.1137/21M1401759}.
+
+\bibitem[Wilson and Sawford(1996)]{Wilson1996Review}
+John~D. Wilson and Brian~L. Sawford.
+\newblock Review of lagrangian stochastic models for trajectories in the
+  turbulent atmosphere.
+\newblock \emph{Boundary-Layer Meteorology}, 78\penalty0 (1):\penalty0
+  191--210, 1996.
+\newblock ISSN 1573-1472.
+\newblock \doi{10.1007/BF00122492}.
+\newblock URL \url{https://doi.org/10.1007/BF00122492}.
+
+\bibitem[Yang and Griffin(2021)]{yang2021grid}
+Xiang~IA Yang and Kevin~P Griffin.
+\newblock Grid-point and time-step requirements for direct numerical simulation
+  and large-eddy simulation.
+\newblock \emph{Physics of Fluids}, 33\penalty0 (1), 2021.
+
+\end{thebibliography}

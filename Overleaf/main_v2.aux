@@ -1,0 +1,76 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{yang2021grid}
+\citation{DonzisResolutionEffects}
+\citation{Wilson1996Review}
+\citation{YenTingLinMZ2021,de2026data}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction to the architecture}{1}{section.1}\protected@file@percent }
+\citation{gu2023Mamba}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Spatial and temporal processing components. In the experiments, a frozen GraphCast baseline is combined at the output with a separate trainable correction branch containing graph message passing and Mamba.\relax }}{2}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:GC_Mamba}{{1}{2}{Spatial and temporal processing components. In the experiments, a frozen GraphCast baseline is combined at the output with a separate trainable correction branch containing graph message passing and Mamba.\relax }{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}A hybrid GraphCast--Mamba architecture}{2}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{GraphCast}{2}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Mamba}{2}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{An additive correction with internal temporal memory.}{4}{section*.5}\protected@file@percent }
+\newlabel{eq:additive_correction}{{11}{4}{An additive correction with internal temporal memory}{equation.1.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Numerical results}{4}{section.2}\protected@file@percent }
+\newlabel{sec:numerical}{{2}{4}{Numerical results}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Evaluation protocol and forecast loss}{4}{subsection.2.1}\protected@file@percent }
+\newlabel{eq:rollout_reduction}{{16}{4}{Evaluation protocol and forecast loss}{equation.2.16}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Forecast skill of the $d_{\mathrm  {inner}}=16$ correction trained with a threefold Mamba learning rate and stochastic weight averaging (SWA) at $1^\circ $ on 32 matched starts. Top: exact GraphCast loss and per-lead loss reduction. Bottom: cosine-latitude-weighted $2$\,m temperature RMSE (K) and RMSE reduction on the same starts. Reductions are relative to its paired GraphCast baseline. Training and model-selection details are given in Appendix\nobreakspace  {}\ref  {app:training}.\relax }}{5}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:res1_forecast}{{2}{5}{Forecast skill of the $d_{\mathrm {inner}}=16$ correction trained with a threefold Mamba learning rate and stochastic weight averaging (SWA) at $1^\circ $ on 32 matched starts. Top: exact GraphCast loss and per-lead loss reduction. Bottom: cosine-latitude-weighted $2$\,m temperature RMSE (K) and RMSE reduction on the same starts. Reductions are relative to its paired GraphCast baseline. Training and model-selection details are given in Appendix~\ref {app:training}.\relax }{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Improved skill at longer forecast leads}{5}{subsection.2.2}\protected@file@percent }
+\citation{lam2023graphcast}
+\citation{lam2023graphcast}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Complete common-grid comparison. The quantities span geopotential, temperature, sea-level pressure, humidity, and wind. Blue is the archived K22 correction, dashed gray its GraphCast-small baseline, and green the $0.25^\circ $ reference. Forecasts are verified on a common $1.5^\circ $ grid, with RMSE normalized to the displayed ENS reference ($100\%$ denotes equal RMSE). This historical comparison is separate from the matched-start evaluations in Figure\nobreakspace  {}\ref  {fig:res1_forecast}.\relax }}{6}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:res1_all_variables}{{3}{6}{Complete common-grid comparison. The quantities span geopotential, temperature, sea-level pressure, humidity, and wind. Blue is the archived K22 correction, dashed gray its GraphCast-small baseline, and green the $0.25^\circ $ reference. Forecasts are verified on a common $1.5^\circ $ grid, with RMSE normalized to the displayed ENS reference ($100\%$ denotes equal RMSE). This historical comparison is separate from the matched-start evaluations in Figure~\ref {fig:res1_forecast}.\relax }{figure.caption.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Persistent memory improves long-lead forecasts. All three policies use the same architecture with $d_{\mathrm  {inner}}=16$, one $B,C$ group, and SWA over updates 2k--8k. Carry/carry retains state during training and forecasting; carry/reset clears state during forecasting; reset/reset clears it during both. Carry/carry achieves the largest day-ten loss reduction. Results use 32 matched cold starts and 40 six-hour leads; positive values indicate lower loss than the paired GraphCast baseline. Loss is reconstructed approximately from saved channel RMSEs.\relax }}{7}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:memory_reset}{{4}{7}{Persistent memory improves long-lead forecasts. All three policies use the same architecture with $d_{\mathrm {inner}}=16$, one $B,C$ group, and SWA over updates 2k--8k. Carry/carry retains state during training and forecasting; carry/reset clears state during forecasting; reset/reset clears it during both. Carry/carry achieves the largest day-ten loss reduction. Results use 32 matched cold starts and 40 six-hour leads; positive values indicate lower loss than the paired GraphCast baseline. Loss is reconstructed approximately from saved channel RMSEs.\relax }{figure.caption.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Evidence for useful temporal memory}{7}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:memory_ablation}{{2.3}{7}{Evidence for useful temporal memory}{subsection.2.3}{}}
+\bibstyle{plainnat}
+\bibdata{bib}
+\bibcite{de2026data}{{1}{2026}{{De~Wit et~al.}}{{De~Wit, Gabbana, Woodward, Lin, Toschi, and Livescu}}}
+\bibcite{DonzisResolutionEffects}{{2}{2008}{{Donzis et~al.}}{{Donzis, Yeung, and Sreenivasan}}}
+\bibcite{gu2023Mamba}{{3}{2023}{{Gu and Dao}}{{}}}
+\bibcite{izmailov2019averagingweightsleadswider}{{4}{2019}{{Izmailov et~al.}}{{Izmailov, Podoprikhin, Garipov, Vetrov, and Wilson}}}
+\bibcite{lam2023graphcast}{{5}{2023}{{Lam et~al.}}{{Lam, Sanchez-Gonzalez, Willson, Wirnsberger, Fortunato, Alet, Ravuri, Ewalds, Eaton-Rosen, Hu, Merose, Hoyer, Holland, Vinyals, Stott, Pritzel, Mohamed, and Battaglia}}}
+\bibcite{YenTingLinMZ2021}{{6}{2021}{{Lin et~al.}}{{Lin, Tian, Livescu, and Anghel}}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Sensitivity to inner dimension and temporal learning rate}{8}{subsection.2.4}\protected@file@percent }
+\newlabel{sec:training_sensitivity}{{2.4}{8}{Sensitivity to inner dimension and temporal learning rate}{subsection.2.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Inner dimension and Mamba learning-rate comparison at $1^\circ $ on the matched 32-start development evaluation. Entries are exact GraphCast loss reductions (\%); bold marks the largest value in each metric column. All runs use spatial width 512, one $B,C$ group, batch size four, the same training schedule, and SWA over branch updates 500, 1,000, 1,500, and 2,000. The spatial learning rate is unchanged; $1\times $ denotes joint learning rates.\relax }}{8}{table.caption.9}\protected@file@percent }
+\newlabel{tab:res1_skill}{{1}{8}{Inner dimension and Mamba learning-rate comparison at $1^\circ $ on the matched 32-start development evaluation. Entries are exact GraphCast loss reductions (\%); bold marks the largest value in each metric column. All runs use spatial width 512, one $B,C$ group, batch size four, the same training schedule, and SWA over branch updates 500, 1,000, 1,500, and 2,000. The spatial learning rate is unchanged; $1\times $ denotes joint learning rates.\relax }{table.caption.9}{}}
+\@writefile{toc}{\contentsline {paragraph}{Scope of the evidence.}{8}{section*.10}\protected@file@percent }
+\bibcite{Wilson1996Review}{{7}{1996}{{Wilson and Sawford}}{{}}}
+\bibcite{yang2021grid}{{8}{2021}{{Yang and Griffin}}{{}}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Complete temporal-state comparison. Column titles specify the SWA windows, and rows specify one or four $B,C$ groups. All panels use approximate GraphCast loss reconstructed from saved channel RMSEs.\relax }}{10}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:memory_all_windows}{{5}{10}{Complete temporal-state comparison. Column titles specify the SWA windows, and rows specify one or four $B,C$ groups. All panels use approximate GraphCast loss reconstructed from saved channel RMSEs.\relax }{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Memory ablation across averaging windows}{10}{appendix.A}\protected@file@percent }
+\newlabel{app:memory_windows}{{A}{10}{Memory ablation across averaging windows}{appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}Training choices and checkpoint averaging}{10}{appendix.B}\protected@file@percent }
+\newlabel{app:training}{{B}{10}{Training choices and checkpoint averaging}{appendix.B}{}}
+\@writefile{toc}{\contentsline {paragraph}{Training methods and model selection.}{10}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Optimizer study.}{10}{section*.14}\protected@file@percent }
+\citation{izmailov2019averagingweightsleadswider}
+\@writefile{toc}{\contentsline {paragraph}{Temporal learning rate and inner dimension.}{11}{section*.15}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Exact GraphCast loss reduction (\%) for the learning-rate study's SWA models. Spatial learning rate is unchanged across these six arms; the multiplier applies to Mamba parameters. All evaluations contain the same 32 starts.\relax }}{11}{table.caption.16}\protected@file@percent }
+\newlabel{tab:lr_sensitivity}{{2}{11}{Exact GraphCast loss reduction (\%) for the learning-rate study's SWA models. Spatial learning rate is unchanged across these six arms; the multiplier applies to Mamba parameters. All evaluations contain the same 32 starts.\relax }{table.caption.16}{}}
+\@writefile{toc}{\contentsline {paragraph}{Stochastic weight averaging.}{11}{section*.17}\protected@file@percent }
+\gdef \@abspage@last{11}

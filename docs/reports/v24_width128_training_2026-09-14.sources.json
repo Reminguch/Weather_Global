@@ -1,0 +1,22 @@
+[
+  {
+    "path": "artifacts/checkpoints/v24_Ilya/res1_width128_mamba1_20260909/runs/w128_fresh_mamba1_di16_bcg1_rank32_seed22/run_config.json",
+    "sha256": "489731d3dbfdd323dfaf26e25a46e292f8eedc80365d06adc27c669e6f5809fd"
+  },
+  {
+    "path": "artifacts/checkpoints/v24_Ilya/res1_width128_mamba1_20260909/runs/w128_fresh_mamba1_di16_bcg1_rank32_seed22/train_metrics.jsonl",
+    "sha256": "ceb57b0105336774e299cec045879c72dfb393ace37799cc8440f68b42988b63"
+  },
+  {
+    "path": "artifacts/checkpoints/v24_Ilya/res1_width128_mamba1_20260909/runs/w128_fresh_mamba1_di16_bcg1_rank32_seed22/eval/cold_full_zero_exact_gc/matched32/swa_step02000-08000.json",
+    "sha256": "0ff9fbc95fb67b24ab4874852ecd35fdf1f7c383ed61acc44b8402f05ee7df07"
+  },
+  {
+    "path": "artifacts/checkpoints/v24_Ilya/res1_width128_mamba1_20260909/runs/w128_fresh_mamba1_di16_bcg1_rank32_seed22/eval/cold_full_zero_exact_gc/matched32/step10000.json",
+    "sha256": "696f89bd084a875861f3d7a1bd727e075f4d9c30a3c8fe05abe1f4e740e66c60"
+  },
+  {
+    "path": "scripts/analyze_models/plot_v24_width128_training.py",
+    "sha256": "f114a1c1ccef4e677ffc712a8c19fc6d8546cec8fb117ef524448de34ab3a669"
+  }
+]
