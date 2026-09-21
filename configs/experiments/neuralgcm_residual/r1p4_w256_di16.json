@@ -1,0 +1,60 @@
+{
+  "architecture": {
+    "bc_groups": 1,
+    "d_conv": 4,
+    "d_inner": 16,
+    "d_state": 16,
+    "dropout": 0.0,
+    "dt_rank": 32,
+    "init_scheme": "mamba1",
+    "initialization": "fresh_zero_head",
+    "mesh_size": 4,
+    "msg_steps": 2,
+    "precision": "fp32",
+    "temporal_layers": 2,
+    "width": 256
+  },
+  "bptt_steps": 24,
+  "feedback_mode": "closed_loop_sg",
+  "finetune_optimizer": {
+    "beta1": 0.9,
+    "beta2": 0.98,
+    "clip_norm": 1.0,
+    "learning_rate": 1e-05,
+    "warmup_updates": 100,
+    "weight_decay": 0.0001
+  },
+  "finetune_updates": 2000,
+  "finetune_validate_every": 200,
+  "forcing_policy": "lag24h_then_persist_at_origin",
+  "loss": "neuralgcm_field_normalized_mse_v1",
+  "pretrain_epochs": 20,
+  "pretrain_optimizer": {
+    "beta1": 0.9,
+    "beta2": 0.98,
+    "clip_norm": 1.0,
+    "learning_rate": 0.0001,
+    "warmup_updates": 200,
+    "weight_decay": 0.0001
+  },
+  "resolution": 1.4,
+  "rollout_steps": 20,
+  "schema": "neuralgcm_residual_v1",
+  "seed": 22,
+  "segment_steps": 96,
+  "step_hours": 6,
+  "test_origins": 128,
+  "test_steps": 40,
+  "test_year": 2023,
+  "train_years": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "validation_origins": 32,
+  "validation_year": 2022
+}

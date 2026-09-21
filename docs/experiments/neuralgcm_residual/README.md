@@ -5,11 +5,25 @@ Implementation and experiment specification, 2026-09-19. The initial study uses
 combinations at each resolution**. Every combination receives cached **k=1**
 pretraining followed by live **k=20** closed-loop fine-tuning.
 
-**Status:** specification, not an implemented NeuralGCM pipeline. Existing GC
-residual and recurrent-training components are reusable, but the NeuralGCM
-adapter, cache, training kernels and launcher below still need implementation.
-Writing this document did not install models, preprocess data or submit jobs.
-Future commands/configuration are marked as implementation contracts.
+**Active launch, 2026-09-20:** the user requested completing and training **2.8°
+first**, while 1.4° remains paused. The active immutable experiment selects all
+four 2.8° architectures. Numerical gates apply to every selected resolution,
+and the resource profile measures the largest selected 2.8° arm, width256/di32.
+All data splits, architecture settings, loss definitions, 20 pretraining passes
+and 2,000 fine-tuning updates below remain the protocol for these four arms.
+The earlier requirements to wait for both resolutions describe the full study,
+not this explicitly selected launch. See the dated launch entry in
+[implementation and operations](IMPLEMENTATION.md).
+
+**Status:** the adapter, native graph branch, decoded-loss training kernels, cache,
+checkpoint/resume, evaluation and launcher are now implemented. NeuralGCM v1.2.2
+and Dinosaur 1.3.3 run in an isolated environment. Real GPU smoke checks passed at
+both resolutions through 40 forecast steps. Full seasonal production gates and
+the sixteen training runs are not complete. See [implementation and operations](IMPLEMENTATION.md)
+for tested commands, measured checks and current download status.
+
+**User amendment:** training now uses **2015–2021**, with **2022 validation and
+2023 test**. This replaces the original proposed 2020–2021 training interval.
 
 This supersedes the [initial plan](../neuralgcm_residual_resolution_plan_2026-09-19.md).
 **“Four” means the 2×2 combinations, not four message-passing steps.** The 0.7°
@@ -105,7 +119,7 @@ the proposed decoded NeuralGCM loss unchanged. Its
 currently restricts execution to one device and batch size one. Start with that
 execution scale and parallelize independent configurations.
 
-Planned files, **not yet implemented**:
+Implemented adapter and worker modules:
 
 ```text
 src/models/neuralgcm_residual/
@@ -131,10 +145,9 @@ consumer-only changes must not silently reinterpret or invalidate existing data.
 
 ## 4. Stage A — checkpoints, environment and unchanged baseline
 
-1. Activate `scripts/graphcast_env.sh` for Python. Record dependency versions and
-   check NeuralGCM/Dinosaur compatibility before installing anything. If necessary,
-   define an isolated compatible environment with an explicit activation path;
-   do not upgrade the environment used by current GC experiments in place.
+1. Activate the isolated environment with `source scripts/neuralgcm_env.sh`.
+   Dependency versions are pinned in `configs/experiments/neuralgcm_residual/`.
+   The existing GC environment is unchanged.
 2. Download the official `v1/deterministic_2_8_deg.pkl` and
    `v1/deterministic_1_4_deg.pkl` checkpoints from `gs://neuralgcm/models/`.
    Save hashes and license metadata. The weights use CC BY-SA 4.0.
@@ -146,9 +159,10 @@ consumer-only changes must not silently reinterpret or invalidate existing data.
 5. Run unchanged one-step, 20-step and 40-step forecasts on fixed seasonal origins.
    Save metrics, diagnostics and a first resource profile.
 
-Usual external grids are 128×64 and 256×128 (longitude×latitude) for 2.8° and
-1.4°. Native solver grids are larger: inspect them rather than using external
-data-grid dimensions for branch geometry. Pin checkpoint/library versions because
+The inspected checkpoints expose 128×64 and 256×128 (longitude×latitude) for
+both `data_coords` and native nodal `model_coords` at 2.8° and 1.4°, respectively.
+The branch uses the inspected native coordinates rather than inferred dimensions.
+Pin checkpoint/library versions because
 the native-state API is not guaranteed stable.
 [State/API documentation](https://neuralgcm.readthedocs.io/en/stable/deepdive_into_models.html).
 
@@ -159,10 +173,12 @@ full-cache storage or production resource requests.
 
 ## 5. Stage B — fields, native adapters and statistics
 
-Proposed split: **2020–2021 train / 2022 validation / 2023 test**, identical at both
-resolutions. Both selected backbones trained through 2017. Keeping the proposed
-split from 2020 also permits a later 0.7° study, whose published model trained
-through 2019. [Training details](https://arxiv.org/html/2311.07222v3#S7.SS2).
+User-selected split: **2015–2021 train / 2022 validation / 2023 test**, identical
+at both resolutions. Both selected frozen backbones trained through 2017.
+Branch training uses all seven requested years, including years overlapping the
+frozen backbone's training period. Neither validation nor test enters branch or
+normalization fitting. The 2022 validation set selects checkpoints; 2023 remains
+sealed until final evaluation. [Training details](https://arxiv.org/html/2311.07222v3#S7.SS2).
 
 Prepare six-hour ERA5 with temperature, geopotential, u/v winds, specific humidity,
 cloud ice and cloud liquid on the checkpoint's required pressure levels, plus
@@ -454,24 +470,26 @@ its own pretrain/selection. Evaluation/reporting depend on complete upstream
 outputs. Record job IDs and `afterok` dependencies. Partial cache completion must
 not release production consumers.
 
-## 12. Planned launcher contract — not runnable yet
+## 12. Launcher contract
 
-The following script and schema **do not exist yet**. These examples define the
-intended interface; they are not commands supported by existing v24 launchers.
+The launcher now implements prepare, submit and execute. It uses the versioned
+JSON configurations in `configs/experiments/neuralgcm_residual/`. Production
+workers reject missing data, incomplete caches and missing numerical/GPU gates.
+The YAML below remains an overview, not a directly accepted configuration file.
 
 ```bash
-source scripts/graphcast_env.sh
+source scripts/neuralgcm_env.sh
 
-# Future: write eight configurations/manifests and an immutable source snapshot.
+# Write eight configurations/manifests and an immutable source snapshot.
 python scripts/experiments/run_neuralgcm_residual.py prepare \
   --experiment-root artifacts/checkpoints/neuralgcm_residual/res2p8_res1p4_w128_256_di16_32
 
-# Future: inspect the planned submission without sending jobs to Slurm.
+# Inspect the planned submission without sending jobs to Slurm.
 python scripts/experiments/run_neuralgcm_residual.py submit \
   --experiment-root artifacts/checkpoints/neuralgcm_residual/res2p8_res1p4_w128_256_di16_32 \
   --stage preflight --dry-run
 
-# Future worker: execute inside an allocated job using a generated config.
+# Execute inside an allocated job, after data/cache/production gates succeed.
 python scripts/experiments/run_neuralgcm_residual.py execute \
   --experiment-root artifacts/checkpoints/neuralgcm_residual/res2p8_res1p4_w128_256_di16_32 \
   --stage pretrain --run-id r2p8_w128_di16

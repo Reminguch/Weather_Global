@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/neuralgcm/neuralgcm",
+  "tag": "v1.2.2",
+  "commit": "c91d2007ca37a4c0842f3ff83256d32e1ec30815",
+  "code_license": "Apache-2.0",
+  "checkpoint_license": "CC-BY-SA-4.0",
+  "local_modifications": false
+}
