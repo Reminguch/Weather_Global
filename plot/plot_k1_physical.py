@@ -54,6 +54,11 @@ def write_readme(output):
         if r['run_id'] == representative and r['field'] == 'geopotential' and float(r['pressure_hpa']) <= 7)
     lines = [
         '# Six-hour K=1 forecasts in physical units', '',
+        '> **The current training loss differs from the NeuralGCM paper.**',
+        f'> Geopotential contributes **{report["fields"]["geopotential"]["objective_baseline_share_pct"]:.2f}%** of baseline custom loss;',
+        f'> its 1–7 hPa levels alone contribute **{100 * top_geopotential / report["baseline_loss"]:.2f}%** of the total.',
+        '> Aggregate loss improvement does not imply improvement across weather variables.',
+        '> See the [loss mismatch explanation](../README.md#loss-mismatch-and-geopotential-dominance).', '',
         f'![Seven-variable comparison]({representative}/all_variables_global_timeseries.png)', '',
         '**Three curves in every time-series panel:** ERA5 truth is black with circles,',
         'frozen NGCM baseline is blue dashed with squares, and residual NGCM is orange',
@@ -161,7 +166,9 @@ def write_readme(output):
                   'weighted MSE. It borrows the amplitude factors (geopotential 2, humidity 0.66,',
                   'cloud species 0.05), but does not fully reproduce the original loss.',
                   'The reported 95% share is an empirical imbalance of this custom objective,',
-                  'not a prescribed NeuralGCM weighting.', '']
+                  'not a prescribed NeuralGCM weighting. Changing the normalization interval alone',
+                  'has not yet been shown to remove this imbalance; these results still use the',
+                  'existing custom objective.', '']
     position = lines.index('## Individual figures and data')
     lines[position:position] = geo_lines
     (output / 'README.md').write_text('\n'.join(lines))

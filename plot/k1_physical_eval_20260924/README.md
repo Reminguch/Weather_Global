@@ -1,5 +1,11 @@
 # Six-hour K=1 forecasts in physical units
 
+> **The current training loss differs from the NeuralGCM paper.**
+> Geopotential contributes **95.06%** of baseline custom loss;
+> its 1–7 hPa levels alone contribute **88.81%** of the total.
+> Aggregate loss improvement does not imply improvement across weather variables.
+> See the [loss mismatch explanation](../README.md#loss-mismatch-and-geopotential-dominance).
+
 ![Seven-variable comparison](r2p8_w128_di16/all_variables_global_timeseries.png)
 
 **Three curves in every time-series panel:** ERA5 truth is black with circles,
@@ -103,7 +109,9 @@ loss terms. Our residual objective uses six-hour change statistics and decoded
 weighted MSE. It borrows the amplitude factors (geopotential 2, humidity 0.66,
 cloud species 0.05), but does not fully reproduce the original loss.
 The reported 95% share is an empirical imbalance of this custom objective,
-not a prescribed NeuralGCM weighting.
+not a prescribed NeuralGCM weighting. Changing the normalization interval alone
+has not yet been shown to remove this imbalance; these results still use the
+existing custom objective.
 
 ## Individual figures and data
 
