@@ -43,7 +43,8 @@ this particular objective, but do not demonstrate a better weather forecast.
 
 Ratios above one indicate degradation. These are normalized **MSE** ratios
 across all pressure levels, not RMSE ratios or single-level weather scores.
-The closed-loop root-cause investigation is recorded separately.
+The closed-loop root causes and controlled interventions are documented in the
+[instability audit](../docs/experiments/neuralgcm_residual/INSTABILITY_AUDIT_20260924.md).
 
 ## Reproduce
 
