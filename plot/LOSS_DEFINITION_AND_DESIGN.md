@@ -120,6 +120,22 @@ to the total README baseline loss of 20,832. Similar floor-dominated levels
 accumulate into nearly the entire objective. Equal field coefficients of 1/7
 do not create equal field contributions.
 
+More explicitly, that level contributes
+
+```text
+(1/7) * (175 / 15548) * (1.66994e-6 / 1e-9)**2 = approximately 4,484
+```
+
+This is **21.52% of the total loss from a single cloud-liquid level**. The
+150, 125 and 100 hPa cloud-liquid scales also sit at the same floor and
+contribute approximately 3,131, 2,275 and 2,119, respectively. The floor
+prevents division by zero, but is still much smaller than these forecast
+errors. The effective coefficient on physical squared error is
+`b[p] / (7 * s6[v,p]**2)`, so equal nominal field weights cannot ensure equal
+importance after normalization. These measured validation contributions do
+not by themselves identify the source of the cloud forecast errors or their
+training-gradient contributions.
+
 The problem is not simply that geopotential has large physical units. Consistently
 converting both errors and scales from geopotential to geopotential height leaves
 their ratio unchanged. The relevant quantity is forecast error **relative to the
@@ -225,52 +241,87 @@ reduction, and the common lead-time factor. It is not a controlled ablation of
 the interval alone. The separate matched-snapshot 6 h / 24 h audit holds the
 other choices fixed to isolate that interval.
 
-### B. Baseline-calibrated residual objective
+### B. Equal-variable relative MSE without temporal sigma
 
-For a residual model with a fixed pretrained backbone, a second candidate can
-explicitly balance *relative forecast skill*. For each variable v and a small
-set of physically defined pressure bands g, first compute the candidate-A
-normalized MSE E[v,g]. Use only training data to fit the frozen baseline's
-corresponding mean error B[v,g], then freeze these constants:
+[Standalone proposal and review questions for Ilya](EQUAL_VARIABLE_LOSS_PROPOSAL.md)
 
-```text
-R[v,g] = E[v,g] / max(B[v,g], epsilon[v,g])
-L_balanced = sum_v w[v] * sum_g w[g|v] * R[v,g]
-```
+**Recommended next pilot:** use the frozen baseline's training-set physical
+MSE as each variable's fixed reference. Do not use six-hour or 24-hour change
+standard deviations, the v2 variable amplitudes, or an extra cloud multiplier.
+All seven variables receive exactly the same coefficient, `1/7`.
 
-Fit E and B with the same level masks, lead-time reduction and forecast protocol.
-For a multi-lead experiment, either calibrate the declared combined-lead score
-or keep separate, fixed constants for each lead; do not mix six-hour baseline
-calibration with an otherwise unadjusted long-rollout objective. The calibration
-forecasts must be from the training split, not the validation forecasts used in
-the tables above. Keep B fixed while the residual model trains.
-
-Use fixed, normalized band weights and a documented floor to prevent nearly
-perfect baseline channels from creating excessive weights.
-The baseline starts near one per non-floored component. Equal component
-weights then have a direct interpretation: comparable relative error changes
-have comparable effects on the objective. This addresses field and pressure-band
-dominance more directly than repeatedly guessing amplitude factors.
-
-A concrete pilot can use equal weights over the five core variables T, Z,
-U, V and Q, with cloud species as a separately reported auxiliary term:
+For each variable v, define physical MSE E[v] with the existing Gaussian area
+weights and pressure-proportional level weights. For the initial K=1 comparison,
+use the existing six-hour forecast protocol:
 
 ```text
-L_core  = mean over {T, Z, U, V, Q} of pressure-band-averaged R
-L_cloud = mean over {cloud ice, cloud liquid} of pressure-band-averaged R
-L_pilot = (L_core + lambda_cloud * L_cloud) / (1 + lambda_cloud)
+E[v] = sum_p b[p] * area_mean((prediction[v,p] - ERA5[v,p])**2)
+b[p] = p / sum_p(p)
+
+B[v] = mean over fixed training calibration origins of E_baseline[v]
+
+L_equal = (1/7) * sum_v E_residual[v] / B[v]
 ```
 
-`lambda_cloud=0.1` is an explicit **pilot hypothesis**, not an established optimum
-or a paper parameter. Compare it with equal variable weighting and candidate A;
-select any final setting through a declared validation procedure, never the
-held-out 2023 test set. Define pressure bands from the physical evaluation
-purpose and verified model coverage before inspecting candidate improvements.
+The constants B[v] have the physical units of their variable squared, making
+each ratio dimensionless. Equivalently, errors are divided by the fixed
+baseline RMSE `sqrt(B[v])` before squaring. This is rescaling by the baseline's
+forecast error, **not by the temporal-change sigma**. Directly averaging the
+seven raw physical MSEs would still make the choice of physical units determine
+their importance.
 
-This objective is **a new residual-learning design**, not a closer reproduction
-of NeuralGCM. Within a component, scalar variable amplitudes largely cancel
-against the matching baseline calibration. It therefore must be evaluated using
-fixed physical metrics and the common candidate-A score as well as its own loss.
+On the training calibration set, each baseline component averages exactly
+one and baseline total loss is one. A 10% reduction in temperature MSE and a
+10% reduction in cloud-liquid MSE each lower the objective by `0.1 / 7`, when
+the other terms are fixed. These percentages are **MSE**, not RMSE, reductions.
+This gives equal importance to equal changes relative to each variable's
+fixed baseline reference. Individual samples and validation averages need not
+have baseline score one; always score the baseline on the same evaluation set.
+
+Keep B fixed throughout training. Do not normalize by the current model's
+batch errors or recompute B from validation/test errors. Using the same error
+as both numerator and denominator would make the ratio constant, or change
+the intended objective if that denominator were detached. Equal scalar loss
+weights also do not guarantee equal parameter-gradient norms.
+
+Compute B on a declared training-only calibration set covering the training
+years and seasons. Use the same level masks, spatial weights, forecast times,
+initialization and recurrent-memory protocol for the compared models. Audit
+near-zero B values before training; zero or nonfinite values must fail, and any
+floor must be separately justified in that variable's squared physical units.
+Do not silently introduce a common numerical floor across incompatible units.
+
+For K=2, calibrate the declared combined score
+`(E[v,6h] + E[v,12h]) / 2` on actual baseline rollouts from the training split.
+Use that same reduction for the residual model, advancing from the predicted
+six-hour state. An alternative is separate fixed constants for each lead with
+an explicit equal-lead average. A K=1 calibration must not be presented as an
+equalized K=2 or K=20 objective without recalibration for that protocol.
+
+### Optional extension: equal pressure bands within each variable
+
+Equal-variable scaling prevents geopotential from dominating **other variables
+at calibration**, but does not prevent its upper-atmosphere levels from
+dominating **its own component**. First inspect the per-level contributions
+under L_equal. If pressure-band balancing is needed, predeclare physically
+motivated bands and calibrate each band directly in physical units:
+
+```text
+B[v,g] = training mean of baseline physical MSE in band g
+L_equal_bands = (1/7) * sum_v sum_g w[g|v] * E_residual[v,g] / B[v,g]
+sum_g w[g|v] = 1
+```
+
+Band weights, within-band level reductions, and coverage must be stated before
+comparing candidate improvements. Do not automatically divide by an independent
+baseline error at every pressure level; nearly perfect levels can create
+excessive weights. Start with variable-only rescaling while retaining the
+existing level weights, so the first pilot isolates the normalization change.
+
+This is **a custom residual-learning objective**, not a reproduction of the
+NeuralGCM paper loss. Physical RMSE, bias, per-variable degradation and multi-step
+stability remain necessary evaluation criteria. None of these proposed
+constants has been substituted into the currently running training jobs.
 
 ### Training and selection checks
 
@@ -288,11 +339,11 @@ fixed physical metrics and the common candidate-A score as well as its own loss.
    from loss changes. Compare fresh, matched residual initializations if the
    goal is to attribute a difference to the training objective.
 
-**Recommendation:** retain A as the closest disclosed simplified control;
-complete the 0 h representation and pressure-coverage checks; test B as a
-clearly named residual-specific alternative if A remains dominated by a few
-components. Do not start another large training sweep merely because a
-rescored aggregate improvement looks larger. GPU pilot tests must use
+**Recommendation:** test B's seven equally weighted relative physical MSEs
+as the next residual-learning pilot, keeping the existing pressure weights for
+the first comparison. Retain A as a disclosed simplified alignment control.
+Complete the 0 h representation and pressure-coverage checks before attributing
+upper-atmosphere errors to forecasting alone. GPU pilot tests must use
 `gpu-test`, no explicit partition, and at most one hour per job.
 
 ## 5. Evidence
