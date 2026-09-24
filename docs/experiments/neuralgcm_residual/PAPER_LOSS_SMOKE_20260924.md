@@ -1,21 +1,27 @@
 # Detailed smoke tests for frozen-NGCM K=1 / K=2 training
 
-**Update, September 24, 2026, 13:24 EDT:** the production CLI test passed for
-**both K=1 and K=2**, including exact independent-process checkpoint/metric
-resume and fresh-process baseline equality. Job 14374768 completed with exit
-code 0 in **17 min 43 s**. The pinned execution configuration resolves the
-previously observed discrepancy in these tested cases. The specific source of
-that discrepancy has not been isolated, because three execution settings were
-pinned together.
+**Latest update, September 24, 2026:** width128/d16 completed its full detailed
+**K=1 and K=2** tests successfully in **23 min 10 s** (job 14374769, exit 0).
+The production CLI test also passed for both horizons in **17 min 43 s**
+(job 14374768, exit 0), including exact independent-process checkpoint/metric
+resume and fresh-process baseline equality.
 
-Both width-128 detailed tests have completed K=1 successfully and are running
-K=2. The width256/d16 test has started; width256/d32 awaits the GPU-test
-concurrency limit. The full architecture matrix is not yet reported as passed.
-Seven CPU tests and the independent real-data pilot also passed.
+**User-authorized startup change:** all eight production jobs now have their
+smoke dependencies removed. The completed width128/d16 and CLI tests provide
+the representative startup evidence. Other architecture tests continue in
+parallel. At release, all eight jobs were pending GPU scheduling, with Slurm
+`DEPENDENCY=(null)`. Passing the representative architecture does not certify
+width256 memory use or architecture-specific numerical checks; those checks
+continue without blocking startup, as requested.
+
+The pinned execution configuration resolves the earlier cross-process discrepancy
+in the tested cases. Its individual cause has not been isolated, because three
+execution settings were pinned together. Seven CPU tests and the independent
+real-data pilot also passed.
 
 [Production CLI report](evidence_20260924/cli_smoke_v2.json) ·
-[width128/d16 K=1](evidence_20260924/w128_d16_K1.json) ·
-[width128/d32 K=1](evidence_20260924/w128_d32_K1.json)
+[width128/d16 complete K=1/K=2 report](evidence_20260924/w128_d16_full.json) ·
+[User-authorized release record](evidence_20260924/startup_release.json)
 
 The [experiment definition](NGCM_ALIGNMENT_K2_20260924.md) describes the exact
 loss, scales, frozen model and memory-only gradient contract. Every GPU smoke
@@ -72,10 +78,10 @@ These CPU checks support, but do not replace, the real-model tests below.
 
 | Width | `d_inner` | GPU test job | Horizons | Status |
 | ---: | ---: | ---: | --- | --- |
-| 128 | 16 | 14374769 | K=1 and K=2 | K=1 passed; K=2 running |
+| 128 | 16 | 14374769 | K=1 and K=2 | Passed both; completed |
 | 128 | 32 | 14374770 | K=1 and K=2 | K=1 passed; K=2 running |
 | 256 | 16 | 14374778 | K=1 and K=2 | Running |
-| 256 | 32 | 14374779 | K=1 and K=2 | Pending concurrency limit |
+| 256 | 32 | 14374779 | K=1 and K=2 | Running |
 
 The completed width-128 K=1 gradient comparisons have relative L2 errors of
 1.052e-6 and 9.125e-7. Both have exact zero-head identity, zero physical-feedback
@@ -84,7 +90,8 @@ process replay. The width128/d16 K=2 gradient check also passed with relative
 L2 error **5.884e-7** and gradient cosine **0.9999999999998734**. Its second step
 consumes the corrected first state, verified exactly. See the
 [K=2 numerical-check report](evidence_20260924/w128_d16_K2_checks.json);
-the complete K=2 training/resume portion remains in progress.
+the [complete K=2 training/resume report](evidence_20260924/w128_d16_K2.json)
+also passed, including 20 actual updates and exact replay from update 10.
 
 Each job performs:
 
@@ -157,7 +164,9 @@ existing v2 jobs and artifacts. Revised tests execute immutable
 `source_train_v4`, source ID
 `f4346f67bf51ca59dcd0d85d67dbaaebd802f2fab77c6c5ce330c059d9c44423`.
 Eight replacement 2,000-update jobs now use this same pinned execution policy.
-Each waits for its corresponding detailed test and the CLI test to succeed.
+Their original per-architecture dependencies have now been removed under the
+[user-authorized representative-test policy](evidence_20260924/startup_release.json).
+Only scheduler resource/priority availability remains before startup.
 
 | Width | `d_inner` | K=1 job | K=2 job |
 | ---: | ---: | ---: | ---: |
@@ -166,7 +175,7 @@ Each waits for its corresponding detailed test and the CLI test to succeed.
 | 256 | 16 | 14374866 | 14374867 |
 | 256 | 32 | 14374868 | 14374870 |
 
-[Current exact commands and dependencies](evidence_20260924/training_jobs_v2.json).
+[Original submission commands and current dependency override](evidence_20260924/training_jobs_v2.json).
 
 These tests assess loss arithmetic, the chosen gradient contract and operational
 correctness. Long-run stability and forecast skill require training and held-out

@@ -7,8 +7,9 @@ backward pass. We do not require the unpublished original training gin bindings.
 
 **Status:** implemented in a separate training entry point. The independent
 real-data GPU pilot and the K=1/K=2 production-CLI resume tests passed.
-The detailed numerical/training tests across all four architectures are still
-in progress before the new training matrix. See the
+The width128/d16 detailed K=1/K=2 test also passed. Following the user's startup
+amendment, all eight training jobs are released for GPU scheduling on this
+representative evidence; the remaining architecture tests continue in parallel. See the
 [smoke-test report](PAPER_LOSS_SMOKE_20260924.md) for measured results and job IDs.
 Historical v2 checkpoints and plots retain their original loss definition.
 

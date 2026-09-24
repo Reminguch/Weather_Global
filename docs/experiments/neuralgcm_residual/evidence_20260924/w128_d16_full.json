@@ -1,0 +1,100 @@
+{
+  "passed": true,
+  "runs": {
+    "K1": {
+      "K": 1,
+      "checks": {
+        "independent_recurrent_gradient": {
+          "cosine": 0.9999999999998412,
+          "relative_l2": 1.0517165610018733e-06
+        },
+        "nonzero_hidden_gradient_squared_norm": 197.35696233351067,
+        "numpy_five_term_parity": {
+          "bias": 522.2885131835938,
+          "data": 5271.2353515625,
+          "data_spectrum": 32.53579330444336,
+          "model": 0.20246738195419312,
+          "model_spectrum": 0.0005758472252637148
+        },
+        "physical_feedback_gradient": 0.0,
+        "zero_identity_6h": {
+          "cosine": 1.0,
+          "max_abs": 0.0
+        }
+      },
+      "exact_separate_process_resume": true,
+      "final_loss": 5775.892578125,
+      "frozen_backbone": true,
+      "identity": "f97581f6196b4444cfdc10a5c092f4df7f10c36f690dd55af5bff586f76b8b47",
+      "max_parameter_change": 0.0001942647941177711,
+      "passed": true,
+      "peak_device_memory": {
+        "bytes_in_use": 29909504,
+        "bytes_limit": 42559078400,
+        "bytes_reserved": 0,
+        "largest_alloc_size": 931941376,
+        "largest_free_block_bytes": 0,
+        "num_allocs": 31707,
+        "peak_bytes_in_use": 1273891840,
+        "peak_bytes_reserved": 0,
+        "peak_pool_bytes": 1675624448,
+        "pool_bytes": 1675624448
+      },
+      "resume_at": 10,
+      "seconds": 125.82774731214158,
+      "updates": 20
+    },
+    "K2": {
+      "K": 2,
+      "checks": {
+        "independent_recurrent_gradient": {
+          "cosine": 0.9999999999998734,
+          "relative_l2": 5.884005018500214e-07
+        },
+        "nonzero_hidden_gradient_squared_norm": 164.2070238750866,
+        "numpy_five_term_parity": {
+          "bias": 478.3932800292969,
+          "data": 4838.92431640625,
+          "data_spectrum": 32.47683334350586,
+          "model": 0.2024226188659668,
+          "model_spectrum": 0.0006286630523391068
+        },
+        "physical_feedback_gradient": 0.0,
+        "second_step_corrected_features": {
+          "cosine": 1.0,
+          "max_abs": 0.0
+        },
+        "zero_identity_12h": {
+          "cosine": 1.0,
+          "max_abs": 0.0
+        },
+        "zero_identity_6h": {
+          "cosine": 1.0,
+          "max_abs": 0.0
+        }
+      },
+      "exact_separate_process_resume": true,
+      "final_loss": 5297.76904296875,
+      "frozen_backbone": true,
+      "identity": "09b9420d2cfa1f42583b38e439c9ebc370e61f313eb71f3e43fb7ba790d2cb54",
+      "max_parameter_change": 0.00019423961930442601,
+      "passed": true,
+      "peak_device_memory": {
+        "bytes_in_use": 30056960,
+        "bytes_limit": 42559078400,
+        "bytes_reserved": 0,
+        "largest_alloc_size": 931941376,
+        "largest_free_block_bytes": 0,
+        "num_allocs": 48943,
+        "peak_bytes_in_use": 1434217472,
+        "peak_bytes_reserved": 0,
+        "peak_pool_bytes": 1675624448,
+        "pool_bytes": 1675624448
+      },
+      "resume_at": 10,
+      "seconds": 140.14685785397887,
+      "updates": 20
+    }
+  },
+  "slurm_job_id": "14374769"
+}
