@@ -1,0 +1,357 @@
+{
+  "captured_at_utc": "2026-09-24T03:22:07.327262+00:00",
+  "experiment_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260920_scatter_v3",
+  "source_id": "02afdad970c37dec9cc67b34a780be0621aba1f24f8773e7917a7ad2aeee2ec1",
+  "improvement_definition": "100 * (1 - residual_ngcm_loss / ngcm_loss)",
+  "time_definition": "sum(metrics.jsonl seconds through checkpoint update) / 3600",
+  "baseline_definition": "epoch 0, exactly zero residual output head",
+  "runs": {
+    "r2p8_w128_di16": {
+      "metrics_path": "runs/r2p8_w128_di16/seed22/pretrain/metrics.jsonl",
+      "metrics_prefix_updates": 2120,
+      "metrics_prefix_sha256": "378c20fd50fdadefe5159594f93ee6dfc17867f38c1b25029666048b38994956",
+      "validation_points": [
+        {
+          "epoch": 0,
+          "update": 0,
+          "score": {
+            "loss": 20832.350542310996,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di16/seed22/pretrain/validation/000000/one_step.json",
+          "validation_sha256": "f1a81205c0daa32394b29af7600a0c13ff728d4df2a68d16efd9e60cedab616c",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di16/seed22/pretrain/checkpoint_initial.json",
+          "checkpoint_metadata_sha256": "1f090e1539ffaf7fe97666d98303a70715fdd6553cbdbd27ad9dbf2eca4325b4",
+          "checkpoint_sha256": "eb185fa19a19d5b8ed2f2c2bb210cde39320ca760135c193428dce5ef228d01b"
+        },
+        {
+          "epoch": 1,
+          "update": 424,
+          "score": {
+            "loss": 19068.636188520188,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di16/seed22/pretrain/validation/000001/one_step.json",
+          "validation_sha256": "629d7f6a916b1f092623bd06341e264c2a997b45a97eab23612d9337ab88dd56",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_01.json",
+          "checkpoint_metadata_sha256": "634baa12d8b4c0326e0da74b42b07790b9604ac3836c0172556cdbea8fe3d166",
+          "checkpoint_sha256": "56954e8e2d5e38269b08b61d231aacc2ab305352ae5f2179b79d4dc1a63ff886"
+        },
+        {
+          "epoch": 2,
+          "update": 848,
+          "score": {
+            "loss": 18340.565766618343,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di16/seed22/pretrain/validation/000002/one_step.json",
+          "validation_sha256": "8548f2e3b8709a6ade39afec2206b8b6990b6420b1dc2527ef600c9280d53625",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_02.json",
+          "checkpoint_metadata_sha256": "b19f03b76e5e3d47f27e27752cd345cb9ce61c38af6fe82bc2a24a373bb142ee",
+          "checkpoint_sha256": "825cff268b334e194c33bd3495853f9de48c1f824fd3f6551f3f6da81ab09682"
+        },
+        {
+          "epoch": 3,
+          "update": 1272,
+          "score": {
+            "loss": 17666.42263812822,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di16/seed22/pretrain/validation/000003/one_step.json",
+          "validation_sha256": "bcf5b75e4847d99d3b2f5f741b8ce9670b96b8b39d8b02ed98c247654d7ee266",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_03.json",
+          "checkpoint_metadata_sha256": "e97bf97f56ab0f2ed21deab12a52c8328db30f2477e8a67535c8d3f80138fb2f",
+          "checkpoint_sha256": "712c4cb79d3d80bac8d219a8098bc455d038edaa8cd5c57564d7a9eec6aef5e4"
+        },
+        {
+          "epoch": 4,
+          "update": 1696,
+          "score": {
+            "loss": 16930.09515275988,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di16/seed22/pretrain/validation/000004/one_step.json",
+          "validation_sha256": "62cd5e56c2c7ea437bc6cf26d8e97806234d5c18cda6c37a5fa096dbd8f099be",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_04.json",
+          "checkpoint_metadata_sha256": "8d47c729b69468e2a0359d1c979ba2a57bdfb2771d1c25302314ec16075dd9fb",
+          "checkpoint_sha256": "44f47986abda791fd78037e6767a069ce88663283178fe64b9b6a893de3b8ceb"
+        },
+        {
+          "epoch": 5,
+          "update": 2120,
+          "score": {
+            "loss": 16419.299371107172,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di16/seed22/pretrain/validation/000005/one_step.json",
+          "validation_sha256": "7bb1e65e661e32942e80b4b5f207ae19e0493cb3015cbc0914c8146555af831d",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_05.json",
+          "checkpoint_metadata_sha256": "2e157d065d595e1789f73c8022b0949ec7c752320b07a9e2f7b96dafc17f4a17",
+          "checkpoint_sha256": "803b1a647143bbd333c60115dcfe2c516e991a2260509990d7a47e419fc5f7fa"
+        }
+      ]
+    },
+    "r2p8_w128_di32": {
+      "metrics_path": "runs/r2p8_w128_di32/seed22/pretrain/metrics.jsonl",
+      "metrics_prefix_updates": 2120,
+      "metrics_prefix_sha256": "c1f0d41934391f05244ecd2d30e7148b214598ae5e8f2d2fb019b91558959de0",
+      "validation_points": [
+        {
+          "epoch": 0,
+          "update": 0,
+          "score": {
+            "loss": 20832.350542310996,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di32/seed22/pretrain/validation/000000/one_step.json",
+          "validation_sha256": "f1a81205c0daa32394b29af7600a0c13ff728d4df2a68d16efd9e60cedab616c",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di32/seed22/pretrain/checkpoint_initial.json",
+          "checkpoint_metadata_sha256": "60d32df4c35cd8643555d422bd856f36ad1eec4c04b670447e62d2578ee6365f",
+          "checkpoint_sha256": "dd874460080919156957d43f5672c5bdb714188412b61d2c08622ee42ed40d38"
+        },
+        {
+          "epoch": 1,
+          "update": 424,
+          "score": {
+            "loss": 19070.389473260308,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di32/seed22/pretrain/validation/000001/one_step.json",
+          "validation_sha256": "b1a2533d5c66da46478799b7f606ee0f59472cea7170aa5e5f50d96d4d5e0750",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_01.json",
+          "checkpoint_metadata_sha256": "cd5ab4bb12ee216597b0a20e0c1057c30bf5e567708c220f356dfb4bb0ba1bc0",
+          "checkpoint_sha256": "d85afdd144a249be13468fc527b36aef18ec947b8f50db6e46846ffa40feaf11"
+        },
+        {
+          "epoch": 2,
+          "update": 848,
+          "score": {
+            "loss": 18427.62009302513,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di32/seed22/pretrain/validation/000002/one_step.json",
+          "validation_sha256": "ea6ee4bb6650c935454dd061497344935319cf52543ebda5b2c9c6193d6c1a67",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_02.json",
+          "checkpoint_metadata_sha256": "f02d263372a46b347a4827171df80c0681eeb2137d2f81aa753d618c155d6a1e",
+          "checkpoint_sha256": "f1fd73962c423786274bfad9d837933b901989ccb4a9fc43513ef1dfbd9b11c6"
+        },
+        {
+          "epoch": 3,
+          "update": 1272,
+          "score": {
+            "loss": 17716.205386195234,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di32/seed22/pretrain/validation/000003/one_step.json",
+          "validation_sha256": "82105edc61f9fb18941dcbc5cd33a0eb498c3ddf587422eb975dd46ccd6a4044",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_03.json",
+          "checkpoint_metadata_sha256": "4d88e262cca34a4d5f31327e3103e4c2f7f44b7c646c308c2326e56bbcf15078",
+          "checkpoint_sha256": "28b2090a08098e539a388e67532a1aaa6d360e3034a0111ee5ec8f2a6fd710c1"
+        },
+        {
+          "epoch": 4,
+          "update": 1696,
+          "score": {
+            "loss": 16847.562516779424,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di32/seed22/pretrain/validation/000004/one_step.json",
+          "validation_sha256": "fe74c7de1daef45e5ccc8dc4eb5b8c948ce7dcf04961b9dce53acf85f4078c85",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_04.json",
+          "checkpoint_metadata_sha256": "2b57addca5c86954b4dd0b343888f899e516554230e2792006004509319315d8",
+          "checkpoint_sha256": "0de30c174bddf7a2b397c88009986249720d113bac6cdfaffca9c10cd6e38e44"
+        },
+        {
+          "epoch": 5,
+          "update": 2120,
+          "score": {
+            "loss": 16329.755802324957,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w128_di32/seed22/pretrain/validation/000005/one_step.json",
+          "validation_sha256": "53925635249e35708abbd91b70a0bc22391363332573d0c160532ef5230782bd",
+          "checkpoint_metadata_path": "runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_05.json",
+          "checkpoint_metadata_sha256": "5b54b98cd8ce328cdbe8ce9b432d31a346be35cc2095d4e3a348844edd3d694a",
+          "checkpoint_sha256": "5b99bc21d25041204938d7631a4d7dfe3e89a36538c94f9d332107c398709f2a"
+        }
+      ]
+    },
+    "r2p8_w256_di16": {
+      "metrics_path": "runs/r2p8_w256_di16/seed22/pretrain/metrics.jsonl",
+      "metrics_prefix_updates": 2120,
+      "metrics_prefix_sha256": "e4c1a54470282120f800cd5ca84702bcf4e40fb990158a93d783c961b9af9437",
+      "validation_points": [
+        {
+          "epoch": 0,
+          "update": 0,
+          "score": {
+            "loss": 20832.350542310996,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di16/seed22/pretrain/validation/000000/one_step.json",
+          "validation_sha256": "f1a81205c0daa32394b29af7600a0c13ff728d4df2a68d16efd9e60cedab616c",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di16/seed22/pretrain/checkpoint_initial.json",
+          "checkpoint_metadata_sha256": "a0a1d46757ce4bffa072fbdc1a40fcabd47f80b4c6a086dc8c03c56ce64abd35",
+          "checkpoint_sha256": "4e4c69688f0f22b69114cd0086e09b4c755fa5d95df28d0f1dd30baa4a5fd84b"
+        },
+        {
+          "epoch": 1,
+          "update": 424,
+          "score": {
+            "loss": 18750.422181727878,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di16/seed22/pretrain/validation/000001/one_step.json",
+          "validation_sha256": "4dcab65a2e9ea06de64b3eb2db51e0690909be7bd684ca337fde454164eb5fa6",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_01.json",
+          "checkpoint_metadata_sha256": "25e5e230fa86b00d1f7104ab7e6551af1e74482f5752d5fcbd875dbaab1dc64f",
+          "checkpoint_sha256": "12c8c02a85f41ad0f74e7732481485d3afa7683d231e3aadf7c27c7c7d3fb4d2"
+        },
+        {
+          "epoch": 2,
+          "update": 848,
+          "score": {
+            "loss": 17908.700290619632,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di16/seed22/pretrain/validation/000002/one_step.json",
+          "validation_sha256": "4705c01f26b169dd29211c809fa269c5ae2effd934806c935dda517ec8fd3b47",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_02.json",
+          "checkpoint_metadata_sha256": "b7cf2737a4f9bea706ff38d2eafa5c4b71e83659fa239bba041f11ed3cf60d2c",
+          "checkpoint_sha256": "ce657e61930f5c03177aad205a12496cb58e5debc5d8f77ce13b096ba38c232f"
+        },
+        {
+          "epoch": 3,
+          "update": 1272,
+          "score": {
+            "loss": 16786.24394933956,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di16/seed22/pretrain/validation/000003/one_step.json",
+          "validation_sha256": "42f12a890c380c7bbeb760ba3235f83779052274915d2a36cafa80b63febb17d",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_03.json",
+          "checkpoint_metadata_sha256": "63dcce5ad821f584f71f826e957a2e45323e15685bb673f4dc74be7c3dc9cd23",
+          "checkpoint_sha256": "7ed309b3b586209c2c093c3230eea646490c0d968643c92e69bca34c1632c978"
+        },
+        {
+          "epoch": 4,
+          "update": 1696,
+          "score": {
+            "loss": 16384.837239583332,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di16/seed22/pretrain/validation/000004/one_step.json",
+          "validation_sha256": "924adbfd711fd85e508c498e64678926e322f81b4534348a70e91227fbf55380",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_04.json",
+          "checkpoint_metadata_sha256": "ee2c54a2638a96399ab61c4cfa5a7fecdea25575a79b997467a2b1d23af769d6",
+          "checkpoint_sha256": "071bfe419c53bd2aead1627d679ba815427f115b0d1d3a58f4cb3167f61a08d3"
+        },
+        {
+          "epoch": 5,
+          "update": 2120,
+          "score": {
+            "loss": 15612.177191392826,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di16/seed22/pretrain/validation/000005/one_step.json",
+          "validation_sha256": "bd393b8b1d0d3225bc46de548e31360e06586e07b383f1a7e079dc0e116dfbb7",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_05.json",
+          "checkpoint_metadata_sha256": "0dac03272dc3c92717e645be1023d654cc59e64c7c5f16fcad536f434d05939b",
+          "checkpoint_sha256": "78b6da3d6f07475ef003e153e65a263cfdc46e566833339ad57828c3d5b0877a"
+        }
+      ]
+    },
+    "r2p8_w256_di32": {
+      "metrics_path": "runs/r2p8_w256_di32/seed22/pretrain/metrics.jsonl",
+      "metrics_prefix_updates": 2120,
+      "metrics_prefix_sha256": "cd053655ab966d84e06c677c88b014731a372a611acfa35add6a9ccb3f7683b3",
+      "validation_points": [
+        {
+          "epoch": 0,
+          "update": 0,
+          "score": {
+            "loss": 20832.350542310996,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di32/seed22/pretrain/validation/000000/one_step.json",
+          "validation_sha256": "f1a81205c0daa32394b29af7600a0c13ff728d4df2a68d16efd9e60cedab616c",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di32/seed22/pretrain/checkpoint_initial.json",
+          "checkpoint_metadata_sha256": "cbfd620fa9ad47b3cabba44e47e6a9e3cec360132d0b4a86db6da78ffbf825a6",
+          "checkpoint_sha256": "53c2d49925d9f032cbed7ee14b2446fa72d1edc952724db6bedcb7297e2862af"
+        },
+        {
+          "epoch": 1,
+          "update": 424,
+          "score": {
+            "loss": 18747.013175204036,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di32/seed22/pretrain/validation/000001/one_step.json",
+          "validation_sha256": "80db743a1489f64ae37510e570b23bb300a6825bb0dde235c9708ce8b96705b4",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_01.json",
+          "checkpoint_metadata_sha256": "2418893567e93d3d664aaf333fe244e247e58767b3efbb90d52d34fc94a60837",
+          "checkpoint_sha256": "1d1b17f4970d576031516a510cfdea6c9e82097a15afdfd1ca75c10a47273c8e"
+        },
+        {
+          "epoch": 2,
+          "update": 848,
+          "score": {
+            "loss": 17838.384764953822,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di32/seed22/pretrain/validation/000002/one_step.json",
+          "validation_sha256": "dfddafe0cd8ad4e4e35d0528b5ca153ffb78c97cfb0e9612e229dd773a845640",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_02.json",
+          "checkpoint_metadata_sha256": "836fa180fc3cad72012e536ee98b856cbcaa8020b8a4322ee95c00c77ebcb849",
+          "checkpoint_sha256": "b85e839a3ec71969780a3969ecec5a30043459114502603249a3695447e99f11"
+        },
+        {
+          "epoch": 3,
+          "update": 1272,
+          "score": {
+            "loss": 17133.91415109536,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di32/seed22/pretrain/validation/000003/one_step.json",
+          "validation_sha256": "4a5e7c2e66d106f803f4c38a8164f999337f47ce3c78a7ccc2415bfb4931ba68",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_03.json",
+          "checkpoint_metadata_sha256": "f33cf5128fe3feec4b5b49e59c6a7f130d4e44ccf7a28d08f53bf71ef3e5ea04",
+          "checkpoint_sha256": "b6c705b17bfc3e70f33a1bb9d43ce592a588f3322a03dc93b4c5535f44650d65"
+        },
+        {
+          "epoch": 4,
+          "update": 1696,
+          "score": {
+            "loss": 16098.334441446521,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di32/seed22/pretrain/validation/000004/one_step.json",
+          "validation_sha256": "d98a8166a06d7f042d3901efba52eb695bd0a81359c9015c1257083c866d4ed9",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_04.json",
+          "checkpoint_metadata_sha256": "1a41ca7964d5b23644115bcf2a13e5b2bbcd8e12362e35cdde0aae3257699f14",
+          "checkpoint_sha256": "269f481ddfb71aa9a82a1032ed2e11c828b929c30853d6253c052001f49f861a"
+        },
+        {
+          "epoch": 5,
+          "update": 2120,
+          "score": {
+            "loss": 15454.734744818514,
+            "records": 1455
+          },
+          "validation_path": "runs/r2p8_w256_di32/seed22/pretrain/validation/000005/one_step.json",
+          "validation_sha256": "c74ae89ad6ad8beb32266dcd85f7f59eb2bef83914b80eba0572f604e6cb88d0",
+          "checkpoint_metadata_path": "runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_05.json",
+          "checkpoint_metadata_sha256": "ec919ce95a8b47ebf872324232f05c227c987699671d681da7c4baace9de18e5",
+          "checkpoint_sha256": "329e95aa102974239909af8ce5e2ae1bc9e7aa061a357142740f3fc452e1cf26"
+        }
+      ]
+    }
+  },
+  "shared_identities": {
+    "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+    "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f",
+    "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+    "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+    "source": "02afdad970c37dec9cc67b34a780be0621aba1f24f8773e7917a7ad2aeee2ec1"
+  }
+}
