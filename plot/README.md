@@ -9,6 +9,31 @@
 This proposal is not active in the running jobs. The physical-time plots are
 displayed directly below and individually further down this page.
 
+## Upper-air improvements vs physical time
+
+**The improving upper-air results include both geopotential and specific humidity.**
+The figure below compares ERA5, frozen NGCM and residual NGCM for **all twelve
+improving field/level pairs at pressures <=100 hPa** in the representative
+w128/di16 evaluation. They also improve in all three other configurations.
+
+![Improving upper-air geopotential and humidity versus physical time](upper_air_physical_eval_20260924/r2p8_w128_di16/upper_air_improvements.png)
+
+| Physical variable | Improving pressure levels (hPa) | Full-year spatial RMSE reduction, w128/di16 |
+| --- | --- | --- |
+| Geopotential | 1, 2, 3, 5, 7, 10, 20, 30 | 37.73%–90.32%; 2 hPa: **90.15%**, 3 hPa: **90.32%** |
+| Specific humidity | 1, 2, 3, 5 | 38.72%–70.26%; 2 hPa: **70.26%**, 3 hPa: **70.22%** |
+
+The curves show global means in physical units for **w128/di16, update 2,968**.
+The x-axis is valid time relative to January 10, 2022 00 UTC; each point remains
+a six-hour K=1 forecast initialized at the preceding origin. The percentages
+use all **1,455 forecasts over 2022**, not only the illustrated three-day window.
+These levels were selected for positive physical RMSE improvement; the standard
+levels below retain the comparisons where errors increase.
+
+**[All twelve individual physical-time plots, absolute RMSE values, and all four configurations](upper_air_physical_eval_20260924/README.md)** ·
+[CSV](upper_air_physical_eval_20260924/timeseries.csv) ·
+[PDF](upper_air_physical_eval_20260924/r2p8_w128_di16/upper_air_improvements.pdf)
+
 ## Physical variables vs physical time
 
 ![Seven physical variables versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/all_variables_global_timeseries.png)
@@ -207,6 +232,10 @@ do not create three different sets of physical-time curves.
 ![Cloud liquid water versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/CL850_global_timeseries.png)
 
 ### Upper-atmosphere geopotential
+
+The [upper-air results page](upper_air_physical_eval_20260924/README.md) also
+includes the improved **specific-humidity levels at 1, 2, 3 and 5 hPa**, with
+individual physical-time curves and full-year RMSE for all four configurations.
 
 ![Upper-atmosphere geopotential versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/geopotential_improved_levels.png)
 

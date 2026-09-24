@@ -133,6 +133,7 @@ tests must use `gpu-test`, no explicit partition, and at most one hour per job.
 
 ## Figures to review alongside this proposal
 
+- [Improving upper-air geopotential and humidity, individual time series and all four configurations](upper_air_physical_eval_20260924/README.md)
 - [Physical variables versus physical time, displayed in the plot README](README.md#physical-variables-vs-physical-time)
 - [Seven larger individual physical-time panels](README.md#physical-unit-forecasts)
 - [Full-year physical RMSE and checkpoint identities](k1_physical_eval_20260924/README.md#physical-forecast-errors)

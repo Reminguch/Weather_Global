@@ -6,6 +6,9 @@
 > Aggregate loss improvement does not imply improvement across weather variables.
 > See the [loss mismatch explanation](../README.md#loss-mismatch-and-geopotential-dominance).
 
+**Improving upper-air results:** [geopotential at 1–30 hPa and specific humidity
+at 1–5 hPa, with all twelve individual comparisons and all four configurations](../upper_air_physical_eval_20260924/README.md).
+
 ![Seven-variable comparison](r2p8_w128_di16/all_variables_global_timeseries.png)
 
 **Three curves in every time-series panel:** ERA5 truth is black with circles,

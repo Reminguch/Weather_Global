@@ -1,0 +1,69 @@
+{
+  "runs": {
+    "r2p8_w128_di16": {
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_07.pkl",
+        "checkpoint_sha256": "a61b34e3c81ca0fcb085fc140bd6e17f6fca7812f10914dae81397502e8445b0",
+        "epoch": 7,
+        "update": 2968,
+        "validation_loss": 0.17766703895686828,
+        "baseline_loss": 1.1389527632198793
+      },
+      "job_id": "14366171",
+      "records": 1455,
+      "report_sha256": "9ba500096df632918a2a2a93170b924a13cd5297ca462f7fa846bc80cc9702bb",
+      "timeseries_sha256": "486d7f8136422e92dfda79e469857a517d3a9fca768a3f861f4cfd713f779c86"
+    },
+    "r2p8_w128_di32": {
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_07.pkl",
+        "checkpoint_sha256": "890a699653ff2d8e31c5ab6e4949321892c6ac26d8dc93d3b4a6a1bbdd508108",
+        "epoch": 7,
+        "update": 2968,
+        "validation_loss": 0.17772658312648432,
+        "baseline_loss": 1.1389527632198793
+      },
+      "job_id": "14366172",
+      "records": 1455,
+      "report_sha256": "2867481d8177c52eaee4e268d0e2cfc1cfd31f8079a8bafcd64420c566b785ca",
+      "timeseries_sha256": "81552490de4546023f7de3a929144086d59808cce2a06511554271c9e743e5ec"
+    },
+    "r2p8_w256_di16": {
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_05.pkl",
+        "checkpoint_sha256": "f43d382bd08950091898abe3b3d079a682eddf42813c936409c3648fdf05468f",
+        "epoch": 5,
+        "update": 2120,
+        "validation_loss": 0.17889596053824802,
+        "baseline_loss": 1.1389527632198793
+      },
+      "job_id": "14366173",
+      "records": 1455,
+      "report_sha256": "facaa3c51b6d0e19ef3d2432329e2a1d44e2a46cd5f554a052fc6d0b20eee272",
+      "timeseries_sha256": "18bde615de70b15c527aaf6a13787f992b8484b465ea8c51aade74ae635bc88e"
+    },
+    "r2p8_w256_di32": {
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_05.pkl",
+        "checkpoint_sha256": "14baf60f3240a975226cac26b4be6cac91a41d124178409a64cbb311b30ea5dd",
+        "epoch": 5,
+        "update": 2120,
+        "validation_loss": 0.17898251344657845,
+        "baseline_loss": 1.1389527632198793
+      },
+      "job_id": "14366184",
+      "records": 1455,
+      "report_sha256": "f33fa4af544266442ab37c6fd354741d4e81349879b0f48bb89e9810e66445bf",
+      "timeseries_sha256": "6d0c9e5792e18f3a09255e0f82f63f691c9254e9a1330e5ccf15e7111057bed1"
+    }
+  },
+  "physical_summary_sha256": "78300f114fe12b2d4ec88bd3065667801dcfa695ac164e94ab0f04b92efef181",
+  "physical_metrics_sha256": "01cb38566b25e63417ff0dd188e2b2f275ffd2f7634b4ff4dd980be8fb17aed1",
+  "timeseries_sha256": "a070826448637ca30fdda0acb454cfa112ab154e912052afd0411214cc6f176c",
+  "window_start": "2022-01-10T00",
+  "duration_hours": 72,
+  "forecast_lead_hours": 6,
+  "statistic": "global Gaussian-area mean",
+  "selection": "All positive full-year RMSE improvements at <=100 hPa for w128/di16; same field/levels shown for all four runs",
+  "role": "Existing six-hour v2-trained K=1 forecasts; no retraining or new GPU evaluation"
+}
