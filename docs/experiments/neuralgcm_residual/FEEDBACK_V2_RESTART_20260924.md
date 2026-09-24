@@ -2,7 +2,9 @@
 
 User authorization on September 24, 2026: fix the numerical constraints and
 loss, start all four configurations from scratch, and submit formal jobs and
-smokes together. Formal jobs wait for successful smoke completion.
+smokes together. The user subsequently clarified that **formal training must
+not wait for the full smoke jobs**. The current production jobs have no smoke
+dependencies and run independently of those checks.
 
 ## Frozen experiment
 
@@ -60,31 +62,47 @@ baseline forecasts while keeping the revised residual contract explicit.
 
 | Configuration | Full GPU smoke | Fresh formal pretraining |
 | --- | --- | --- |
-| w128 / di16 | 14352533 | 14352581 |
-| w128 / di32 | 14352534 | 14352582 |
-| w256 / di16 | 14352535 | 14352583 |
-| w256 / di32 | 14352536 | 14352584 |
+| w128 / di16 | 14352533 | 14353383 |
+| w128 / di32 | 14352534 | 14353384 |
+| w256 / di16 | 14352535 | 14353385 |
+| w256 / di32 | 14352536 | 14353386 |
 
-All four formal jobs depend on **all four** full smoke jobs with `afterok`.
-Successful Slurm completion alone is insufficient: the production runner also
-validates all four content-bound `PASSED.json` reports and evidence hashes.
-Pretraining completion submits the actual fine-tuning slice with an `afterok`
-dependency and the selected parent's hash.
+The original pending formal jobs 14352581–14352584 were cancelled and replaced
+with the jobs above after the user's clarification. Both the scheduler smoke
+dependency and the runtime requirement for full smoke reports were removed.
+Slurm confirmed `Dependency=(null)` for all four replacements. These jobs use
+the separate, hashed operational runner
+`pipeline/early_start_v1/run_neuralgcm_feedback_early_start.py`; its adjacent
+`policy.json` records the user's instruction, source identity, runner hash, and
+the successful independent-smoke report hash. The frozen numerical source,
+configuration, cache/statistics checks, and checkpoint identities are unchanged.
+Startup audits record this authorization explicitly, without creating or
+claiming missing full-smoke pass evidence. Pretraining completion still submits
+fine-tuning with an `afterok` dependency on its own pretraining slice, and stage
+transfer still checks the selected parent's hash.
+
+At replacement submission, the first three full smoke reports were present
+and passed; the w256/di32 smoke had started. The production jobs were pending
+cluster scheduling, with no estimated start time available yet.
 
 Independent representative-data GPU smoke **14351743** passed first. It fit its
 own isolated pilot statistics. Cached/live state, features, loss, gradients and
 updates matched exactly. Saving, reloading and continuing also matched exactly,
-and the frozen backbone parameters were unchanged. It is not the sole
-production gate.
+and the frozen backbone parameters were unchanged. Its verified report remains
+a startup requirement. Full transition checks continue independently and retain
+their own pass/fail reports.
 
 The initial attempt to attach that already-completed pilot job ID as a Slurm
 dependency was rejected with `Job dependency problem`, after Slurm had removed
 it from the active dependency table. No formal job was created on that attempt.
 The completed report and core-code hashes were verified instead; its report
-hash is stored in the final submission graph. All four full-smoke dependencies
-were retained. The generic submitter now handles completed pilot evidence this
-way, with a CPU regression test. This submission-only follow-up does not modify
-the frozen numerical source.
+hash is stored in the submission graph. That first submission retained all four
+full-smoke dependencies, which were subsequently removed as described above.
+The generic submitter handles completed pilot evidence with a CPU regression
+test. The independent-start wrapper has three passing CPU checks covering
+dependency-free initial submission, continuation dependencies, and authorization
+identity/evidence rejection. These operational changes do not modify the frozen
+numerical source.
 
 The remaining old-configuration job **14322230** was cancelled after the new
 jobs were confirmed in Slurm. Its latest saved checkpoint was update **2,600**.
@@ -112,6 +130,9 @@ after all children succeed and all comparisons pass.
 
 Per-arm evidence is under `checks/restart_smoke/<run_id>/`, with final
 `PASSED.json`. The durable submission graph is `pipeline/restart_chain.json`.
+The superseded dependency graph is retained as
+`pipeline/restart_chain_with_smoke_dependencies.json`; the current independent
+startup graph is also recorded in `pipeline/early_start_chain.json`.
 Operational and training logs are under `logs/` and `runs/<run_id>/seed22/`.
 
 Submission is not a pass result. Check the live reports and scheduler states
