@@ -215,8 +215,14 @@ def validation_callback(root, manifest, runtime, resources, output, stage):
         if ar:
             for warm in (False, True):
                 report = evaluate_origins(runtime, params, val_origins, step_root / ("warm" if warm else "cold"), warm=warm)
-                if not warm:
+                if not warm and report["eligible_for_selection"]:
                     select_checkpoint(Path(output) / "selected.json", checkpoint, report, split="val", epoch_or_update=index)
+                elif not warm:
+                    write_json(step_root / "selection_rejected.json", {
+                        "checkpoint_sha256": checkpoint_id,
+                        "reason": "incomplete_or_nonfinite_cold_validation",
+                        "eligible_for_selection": False,
+                    }, immutable=True)
         write_json(step_root / "COMPLETE.json", {"checkpoint_sha256": checkpoint_id, "ar": ar}, immutable=True)
     return validate
 
@@ -254,7 +260,7 @@ def evaluate_run(root, manifest, run_id):
     from .runtime import build_runtime
     from .checkpoint import load_checkpoint
     from .evaluate import evaluate_origins
-    from .loss import WeatherLoss
+    from .loss import make_weather_loss
     from .normalization import Normalization
     config = load_config(manifest["configs"][run_id]["path"])
     require_receipt(root, "finetune", run_id, manifest["source_id"])
@@ -269,7 +275,8 @@ def evaluate_run(root, manifest, run_id):
     scales = Normalization.load(coarse["statistics"]).manifest["loss_scales"]
     common = (horizontal_interpolation.ConservativeRegridder(runtime.backbone.model.data_coords.horizontal,
                coarse_b.model.data_coords.horizontal),
-              WeatherLoss(coarse_b.model.data_coords.horizontal.latitudes, coarse_b.model.data_coords.vertical.centers, scales))
+              make_weather_loss(config.loss, coarse_b.model.data_coords.horizontal.latitudes,
+                                coarse_b.model.data_coords.vertical.centers, scales))
     runs = {}
     for stage in ("baseline", "pretrain", "finetune"):
         params = None

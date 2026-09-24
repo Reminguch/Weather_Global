@@ -11,6 +11,8 @@ FORCING_FIELDS = ("sea_surface_temperature", "sea_ice_cover")
 STAGES = ("preflight", "data", "cache", "verify-cache", "pretrain", "finetune", "evaluate", "report")
 FORCING_POLICY = "lag24h_then_persist_at_origin"
 LOSS_NAME = "neuralgcm_field_normalized_mse_v1"
+BALANCED_LOSS_NAME = "neuralgcm_pooled_change_mse_v2"
+CORRECTION_POLICIES = ("native_modal_v1", "no_pressure_zero_mean_v2")
 
 
 @dataclass(frozen=True)
@@ -74,6 +76,7 @@ class RunConfig:
     forcing_policy: str = FORCING_POLICY
     feedback_mode: str = "closed_loop_sg"
     loss: str = LOSS_NAME
+    correction_policy: str = "native_modal_v1"
 
     def __post_init__(self):
         if self.schema != SCHEMA or self.resolution not in (2.8, 1.4):
@@ -86,8 +89,11 @@ class RunConfig:
                   self.finetune_validate_every, self.validation_origins, self.test_origins, self.test_steps)
         if actual != expected:
             raise ValueError("Initial experiment budgets/horizons are locked; use a new schema for changes")
-        if (self.forcing_policy, self.feedback_mode, self.loss) != (FORCING_POLICY, "closed_loop_sg", LOSS_NAME):
+        if ((self.forcing_policy, self.feedback_mode) != (FORCING_POLICY, "closed_loop_sg")
+                or self.loss not in (LOSS_NAME, BALANCED_LOSS_NAME)):
             raise ValueError("Unsupported causal/gradient/objective contract")
+        if self.correction_policy not in CORRECTION_POLICIES:
+            raise ValueError("Unsupported native correction contract")
 
     @property
     def resolution_id(self):
@@ -98,7 +104,11 @@ class RunConfig:
         return f"r{str(self.resolution).replace('.', 'p')}_w{self.architecture.width}_di{self.architecture.d_inner}"
 
     def to_dict(self):
-        return asdict(self)
+        result = asdict(self)
+        # Keep the identities of historical configuration files unchanged.
+        if self.correction_policy == "native_modal_v1":
+            result.pop("correction_policy")
+        return result
 
     @property
     def identity(self):

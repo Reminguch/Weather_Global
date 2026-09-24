@@ -1,5 +1,9 @@
 # K=1 residual NeuralGCM instability audit
 
+Follow-up: the user authorized a fresh run with numerical constraints and a
+rebalanced loss. See the [versioned restart](FEEDBACK_V2_RESTART_20260924.md).
+The findings below describe the original checkpoints and diagnostic interventions.
+
 The observed failures have reproducible causes in the residual-to-solver
 interface. Unconstrained pressure increments cause the immediate second-step
 error increase. Injected degree-zero divergence drives a separate, sustained

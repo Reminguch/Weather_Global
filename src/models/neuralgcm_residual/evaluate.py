@@ -137,7 +137,9 @@ def evaluate_origins(runtime, params, manifest, output, *, warm=False, diagnosti
             failures.append(failure)
             append_jsonl(output / "failures.jsonl", failure)
     summary = {"origin_manifest": digest(manifest), "warm": warm, "expected_origins": len(manifest["origins"]),
-               "completed_origins": len(scores), "failures": failures, "eligible_for_selection": not failures}
+               "completed_origins": len(scores), "failures": failures,
+               "loss_name": runtime.trainer.weather_loss.name,
+               "eligible_for_selection": not failures and bool(scores)}
     if not failures and scores:
         c, b = np.array([s["corrected"] for s in scores]), np.array([s["baseline"] for s in scores])
         summary.update(loss=float(c.mean()), baseline_loss=float(b.mean()), reduction_pct=aggregate_reduction(c, b),
@@ -175,7 +177,8 @@ def select_checkpoint(selection_path, checkpoint, summary, *, split, epoch_or_up
     score = summary["five_day_loss"]
     previous = read_json(path) if path.exists() else None
     if previous is None or score < previous["score"]:
-        write_json(path, {"metric": "cold_5day_neuralgcm_field_normalized_mse", "split": "val",
+        metric = "cold_5day_" + summary.get("loss_name", "neuralgcm_field_normalized_mse")
+        write_json(path, {"metric": metric, "split": "val",
                          "score": score, "checkpoint": str(Path(checkpoint).resolve()),
                          "sha256": sha256(checkpoint), "epoch_or_update": epoch_or_update,
                          "origin_manifest": summary["origin_manifest"]})

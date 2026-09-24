@@ -7,10 +7,10 @@ import jax
 import numpy as np
 from .backbone import FrozenBackbone
 from .data import PreparedStore, require_complete_experiment_data
-from .native_state import NativeAdapter
+from .corrections import make_adapter
 from .features import KnownFeatures
 from .normalization import Normalization
-from .loss import WeatherLoss
+from .loss import make_weather_loss
 from .model import make_branch, zero_memory
 from .kernels import DecodedTrainer, make_optimizer
 from .io import digest, read_json, sha256
@@ -70,7 +70,7 @@ def build_runtime(config, resources, *, stage):
                  and str(t)[:4] == str(t - np.timedelta64(24, "h"))[:4])
     inputs, forcing = store.inputs_and_forcing(backbone.model, valid)
     state = backbone.encode(inputs, forcing)
-    adapter = NativeAdapter(backbone.model, state)
+    adapter = make_adapter(backbone.model, state, config.correction_policy)
     normalization = Normalization.load(resources["statistics"])
     if (normalization.manifest["native_schema_id"] != adapter.identity or
             normalization.manifest["dataset_id"] != store.identity):
@@ -87,7 +87,7 @@ def build_runtime(config, resources, *, stage):
                                 normalization.inputs(adapter.features(state)), known(state, forcing))
     params = jax.tree_util.tree_map(lambda x: x.astype(np.float32), params)
     memory = zero_memory(memory)
-    loss = WeatherLoss(backbone.model.data_coords.horizontal.latitudes,
+    loss = make_weather_loss(config.loss, backbone.model.data_coords.horizontal.latitudes,
                        backbone.model.data_coords.vertical.centers, normalization.manifest["loss_scales"])
     optimizer = make_optimizer(config.pretrain_optimizer if stage == "pretrain" else config.finetune_optimizer)
     trainer = DecodedTrainer(branch, adapter, normalization, backbone, loss, optimizer)
@@ -107,4 +107,8 @@ def runtime_identities(runtime, config, source_id, cache_id=None):
               "source": source_id, "known_features": list(runtime.known.names), "numerical_policy": POLICY}
     if cache_id:
         result["cache"] = cache_id
+    if config.correction_policy != "native_modal_v1":
+        result["correction_policy"] = config.correction_policy
+    if config.loss != "neuralgcm_field_normalized_mse_v1":
+        result["loss"] = config.loss
     return result

@@ -25,8 +25,8 @@ def burn_in(branch, params, memory, rng, backbone, adapter, normalization, known
 
 def episode_gradients(trainer, params, initial_memory, rng, *, backbone, store, known, origin,
                       warm=False, rollout_steps=20):
-    if rollout_steps != 20:
-        raise ValueError("Fine-tuning requires exactly twenty predictions")
+    if rollout_steps not in (2, 20):
+        raise ValueError("Use two predictions for transition smoke or twenty for production")
     memory = zero_memory(initial_memory)
     if warm:
         memory, rng = burn_in(trainer.branch, params, memory, rng, backbone, trainer.adapter,
@@ -48,8 +48,8 @@ def episode_gradients(trainer, params, initial_memory, rng, *, backbone, store, 
         backbone.assert_time(initial_time, physical, lead)
         losses.append(float(value))
         valid_times.append(lead * 6)
-    if valid_times != list(range(6, 121, 6)):
-        raise AssertionError("Forecast valid times differ from 6..120h")
+    if valid_times != list(range(6, 6 * rollout_steps + 1, 6)):
+        raise AssertionError("Forecast valid times differ from the requested six-hour leads")
     if not np.isfinite(losses).all():
         raise FloatingPointError(f"Nonfinite forecast at origin {origin}")
     return {"loss": float(np.mean(losses)), "lead_losses": losses, "memory": stop(memory),
@@ -63,8 +63,9 @@ def run_finetune(runtime, config, output, identities, parent, *, resume=None, va
     if resume is None and output.exists() and any(output.iterdir()):
         raise FileExistsError("Nonempty fine-tuning output requires explicit --resume")
     output.mkdir(parents=True, exist_ok=True)
-    params, parent_info = transfer_parent(parent, {k: identities[k] for k in
-        ("architecture", "backbone", "native_schema", "normalization", "dataset")})
+    transfer_keys = ("architecture", "backbone", "native_schema", "normalization", "dataset",
+                     "config", "source", "numerical_policy", "correction_policy", "loss")
+    params, parent_info = transfer_parent(parent, {k: identities[k] for k in transfer_keys if k in identities})
     identities = dict(identities, parent=parent_info["sha256"])
     optimizer = trainer.optimizer.init(params)
     memory, rng, start = zero_memory(runtime.memory), jax.random.PRNGKey(config.seed), 0
@@ -76,7 +77,7 @@ def run_finetune(runtime, config, output, identities, parent, *, resume=None, va
         if validate and start % config.finetune_validate_every == 0:
             validate(params, Path(resume), start)
     write_json(output / "parent.json", parent_info, immutable=True)
-    origins = seasonal_order(eligible_origins(store.times, "train", 20), seed=config.seed)
+    origins = seasonal_order(eligible_origins(store.times, "train", config.rollout_steps), seed=config.seed)
     if not origins:
         raise ValueError("No eligible training episodes")
     write_json(output / "episode_order.json", {"origins": origins, "alternate_cold_warm": True}, immutable=True)
@@ -84,7 +85,8 @@ def run_finetune(runtime, config, output, identities, parent, *, resume=None, va
         started = time.perf_counter()
         origin, warm = origins[update % len(origins)], bool(update % 2)
         result = episode_gradients(trainer, params, memory, rng, backbone=runtime.backbone,
-                                   store=store, known=runtime.known, origin=origin, warm=warm)
+                                   store=store, known=runtime.known, origin=origin, warm=warm,
+                                   rollout_steps=config.rollout_steps)
         params, optimizer, norm = trainer.checked_update(params, optimizer, result["gradients"])
         rng = result["rng"]
         memory = zero_memory(runtime.memory)  # Episodes are independent.

@@ -16,6 +16,8 @@ def main():
     p.add_argument('--prepared', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--resolution', type=float, choices=(2.8,1.4), default=2.8)
+    p.add_argument('--correction-policy', default='native_modal_v1')
+    p.add_argument('--loss', default='neuralgcm_field_normalized_mse_v1')
     args=p.parse_args()
     from src.models.neuralgcm_residual.numerics import configure_environment
     configure_environment()
@@ -25,12 +27,12 @@ def main():
     from src.models.neuralgcm_residual.backbone import FrozenBackbone
     from src.models.neuralgcm_residual.data import PreparedStore
     from src.models.neuralgcm_residual.cache import live_record, valid_k1_origins
-    from src.models.neuralgcm_residual.native_state import NativeAdapter
+    from src.models.neuralgcm_residual.corrections import make_adapter
     from src.models.neuralgcm_residual.normalization import fit_statistics
     from src.models.neuralgcm_residual.features import KnownFeatures
     from src.models.neuralgcm_residual.config import RunConfig,Architecture
     from src.models.neuralgcm_residual.model import make_branch,zero_memory
-    from src.models.neuralgcm_residual.loss import WeatherLoss
+    from src.models.neuralgcm_residual.loss import make_weather_loss
     from src.models.neuralgcm_residual.kernels import DecodedTrainer,make_optimizer
     from src.models.neuralgcm_residual.checks import tree_comparison,backbone_parameter_digest,TOLERANCES
     from src.models.neuralgcm_residual.io import write_json,sha256
@@ -41,7 +43,7 @@ def main():
     origin=valid_k1_origins(store,'train')[0]
     print('real ERA5 origin',origin,'devices',jax.devices(),flush=True)
     record=live_record(b,store,origin)
-    adapter=NativeAdapter(b.model,record['origin_state'])
+    adapter=make_adapter(b.model,record['origin_state'],args.correction_policy)
     record['target']=store.frame(record['valid'])
     record['truth']=store.frame(origin)
     inputs,f=store.inputs_and_forcing(b.model,record['valid'])
@@ -49,7 +51,8 @@ def main():
     norm=fit_statistics([record],adapter,b.model.data_coords.horizontal.latitudes,
                         dataset_id=store.identity,output=args.output/'pilot_only_statistics.json')
     known=KnownFeatures(b.model)
-    cfg=RunConfig(resolution=args.resolution,architecture=Architecture(width=128 if args.resolution==2.8 else 256,
+    cfg=RunConfig(resolution=args.resolution,correction_policy=args.correction_policy,loss=args.loss,
+                  architecture=Architecture(width=128 if args.resolution==2.8 else 256,
                                                                     d_inner=16 if args.resolution==2.8 else 32))
     branch=make_branch(cfg.architecture,adapter.grid.latitudes,adapter.grid.longitudes,adapter.output_size)
     x=norm.inputs(adapter.features(record['origin_state']))
@@ -59,7 +62,7 @@ def main():
         if 'native_zero_head' in name:
             params[name]=dict(params[name],w=jnp.full_like(params[name]['w'],1e-5),b=jnp.full_like(params[name]['b'],1e-3))
     memory=jax.tree_util.tree_map(lambda x:jnp.full_like(x,1e-3),memory)
-    loss=WeatherLoss(b.model.data_coords.horizontal.latitudes,b.model.data_coords.vertical.centers,norm.manifest['loss_scales'])
+    loss=make_weather_loss(cfg.loss,b.model.data_coords.horizontal.latitudes,b.model.data_coords.vertical.centers,norm.manifest['loss_scales'])
     trainer=DecodedTrainer(branch,adapter,norm,b,loss,make_optimizer(cfg.pretrain_optimizer))
     frozen=backbone_parameter_digest(b.model)
     cached=trainer.record(record['origin_state'],record['baseline_state'],record['forcing'],record['target'],known_input)
