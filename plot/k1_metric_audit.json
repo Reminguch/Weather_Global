@@ -1,0 +1,544 @@
+{
+  "r2p8_w128_di16": {
+    "job_id": "14349822",
+    "checkpoint_sha256": "803b1a647143bbd333c60115dcfe2c516e991a2260509990d7a47e419fc5f7fa",
+    "identities": {
+      "config": "10aa2593449c4b7b4d61d9cd691498d119dbe3b8ad00da1441b9734baeafda3b",
+      "architecture": "c9d9b88c6450bf0f5bde9ab8ddc19bc20e47f1c10fb67585d56148e704b4f0c4",
+      "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+      "native_schema": "cadcf0aac36de426e3ae9745e73e917a62c8209adb4482e727ca200f98ddb113",
+      "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+      "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+      "source": "02afdad970c37dec9cc67b34a780be0621aba1f24f8773e7917a7ad2aeee2ec1",
+      "known_features": [
+        "checkpoint_surface_geopotential_scaled",
+        "checkpoint_land_sea_mask",
+        "sin_longitude",
+        "cos_longitude",
+        "sin_latitude",
+        "cos_latitude",
+        "lagged_sst_scaled",
+        "lagged_sea_ice",
+        "sin_year",
+        "cos_year",
+        "sin_day",
+        "cos_day"
+      ],
+      "numerical_policy": {
+        "version": "fp32_deterministic_v1",
+        "matmul_precision": "highest",
+        "x64": false,
+        "xla_gpu_exclude_nondeterministic_ops": true
+      },
+      "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f"
+    },
+    "script_sha256": "b766f0ce4e1db385655f9e888786a73e98cda2f8245b4d10030ae823bf6445c0",
+    "devices": [
+      "NVIDIA A100-SXM4-80GB"
+    ],
+    "production_checkpoint_unchanged": true,
+    "frozen_backbone_unchanged": true,
+    "audit": {
+      "records": 1455,
+      "stored": {
+        "loss": 16419.299371107172,
+        "records": 1455
+      },
+      "recomputed_loss": 16419.29953621671,
+      "original_baseline": {
+        "loss": 20832.350542310996,
+        "records": 1455
+      },
+      "recomputed_baseline": 20832.350542310996,
+      "fields_mean": {
+        "temperature": [
+          0.11547445468476548,
+          0.6997882512836522
+        ],
+        "geopotential": [
+          0.7019347049935987,
+          72.67201104967045
+        ],
+        "u_component_of_wind": [
+          0.15614628218805668,
+          0.2197147652967689
+        ],
+        "v_component_of_wind": [
+          0.10546345297516006,
+          0.13808608408953316
+        ],
+        "specific_humidity": [
+          0.3028719200096589,
+          0.4814933811471225
+        ],
+        "specific_cloud_ice_water_content": [
+          4363.42842468052,
+          3215.7178316621025
+        ],
+        "specific_cloud_liquid_water_content": [
+          141461.6370972938,
+          111645.16251610825
+        ]
+      },
+      "numpy_checks": [
+        {
+          "index": 0,
+          "origin": "2022-01-02T00",
+          "original": 18471.83984375,
+          "numpy_float64": 18471.840093600713,
+          "fields": {
+            "temperature": 0.6474185435521265,
+            "geopotential": 69.03879683147224,
+            "u_component_of_wind": 0.216211013672589,
+            "v_component_of_wind": 0.1349295552100031,
+            "specific_humidity": 0.40888711363476427,
+            "specific_cloud_ice_water_content": 4019.991606488538,
+            "specific_cloud_liquid_water_content": 125212.4428056589
+          }
+        },
+        {
+          "index": 207,
+          "origin": "2022-02-22T18",
+          "original": 16235.4619140625,
+          "numpy_float64": 16235.461956768531,
+          "fields": {
+            "temperature": 0.6337714556297038,
+            "geopotential": 70.18775089275714,
+            "u_component_of_wind": 0.25214961815614273,
+            "v_component_of_wind": 0.15393189902945337,
+            "specific_humidity": 0.49206780268299255,
+            "specific_cloud_ice_water_content": 2858.272449236637,
+            "specific_cloud_liquid_water_content": 110718.24157647483
+          }
+        },
+        {
+          "index": 415,
+          "origin": "2022-04-15T18",
+          "original": 15371.5419921875,
+          "numpy_float64": 15371.542267968336,
+          "fields": {
+            "temperature": 0.6661836860056588,
+            "geopotential": 70.78211134588663,
+            "u_component_of_wind": 0.2393134229499691,
+            "v_component_of_wind": 0.1505425323899791,
+            "specific_humidity": 0.5198707800582322,
+            "specific_cloud_ice_water_content": 3068.2079687058285,
+            "specific_cloud_liquid_water_content": 104460.22988530523
+          }
+        },
+        {
+          "index": 623,
+          "origin": "2022-06-06T18",
+          "original": 14230.4013671875,
+          "numpy_float64": 14230.402293715862,
+          "fields": {
+            "temperature": 0.7340618784063357,
+            "geopotential": 74.09779901520083,
+            "u_component_of_wind": 0.2491601651611991,
+            "v_component_of_wind": 0.16073382535777603,
+            "specific_humidity": 0.5517003866302075,
+            "specific_cloud_ice_water_content": 2623.355777653566,
+            "specific_cloud_liquid_water_content": 96913.66682308672
+          }
+        },
+        {
+          "index": 830,
+          "origin": "2022-07-28T12",
+          "original": 17569.44140625,
+          "numpy_float64": 17569.44238354714,
+          "fields": {
+            "temperature": 0.7302414449140682,
+            "geopotential": 75.38934555327187,
+            "u_component_of_wind": 0.1996392389446351,
+            "v_component_of_wind": 0.1217813911320048,
+            "specific_humidity": 0.48266498690109866,
+            "specific_cloud_ice_water_content": 3626.432964257158,
+            "specific_cloud_liquid_water_content": 119282.74004795765
+          }
+        },
+        {
+          "index": 1038,
+          "origin": "2022-09-18T12",
+          "original": 17209.8515625,
+          "numpy_float64": 17209.851611306796,
+          "fields": {
+            "temperature": 0.7288486426687375,
+            "geopotential": 75.70336424257805,
+            "u_component_of_wind": 0.1867674972951166,
+            "v_component_of_wind": 0.1220167668944028,
+            "specific_humidity": 0.44787669019218235,
+            "specific_cloud_ice_water_content": 3800.490658811969,
+            "specific_cloud_liquid_water_content": 116591.28174649597
+          }
+        },
+        {
+          "index": 1246,
+          "origin": "2022-11-09T12",
+          "original": 14956.25,
+          "numpy_float64": 14956.249003716732,
+          "fields": {
+            "temperature": 0.6817144568728787,
+            "geopotential": 73.77752546329387,
+            "u_component_of_wind": 0.17685086083480833,
+            "v_component_of_wind": 0.10935100206166412,
+            "specific_humidity": 0.3923027146788584,
+            "specific_cloud_ice_water_content": 2872.3113520779807,
+            "specific_cloud_liquid_water_content": 101746.2939294414
+          }
+        },
+        {
+          "index": 1454,
+          "origin": "2022-12-31T12",
+          "original": 16836.126953125,
+          "numpy_float64": 16836.12769542836,
+          "fields": {
+            "temperature": 0.6416575824442723,
+            "geopotential": 70.29656801654642,
+            "u_component_of_wind": 0.20139400198130675,
+            "v_component_of_wind": 0.111716768185632,
+            "specific_humidity": 0.389117806763748,
+            "specific_cloud_ice_water_content": 2925.6521691584535,
+            "specific_cloud_liquid_water_content": 114855.60124466414
+          }
+        }
+      ],
+      "live_cache_checks": [
+        {
+          "origin": "2022-01-02T00",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-02-22T18",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-04-15T18",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-06-06T18",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-07-28T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-09-18T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-11-09T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-12-31T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        }
+      ]
+    }
+  },
+  "r2p8_w256_di32": {
+    "job_id": "14349823",
+    "checkpoint_sha256": "329e95aa102974239909af8ce5e2ae1bc9e7aa061a357142740f3fc452e1cf26",
+    "identities": {
+      "config": "79e8a9d98bc63fc5f94d579aea28f029c3b0d30e80e55cd4c55e35bbba6cb3b2",
+      "architecture": "297476b6ee6edecf970c9ef6bfa71f5f5324d76570fb53e6b96341dbc7057324",
+      "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+      "native_schema": "cadcf0aac36de426e3ae9745e73e917a62c8209adb4482e727ca200f98ddb113",
+      "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+      "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+      "source": "02afdad970c37dec9cc67b34a780be0621aba1f24f8773e7917a7ad2aeee2ec1",
+      "known_features": [
+        "checkpoint_surface_geopotential_scaled",
+        "checkpoint_land_sea_mask",
+        "sin_longitude",
+        "cos_longitude",
+        "sin_latitude",
+        "cos_latitude",
+        "lagged_sst_scaled",
+        "lagged_sea_ice",
+        "sin_year",
+        "cos_year",
+        "sin_day",
+        "cos_day"
+      ],
+      "numerical_policy": {
+        "version": "fp32_deterministic_v1",
+        "matmul_precision": "highest",
+        "x64": false,
+        "xla_gpu_exclude_nondeterministic_ops": true
+      },
+      "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f"
+    },
+    "script_sha256": "b766f0ce4e1db385655f9e888786a73e98cda2f8245b4d10030ae823bf6445c0",
+    "devices": [
+      "NVIDIA A100-SXM4-80GB"
+    ],
+    "production_checkpoint_unchanged": true,
+    "frozen_backbone_unchanged": true,
+    "audit": {
+      "records": 1455,
+      "stored": {
+        "loss": 15454.734744818514,
+        "records": 1455
+      },
+      "recomputed_loss": 15454.73474146263,
+      "original_baseline": {
+        "loss": 20832.350542310996,
+        "records": 1455
+      },
+      "recomputed_baseline": 20832.350542310996,
+      "fields_mean": {
+        "temperature": [
+          0.11547445468476548,
+          0.9237792248578416
+        ],
+        "geopotential": [
+          0.7019347049935987,
+          131.1553139440792
+        ],
+        "u_component_of_wind": [
+          0.15614628218805668,
+          0.24284872489491688
+        ],
+        "v_component_of_wind": [
+          0.10546345297516006,
+          0.14876240309059005
+        ],
+        "specific_humidity": [
+          0.3028719200096589,
+          0.5153457155547191
+        ],
+        "specific_cloud_ice_water_content": [
+          4363.42842468052,
+          3031.3356022471007
+        ],
+        "specific_cloud_liquid_water_content": [
+          141461.6370972938,
+          105018.81639282645
+        ]
+      },
+      "numpy_checks": [
+        {
+          "index": 0,
+          "origin": "2022-01-02T00",
+          "original": 17483.19921875,
+          "numpy_float64": 17483.19844921871,
+          "fields": {
+            "temperature": 0.8545151343313387,
+            "geopotential": 118.1527262008829,
+            "u_component_of_wind": 0.23042487396197636,
+            "v_component_of_wind": 0.13954792509736388,
+            "specific_humidity": 0.42831202136806645,
+            "specific_cloud_ice_water_content": 3798.3635870883713,
+            "specific_cloud_liquid_water_content": 118464.22003128697
+          }
+        },
+        {
+          "index": 207,
+          "origin": "2022-02-22T18",
+          "original": 15299.39453125,
+          "numpy_float64": 15299.394041250705,
+          "fields": {
+            "temperature": 0.7833801678654767,
+            "geopotential": 121.38260493820255,
+            "u_component_of_wind": 0.27281509089437217,
+            "v_component_of_wind": 0.16088734222885887,
+            "specific_humidity": 0.5151584537811252,
+            "specific_cloud_ice_water_content": 2678.8615121635276,
+            "specific_cloud_liquid_water_content": 104293.78193059843
+          }
+        },
+        {
+          "index": 415,
+          "origin": "2022-04-15T18",
+          "original": 14472.732421875,
+          "numpy_float64": 14472.732910328396,
+          "fields": {
+            "temperature": 0.849653981299553,
+            "geopotential": 126.18257886246593,
+            "u_component_of_wind": 0.2663844846765682,
+            "v_component_of_wind": 0.1614841762289997,
+            "specific_humidity": 0.5476759090419892,
+            "specific_cloud_ice_water_content": 2885.5029102147173,
+            "specific_cloud_liquid_water_content": 98295.61968467034
+          }
+        },
+        {
+          "index": 623,
+          "origin": "2022-06-06T18",
+          "original": 13505.0029296875,
+          "numpy_float64": 13505.002320989763,
+          "fields": {
+            "temperature": 0.9811645411596241,
+            "geopotential": 133.17001133542428,
+            "u_component_of_wind": 0.26973928282249054,
+            "v_component_of_wind": 0.1714554950815906,
+            "specific_humidity": 0.5900912698020584,
+            "specific_cloud_ice_water_content": 2464.9333848691176,
+            "specific_cloud_liquid_water_content": 91934.90040013492
+          }
+        },
+        {
+          "index": 830,
+          "origin": "2022-07-28T12",
+          "original": 16532.17578125,
+          "numpy_float64": 16532.17490766742,
+          "fields": {
+            "temperature": 1.004932751288768,
+            "geopotential": 139.3794640115991,
+            "u_component_of_wind": 0.2285264500050999,
+            "v_component_of_wind": 0.13767870713405583,
+            "specific_humidity": 0.5371052461911052,
+            "specific_cloud_ice_water_content": 3468.440111690399,
+            "specific_cloud_liquid_water_content": 112115.49653481533
+          }
+        },
+        {
+          "index": 1038,
+          "origin": "2022-09-18T12",
+          "original": 16079.6572265625,
+          "numpy_float64": 16079.655958222356,
+          "fields": {
+            "temperature": 0.9474631294795833,
+            "geopotential": 136.59073225966262,
+            "u_component_of_wind": 0.21014083689918123,
+            "v_component_of_wind": 0.13408518531998426,
+            "specific_humidity": 0.4821993937586136,
+            "specific_cloud_ice_water_content": 3570.3354016490857,
+            "specific_cloud_liquid_water_content": 108848.8916851023
+          }
+        },
+        {
+          "index": 1246,
+          "origin": "2022-11-09T12",
+          "original": 14018.3740234375,
+          "numpy_float64": 14018.37468360263,
+          "fields": {
+            "temperature": 0.9089158679677964,
+            "geopotential": 133.5015080758107,
+            "u_component_of_wind": 0.19507826740385226,
+            "v_component_of_wind": 0.11887174111880346,
+            "specific_humidity": 0.4166082159139711,
+            "specific_cloud_ice_water_content": 2706.288481727455,
+            "specific_cloud_liquid_water_content": 95287.19332132275
+          }
+        },
+        {
+          "index": 1454,
+          "origin": "2022-12-31T12",
+          "original": 15868.1669921875,
+          "numpy_float64": 15868.167283456398,
+          "fields": {
+            "temperature": 0.8658925112843118,
+            "geopotential": 124.9513557266921,
+            "u_component_of_wind": 0.22275051245603783,
+            "v_component_of_wind": 0.11856995897870777,
+            "specific_humidity": 0.41194811704654405,
+            "specific_cloud_ice_water_content": 2759.7191426681543,
+            "specific_cloud_liquid_water_content": 108190.88132470018
+          }
+        }
+      ],
+      "live_cache_checks": [
+        {
+          "origin": "2022-01-02T00",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-02-22T18",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-04-15T18",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-06-06T18",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-07-28T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-09-18T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-11-09T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        },
+        {
+          "origin": "2022-12-31T12",
+          "max_abs_difference": {
+            "origin_state": 0.0,
+            "baseline_state": 0.0,
+            "forcing": 0.0
+          }
+        }
+      ]
+    }
+  }
+}

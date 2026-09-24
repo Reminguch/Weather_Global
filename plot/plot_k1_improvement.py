@@ -12,7 +12,7 @@ from pathlib import Path
 import tempfile
 
 
-STEM = "k1_improvement_vs_training_time"
+STEM = "k1_improvement_vs_training_step"
 RUNS = (
     "r2p8_w128_di16", "r2p8_w128_di32",
     "r2p8_w256_di16", "r2p8_w256_di32",
@@ -36,6 +36,7 @@ def snapshot(root, output):
         "source_id": manifest["source_id"],
         "improvement_definition": "100 * (1 - residual_ngcm_loss / ngcm_loss)",
         "time_definition": "sum(metrics.jsonl seconds through checkpoint update) / 3600",
+        "plotted_x_axis": "checkpoint optimizer update count (training step)",
         "baseline_definition": "epoch 0, exactly zero residual output head",
         "runs": {},
     }
@@ -131,84 +132,65 @@ def draw(output):
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        from matplotlib.ticker import MultipleLocator, PercentFormatter
+        from matplotlib.ticker import MultipleLocator
 
         with (output / f"{STEM}.csv").open(newline="") as stream:
             rows = list(csv.DictReader(stream))
         styles = (
-            ("#0072B2", "o", "-", -14),
-            ("#D55E00", "s", "--", -6),
-            ("#009E73", "^", "-", -14),
-            ("#9B59A1", "D", "--", 8),
+            ("#0072B2", "o", "-"), ("#D55E00", "s", "--"),
+            ("#009E73", "^", "-"), ("#9B59A1", "D", "--"),
         )
         plt.rcParams.update({
-            "font.family": "DejaVu Sans", "font.size": 11,
-            "axes.labelsize": 12, "axes.edgecolor": "#AAB2BC",
-            "text.color": "#202A35", "axes.labelcolor": "#202A35",
-            "xtick.color": "#46515D", "ytick.color": "#46515D",
-            "pdf.fonttype": 42, "ps.fonttype": 42, "svg.fonttype": "none",
-            "svg.hashsalt": "ngcm-k1-training-time",
+            "font.family": "serif", "font.serif": ["DejaVu Serif"], "font.size": 9,
+            "mathtext.fontset": "dejavuserif", "axes.labelsize": 10,
+            "axes.linewidth": 0.7, "pdf.fonttype": 42, "ps.fonttype": 42,
+            "svg.fonttype": "none", "svg.hashsalt": "ngcm-k1-training-step",
         })
-        fig, ax = plt.subplots(figsize=(9, 5.8))
-        fig.subplots_adjust(left=0.105, right=0.96, bottom=0.205, top=0.82)
-        fig.text(0.105, 0.935, "Residual NGCM over NGCM", fontsize=18, weight="bold")
-        records = {int(r["validation_records"]) for r in rows}
-        if len(records) != 1:
+        fig, ax = plt.subplots(figsize=(4.8, 3.35))
+        fig.subplots_adjust(left=0.145, right=0.975, bottom=0.16, top=0.975)
+        if len({int(r["validation_records"]) for r in rows}) != 1:
             raise ValueError("Mixed validation sample counts")
-        fig.text(0.105, 0.885,
-                 f"K = 1 (6-hour) validation  |  2.8° resolution  |  {records.pop():,} samples from 2022",
-                 fontsize=10.5, color="#5B6571")
-        xmax, ymax, ymin = 0.0, 0.0, 0.0
-        for run_id, (color, marker, linestyle, offset) in zip(RUNS, styles):
+        xmax, ymax, ymin = 0, 0.0, 0.0
+        for run_id, (color, marker, linestyle) in zip(RUNS, styles):
             points = sorted((r for r in rows if r["run_id"] == run_id), key=lambda r: int(r["epoch"]))
             if not points:
                 raise ValueError(f"Missing series: {run_id}")
-            x = [float(r["training_hours"]) for r in points]
+            x = [int(r["update"]) for r in points]
             y = [float(r["improvement_pct"]) for r in points]
             for row, value in zip(points, y):
                 expected = 100 * (1 - float(row["residual_ngcm_loss"]) / float(row["ngcm_loss"]))
                 if not math.isclose(value, expected, abs_tol=1e-10):
                     raise ValueError("CSV improvement is inconsistent with losses")
             if x[0] != 0 or y[0] != 0 or any(b <= a for a, b in zip(x, x[1:])):
-                raise ValueError("Expected zero initial improvement and increasing training times")
+                raise ValueError("Expected zero initial improvement and increasing training steps")
             width, inner = run_id.split("_")[1:]
-            label = f"w = {width[1:]}, di = {inner[2:]}"
+            label = rf"$w={width[1:]},\ d_{{\mathrm{{inner}}}}={inner[2:]}$"
             ax.plot(x, y, label=label, color=color, marker=marker, linestyle=linestyle,
-                    linewidth=2.2, markersize=5.8, markeredgecolor="white", markeredgewidth=0.7)
-            ax.annotate(f"{y[-1]:.1f}%", xy=(x[-1], y[-1]), xytext=(9, offset),
-                        textcoords="offset points", color=color, weight="bold", fontsize=10.5,
-                        va="center")
+                    linewidth=1.4, markersize=4, markeredgecolor="white", markeredgewidth=0.4)
             xmax, ymax, ymin = max(xmax, max(x)), max(ymax, max(y)), min(ymin, min(y))
-        ax.axhline(0, color="#8C97A3", linewidth=1, linestyle=(0, (3, 3)), zorder=0)
-        ax.set(xlabel="Training time (hours)", ylabel="Improvement over NGCM (%)",
-               xlim=(-0.04, xmax * 1.14), ylim=(min(-0.7, ymin - 1), max(30, ymax + 4)))
-        ax.xaxis.set_major_locator(MultipleLocator(0.5))
+        ax.axhline(0, color="#999999", linewidth=0.6, linestyle=(0, (3, 3)), zorder=0)
+        ax.set(xlabel="Training step", ylabel="Improvement over NGCM (%)",
+               xlim=(-35, xmax * 1.035), ylim=(min(-0.7, ymin - 1), max(28, ymax + 2)))
+        ax.xaxis.set_major_locator(MultipleLocator(500))
         ax.yaxis.set_major_locator(MultipleLocator(5))
-        ax.yaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
         ax.spines[["top", "right"]].set_visible(False)
-        ax.grid(axis="y", color="#E2E7EC", linewidth=0.8)
+        ax.grid(axis="y", color="#E4E4E4", linewidth=0.5)
         ax.set_axisbelow(True)
-        ax.tick_params(length=3.5)
-        ax.legend(loc="upper left", ncol=2, frameon=False, fontsize=10,
-                  handlelength=2.8, columnspacing=1.8)
-        fig.text(0.105, 0.09,
-                 "Improvement = 100 × (1 − residual NGCM loss / NGCM loss)", fontsize=10,
-                 color="#46515D")
-        fig.text(0.105, 0.052,
-                 "Cumulative logged training time; validation and queue time excluded. Dots mark completed epochs.",
-                 fontsize=9, color="#65717E")
+        ax.tick_params(length=3, width=0.7, direction="out")
+        ax.legend(loc="upper left", frameon=False, fontsize=8,
+                  handlelength=2.3, labelspacing=0.35, borderaxespad=0.35)
         for extension in ("png", "pdf", "svg"):
             metadata = {"CreationDate": None} if extension == "pdf" else None
             if extension == "svg":
                 metadata = {"Date": None}
             path = output / f"{STEM}.{extension}"
-            fig.savefig(path, dpi=240, facecolor="white", metadata=metadata)
+            fig.savefig(path, dpi=300, facecolor="white", metadata=metadata)
             if extension == "svg":
                 path.write_text("\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n")
         plt.close(fig)
     for run_id in RUNS:
         last = max((r for r in rows if r["run_id"] == run_id), key=lambda r: int(r["epoch"]))
-        print(f"{run_id}: epoch {last['epoch']}, {float(last['training_hours']):.3f} h, "
+        print(f"{run_id}: epoch {last['epoch']}, training step {last['update']}, "
               f"{float(last['improvement_pct']):.2f}% improvement")
 
 

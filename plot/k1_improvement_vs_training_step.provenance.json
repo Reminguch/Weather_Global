@@ -353,5 +353,6 @@
     "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
     "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
     "source": "02afdad970c37dec9cc67b34a780be0621aba1f24f8773e7917a7ad2aeee2ec1"
-  }
+  },
+  "plotted_x_axis": "checkpoint optimizer update count (training step)"
 }
