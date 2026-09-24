@@ -1,159 +1,182 @@
-# NeuralGCM with an added residual head: initial 12 h training
+# Frozen NeuralGCM with Residual Mamba: matched K=1 and K=2
 
-**User direction, September 24, 2026:** keep the experiment as close as possible
-to the original deterministic NeuralGCM and add our residual head. Start with
-K=2, a 12 h forecast made of two consecutive six-hour correction intervals.
+**Latest user direction, September 24, 2026:** freeze NeuralGCM, train only our
+residual head, and compare K=1 (6 h) with K=2 (12 h). Cross-step differentiation
+through Mamba memory is sufficient. The physical solver remains outside the
+backward pass. We do not require the unpublished original training gin bindings.
 
-**Status:** this is the revised experiment specification. It is not an activated
-training configuration or evidence that the complete paper loss and full
-physical-state backward pass have been implemented. Existing v2 checkpoints,
-plots and immutable jobs retain their historical definitions.
+**Status:** implemented in a separate training entry point. The independent
+real-data GPU pilot passed. Detailed numerical and training-lifecycle tests are
+being run before the new training matrix. See the
+[smoke-test report](PAPER_LOSS_SMOKE_20260924.md) for measured results and job IDs.
+Historical v2 checkpoints and plots retain their original loss definition.
 
-This direction replaces the proposed equal-variable objective as the primary
-next experiment. It also replaces the original plan to require cached K=1
-pretraining before the new experiment's live training. The earlier six-hour
-normalizations and stop-gradient physical feedback are historical variants,
-not the target protocol below.
+This document supersedes its earlier full-solver-gradient proposal. It also
+supersedes the equal-variable proposal as the primary next experiment. The
+implementation is a **documented reconstruction of the public five-term loss**,
+not a claim to reproduce unavailable original training bindings.
 
-## What “12 h per update” means
+## What K and the training update mean
 
-The paper's Supplementary Table 5 (Table 5 in the arXiv HTML) starts both the
-2.8-degree and 1.4-degree deterministic models at a **12 h unroll length**.
-It changes to 24 h at optimizer step 2,000, then progressively extends to
-36, 48, 60 and 72 h. Twelve hours is the initial forecast horizon, not the
-integrator timestep, the loss-normalization interval, or a permanent training
-horizon. The 0.7-degree model has a different curriculum, beginning at 6 h.
+An episode starts from one ERA5 origin and zero residual memory. For each of K
+steps, the frozen model advances six physical hours, the residual branch adds a
+native-state increment, and the corrected state becomes the next forecast's
+input. ERA5 does not replace the intermediate prediction. Parameters remain
+fixed during the episode. One optimizer update aggregates two independent
+origins and all their forecast leads.
 
-For our initial K=2 experiment, one optimizer update processes a batch of
-complete 12 h trajectories. Within a trajectory:
+| Setting | K=1 | K=2 |
+| --- | --- | --- |
+| Forecast outputs scored | +6 h | +6 h and +12 h |
+| Residual injections per episode | 1 | 2 |
+| Physical forecast horizon | 6 h | 12 h |
+| Independent origins per optimizer update | 2 | 2 |
+| Normalization difference interval | 24 h | 24 h |
 
-1. Encode ERA5 at the forecast origin once and initialize the residual memory.
-2. Advance the original NeuralGCM for 6 h, apply the residual increment, and
-   retain the corrected native state and residual memory.
-3. Advance that corrected state for another 6 h and apply the second increment.
-   Do not replace the 6 h state with ERA5.
-4. Evaluate the trajectory objective using the 6 h and 12 h predictions and
-   matching ERA5 targets, including the native and decoded representations.
-5. Differentiate the batch objective through the whole trajectory and perform
-   one optimizer update. The residual parameters stay fixed during both steps.
+The selected checkpoint's internal timestep is one hour. Six hours is our
+residual injection interval. Twelve hours in the paper is an initial training
+trajectory length. Neither is the optimizer's wall-clock update interval.
+The paper starts its 2.8°/1.4° curriculum at 12 h and extends to 24 h at optimizer
+step 2,000. Our matched experiment compares two fixed short horizons for the
+initial 2,000 updates. It does not implement the paper's entire curriculum.
 
-If the batch contains B forecast origins, one optimizer update uses B distinct
-12 h trajectories. K=2 does not specify B. Origins may be sampled independently;
-the next optimizer update need not start where the previous forecast ended.
+## Frozen model and gradient contract
 
-The original solver keeps its checkpoint-defined internal timesteps and
-learned-physics schedule. Our six-hour residual injection interval is an added
-interface choice, not a claim about the original learned-physics update rate.
-
-## Trainable parameters and gradient paths
-
-The pretrained encoder, dynamics, learned physics and decoder remain the
-reference NeuralGCM. Only residual-head parameters are optimized. Frozen
-parameters are constants for optimization; derivatives with respect to their
-inputs must still propagate.
-
-The 12 h loss must reach the first residual increment through the intervening
-six-hour physical integration, as well as through the recurrent memory and
-the next residual input features. All of these paths are part of the new
-backward pass. The current host-tape reverse pass carries only memory
-cotangents and cannot implement this by changing K alone. Removing one
-`stop_gradient` is also insufficient.
-
-Use gradient checkpointing/recomputation to manage activation memory, preserving
-the differentiated function. Independent training episodes reset physical
-initial conditions and memory. Any later observed-history memory initialization
-is a separately recorded extension. Existing K=1 cache/statistics can support
-diagnostics but cannot substitute for the second live forecast or supply the
-missing solver-state derivatives.
-
-Zero residual output must recover the frozen NeuralGCM trajectory and decoded
-predictions. Original numerics, grids, units, state carry, encoder and decoder
-must be preserved. The existing pressure and degree-zero increment restrictions
-are properties of our residual interface, not original NeuralGCM loss terms.
-Their compatibility with the original state constraints must be recorded; neither
-their removal nor a new clipping/filtering rule follows automatically from this
-change in objective and gradients.
-
-## Objective to align
-
-Use the deterministic paper's main-stage objective as the reference:
+The encoder, dynamics, learned physics and decoder parameters are frozen.
+Only Residual Mamba parameters appear in the optimizer state.
 
 ```text
-L = 20 * M_data + M_model
-    + 0.1 * (M_data_spectrum + M_model_spectrum)
-    + 2 * M_bias
+baseline[k+1] = stop_gradient(NGCM_6h(stop_gradient(state[k])))
+(delta[k+1], memory[k+1]) = ResidualMamba(
+    theta, memory[k], stop_gradient(features(state[k])), known_inputs[k])
+state[k+1] = apply_increment(baseline[k+1], scale_increment(delta[k+1]))
+prediction[k+1] = frozen_decoder(state[k+1])
 ```
 
-Data and model accuracy terms use the paper's lead-dependent filtering in
-pressure and sigma representations. Spectrum terms compare spectral amplitudes.
-Bias aggregation occurs across the specified batch and forecast-time axes
-before squaring. In particular, averaging independent per-example squared
-bias losses is not equivalent to a squared batch-mean bias.
+The loss differentiates through the current residual increment and the frozen
+decoder's **input**, and through the residual memory recurrence. It does not
+propagate through a subsequent physical integration or the next step's physical
+features. The next step still consumes the corrected state in its forward
+calculation. Frozen parameters and stopped state derivatives are separate choices;
+both are intentional here, following the user's explicit correction.
 
-Use 24 h ERA5 differences for loss scales, pooled across levels except for
-specific humidity, with the paper's amplitude factors (Z=2, q=0.66,
-cloud species=0.05, internal log surface pressure=5). Apply the documented
-lead-dependent scaling separately for the relevant terms. A 12 h training
-horizon does **not** change the normalization interval to 12 h.
+The batch/time objective is differentiated jointly, then its cotangents are
+passed backwards through the residual recurrence. This preserves the coupled
+batch-bias derivative. Summing independently computed per-example losses would
+not implement that derivative.
 
-Do not silently retain the custom pressure-proportional level weighting,
-seven-field average, six-hour scale floors or RMS-of-per-level-STD pooling
-under an “original NeuralGCM loss” label. Do not substitute the proposed
-equal-baseline-error normalization for the paper objective.
+## Implemented five-term loss
 
-The vendored reference code provides transformed L2, spectrum, batch-bias and
-scaling components. The inspected inference configs do not establish the full
-original training-loss bindings. Exact variable/level selection, reductions,
-normalization constants, native target construction, filter parameters and
-initial-time treatment still require a recorded reference configuration and
-numerical checks. Code defaults alone are not evidence of the paper's bindings.
-Where exact original artifacts are unavailable, disclose the reconstruction
-and its differences rather than claiming exact reproduction.
+```text
+L = 20 M_data + M_model
+    + 0.1 M_data_spectrum + 0.1 M_model_spectrum + 2 M_bias
+```
 
-## Other comparisons that must remain explicit
+- **Data accuracy:** decoded pressure-level prediction versus ERA5, using the
+  squared spherical norm of the scaled and filtered modal error.
+- **Model accuracy:** corrected native state versus the frozen encoder's ERA5
+  representation, with the corresponding modal norm.
+- **Two spectrum losses:** compare square roots of summed squared modal
+  coefficients over zonal wavenumber, retaining total wavenumbers 0–42.
+- **Data bias:** average modal-amplitude errors across batch and forecast time
+  **before squaring**. This follows the public `BatchMeanSquaredBias` default
+  `abs(modal)`. The displayed paper equation can be read as signed coefficients;
+  the amplitude choice is explicitly recorded rather than left implicit.
 
-- The paper trains NeuralGCM parameters; our experiment trains an added head on
-  a frozen pretrained model. This is the intended intervention.
-- The user-selected split remains 2015–2021 training, 2022 validation and 2023
-  test. It differs from the original model's training data. Fit any new loss
-  statistics only on the selected training split and share them across arms.
-- The paper uses Adam with beta1=0.9, beta2=0.95 and epsilon=1e-6. Its 2.8-degree
-  peak learning rate is 0.002 with a 2,000-step warmup. Current residual AdamW
-  settings are different. Record the chosen optimizer, batch size and schedule
-  explicitly; the paper's settings do not demonstrate an optimal learning rate
-  for our head.
-- Start directly with live K=2 and a fresh zero-output head. The later choice
-  to extend the horizon is separate from validating this initial stage. Staying
-  at K=2 for the entire experiment would differ from the full paper curriculum.
-- The paper's separate decoder fine-tuning stage is not automatically included
-  when the intended trainable component is only our residual head.
+Modal norms are divided by the sphere area. Fields are summed, levels are
+uniformly averaged, and batch/time accuracy and spectrum terms are averaged.
+No pressure-proportional level weights or seven-variable average are retained.
+The initial analysis is excluded from scoring.
 
-## Initial verification
+Data fields are temperature, geopotential, eastward/northward wind, specific
+humidity, cloud ice and cloud liquid water, on all 37 pressure levels. Native
+fields are temperature variation, vorticity, divergence, specific humidity,
+cloud ice, cloud liquid water and log surface pressure, on 32 sigma levels
+(surface pressure has one level).
 
-Run an independent representative-ERA5 GPU smoke before relying on full new
-training statistics. Use Slurm `--qos=gpu-test`, a GPU request, no explicit
-partition, and at most one hour. Keep pilot statistics and outputs separate.
+### Scales and cloud weights
 
-Verify zero-head baseline identity; the loss against reference components;
-the 12 h loss derivative with respect to the first increment using a nonzero
-perturbation; finite gradients and an actual residual-parameter update; frozen
-backbone parameters; and that the second forecast consumes the corrected first
-state. Measure memory and elapsed time rather than assuming full gradients
-are infeasible. A diagnostic loss used only for gradient checks must be labeled
-as such and cannot certify paper-loss parity or production training.
+Each loss field is divided by its training-only **24 h difference standard
+deviation**, estimated from 60 selected training snapshots spanning 2015–2021.
+Population moments pool samples, horizontal points and levels, except specific
+humidity, whose scales remain per level. Pooling includes between-sample mean
+shifts. Degenerate scales fail validation; no arbitrary scale floor is added.
+Statistics use uniform gridpoint moments. Spherical loss norms and physical
+verification use their own proper area weighting.
 
-Report training curves against optimizer updates and physical-unit errors
-separately at 6 h and 12 h. Baseline and residual use identical forecast origins,
-truth, loss constants and verification grids. Report each of the five loss
-terms and their variable contributions alongside aggregate scores.
+Multiplicative amplitude factors applied **before squaring** are:
 
-## References and implementation locations
+| Variable | Amplitude | Corresponding squared factor |
+| --- | ---: | ---: |
+| Geopotential | 2 | 4 |
+| Specific humidity | 0.66 | 0.4356 |
+| Each cloud species | 0.05 | 0.0025 |
+| Native log surface pressure | 5 | 25 |
+| Other fields | 1 | 1 |
 
-- [Paper training and curriculum, Sections 7.1–7.2 / Supplement G.1–G.2](https://arxiv.org/html/2311.07222v3#S7.SS1)
-- [Paper rescaling and losses, Sections 7.3–7.5 / Supplement G.3–G.5](https://arxiv.org/html/2311.07222v3#S7.SS3)
-- [Current gradient kernels](../../../src/models/neuralgcm_residual/kernels.py)
-- [Current live rollout](../../../src/models/neuralgcm_residual/finetune.py)
-- [Current locked configuration](../../../src/models/neuralgcm_residual/config.py)
-- [Reference metric implementations](../../../third_party/neuralgcm/neuralgcm/reference_code/metrics.py)
-- [Reference transforms](../../../third_party/neuralgcm/neuralgcm/reference_code/linear_transforms.py)
-- [Historical normalization audit](../../../plot/loss_alignment_audit_20260924/README.md)
+Thus this is not an equal-variable objective. In particular, cloud amplitude
+0.05 means an MSE multiplier of 0.0025, not 0.05. Input-feature and native-increment
+normalization remain separate from these new loss scales.
+
+Accuracy and bias amplitudes have time factor `(1 + lead_hours/24)^(-1/2)`.
+Spectrum amplitudes use `(1 + (lead_hours/40)^4)^(-1/2)`.
+
+### Explicit reconstruction choices
+
+The public paper describes order-12 filtering fitted to relative HRES error.
+Those original bindings are unavailable. For these short 6/12 h forecasts we
+record `exp(-log(2) * (l/120)^24)`, with half amplitude at wavenumber 120,
+for both spaces and leads. On the selected grid (maximum wavenumber 64), this
+is almost identity. This is an approximation, not the fitted original filter.
+
+Native **scale statistics** use physical pressure-to-sigma interpolation and
+wind-to-vorticity/divergence conversion. Surface pressure uses the checkpoint's
+auxiliary orography, omitting its learned orography perturbation. Native
+**training targets** use the frozen learned encoder. These different operations
+serve different purposes and are recorded in the artifacts.
+
+The all-field/all-level selection, uniform level reduction, initial-time
+exclusion, batch size two, and fixed K comparison are explicit experiment
+choices. The inference checkpoint is not evidence of original training bindings.
+
+## Matched training settings
+
+The matrix is 2.8° only, with width 128/256 × Mamba `d_inner` 16/32 × K 1/2,
+for eight runs. Each starts with fresh zero output weights and the same seed,
+training-origin order, loss-statistics artifact, input/increment statistics,
+validation origins and pretrained checkpoint. Each episode resets memory.
+
+Training uses 2015–2021, validation 2022, and reserves 2023 for test. Adam uses
+beta1 0.9, beta2 0.95, epsilon 1e-6, zero weight decay, peak LR 0.002 and a
+2,000-update warmup. The retained longer-run schedule stays constant to update
+15,000 then halves every 10,000 updates. The present budget ends at 2,000.
+Paper settings are a starting point, not evidence of an optimal residual-head LR.
+
+The existing causal 24 h-lag/persistent forcing policy and the residual adapter's
+`no_pressure_zero_mean_v2` correction restrictions remain explicit interface
+choices. They are not additional NeuralGCM paper loss terms.
+
+Fresh-process replay also pins the Python hash seed, cuBLAS workspace policy and
+XLA autotuning level. The exact execution environment is part of the run identity.
+The initial smoke exposed a cross-process baseline discrepancy; the detailed
+report records its correction and the status of the required rerun.
+
+Training logs all five weighted terms and field contributions. Validation uses
+identical origins for frozen baseline and residual forecasts and saves
+Gaussian-area physical RMSE for every field, pressure level and forecast lead.
+Validation loss averages the fixed batches' objectives, including their
+batch-dependent bias terms. It does not claim a single bias average over the
+entire validation set. Training plots use optimizer update count on the x-axis;
+physical forecast comparisons use lead/valid time.
+
+## Code and references
+
+- [Loss implementation](../../../src/models/neuralgcm_residual/paper_loss.py)
+- [Training-only 24 h statistics](../../../src/models/neuralgcm_residual/paper_statistics.py)
+- [Memory-gradient trajectory trainer](../../../src/models/neuralgcm_residual/trajectory_training.py)
+- [Training entry point](../../../scripts/training/train_neuralgcm_paper_residual.py)
+- [Detailed real-model tests](../../../scripts/training/smoke_neuralgcm_paper_detailed.py)
+- [Production CLI and resume tests](../../../scripts/training/smoke_neuralgcm_paper_cli.py)
+- [Paper training and curriculum](https://arxiv.org/html/2311.07222v3#S7.SS1)
+- [Paper rescaling and losses](https://arxiv.org/html/2311.07222v3#S7.SS3)
+- [Public reference metrics](../../../third_party/neuralgcm/neuralgcm/reference_code/metrics.py)

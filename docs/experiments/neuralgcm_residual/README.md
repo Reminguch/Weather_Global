@@ -1,11 +1,11 @@
 # NeuralGCM residual GC–Mamba pipeline
 
-**Latest user direction, September 24:** align the next experiment with the
-original NeuralGCM objective and full physical-state gradients, adding only our
-residual head, and start directly with **K=2 / 12 h** live trajectories. See
-[the revised specification](NGCM_ALIGNMENT_K2_20260924.md). This is not yet an
-activated implementation. The K=1/K=20, custom-loss and stop-gradient sections
-below describe the historical implemented protocol and existing checkpoints.
+**Latest user direction, September 24:** freeze NeuralGCM and train only the
+residual head, comparing **K=1 / 6 h and K=2 / 12 h** with the public five-term
+loss reconstruction. Physical feedback stays stop-gradient; Mamba memory carries
+cross-step gradients. See the [implemented specification](NGCM_ALIGNMENT_K2_20260924.md)
+and [detailed smoke report](PAPER_LOSS_SMOKE_20260924.md).
+The K=1/K=20 and custom-loss sections below describe the historical protocol.
 
 Implementation and experiment specification, 2026-09-19. The initial study uses
 **2.8° and 1.4° pretrained deterministic NeuralGCM**, with **four width/inner-width

@@ -5,11 +5,11 @@
 > v2-trained checkpoints and the same frozen NGCM baseline. The 24 h panels
 > do **not** represent a model retrained with 24 h normalization.
 
-**Latest direction for Ilya's review:** [Original NeuralGCM objective and full gradients, starting with K=2 / 12 h](../docs/experiments/neuralgcm_residual/NGCM_ALIGNMENT_K2_20260924.md).
-This revised specification has not been activated in training. The earlier
-[equal-variable proposal without temporal sigma](EQUAL_VARIABLE_LOSS_PROPOSAL.md)
-is retained as an alternative, not the primary next experiment. All plots below
-still describe the existing v2-trained checkpoints.
+**Latest direction for Ilya's review:** [Frozen NeuralGCM, five-term loss, matched K=1 / K=2](../docs/experiments/neuralgcm_residual/NGCM_ALIGNMENT_K2_20260924.md).
+The new implementation keeps physical feedback stop-gradient and trains only
+Residual Mamba. See its [smoke-test report](../docs/experiments/neuralgcm_residual/PAPER_LOSS_SMOKE_20260924.md).
+The [equal-variable proposal](EQUAL_VARIABLE_LOSS_PROPOSAL.md) is retained as an
+alternative. All plots below still describe the existing v2-trained checkpoints.
 
 ## Upper-air improvements vs physical time
 
