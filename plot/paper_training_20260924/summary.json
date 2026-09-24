@@ -1,0 +1,163 @@
+{
+  "captured_at_utc": "2026-09-24T20:11:35.135269+00:00",
+  "snapshot_sha256": "d190fcc1dc166b8ae1b19c2cc46bf989149ed75e3f96631628d50078974e82c3",
+  "diagnostic_definition": "Unfiltered normalized nodal 20*M_data analogue; not exact modal or full five-term loss",
+  "runs": [
+    {
+      "K": 1,
+      "width": 128,
+      "d_inner": 16,
+      "status": "Stopped at 1000-update review",
+      "training_step": 1000,
+      "validation_step": 1000,
+      "baseline_loss": 5808.064025878906,
+      "loss": 142.43704223632812,
+      "objective_reduction_pct": 97.54759862147398,
+      "baseline_diagnostic": {
+        "total": 5257.8883442318975,
+        "by_field": {
+          "geopotential": 5149.146016059871,
+          "temperature": 9.484233675534034,
+          "u_component_of_wind": 16.35443784480233,
+          "v_component_of_wind": 2.1139298930302477,
+          "specific_humidity": 80.77440082782887,
+          "specific_cloud_ice_water_content": 0.007063414580335411,
+          "specific_cloud_liquid_water_content": 0.00826251625123014
+        },
+        "geo_share_pct": 97.93182507781243,
+        "upper_geo_share_pct": 97.93046531148434,
+        "exact_logged_modal_data_term": 5254.4100341796875
+      },
+      "latest_diagnostic": {
+        "total": 134.69388399015196,
+        "by_field": {
+          "geopotential": 51.512272892041004,
+          "temperature": 20.23423160467836,
+          "u_component_of_wind": 20.470620257682462,
+          "v_component_of_wind": 10.391799249392914,
+          "specific_humidity": 31.82072603549708,
+          "specific_cloud_ice_water_content": 0.012369168996555095,
+          "specific_cloud_liquid_water_content": 0.2518647818635935
+        },
+        "geo_share_pct": 38.24395834914619,
+        "upper_geo_share_pct": 36.41494489670627,
+        "exact_logged_modal_data_term": 131.04895782470703
+      },
+      "improved_level_lead_cells": {
+        "geopotential": 8,
+        "temperature": 1,
+        "u_component_of_wind": 3,
+        "v_component_of_wind": 0,
+        "specific_humidity": 5,
+        "specific_cloud_ice_water_content": 0,
+        "specific_cloud_liquid_water_content": 0
+      }
+    },
+    {
+      "K": 1,
+      "width": 256,
+      "d_inner": 16,
+      "status": "Stopped at 1000-update review",
+      "training_step": 1000,
+      "validation_step": 1000,
+      "baseline_loss": 5808.064025878906,
+      "loss": 148.0714569091797,
+      "objective_reduction_pct": 97.4505884189737,
+      "baseline_diagnostic": {
+        "total": 5257.8883442318975,
+        "by_field": {
+          "geopotential": 5149.146016059871,
+          "temperature": 9.484233675534034,
+          "u_component_of_wind": 16.35443784480233,
+          "v_component_of_wind": 2.1139298930302477,
+          "specific_humidity": 80.77440082782887,
+          "specific_cloud_ice_water_content": 0.007063414580335411,
+          "specific_cloud_liquid_water_content": 0.00826251625123014
+        },
+        "geo_share_pct": 97.93182507781243,
+        "upper_geo_share_pct": 97.93046531148434,
+        "exact_logged_modal_data_term": 5254.4100341796875
+      },
+      "latest_diagnostic": {
+        "total": 139.20721734752414,
+        "by_field": {
+          "geopotential": 54.94759057170473,
+          "temperature": 19.3436040860939,
+          "u_component_of_wind": 21.617461633448293,
+          "v_component_of_wind": 11.61885279253674,
+          "specific_humidity": 31.39995280550398,
+          "specific_cloud_ice_water_content": 0.012791218916069875,
+          "specific_cloud_liquid_water_content": 0.2669642393203918
+        },
+        "geo_share_pct": 39.4717972377328,
+        "upper_geo_share_pct": 37.787123272338675,
+        "exact_logged_modal_data_term": 135.3318328857422
+      },
+      "improved_level_lead_cells": {
+        "geopotential": 8,
+        "temperature": 1,
+        "u_component_of_wind": 3,
+        "v_component_of_wind": 0,
+        "specific_humidity": 5,
+        "specific_cloud_ice_water_content": 0,
+        "specific_cloud_liquid_water_content": 0
+      }
+    },
+    {
+      "K": 2,
+      "width": 128,
+      "d_inner": 16,
+      "status": "Partial run; latest completed validation shown",
+      "training_step": 797,
+      "validation_step": 700,
+      "baseline_loss": 5341.049011230469,
+      "loss": 162.18743896484375,
+      "objective_reduction_pct": 96.96337856807124,
+      "baseline_diagnostic": {
+        "total": 4833.865866038528,
+        "by_field": {
+          "geopotential": 4733.742145531591,
+          "temperature": 8.876459264368396,
+          "u_component_of_wind": 15.220980844230743,
+          "v_component_of_wind": 2.0113380846402586,
+          "specific_humidity": 74.00008684133631,
+          "specific_cloud_ice_water_content": 0.006889902281984496,
+          "specific_cloud_liquid_water_content": 0.007965570080289378
+        },
+        "geo_share_pct": 97.92870296194232,
+        "upper_geo_share_pct": 97.92684622438179,
+        "exact_logged_modal_data_term": 4830.663757324219
+      },
+      "latest_diagnostic": {
+        "total": 150.90700653845587,
+        "by_field": {
+          "geopotential": 60.062004616892274,
+          "temperature": 24.378086316372503,
+          "u_component_of_wind": 22.120970899349576,
+          "v_component_of_wind": 11.260137995474446,
+          "specific_humidity": 32.7767319790463,
+          "specific_cloud_ice_water_content": 0.02598613003874978,
+          "specific_cloud_liquid_water_content": 0.2830886012820437
+        },
+        "geo_share_pct": 39.80067327197732,
+        "upper_geo_share_pct": 35.1265095050668,
+        "exact_logged_modal_data_term": 146.7030200958252
+      },
+      "improved_level_lead_cells": {
+        "geopotential": 16,
+        "temperature": 2,
+        "u_component_of_wind": 4,
+        "v_component_of_wind": 0,
+        "specific_humidity": 10,
+        "specific_cloud_ice_water_content": 0,
+        "specific_cloud_liquid_water_content": 0
+      }
+    },
+    {
+      "K": 2,
+      "width": 256,
+      "d_inner": 16,
+      "status": "Partial run; latest completed validation shown"
+    }
+  ]
+}

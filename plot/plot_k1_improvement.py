@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Snapshot existing K=1 validation results, or redraw the committed snapshot."""
+"""Historical v2 plots; use plot_paper_training.py for the current five-term runs."""
 
 import argparse
 import csv
@@ -249,7 +249,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--experiment-root", type=Path,
                         help="Refresh CSV and provenance from this experiment before plotting")
-    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
+    parser.add_argument("--output-dir", type=Path,
+                        default=Path(__file__).resolve().parent / 'historical_v2',
+                        help="Historical output directory; current overview files use the new plotting script")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.experiment_root:

@@ -1,279 +1,175 @@
-# NeuralGCM residual: loss comparisons and physical forecasts
+# NeuralGCM residual: new five-term training results
 
-> **The original README loss, the running v2 loss, and the 24 h simplified
-> loss are different definitions.** The training-step loss curves rescore the same
-> v2-trained checkpoints and the same frozen NGCM baseline. The 24 h panels
-> do **not** represent a model retrained with 24 h normalization.
+These figures replace the morning overview. They show models **actually trained
+with the new five-term objective**, rather than older models rescored with a new
+formula. All training curves use **optimizer update count** on the horizontal axis.
 
-**Latest direction for Ilya's review:** [Frozen NeuralGCM, five-term loss, matched K=1 / K=2](../docs/experiments/neuralgcm_residual/NGCM_ALIGNMENT_K2_20260924.md).
-The new implementation keeps physical feedback stop-gradient and trains only
-Residual Mamba. See its [smoke-test report](../docs/experiments/neuralgcm_residual/PAPER_LOSS_SMOKE_20260924.md).
-The [equal-variable proposal](EQUAL_VARIABLE_LOSS_PROPOSAL.md) is retained as an
-alternative. All plots below still describe the existing v2-trained checkpoints.
+**Current result:** the validation objective drops sharply, but most field/pressure
+pairs have larger physical RMSE. The large loss reduction must not be reported
+as a comparable improvement in weather forecasting skill.
 
-## Upper-air improvements vs physical time
+Snapshot: **2026-09-24T20:11:35.135269+00:00**. Both K=1 runs reached their 1000-update review
+milestone. Other runs are shown only through their available validation points.
+Missing results are not extrapolated. All configurations use d_inner=16.
 
-**The improving upper-air results include both geopotential and specific humidity.**
-The figure below compares ERA5, frozen NGCM and residual NGCM for **all twelve
-improving field/level pairs at pressures <=100 hPa** in the representative
-w128/di16 evaluation. They also improve in all three other configurations.
+| Matched train/eval K | Width | Last validation step | Frozen NGCM loss | Residual loss | Objective reduction |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 128 | 1000 | 5808.064 | 142.437 | 97.55% |
+| 1 | 256 | 1000 | 5808.064 | 148.071 | 97.45% |
+| 2 | 128 | 700 | 5341.049 | 162.187 | 96.96% |
+| 2 | 256 | No completed validation | — | — | — |
 
-![Improving upper-air geopotential and humidity versus physical time](upper_air_physical_eval_20260924/r2p8_w128_di16/upper_air_improvements.png)
+## Training and validation
 
-| Physical variable | Improving pressure levels (hPa) | Full-year spatial RMSE reduction, w128/di16 |
-| --- | --- | --- |
-| Geopotential | 1, 2, 3, 5, 7, 10, 20, 30 | 37.73%–90.32%; 2 hPa: **90.15%**, 3 hPa: **90.32%** |
-| Specific humidity | 1, 2, 3, 5 | 38.72%–70.26%; 2 hPa: **70.26%**, 3 hPa: **70.22%** |
+![Actual new-loss training and matched validation](paper_training_20260924/objective_by_training_step.png)
 
-The curves show global means in physical units for **w128/di16, update 2,968**.
-The x-axis is valid time relative to January 10, 2022 00 UTC; each point remains
-a six-hour K=1 forecast initialized at the preceding origin. The percentages
-use all **1,455 forecasts over 2022**, not only the illustrated three-day window.
-These levels were selected for positive physical RMSE improvement; the standard
-levels below retain the comparisons where errors increase.
+Solid curves show validation every 100 updates, including the zero-residual
+baseline at step 0. Faint curves are trailing 25-update means of training loss,
+using changing training minibatches. Dashed lines are the frozen baseline on
+the fixed validation set. The percentage is `100 * (1 - loss / baseline_loss)`.
+It measures reduction of this objective, not a physical RMSE percentage.
 
-**[All twelve individual physical-time plots, absolute RMSE values, and all four configurations](upper_air_physical_eval_20260924/README.md)** ·
-[CSV](upper_air_physical_eval_20260924/timeseries.csv) ·
-[PDF](upper_air_physical_eval_20260924/r2p8_w128_di16/upper_air_improvements.pdf)
+[PDF](paper_training_20260924/objective_by_training_step.pdf) ·
+[SVG](paper_training_20260924/objective_by_training_step.svg) ·
+[Exact five-term validation contributions](paper_training_20260924/loss_terms_by_training_step.png) ·
+[Seven training-field contributions](paper_training_20260924/training_field_contributions.png)
 
-## Physical variables vs physical time
+The training-field panels use the recorded, weighted data MSE + data spectrum +
+bias for each variable. Native model-space contributions are additional. These
+are training minibatch contributions, not per-field validation values.
 
-![Seven physical variables versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/all_variables_global_timeseries.png)
+## Physical errors on the same validation forecasts
 
-These are **physical values**, with ERA5 truth in black, frozen NGCM in blue,
-and residual NGCM in orange. The panels show temperature, geopotential, both
-wind components, specific humidity, cloud ice, and cloud liquid water in their
-physical units. Values are global Gaussian-area means at the labeled pressure
-levels. The representative model is **w128/di16, update 2,968**.
+![Physical RMSE versus optimizer updates](paper_training_20260924/physical_rmse_by_training_step.png)
 
-The horizontal axis is **forecast valid time minus 2022-01-10 00 UTC**, in hours.
-The plotted points are at 6, 12, ..., 72 h. Every point has a **six-hour forecast
-lead**, initialized from ERA5 at the preceding origin. For example, the point
-at 12 h predicts from 6 h to 12 h. This is a sequence of K=1 forecasts with
-chronological recurrent memory, not a 72-hour free-running rollout.
+All seven fields are shown at the labeled levels in physical units. Lower is
+better. Dashed lines are matched frozen NGCM errors. K=1 scores +6 h. K=2 scores
++6 and +12 h, averaging their squared errors before taking the square root.
+The CSV additionally retains each lead and all 37 levels separately.
 
-[Seven larger individual plots and all four configurations](#physical-unit-forecasts) ·
-[Full evaluation, physical RMSE and downloadable data](k1_physical_eval_20260924/README.md)
+For K=1 / w128 at **step 1000**, on the same 16 origins:
 
-## Requested comparisons
-
-All training curves use **training step (optimizer update count)** on the
-horizontal axis. Every definition provides total loss, seven separate variable
-contributions, and improvement over the baseline. The black dashed line is
-frozen NGCM; colored lines identify the four residual configurations.
-
-| Scoring definition | Total + seven variables | Improvement | Interpretation |
+| Field and level | Frozen NGCM RMSE | Residual RMSE | Unit |
 | --- | --- | --- | --- |
-| **1. Original README loss** | [Loss curves](loss_definitions_20260924/readme_v1/loss_by_training_step.png) | [Improvement curves](loss_definitions_20260924/readme_v1/improvement_by_training_step.png) | Per-level 6 h scales, pressure weights, seven-field mean |
-| Current training loss v2 | [Loss curves](loss_definitions_20260924/current_v2/loss_by_training_step.png) | [Improvement curves](loss_definitions_20260924/current_v2/improvement_by_training_step.png) | Pooled 6 h scales and additional variable amplitudes; this is the actual training objective |
-| **2. 24 h simplified MSE** | [Loss curves](loss_definitions_20260924/normalized24_mse/loss_by_training_step.png) | [Improvement curves](loss_definitions_20260924/normalized24_mse/improvement_by_training_step.png) | NeuralGCM-style 24 h normalization with reference default reductions; still differs from the complete paper loss |
+| geopotential, 500 hPa | 25.591 | 121.907 | m²/s² |
+| temperature, 850 hPa | 0.436 | 3.512 | K |
+| u_component_of_wind, 850 hPa | 0.862 | 2.092 | m/s |
+| v_component_of_wind, 850 hPa | 0.919 | 3.464 | m/s |
 
-![Three definitions compared](loss_definitions_20260924/total_improvement_comparison.png)
+![All field and pressure-level RMSE ratios](paper_training_20260924/physical_rmse_by_level.png)
 
-[Complete figures, individual variable plots, checkpoint steps and validation details](loss_definitions_20260924/README.md) ·
-[Loss CSV](loss_definitions_20260924/loss_curves.csv) ·
-[Per-level physical MSE CSV](loss_definitions_20260924/physical_mse_by_step.csv) ·
-[Source hashes and scoring coefficients](loss_definitions_20260924/provenance.json)
+Blue means lower RMSE than baseline; red means higher RMSE. All levels and fields
+are included. These are ratios, not absolute errors, and colors saturate below
+0.01× and above 100×. For both K=1 models, geopotential improves at **8 of 37**
+levels, all at 1–30 hPa. Temperature improves at 1/37, zonal wind at 3/37,
+humidity at 5/37, and meridional wind and both cloud species at 0/37 levels.
+These counts use the 1000-update checkpoints, not the minimum-loss checkpoint.
 
-Loss magnitudes across definitions have different scales and are not directly
-comparable. Within each definition both models use exactly the same statistics,
-weights, forecast times, targets and grid. **Negative improvement means worse
-than baseline.** Each variable panel includes all 37 pressure levels and shows
-its contribution to total loss, not a single-level physical RMSE.
+## What matches the paper, and what remains approximate
 
-## Loss mismatch and geopotential dominance
-
-[Exact current loss, differences from the original README, diagnosed problems,
-and proposed redesign](LOSS_DEFINITION_AND_DESIGN.md)
-
-**The 95.06% geopotential share belongs to the modified v2 loss, not the
-original README formula.** Using identical baseline predictions from the full
-1,455-origin K=1 audit:
-
-| Baseline loss contribution | Original README | Current v2 |
-| --- | ---: | ---: |
-| Geopotential | **0.00048%** | **95.06%** |
-| Cloud liquid water | **97.01%** | **0.0229%** |
-| Cloud ice | **2.99%** | **0.0079%** |
-
-The original recipe is dominated by cloud terms. The v2 revision pools
-per-level scales and applies amplitudes before squaring: geopotential 2,
-humidity 0.66, and cloud species 0.05. Together with large normalized
-upper-atmosphere geopotential errors, these changes shift the dominant term
-to geopotential. The 1–7 hPa geopotential levels alone contribute **88.81%** of
-baseline v2 loss. These are empirical loss contributions, not NeuralGCM's
-prescribed percentages or physical-energy shares.
-
-### Why cloud water dominates the original README loss
-
-Each squared physical error is divided by the **square of its training-set
-six-hour change scale**. A small scale therefore gives a large effective weight:
+The implementation follows the five-term construction and coefficients in
+[NeuralGCM, Supplementary Information G.3–G.4](https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-024-07744-y/MediaObjects/41586_2024_7744_MOESM1_ESM.pdf):
 
 ```text
-contribution[v,p] = (1/7) * (p / sum_pressure) * (RMSE[v,p] / scale6[v,p])**2
+L = 20 M_data + M_model + 0.1 M_data_spectrum + 0.1 M_model_spectrum + 2 M_bias
 ```
 
-For baseline cloud liquid water at **175 hPa**, the full-year spatial RMSE is
-`1.66994e-6 kg/kg`, while the training scale is at its floor of `1e-9 kg/kg`.
-Their ratio is about **1,670**, which becomes **2.79 million** after squaring.
-Applying the pressure weight `175 / 15548` and field weight `1/7` still leaves
-**4,484 loss units from this one level**, or **21.52%** of the total 20,832.
-Several other cloud-liquid levels also have scales at the floor, so their
-contributions accumulate to **97.01%**. Cloud ice contributes another **2.99%**.
+Variables are divided by training-only 24 h difference standard deviations from
+60 snapshots. Samples, grid points and levels are pooled, except specific
+humidity, which retains per-level scales. Additional amplitudes are geopotential
+2, humidity 0.66, cloud species 0.05 and native log surface pressure 5, applied
+before squaring. Lead-time amplitude factors follow G.3. These choices do not
+guarantee equal contributions for a different initial model and training regime.
 
-Equal coefficients of `1/7` do not ensure equal contributions after normalization.
-The score effectively demands far smaller absolute cloud errors at those levels.
-The scale measures natural six-hour variation, which need not match the frozen
-model's error. This explains the arithmetic imbalance; it does not identify
-the physical cause of the cloud forecast errors. Changing kg/kg to g/kg in
-both the error and scale leaves the ratio unchanged.
+**This remains a documented reconstruction, not an exact reproduction of the
+original training objective or evaluation protocol.** We did not find the full
+original training-loss filter bindings in the public inference checkpoint and
+reference code. The inference checkpoint alone does not establish those bindings.
 
-These percentages describe **baseline validation loss under the README formula**,
-not water abundance, physical energy, or measured training-gradient shares.
-The cloud-liquid time-series panel below is at **850 hPa**; the numerical
-example above is a different level, **175 hPa**.
+| Component | This experiment | Paper alignment boundary |
+| --- | --- | --- |
+| Accuracy filter | `exp(-log(2) * (l / 120)^24)`, same for both spaces, variables and leads | Retains order 12 but fixes half-amplitude wavenumber 120; almost identity at l ≤ 64. The paper fits variable/lead-dependent attenuation using HRES/ERA5 errors. Those fitted parameters have not been reproduced. |
+| Field/level reduction | All seven decoded fields, all 37 pressure levels, uniform level mean, field sum | Explicit experiment choice; full original selection and weighting bindings have not been verified. |
+| Bias | Squared batch/time mean of modal-amplitude differences | Follows public `BatchMeanSquaredBias` default `abs(modal)`; original bindings have not been established. |
+| Native scales | Linear pressure-to-sigma conversion with auxiliary orography | Omits learned orography perturbation for the scale statistics. Native targets use the frozen learned encoder. |
+| Trainable parameters | Residual Mamba only; NGCM encoder, physics and decoder frozen | Differs from original end-to-end training and subsequent decoder fine-tuning. |
+| Rollout | Fixed K=1 or K=2 with matched evaluation K | Original lead-time curriculum is not reproduced. |
 
-### Proposed equal-variable rescaling without temporal sigma
+Training retains its current configuration. No loss weights or filters were
+changed for these plots. Existing numerical settings are recorded in the
+[published snapshot](paper_training_20260924/snapshot.json), including source
+hashes, statistics, origins and per-run objective metadata.
 
-For the next pilot, the recommended alternative is to divide each variable's
-**physical MSE by the frozen baseline's mean physical MSE on a fixed training
-calibration set**, then average all seven variables equally:
+## Is this the paper's 2.8° baseline evaluation?
 
-```text
-B[v] = training-calibration mean of baseline physical MSE[v]
-L_equal = (1/7) * sum_v physical_MSE_residual[v] / B[v]
-```
+**The baseline model is the official pretrained deterministic 2.8° checkpoint.
+The evaluation protocol is our paired short-lead validation, not the paper's
+reported benchmark.** Its SHA256 is
+`bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e`.
+The residual branch starts with a zero output head; step 0 is the frozen model.
 
-This uses no temporal-change sigma and no extra variable amplitudes. Keep the
-current spatial and pressure weights for the first comparison. On the calibration
-set, each baseline component averages one; a 10% MSE reduction for any one
-variable has the same effect on the total. Freeze B during training and compute
-it without validation or test data. Baseline scores on other datasets need not
-equal one. Equal-variable weighting alone does not balance pressure levels
-inside a variable or guarantee equal gradient contributions.
+- Training years are 2015–2021. Evaluation here uses **16 fixed origins from 2022**.
+  This is neither full-year validation nor the held-out 2023 test.
+- Baseline and residual use the same ERA5 targets, regridded Gaussian grid,
+  37 pressure levels, forcing policy, initialization times and forecast leads.
+- Each origin starts from the official encoder and zero residual memory. Memory
+  persists within the K-step forecast. There is no transfer between validation origins.
+- K=1 includes +6 h; K=2 includes +6 and +12 h. Absolute losses from different K
+  are not a controlled comparison at one common forecast horizon.
+- Physical RMSE uses Gaussian area weighting, with errors formed in float64.
+  Model execution remains FP32. Model selection uses the five-term validation loss.
 
-This is a **proposal, not the objective of the displayed checkpoints**.
-[Standalone proposal for Ilya's review](EQUAL_VARIABLE_LOSS_PROPOSAL.md) ·
-[Design context and optional pressure-band extension](LOSS_DEFINITION_AND_DESIGN.md#b-equal-variable-relative-mse-without-temporal-sigma)
+No claim of statistical significance or reproduction of the paper's published
+2.8° forecast scores follows from this small validation set.
 
-The previously reported roughly **84% improvement is a reduction in this
-custom v2 loss**. It does not mean that all weather variables improve by 84%.
-The physical audit shows worse standard-level temperature, wind, humidity,
-cloud and Z500 RMSE for those evaluated checkpoints.
+## Why geopotential still dominates the initial loss
 
-**24 h normalization alone does not fix the imbalance.** A train-only
-60-snapshot audit still gives geopotential **91.30%** with uniform statistical
-pooling and current pressure weights. Using equal-level averaging, the default
-in the official reference reducer, increases its share to **97.94%**. Neither
-calculation is a claim to reproduce the complete paper objective. See the
-[controlled normalization and weighting audit](loss_alignment_audit_20260924/README.md).
+The 24 h standard deviation measures variability, not the current baseline's
+forecast error. The pooled geopotential scale is **755.142 m²/s²**. The baseline
+6 h geopotential RMSE is **30,017.113 m²/s² at 1 hPa**, compared with **25.591 m²/s²
+at 500 hPa**. Squaring the normalized errors gives the few upper levels enormous
+contributions, despite using the paper's rescaling recipe.
 
-The percentages in this section use the earlier w128/di16 checkpoint at epoch
-7, update 2,968, over all 1,455 six-hour 2022 validation forecasts. The new
-training-step figures include later completed epoch checkpoints and retain
-all checkpoint identities. Rescoring does not change any physical prediction.
+An independent diagnostic reconstructed from physical RMSE applies the same
+amplitudes, time weights and uniform levels as `20 M_data`, but omits modal
+projection and filtering. In this **unfiltered nodal diagnostic**, geopotential
+contributes **97.93%** of baseline K=1 data error, almost all at 1–30 hPa.
+After w128 reaches 1000 updates, its share is **38.24%**.
+These are not shares of the full five-term objective or measured gradient shares.
+The baseline diagnostic totals 5257.888, versus the exact logged modal
+`20 M_data` of 5254.410; projection/filtering account for their differing definitions.
 
-## What the README and paper actually specify
+The arithmetic explains how the loss can fall while most levels worsen. It does
+not establish the source of the baseline's large upper-atmosphere error, nor
+prove that the filter approximation causes it. A dedicated encode/decode and
+upper-level diagnostic would be needed to establish that cause.
 
-The initial project specification is
-[section 9: Objective, validation and final report](../docs/experiments/neuralgcm_residual/README.md#9-objective-validation-and-final-report).
-It explicitly requests six-hour change standard deviations, pressure-proportional
-level weights and an average over seven decoded fields. It explicitly calls
-this a custom loss rather than the original NeuralGCM objective. The
-[v2 restart](../docs/experiments/neuralgcm_residual/FEEDBACK_V2_RESTART_20260924.md)
-subsequently changed pooling and variable amplitudes.
+## Data and reproduction
 
-The [paper, G.3–G.4](https://arxiv.org/pdf/2311.07222#page=41) instead uses
-24-hour difference scales and combines filtered MSE, model-space, spectral and
-bias terms. The user has accepted temporarily omitting these additional terms
-while checking the remaining normalization and reductions as closely as possible.
-The 24 h candidate remains explicitly labeled **simplified data MSE**.
-Exact paper statistical samples and full training-loss bindings, including
-level masks, have not been reproduced. Uniform and Gaussian choices for fitting
-statistics are both documented in the sensitivity audit. This is why the
-24 h panel cannot be labeled the paper's complete training loss.
-
-The 24 h interval is only the interval used to fit normalization scales from
-training ERA5. It does not require a 24 h forecast; all forecasts plotted here
-are K=1, six-hour predictions. Training has not been restarted with a new loss.
-
-## Physical-unit forecasts
-
-All seven individual panels are displayed here directly. They use the same
-**w128/di16 checkpoint at update 2,968**, the same January 10–13 window, and the
-same three curves as the overview above. The normalization recipe does not
-change these physical predictions, so the README, v2 and 24 h rescoring choices
-do not create three different sets of physical-time curves.
-
-### Temperature at 850 hPa (K)
-
-![Temperature versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/T850_global_timeseries.png)
-
-### Geopotential at 500 hPa (m²/s²)
-
-![Geopotential versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/Z500_global_timeseries.png)
-
-### Eastward wind at 850 hPa (m/s)
-
-![Eastward wind versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/U850_global_timeseries.png)
-
-### Northward wind at 850 hPa (m/s)
-
-![Northward wind versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/V850_global_timeseries.png)
-
-### Specific humidity at 700 hPa (g/kg)
-
-![Specific humidity versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/Q700_global_timeseries.png)
-
-### Cloud ice at 250 hPa (g/kg)
-
-![Cloud ice versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/CI250_global_timeseries.png)
-
-### Cloud liquid water at 850 hPa (g/kg)
-
-![Cloud liquid water versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/CL850_global_timeseries.png)
-
-### Upper-atmosphere geopotential
-
-The [upper-air results page](upper_air_physical_eval_20260924/README.md) also
-includes the improved **specific-humidity levels at 1, 2, 3 and 5 hPa**, with
-individual physical-time curves and full-year RMSE for all four configurations.
-
-![Upper-atmosphere geopotential versus physical time](k1_physical_eval_20260924/r2p8_w128_di16/geopotential_improved_levels.png)
-
-These eight levels were selected because their full-year geopotential RMSE
-improves for the representative checkpoint. This selection is disclosed;
-the standard-level comparisons above show where forecasts deteriorate.
-Global means can hide spatial errors, so use the
-[full-year spatial RMSE table](k1_physical_eval_20260924/README.md#physical-forecast-errors)
-to assess forecast skill beyond this three-day illustration.
-
-### All four configurations and local time series
-
-The physical-time evaluation uses the following frozen checkpoints. The
-training-step loss plots include later checkpoints; these are separate snapshots.
-New York and Beijing figures show nearest grid cells in winter and summer,
-not station observations.
-
-| Configuration | Training step | Global physical-time curves | New York | Beijing | Data |
-| --- | ---: | --- | --- | --- | --- |
-| w128 / di16 | 2,968 | [Seven variables](k1_physical_eval_20260924/r2p8_w128_di16/all_variables_global_timeseries.png) | [Figure](k1_physical_eval_20260924/r2p8_w128_di16/all_variables_new_york.png) | [Figure](k1_physical_eval_20260924/r2p8_w128_di16/all_variables_beijing.png) | [CSV](k1_physical_eval_20260924/r2p8_w128_di16_timeseries.csv) |
-| w128 / di32 | 2,968 | [Seven variables](k1_physical_eval_20260924/r2p8_w128_di32/all_variables_global_timeseries.png) | [Figure](k1_physical_eval_20260924/r2p8_w128_di32/all_variables_new_york.png) | [Figure](k1_physical_eval_20260924/r2p8_w128_di32/all_variables_beijing.png) | [CSV](k1_physical_eval_20260924/r2p8_w128_di32_timeseries.csv) |
-| w256 / di16 | 2,120 | [Seven variables](k1_physical_eval_20260924/r2p8_w256_di16/all_variables_global_timeseries.png) | [Figure](k1_physical_eval_20260924/r2p8_w256_di16/all_variables_new_york.png) | [Figure](k1_physical_eval_20260924/r2p8_w256_di16/all_variables_beijing.png) | [CSV](k1_physical_eval_20260924/r2p8_w256_di16_timeseries.csv) |
-| w256 / di32 | 2,120 | [Seven variables](k1_physical_eval_20260924/r2p8_w256_di32/all_variables_global_timeseries.png) | [Figure](k1_physical_eval_20260924/r2p8_w256_di32/all_variables_new_york.png) | [Figure](k1_physical_eval_20260924/r2p8_w256_di32/all_variables_beijing.png) | [CSV](k1_physical_eval_20260924/r2p8_w256_di32_timeseries.csv) |
-
-[Individual PNG, PDF and SVG downloads, all-level RMSE, and evaluation checks](k1_physical_eval_20260924/README.md)
-
-## Earlier snapshot and reproduction
-
-The [earlier v2 training snapshot](k1_training_snapshot_20260924.md), its
-[figure](k1_improvement_vs_training_step.png),
-[CSV](k1_improvement_vs_training_step.csv), and
-[provenance](k1_improvement_vs_training_step.provenance.json) are retained as
-history. Use the three-definition comparison above for the current analysis.
-
-Redraw the new comparisons from the committed portable data:
+[Validation losses and all five terms](paper_training_20260924/validation_by_step.csv) ·
+[Every field, pressure level and lead](paper_training_20260924/physical_rmse_by_step.csv) ·
+[Diagnostic summary](paper_training_20260924/summary.json) ·
+[Portable log snapshot and source hashes](paper_training_20260924/snapshot.json) ·
+[Plotting script](plot_paper_training.py)
 
 ```bash
-python plot/plot_loss_definitions.py
+# Reproduce the published figures from their saved inputs, without a GPU.
+python3 plot/plot_paper_training.py
+# Explicitly refresh from local live logs before making a later report.
+python3 plot/plot_paper_training.py --refresh
 ```
+
+The export checks matched K, 16 origins, 37 levels, finite RMSE, increasing update
+counts, term/field sums against logged loss, and identical baselines across widths.
+Figures are available as PNG, PDF and SVG. Curves are not extrapolated beyond
+completed validation; intervening checkpoints were not independently replayed.
+
+## Historical material
+
+The morning v2 and rescoring figures describe older training and are superseded
+as the current overview. They remain only as explicitly marked historical audits:
+[three old scoring definitions](loss_definitions_20260924/README.md),
+[old physical evaluation](k1_physical_eval_20260924/README.md), and
+[old normalization audit](loss_alignment_audit_20260924/README.md).
+The previous claim that a large aggregate loss reduction established a broad
+forecasting improvement is withdrawn.

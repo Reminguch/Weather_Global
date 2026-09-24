@@ -1,3 +1,7 @@
+> **Historical, superseded as the current overview.** These results use older
+> checkpoints/scoring definitions, not the current five-term training.
+> See the [current results and evaluation limits](../README.md).
+
 # Three loss definitions on the same training checkpoints
 
 **All models here were trained with the current 6 h v2 objective.**

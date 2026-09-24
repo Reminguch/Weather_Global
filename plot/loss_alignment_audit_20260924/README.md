@@ -1,3 +1,7 @@
+> **Historical, superseded as the current overview.** These results use older
+> checkpoints/scoring definitions, not the current five-term training.
+> See the [current results and evaluation limits](../README.md).
+
 # Offline audit of NeuralGCM-style normalization
 
 **Changing to 24 h normalization does not resolve geopotential dominance in

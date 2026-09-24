@@ -1,3 +1,7 @@
+> **Historical, superseded as the current overview.** These results use older
+> checkpoints/scoring definitions, not the current five-term training.
+> See the [current results and evaluation limits](../README.md).
+
 # Upper-air physical variables with improved RMSE
 
 **Geopotential improves at 1, 2, 3, 5, 7, 10, 20 and 30 hPa; specific

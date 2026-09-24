@@ -1,4 +1,25 @@
-# Weather Global: Stateful Mamba for GraphCast
+# Weather Global: NeuralGCM residual experiments
+
+The active `residual_NGCM` branch trains a Residual Mamba head on the official
+frozen deterministic NeuralGCM 2.8° model, with matched K=1/K=2 training and
+validation and d_inner=16.
+
+**[Current training results and full evaluation report](plot/README.md)** replace
+the September 24 morning overview. These runs actually use the new five-term
+objective. Its large reduction does not imply broad forecast improvement;
+most field/pressure pairs currently have larger physical errors.
+
+![New five-term training results](plot/paper_training_20260924/objective_by_training_step.png)
+
+The five-term construction and rescaling follow the paper. Filtering and some
+training bindings remain documented approximations. The baseline checkpoint is
+official, but this report evaluates 16 fixed 2022 origins at 6/12 h, rather than
+reproducing the paper's benchmark. See the report for physical RMSE, all 37 levels,
+source hashes, downloadable data and the precise alignment boundaries.
+
+---
+
+# Earlier GraphCast architecture
 
 This project integrates a **Mamba-style selective state space model (SSM)** into the [GraphCast](https://github.com/google-deepmind/graphcast) weather forecasting architecture, exploring whether explicit temporal memory across autoregressive rollout steps can improve multi-step weather prediction.
 

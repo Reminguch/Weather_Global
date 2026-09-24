@@ -1,3 +1,7 @@
+> **Historical, superseded as the current overview.** These results use older
+> checkpoints/scoring definitions, not the current five-term training.
+> See the [current results and evaluation limits](../README.md).
+
 # Six-hour K=1 forecasts in physical units
 
 > **The current training loss differs from the NeuralGCM paper.**
