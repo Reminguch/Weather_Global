@@ -1,0 +1,27 @@
+{
+  "independent_recurrent_gradient": {
+    "cosine": 0.9999999999998734,
+    "relative_l2": 5.884005018500214e-07
+  },
+  "nonzero_hidden_gradient_squared_norm": 164.2070238750866,
+  "numpy_five_term_parity": {
+    "bias": 478.3932800292969,
+    "data": 4838.92431640625,
+    "data_spectrum": 32.47683334350586,
+    "model": 0.2024226188659668,
+    "model_spectrum": 0.0006286630523391068
+  },
+  "physical_feedback_gradient": 0.0,
+  "second_step_corrected_features": {
+    "cosine": 1.0,
+    "max_abs": 0.0
+  },
+  "zero_identity_12h": {
+    "cosine": 1.0,
+    "max_abs": 0.0
+  },
+  "zero_identity_6h": {
+    "cosine": 1.0,
+    "max_abs": 0.0
+  }
+}

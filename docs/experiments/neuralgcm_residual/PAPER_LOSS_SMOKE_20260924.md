@@ -1,8 +1,21 @@
 # Detailed smoke tests for frozen-NGCM K=1 / K=2 training
 
-Status recorded September 24, 2026. **The independent pilot and seven CPU tests
-passed. The full detailed GPU matrix and production-CLI resume tests are still
-in progress. They are not reported as passed.**
+**Update, September 24, 2026, 13:24 EDT:** the production CLI test passed for
+**both K=1 and K=2**, including exact independent-process checkpoint/metric
+resume and fresh-process baseline equality. Job 14374768 completed with exit
+code 0 in **17 min 43 s**. The pinned execution configuration resolves the
+previously observed discrepancy in these tested cases. The specific source of
+that discrepancy has not been isolated, because three execution settings were
+pinned together.
+
+Both width-128 detailed tests have completed K=1 successfully and are running
+K=2. The width256/d16 test has started; width256/d32 awaits the GPU-test
+concurrency limit. The full architecture matrix is not yet reported as passed.
+Seven CPU tests and the independent real-data pilot also passed.
+
+[Production CLI report](evidence_20260924/cli_smoke_v2.json) ·
+[width128/d16 K=1](evidence_20260924/w128_d16_K1.json) ·
+[width128/d32 K=1](evidence_20260924/w128_d32_K1.json)
 
 The [experiment definition](NGCM_ALIGNMENT_K2_20260924.md) describes the exact
 loss, scales, frozen model and memory-only gradient contract. Every GPU smoke
@@ -59,10 +72,19 @@ These CPU checks support, but do not replace, the real-model tests below.
 
 | Width | `d_inner` | GPU test job | Horizons | Status |
 | ---: | ---: | ---: | --- | --- |
-| 128 | 16 | 14374769 | K=1 and K=2 | Submitted |
-| 128 | 32 | 14374770 | K=1 and K=2 | Submitted |
-| 256 | 16 | 14374778 | K=1 and K=2 | Submitted |
-| 256 | 32 | 14374779 | K=1 and K=2 | Submitted |
+| 128 | 16 | 14374769 | K=1 and K=2 | K=1 passed; K=2 running |
+| 128 | 32 | 14374770 | K=1 and K=2 | K=1 passed; K=2 running |
+| 256 | 16 | 14374778 | K=1 and K=2 | Running |
+| 256 | 32 | 14374779 | K=1 and K=2 | Pending concurrency limit |
+
+The completed width-128 K=1 gradient comparisons have relative L2 errors of
+1.052e-6 and 9.125e-7. Both have exact zero-head identity, zero physical-feedback
+gradient, nonzero hidden-network gradients and exact update-10 to update-20
+process replay. The width128/d16 K=2 gradient check also passed with relative
+L2 error **5.884e-7** and gradient cosine **0.9999999999998734**. Its second step
+consumes the corrected first state, verified exactly. See the
+[K=2 numerical-check report](evidence_20260924/w128_d16_K2_checks.json);
+the complete K=2 training/resume portion remains in progress.
 
 Each job performs:
 
@@ -97,7 +119,7 @@ Those canceled tests are not counted as passes.
 
 ## Production entry-point and physical validation test
 
-Job **14374768** exercises the actual production command for both K values.
+Job **14374768 passed**, exercising the actual production command for both K values.
 For each K it compares a continuous 12-update run with a run stopped at update
 10 and resumed in a fresh process. It also injects uncommitted metric tails to
 verify recovery. It checks:
@@ -116,12 +138,12 @@ baseline (loss 5850.3452 versus 5850.5356). It was canceled before declaring any
 resume success. The current submission pins `PYTHONHASHSEED=0`,
 `CUBLAS_WORKSPACE_CONFIG=:4096:8` and `--xla_gpu_autotune_level=0`, in addition to
 the existing deterministic-operation flags. These settings are recorded in the
-run identity. Complete cross-process K=1/K=2 parity remains pending.
+run identity. The replacement test passed complete cross-process K=1/K=2 parity.
 
 The compiler choice is motivated by [OpenXLA's determinism guidance](https://openxla.org/xla/determinism).
 Autotuning can select different floating-point reduction kernels in separate
-compilations. The rerun tests whether the pinned environment resolves our
-observed difference; that diagnosis is not yet confirmed.
+compilations. The successful rerun confirms equality under the pinned environment for the
+tested cases; it does not identify which individual setting caused the change.
 
 ## Training submissions and reproducibility
 

@@ -6,8 +6,9 @@ through Mamba memory is sufficient. The physical solver remains outside the
 backward pass. We do not require the unpublished original training gin bindings.
 
 **Status:** implemented in a separate training entry point. The independent
-real-data GPU pilot passed. Detailed numerical and training-lifecycle tests are
-being run before the new training matrix. See the
+real-data GPU pilot and the K=1/K=2 production-CLI resume tests passed.
+The detailed numerical/training tests across all four architectures are still
+in progress before the new training matrix. See the
 [smoke-test report](PAPER_LOSS_SMOKE_20260924.md) for measured results and job IDs.
 Historical v2 checkpoints and plots retain their original loss definition.
 

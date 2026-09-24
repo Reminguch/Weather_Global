@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "runs": {
+    "K1": {
+      "baseline_and_best_checkpoint": true,
+      "exact_checkpoint_and_metric_resume": true,
+      "interrupted_at": 10,
+      "passed": true,
+      "physical_fields": [
+        "temperature",
+        "geopotential",
+        "u_component_of_wind",
+        "v_component_of_wind",
+        "specific_humidity",
+        "specific_cloud_ice_water_content",
+        "specific_cloud_liquid_water_content"
+      ],
+      "physical_rmse_shape": [
+        1,
+        37
+      ],
+      "uncommitted_tails_archived": true,
+      "updates": 12
+    },
+    "K2": {
+      "baseline_and_best_checkpoint": true,
+      "exact_checkpoint_and_metric_resume": true,
+      "interrupted_at": 10,
+      "passed": true,
+      "physical_fields": [
+        "temperature",
+        "geopotential",
+        "u_component_of_wind",
+        "v_component_of_wind",
+        "specific_humidity",
+        "specific_cloud_ice_water_content",
+        "specific_cloud_liquid_water_content"
+      ],
+      "physical_rmse_shape": [
+        2,
+        37
+      ],
+      "uncommitted_tails_archived": true,
+      "updates": 12
+    }
+  },
+  "slurm_job_id": "14374768"
+}
