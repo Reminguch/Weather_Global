@@ -1,5 +1,10 @@
 # Current loss, README differences, and proposed redesign
 
+**Latest design direction:** [preserve the original NeuralGCM objective and full
+physical-state gradients, starting with K=2 / 12 h](../docs/experiments/neuralgcm_residual/NGCM_ALIGNMENT_K2_20260924.md).
+This supersedes the equal-variable proposal as the primary next experiment.
+It does not change the implemented losses or historical audit results below.
+
 **Status:** the running experiment still optimizes
 `neuralgcm_pooled_change_mse_v2`, using **6 h** change statistics. The 24 h
 calculations and three-definition curves are offline rescoring of the same

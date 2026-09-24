@@ -1,5 +1,11 @@
 # Proposal for review: equal-variable physical MSE
 
+**Later user direction, September 24:** the primary next experiment now aims to
+preserve the original NeuralGCM loss and full physical-state gradients, adding
+the residual head and starting with K=2 / 12 h. See the
+[revised specification](../docs/experiments/neuralgcm_residual/NGCM_ALIGNMENT_K2_20260924.md).
+The proposal below is retained as an alternative and was never activated.
+
 **For Ilya's review. Status: proposed, not implemented in production training.**
 The running jobs and all checkpoints currently plotted were trained with the
 6 h v2 loss. This document proposes a replacement normalization for a matched

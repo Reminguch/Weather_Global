@@ -5,9 +5,11 @@
 > v2-trained checkpoints and the same frozen NGCM baseline. The 24 h panels
 > do **not** represent a model retrained with 24 h normalization.
 
-**For Ilya's review:** [Proposed equal-variable physical MSE, without temporal sigma](EQUAL_VARIABLE_LOSS_PROPOSAL.md).
-This proposal is not active in the running jobs. The physical-time plots are
-displayed directly below and individually further down this page.
+**Latest direction for Ilya's review:** [Original NeuralGCM objective and full gradients, starting with K=2 / 12 h](../docs/experiments/neuralgcm_residual/NGCM_ALIGNMENT_K2_20260924.md).
+This revised specification has not been activated in training. The earlier
+[equal-variable proposal without temporal sigma](EQUAL_VARIABLE_LOSS_PROPOSAL.md)
+is retained as an alternative, not the primary next experiment. All plots below
+still describe the existing v2-trained checkpoints.
 
 ## Upper-air improvements vs physical time
 
