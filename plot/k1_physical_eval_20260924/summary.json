@@ -1,0 +1,1021 @@
+{
+  "captured_at_utc": "2026-09-24T13:17:02.752394+00:00",
+  "plan": {
+    "created_at_utc": "2026-09-24T12:56:09.020339+00:00",
+    "experiment_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2",
+    "sites": [
+      {
+        "name": "New York",
+        "latitude": 40.7128,
+        "longitude": -74.006
+      },
+      {
+        "name": "Beijing",
+        "latitude": 39.9042,
+        "longitude": 116.4074
+      }
+    ],
+    "plot_windows": [
+      [
+        "2022-01-10",
+        "2022-01-17"
+      ],
+      [
+        "2022-07-10",
+        "2022-07-17"
+      ]
+    ],
+    "runs": {
+      "r2p8_w128_di16": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_07.pkl",
+        "checkpoint_sha256": "a61b34e3c81ca0fcb085fc140bd6e17f6fca7812f10914dae81397502e8445b0",
+        "epoch": 7,
+        "update": 2968,
+        "validation_loss": 0.17766703895686828,
+        "baseline_loss": 1.1389527632198793
+      },
+      "r2p8_w128_di32": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_07.pkl",
+        "checkpoint_sha256": "890a699653ff2d8e31c5ab6e4949321892c6ac26d8dc93d3b4a6a1bbdd508108",
+        "epoch": 7,
+        "update": 2968,
+        "validation_loss": 0.17772658312648432,
+        "baseline_loss": 1.1389527632198793
+      },
+      "r2p8_w256_di16": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_05.pkl",
+        "checkpoint_sha256": "f43d382bd08950091898abe3b3d079a682eddf42813c936409c3648fdf05468f",
+        "epoch": 5,
+        "update": 2120,
+        "validation_loss": 0.17889596053824802,
+        "baseline_loss": 1.1389527632198793
+      },
+      "r2p8_w256_di32": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_05.pkl",
+        "checkpoint_sha256": "14baf60f3240a975226cac26b4be6cac91a41d124178409a64cbb311b30ea5dd",
+        "epoch": 5,
+        "update": 2120,
+        "validation_loss": 0.17898251344657845,
+        "baseline_loss": 1.1389527632198793
+      }
+    }
+  },
+  "runs": {
+    "r2p8_w128_di16": {
+      "completed": true,
+      "smoke": false,
+      "run_id": "r2p8_w128_di16",
+      "records": 1455,
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w128_di16/seed22/pretrain/checkpoint_pass_07.pkl",
+        "checkpoint_sha256": "a61b34e3c81ca0fcb085fc140bd6e17f6fca7812f10914dae81397502e8445b0",
+        "epoch": 7,
+        "update": 2968,
+        "validation_loss": 0.17766703895686828,
+        "baseline_loss": 1.1389527632198793
+      },
+      "experiment_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2",
+      "source_id": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+      "identities": {
+        "config": "8c51c710beab3a22b433e928a694031508b73dd560075008a8e88e885c7c6015",
+        "architecture": "c9d9b88c6450bf0f5bde9ab8ddc19bc20e47f1c10fb67585d56148e704b4f0c4",
+        "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+        "native_schema": "cadcf0aac36de426e3ae9745e73e917a62c8209adb4482e727ca200f98ddb113",
+        "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+        "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+        "source": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+        "known_features": [
+          "checkpoint_surface_geopotential_scaled",
+          "checkpoint_land_sea_mask",
+          "sin_longitude",
+          "cos_longitude",
+          "sin_latitude",
+          "cos_latitude",
+          "lagged_sst_scaled",
+          "lagged_sea_ice",
+          "sin_year",
+          "cos_year",
+          "sin_day",
+          "cos_day"
+        ],
+        "numerical_policy": {
+          "version": "fp32_deterministic_v1",
+          "matmul_precision": "highest",
+          "x64": false,
+          "xla_gpu_exclude_nondeterministic_ops": true
+        },
+        "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f",
+        "correction_policy": "no_pressure_zero_mean_v2",
+        "loss": "neuralgcm_pooled_change_mse_v2"
+      },
+      "script_sha256": "52703afea9931eb78c0a0eecaad1b43e3dabacd6938bc8e6855c1eb159c5a4f5",
+      "plan_sha256": "04193bdee9afd68a36ce458bffa08ccebfd53a31d5809395419f1bee1a6e686c",
+      "job_id": "14366171",
+      "devices": [
+        "NVIDIA A100 80GB PCIe"
+      ],
+      "captured_at_utc": "2026-09-24T13:06:36.425053+00:00",
+      "elapsed_seconds": 350.7472532298416,
+      "prediction_horizon_hours": 6,
+      "split": "2022 validation",
+      "sites": [
+        {
+          "name": "New York",
+          "latitude": 40.7128,
+          "longitude": -74.006,
+          "latitude_index": 46,
+          "longitude_index": 102,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": -73.125
+        },
+        {
+          "name": "Beijing",
+          "latitude": 39.9042,
+          "longitude": 116.4074,
+          "latitude_index": 46,
+          "longitude_index": 41,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": 115.3125
+        }
+      ],
+      "spatial_reduction": "Gaussian area weights over latitude, uniform over longitude",
+      "rmse_reduction": "sqrt(mean over all dates of global area-weighted squared error)",
+      "physical_initialization": "ERA5 encoded anew at every origin; no autoregressive physical feedback",
+      "memory_policy": "production validation: chronological memory, reset every 96 records or at gaps",
+      "unavailable_variables": {
+        "2m_temperature": "No 2 m temperature output or target in this checkpoint/data contract"
+      },
+      "decoded_variables": [
+        "temperature",
+        "geopotential",
+        "u_component_of_wind",
+        "v_component_of_wind",
+        "specific_humidity",
+        "specific_cloud_ice_water_content",
+        "specific_cloud_liquid_water_content"
+      ],
+      "fields": {
+        "temperature": {
+          "unit": "K",
+          "objective_score_baseline": 0.08639569336810882,
+          "objective_score_residual": 0.5361475460717768,
+          "objective_baseline_share_pct": 1.0836483123865674
+        },
+        "geopotential": {
+          "unit": "m2/s2",
+          "objective_score_baseline": 7.57892368552611,
+          "objective_score_residual": 0.23790398558595335,
+          "objective_baseline_share_pct": 95.06131082870124
+        },
+        "u_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.10750233501810388,
+          "objective_score_residual": 0.15200431989025823,
+          "objective_baseline_share_pct": 1.3483857745504857
+        },
+        "v_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.06545933358806515,
+          "objective_score_residual": 0.10524687244207999,
+          "objective_baseline_share_pct": 0.8210466703522088
+        },
+        "specific_humidity": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.1319310111995415,
+          "objective_score_residual": 0.20793528570137482,
+          "objective_baseline_share_pct": 1.6547910209909806
+        },
+        "specific_cloud_ice_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0006324028390054863,
+          "objective_score_residual": 0.0009687646240543229,
+          "objective_baseline_share_pct": 0.007932134606720275
+        },
+        "specific_cloud_liquid_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0018245659092492408,
+          "objective_score_residual": 0.0034624487643299747,
+          "objective_baseline_share_pct": 0.022885258411802282
+        }
+      },
+      "numpy_and_production_forward_checks": [
+        {
+          "index": 0,
+          "origin": "2022-01-02T00",
+          "production_forward_loss": 0.17810454964637756,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.466924173006366e-07
+        },
+        {
+          "index": 207,
+          "origin": "2022-02-22T18",
+          "production_forward_loss": 0.18718619644641876,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1553659049700249e-07
+        },
+        {
+          "index": 415,
+          "origin": "2022-04-15T18",
+          "production_forward_loss": 0.18328361213207245,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.4706591235305535e-07
+        },
+        {
+          "index": 623,
+          "origin": "2022-06-06T18",
+          "production_forward_loss": 0.1872120052576065,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.6617838446186026e-07
+        },
+        {
+          "index": 830,
+          "origin": "2022-07-28T12",
+          "production_forward_loss": 0.1745060384273529,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.6831211782062474e-07
+        },
+        {
+          "index": 1038,
+          "origin": "2022-09-18T12",
+          "production_forward_loss": 0.1659715175628662,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.4231906505253877e-07
+        },
+        {
+          "index": 1246,
+          "origin": "2022-11-09T12",
+          "production_forward_loss": 0.1625555008649826,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1182489128594702e-07
+        },
+        {
+          "index": 1454,
+          "origin": "2022-12-31T12",
+          "production_forward_loss": 0.17059820890426636,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.157291306413851e-07
+        }
+      ],
+      "live_cache_checks": [],
+      "baseline_loss": 1.1389527182068835,
+      "residual_loss": 0.1776670318685468,
+      "objective_improvement_pct": 84.40084219226783,
+      "production_checkpoint_unchanged": true,
+      "frozen_backbone_unchanged": true,
+      "artifacts": {
+        "physical_metrics.csv": "fc67ec53812848dfcd41a38cce650ff94a6a321b03a5d5cbb27a29c02065681c",
+        "timeseries.npz": "486d7f8136422e92dfda79e469857a517d3a9fca768a3f861f4cfd713f779c86"
+      },
+      "report_sha256": "9ba500096df632918a2a2a93170b924a13cd5297ca462f7fa846bc80cc9702bb"
+    },
+    "r2p8_w128_di32": {
+      "completed": true,
+      "smoke": false,
+      "run_id": "r2p8_w128_di32",
+      "records": 1455,
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w128_di32/seed22/pretrain/checkpoint_pass_07.pkl",
+        "checkpoint_sha256": "890a699653ff2d8e31c5ab6e4949321892c6ac26d8dc93d3b4a6a1bbdd508108",
+        "epoch": 7,
+        "update": 2968,
+        "validation_loss": 0.17772658312648432,
+        "baseline_loss": 1.1389527632198793
+      },
+      "experiment_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2",
+      "source_id": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+      "identities": {
+        "config": "aa966bbe79d3eb9f5d36cef11d103b31d2c23fabc37db76fac6929bea2138f73",
+        "architecture": "f86c5b5a98880101c56f71f728be6bf2783ef68be29e69cef5a252550138c1dd",
+        "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+        "native_schema": "cadcf0aac36de426e3ae9745e73e917a62c8209adb4482e727ca200f98ddb113",
+        "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+        "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+        "source": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+        "known_features": [
+          "checkpoint_surface_geopotential_scaled",
+          "checkpoint_land_sea_mask",
+          "sin_longitude",
+          "cos_longitude",
+          "sin_latitude",
+          "cos_latitude",
+          "lagged_sst_scaled",
+          "lagged_sea_ice",
+          "sin_year",
+          "cos_year",
+          "sin_day",
+          "cos_day"
+        ],
+        "numerical_policy": {
+          "version": "fp32_deterministic_v1",
+          "matmul_precision": "highest",
+          "x64": false,
+          "xla_gpu_exclude_nondeterministic_ops": true
+        },
+        "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f",
+        "correction_policy": "no_pressure_zero_mean_v2",
+        "loss": "neuralgcm_pooled_change_mse_v2"
+      },
+      "script_sha256": "52703afea9931eb78c0a0eecaad1b43e3dabacd6938bc8e6855c1eb159c5a4f5",
+      "plan_sha256": "04193bdee9afd68a36ce458bffa08ccebfd53a31d5809395419f1bee1a6e686c",
+      "job_id": "14366172",
+      "devices": [
+        "NVIDIA A100 80GB PCIe"
+      ],
+      "captured_at_utc": "2026-09-24T13:06:35.178969+00:00",
+      "elapsed_seconds": 352.3581172111444,
+      "prediction_horizon_hours": 6,
+      "split": "2022 validation",
+      "sites": [
+        {
+          "name": "New York",
+          "latitude": 40.7128,
+          "longitude": -74.006,
+          "latitude_index": 46,
+          "longitude_index": 102,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": -73.125
+        },
+        {
+          "name": "Beijing",
+          "latitude": 39.9042,
+          "longitude": 116.4074,
+          "latitude_index": 46,
+          "longitude_index": 41,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": 115.3125
+        }
+      ],
+      "spatial_reduction": "Gaussian area weights over latitude, uniform over longitude",
+      "rmse_reduction": "sqrt(mean over all dates of global area-weighted squared error)",
+      "physical_initialization": "ERA5 encoded anew at every origin; no autoregressive physical feedback",
+      "memory_policy": "production validation: chronological memory, reset every 96 records or at gaps",
+      "unavailable_variables": {
+        "2m_temperature": "No 2 m temperature output or target in this checkpoint/data contract"
+      },
+      "decoded_variables": [
+        "temperature",
+        "geopotential",
+        "u_component_of_wind",
+        "v_component_of_wind",
+        "specific_humidity",
+        "specific_cloud_ice_water_content",
+        "specific_cloud_liquid_water_content"
+      ],
+      "fields": {
+        "temperature": {
+          "unit": "K",
+          "objective_score_baseline": 0.08639569336810882,
+          "objective_score_residual": 0.5344772286841141,
+          "objective_baseline_share_pct": 1.0836483123865674
+        },
+        "geopotential": {
+          "unit": "m2/s2",
+          "objective_score_baseline": 7.57892368552611,
+          "objective_score_residual": 0.242915393509406,
+          "objective_baseline_share_pct": 95.06131082870124
+        },
+        "u_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.10750233501810388,
+          "objective_score_residual": 0.1510184921247443,
+          "objective_baseline_share_pct": 1.3483857745504857
+        },
+        "v_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.06545933358806515,
+          "objective_score_residual": 0.1042370779356596,
+          "objective_baseline_share_pct": 0.8210466703522088
+        },
+        "specific_humidity": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.1319310111995415,
+          "objective_score_residual": 0.20698807103322545,
+          "objective_baseline_share_pct": 1.6547910209909806
+        },
+        "specific_cloud_ice_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0006324028390054863,
+          "objective_score_residual": 0.0009523971347519136,
+          "objective_baseline_share_pct": 0.007932134606720275
+        },
+        "specific_cloud_liquid_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0018245659092492408,
+          "objective_score_residual": 0.0034973700759657164,
+          "objective_baseline_share_pct": 0.022885258411802282
+        }
+      },
+      "numpy_and_production_forward_checks": [
+        {
+          "index": 0,
+          "origin": "2022-01-02T00",
+          "production_forward_loss": 0.17854411900043488,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 8.237121521864995e-08
+        },
+        {
+          "index": 207,
+          "origin": "2022-02-22T18",
+          "production_forward_loss": 0.1872026026248932,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1553659049700249e-07
+        },
+        {
+          "index": 415,
+          "origin": "2022-04-15T18",
+          "production_forward_loss": 0.18342381715774536,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.4706591235305535e-07
+        },
+        {
+          "index": 623,
+          "origin": "2022-06-06T18",
+          "production_forward_loss": 0.1868278831243515,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1743533119679563e-07
+        },
+        {
+          "index": 830,
+          "origin": "2022-07-28T12",
+          "production_forward_loss": 0.17431391775608063,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.0385637332202406e-07
+        },
+        {
+          "index": 1038,
+          "origin": "2022-09-18T12",
+          "production_forward_loss": 0.16589224338531494,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.2964572529873034e-07
+        },
+        {
+          "index": 1246,
+          "origin": "2022-11-09T12",
+          "production_forward_loss": 0.16271822154521942,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.405763876927483e-07
+        },
+        {
+          "index": 1454,
+          "origin": "2022-12-31T12",
+          "production_forward_loss": 0.17088787257671356,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 7.825853706731059e-08
+        }
+      ],
+      "live_cache_checks": [],
+      "baseline_loss": 1.1389527182068835,
+      "residual_loss": 0.17772657578540957,
+      "objective_improvement_pct": 84.39561423891114,
+      "production_checkpoint_unchanged": true,
+      "frozen_backbone_unchanged": true,
+      "artifacts": {
+        "physical_metrics.csv": "83dba5a92fd2e852e56989972453b9198e035959d7953cfa5bb6818a900990bf",
+        "timeseries.npz": "81552490de4546023f7de3a929144086d59808cce2a06511554271c9e743e5ec"
+      },
+      "report_sha256": "2867481d8177c52eaee4e268d0e2cfc1cfd31f8079a8bafcd64420c566b785ca"
+    },
+    "r2p8_w256_di16": {
+      "completed": true,
+      "smoke": false,
+      "run_id": "r2p8_w256_di16",
+      "records": 1455,
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w256_di16/seed22/pretrain/checkpoint_pass_05.pkl",
+        "checkpoint_sha256": "f43d382bd08950091898abe3b3d079a682eddf42813c936409c3648fdf05468f",
+        "epoch": 5,
+        "update": 2120,
+        "validation_loss": 0.17889596053824802,
+        "baseline_loss": 1.1389527632198793
+      },
+      "experiment_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2",
+      "source_id": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+      "identities": {
+        "config": "ffaec1b11c2c85971b560754b74b3ec85ac2a79e73a48c850be6a6f95ef05e65",
+        "architecture": "06727538e4b297fed5abf719729a09b69d43fd8bddcd9ff3ba573f0db3af7b7f",
+        "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+        "native_schema": "cadcf0aac36de426e3ae9745e73e917a62c8209adb4482e727ca200f98ddb113",
+        "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+        "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+        "source": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+        "known_features": [
+          "checkpoint_surface_geopotential_scaled",
+          "checkpoint_land_sea_mask",
+          "sin_longitude",
+          "cos_longitude",
+          "sin_latitude",
+          "cos_latitude",
+          "lagged_sst_scaled",
+          "lagged_sea_ice",
+          "sin_year",
+          "cos_year",
+          "sin_day",
+          "cos_day"
+        ],
+        "numerical_policy": {
+          "version": "fp32_deterministic_v1",
+          "matmul_precision": "highest",
+          "x64": false,
+          "xla_gpu_exclude_nondeterministic_ops": true
+        },
+        "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f",
+        "correction_policy": "no_pressure_zero_mean_v2",
+        "loss": "neuralgcm_pooled_change_mse_v2"
+      },
+      "script_sha256": "52703afea9931eb78c0a0eecaad1b43e3dabacd6938bc8e6855c1eb159c5a4f5",
+      "plan_sha256": "04193bdee9afd68a36ce458bffa08ccebfd53a31d5809395419f1bee1a6e686c",
+      "job_id": "14366173",
+      "devices": [
+        "NVIDIA A100 80GB PCIe"
+      ],
+      "captured_at_utc": "2026-09-24T13:07:31.065833+00:00",
+      "elapsed_seconds": 376.8577424539253,
+      "prediction_horizon_hours": 6,
+      "split": "2022 validation",
+      "sites": [
+        {
+          "name": "New York",
+          "latitude": 40.7128,
+          "longitude": -74.006,
+          "latitude_index": 46,
+          "longitude_index": 102,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": -73.125
+        },
+        {
+          "name": "Beijing",
+          "latitude": 39.9042,
+          "longitude": 116.4074,
+          "latitude_index": 46,
+          "longitude_index": 41,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": 115.3125
+        }
+      ],
+      "spatial_reduction": "Gaussian area weights over latitude, uniform over longitude",
+      "rmse_reduction": "sqrt(mean over all dates of global area-weighted squared error)",
+      "physical_initialization": "ERA5 encoded anew at every origin; no autoregressive physical feedback",
+      "memory_policy": "production validation: chronological memory, reset every 96 records or at gaps",
+      "unavailable_variables": {
+        "2m_temperature": "No 2 m temperature output or target in this checkpoint/data contract"
+      },
+      "decoded_variables": [
+        "temperature",
+        "geopotential",
+        "u_component_of_wind",
+        "v_component_of_wind",
+        "specific_humidity",
+        "specific_cloud_ice_water_content",
+        "specific_cloud_liquid_water_content"
+      ],
+      "fields": {
+        "temperature": {
+          "unit": "K",
+          "objective_score_baseline": 0.08639569336810882,
+          "objective_score_residual": 0.5204084408651922,
+          "objective_baseline_share_pct": 1.0836483123865674
+        },
+        "geopotential": {
+          "unit": "m2/s2",
+          "objective_score_baseline": 7.57892368552611,
+          "objective_score_residual": 0.26819523825883046,
+          "objective_baseline_share_pct": 95.06131082870124
+        },
+        "u_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.10750233501810388,
+          "objective_score_residual": 0.1512518421942016,
+          "objective_baseline_share_pct": 1.3483857745504857
+        },
+        "v_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.06545933358806515,
+          "objective_score_residual": 0.1022830931796241,
+          "objective_baseline_share_pct": 0.8210466703522088
+        },
+        "specific_humidity": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.1319310111995415,
+          "objective_score_residual": 0.20573502976664973,
+          "objective_baseline_share_pct": 1.6547910209909806
+        },
+        "specific_cloud_ice_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0006324028390054863,
+          "objective_score_residual": 0.0009058770826854503,
+          "objective_baseline_share_pct": 0.007932134606720275
+        },
+        "specific_cloud_liquid_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0018245659092492408,
+          "objective_score_residual": 0.003492152125533043,
+          "objective_baseline_share_pct": 0.022885258411802282
+        }
+      },
+      "numpy_and_production_forward_checks": [
+        {
+          "index": 0,
+          "origin": "2022-01-02T00",
+          "production_forward_loss": 0.18113590776920319,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1134771310990277e-07
+        },
+        {
+          "index": 207,
+          "origin": "2022-02-22T18",
+          "production_forward_loss": 0.18988603353500366,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1553659049700249e-07
+        },
+        {
+          "index": 415,
+          "origin": "2022-04-15T18",
+          "production_forward_loss": 0.18504713475704193,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.4706591235305535e-07
+        },
+        {
+          "index": 623,
+          "origin": "2022-06-06T18",
+          "production_forward_loss": 0.18714021146297455,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.39354384833287e-07
+        },
+        {
+          "index": 830,
+          "origin": "2022-07-28T12",
+          "production_forward_loss": 0.17349308729171753,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.538094210713602e-07
+        },
+        {
+          "index": 1038,
+          "origin": "2022-09-18T12",
+          "production_forward_loss": 0.16645389795303345,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.487628578536377e-07
+        },
+        {
+          "index": 1246,
+          "origin": "2022-11-09T12",
+          "production_forward_loss": 0.16413109004497528,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1182489128594702e-07
+        },
+        {
+          "index": 1454,
+          "origin": "2022-12-31T12",
+          "production_forward_loss": 0.17276635766029358,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 8.964235414132856e-08
+        }
+      ],
+      "live_cache_checks": [],
+      "baseline_loss": 1.1389527182068835,
+      "residual_loss": 0.17889595335324526,
+      "objective_improvement_pct": 84.29294293841355,
+      "production_checkpoint_unchanged": true,
+      "frozen_backbone_unchanged": true,
+      "artifacts": {
+        "physical_metrics.csv": "50c28dfc1bc089c6a7f316e9c0beaadca21d3bcbbf20316b0b54e400b0f3eea7",
+        "timeseries.npz": "18bde615de70b15c527aaf6a13787f992b8484b465ea8c51aade74ae635bc88e"
+      },
+      "report_sha256": "facaa3c51b6d0e19ef3d2432329e2a1d44e2a46cd5f554a052fc6d0b20eee272"
+    },
+    "r2p8_w256_di32": {
+      "completed": true,
+      "smoke": false,
+      "run_id": "r2p8_w256_di32",
+      "records": 1455,
+      "checkpoint": {
+        "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2/runs/r2p8_w256_di32/seed22/pretrain/checkpoint_pass_05.pkl",
+        "checkpoint_sha256": "14baf60f3240a975226cac26b4be6cac91a41d124178409a64cbb311b30ea5dd",
+        "epoch": 5,
+        "update": 2120,
+        "validation_loss": 0.17898251344657845,
+        "baseline_loss": 1.1389527632198793
+      },
+      "experiment_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/artifacts/checkpoints/neuralgcm_residual/res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2",
+      "source_id": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+      "identities": {
+        "config": "9c011b3ef55d33eb458726a64002113205fd69f663559d60d2182a463c5c49ef",
+        "architecture": "297476b6ee6edecf970c9ef6bfa71f5f5324d76570fb53e6b96341dbc7057324",
+        "backbone": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+        "native_schema": "cadcf0aac36de426e3ae9745e73e917a62c8209adb4482e727ca200f98ddb113",
+        "normalization": "684799ab064e79fd740b1af91eb2610cb2099a446e5fbb6f657a1a9ffef7a282",
+        "dataset": "f51534c365518f4c5ecf7b8b71a8182e253365cdabf6511345122219e0236e4a",
+        "source": "8ff196d75294a14eab757a9f5d3df8e9cea78e35356861691cc2a02fd4f984b1",
+        "known_features": [
+          "checkpoint_surface_geopotential_scaled",
+          "checkpoint_land_sea_mask",
+          "sin_longitude",
+          "cos_longitude",
+          "sin_latitude",
+          "cos_latitude",
+          "lagged_sst_scaled",
+          "lagged_sea_ice",
+          "sin_year",
+          "cos_year",
+          "sin_day",
+          "cos_day"
+        ],
+        "numerical_policy": {
+          "version": "fp32_deterministic_v1",
+          "matmul_precision": "highest",
+          "x64": false,
+          "xla_gpu_exclude_nondeterministic_ops": true
+        },
+        "cache": "8f1eac2665325e9bfed6294830cac4571c0dd4958807fedde0ed9fee7e0abf4f",
+        "correction_policy": "no_pressure_zero_mean_v2",
+        "loss": "neuralgcm_pooled_change_mse_v2"
+      },
+      "script_sha256": "52703afea9931eb78c0a0eecaad1b43e3dabacd6938bc8e6855c1eb159c5a4f5",
+      "plan_sha256": "04193bdee9afd68a36ce458bffa08ccebfd53a31d5809395419f1bee1a6e686c",
+      "job_id": "14366184",
+      "devices": [
+        "NVIDIA A100 80GB PCIe"
+      ],
+      "captured_at_utc": "2026-09-24T13:13:15.505635+00:00",
+      "elapsed_seconds": 375.7925024689175,
+      "prediction_horizon_hours": 6,
+      "split": "2022 validation",
+      "sites": [
+        {
+          "name": "New York",
+          "latitude": 40.7128,
+          "longitude": -74.006,
+          "latitude_index": 46,
+          "longitude_index": 102,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": -73.125
+        },
+        {
+          "name": "Beijing",
+          "latitude": 39.9042,
+          "longitude": 116.4074,
+          "latitude_index": 46,
+          "longitude_index": 41,
+          "grid_latitude": 40.46364817811504,
+          "grid_longitude": 115.3125
+        }
+      ],
+      "spatial_reduction": "Gaussian area weights over latitude, uniform over longitude",
+      "rmse_reduction": "sqrt(mean over all dates of global area-weighted squared error)",
+      "physical_initialization": "ERA5 encoded anew at every origin; no autoregressive physical feedback",
+      "memory_policy": "production validation: chronological memory, reset every 96 records or at gaps",
+      "unavailable_variables": {
+        "2m_temperature": "No 2 m temperature output or target in this checkpoint/data contract"
+      },
+      "decoded_variables": [
+        "temperature",
+        "geopotential",
+        "u_component_of_wind",
+        "v_component_of_wind",
+        "specific_humidity",
+        "specific_cloud_ice_water_content",
+        "specific_cloud_liquid_water_content"
+      ],
+      "fields": {
+        "temperature": {
+          "unit": "K",
+          "objective_score_baseline": 0.08639569336810882,
+          "objective_score_residual": 0.5256835103034974,
+          "objective_baseline_share_pct": 1.0836483123865674
+        },
+        "geopotential": {
+          "unit": "m2/s2",
+          "objective_score_baseline": 7.57892368552611,
+          "objective_score_residual": 0.2611673083297166,
+          "objective_baseline_share_pct": 95.06131082870124
+        },
+        "u_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.10750233501810388,
+          "objective_score_residual": 0.15219285528581986,
+          "objective_baseline_share_pct": 1.3483857745504857
+        },
+        "v_component_of_wind": {
+          "unit": "m/s",
+          "objective_score_baseline": 0.06545933358806515,
+          "objective_score_residual": 0.10297904504635899,
+          "objective_baseline_share_pct": 0.8210466703522088
+        },
+        "specific_humidity": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.1319310111995415,
+          "objective_score_residual": 0.20652894070467998,
+          "objective_baseline_share_pct": 1.6547910209909806
+        },
+        "specific_cloud_ice_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0006324028390054863,
+          "objective_score_residual": 0.0009063232160026137,
+          "objective_baseline_share_pct": 0.007932134606720275
+        },
+        "specific_cloud_liquid_water_content": {
+          "unit": "kg/kg",
+          "objective_score_baseline": 0.0018245659092492408,
+          "objective_score_residual": 0.003419563505651359,
+          "objective_baseline_share_pct": 0.022885258411802282
+        }
+      },
+      "numpy_and_production_forward_checks": [
+        {
+          "index": 0,
+          "origin": "2022-01-02T00",
+          "production_forward_loss": 0.18125514686107635,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.0506411011653914e-07
+        },
+        {
+          "index": 207,
+          "origin": "2022-02-22T18",
+          "production_forward_loss": 0.18989822268486023,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1553659049700249e-07
+        },
+        {
+          "index": 415,
+          "origin": "2022-04-15T18",
+          "production_forward_loss": 0.18528100848197937,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.4706591235305535e-07
+        },
+        {
+          "index": 623,
+          "origin": "2022-06-06T18",
+          "production_forward_loss": 0.1873951554298401,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1304729660436528e-07
+        },
+        {
+          "index": 830,
+          "origin": "2022-07-28T12",
+          "production_forward_loss": 0.17377175390720367,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.418253239737275e-07
+        },
+        {
+          "index": 1038,
+          "origin": "2022-09-18T12",
+          "production_forward_loss": 0.16646838188171387,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.545156758632614e-07
+        },
+        {
+          "index": 1246,
+          "origin": "2022-11-09T12",
+          "production_forward_loss": 0.16377168893814087,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 1.1182489128594702e-07
+        },
+        {
+          "index": 1454,
+          "origin": "2022-12-31T12",
+          "production_forward_loss": 0.17266663908958435,
+          "memory_max_abs": 0.0,
+          "numpy_score_max_relative_error": 7.03394714008157e-08
+        }
+      ],
+      "live_cache_checks": [],
+      "baseline_loss": 1.1389527182068835,
+      "residual_loss": 0.17898250662738954,
+      "objective_improvement_pct": 84.28534356464141,
+      "production_checkpoint_unchanged": true,
+      "frozen_backbone_unchanged": true,
+      "artifacts": {
+        "physical_metrics.csv": "c6b58885d310b4edf187cc0978305b4923d4bbe2f8d7a000597efe3c0e10f81d",
+        "timeseries.npz": "6d0c9e5792e18f3a09255e0f82f63f691c9254e9a1330e5ccf15e7111057bed1"
+      },
+      "report_sha256": "f33fa4af544266442ab37c6fd354741d4e81349879b0f48bb89e9810e66445bf"
+    }
+  },
+  "statistics_sha256": "a41acf47e327600f90021d406b4deb23a94cd0673d6f08aa5c0d34a2cfe84792",
+  "plot_time_definition": "hours since fixed t0; each marker is a fresh six-hour K=1 forecast, not autoregressive lead",
+  "plot_start": "2022-01-10T00",
+  "plot_duration_hours": 72,
+  "plot_specs": [
+    {
+      "code": "T850",
+      "field": "temperature",
+      "pressure_hpa": 850,
+      "display_scale": 1.0,
+      "title": "Temperature at 850 hPa",
+      "unit": "K"
+    },
+    {
+      "code": "Z500",
+      "field": "geopotential",
+      "pressure_hpa": 500,
+      "display_scale": 1.0,
+      "title": "Geopotential at 500 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "U850",
+      "field": "u_component_of_wind",
+      "pressure_hpa": 850,
+      "display_scale": 1.0,
+      "title": "Eastward wind at 850 hPa",
+      "unit": "m s$^{-1}$"
+    },
+    {
+      "code": "V850",
+      "field": "v_component_of_wind",
+      "pressure_hpa": 850,
+      "display_scale": 1.0,
+      "title": "Northward wind at 850 hPa",
+      "unit": "m s$^{-1}$"
+    },
+    {
+      "code": "Q700",
+      "field": "specific_humidity",
+      "pressure_hpa": 700,
+      "display_scale": 1000.0,
+      "title": "Specific humidity at 700 hPa",
+      "unit": "g kg$^{-1}$"
+    },
+    {
+      "code": "CI250",
+      "field": "specific_cloud_ice_water_content",
+      "pressure_hpa": 250,
+      "display_scale": 1000.0,
+      "title": "Cloud ice at 250 hPa",
+      "unit": "g kg$^{-1}$"
+    },
+    {
+      "code": "CL850",
+      "field": "specific_cloud_liquid_water_content",
+      "pressure_hpa": 850,
+      "display_scale": 1000.0,
+      "title": "Cloud liquid water at 850 hPa",
+      "unit": "g kg$^{-1}$"
+    }
+  ],
+  "improved_geopotential_specs": [
+    {
+      "code": "Z1",
+      "field": "geopotential",
+      "pressure_hpa": 1,
+      "display_scale": 1.0,
+      "title": "Geopotential at 1 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z2",
+      "field": "geopotential",
+      "pressure_hpa": 2,
+      "display_scale": 1.0,
+      "title": "Geopotential at 2 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z3",
+      "field": "geopotential",
+      "pressure_hpa": 3,
+      "display_scale": 1.0,
+      "title": "Geopotential at 3 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z5",
+      "field": "geopotential",
+      "pressure_hpa": 5,
+      "display_scale": 1.0,
+      "title": "Geopotential at 5 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z7",
+      "field": "geopotential",
+      "pressure_hpa": 7,
+      "display_scale": 1.0,
+      "title": "Geopotential at 7 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z10",
+      "field": "geopotential",
+      "pressure_hpa": 10,
+      "display_scale": 1.0,
+      "title": "Geopotential at 10 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z20",
+      "field": "geopotential",
+      "pressure_hpa": 20,
+      "display_scale": 1.0,
+      "title": "Geopotential at 20 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    },
+    {
+      "code": "Z30",
+      "field": "geopotential",
+      "pressure_hpa": 30,
+      "display_scale": 1.0,
+      "title": "Geopotential at 30 hPa",
+      "unit": "m$^2$ s$^{-2}$"
+    }
+  ]
+}

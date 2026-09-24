@@ -18,6 +18,11 @@ Training is ongoing, so each curve ends at its latest completed validation.
 [CSV data](k1_improvement_vs_training_step.csv) ·
 [Provenance and rollout context](k1_improvement_vs_training_step.provenance.json)
 
+**Physical-variable follow-up:** [six-hour predictions versus ERA5 and NGCM](k1_physical_eval_20260924/README.md)
+now provides all seven variables, fixed-start time axes in 6 h increments,
+and full-year physical-unit errors. The aggregate improvement is concentrated
+in upper-atmosphere geopotential; standard-level forecast errors can worsen.
+
 ## Current snapshot
 
 Captured on **September 24, 2026 at 12:44:00 UTC / 08:44:00 EDT** from
