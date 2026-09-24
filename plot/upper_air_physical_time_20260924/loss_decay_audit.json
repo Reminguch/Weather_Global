@@ -1,0 +1,118 @@
+{
+  "scope": "K1/w128 update 900; original 16 fixed validation origins, not the plotted 12-origin window",
+  "definition": "Unfiltered nodal analogue of 20*M_data; NOT the exact modal five-term loss",
+  "exact_loss": {
+    "baseline": 5808.064025878906,
+    "residual": 132.10685634613037
+  },
+  "exact_terms": {
+    "baseline": {
+      "bias": 521.0307769775391,
+      "data": 5254.4100341796875,
+      "data_spectrum": 32.44912385940552,
+      "model": 0.17357761599123478,
+      "model_spectrum": 0.0004341496533015743
+    },
+    "residual": {
+      "bias": 8.062490403652191,
+      "data": 120.87840747833252,
+      "data_spectrum": 0.4459434859454632,
+      "model": 2.4766396582126617,
+      "model_spectrum": 0.2433738149702549
+    }
+  },
+  "contributions": [
+    {
+      "field": "geopotential",
+      "baseline": 5149.146016059869,
+      "residual": 40.89120283187707,
+      "improved_levels_hpa": [
+        1,
+        2,
+        3,
+        5,
+        7,
+        10,
+        20,
+        30
+      ]
+    },
+    {
+      "field": "temperature",
+      "baseline": 9.484233675534036,
+      "residual": 20.445269389623107,
+      "improved_levels_hpa": [
+        1
+      ]
+    },
+    {
+      "field": "u_component_of_wind",
+      "baseline": 16.35443784480233,
+      "residual": 20.601001729588056,
+      "improved_levels_hpa": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "field": "v_component_of_wind",
+      "baseline": 2.113929893030247,
+      "residual": 9.963659449708741,
+      "improved_levels_hpa": []
+    },
+    {
+      "field": "specific_humidity",
+      "baseline": 80.77440082782887,
+      "residual": 32.43082410015194,
+      "improved_levels_hpa": [
+        1,
+        2,
+        3,
+        5,
+        7
+      ]
+    },
+    {
+      "field": "specific_cloud_ice_water_content",
+      "baseline": 0.007063414580335409,
+      "residual": 0.012260678705034491,
+      "improved_levels_hpa": []
+    },
+    {
+      "field": "specific_cloud_liquid_water_content",
+      "baseline": 0.008262516251230142,
+      "residual": 0.24413164459427003,
+      "improved_levels_hpa": []
+    }
+  ],
+  "upper_geopotential": {
+    "baseline": 5149.0745210645955,
+    "residual": 38.64270944994867
+  },
+  "physical_examples": [
+    {
+      "field": "geopotential",
+      "pressure_hpa": 1,
+      "baseline_rmse": 30017.112690917347,
+      "residual_rmse": 2498.6765360849245
+    },
+    {
+      "field": "geopotential",
+      "pressure_hpa": 500,
+      "baseline_rmse": 25.5906557844183,
+      "residual_rmse": 125.27112443243293
+    },
+    {
+      "field": "temperature",
+      "pressure_hpa": 850,
+      "baseline_rmse": 0.4357134643717728,
+      "residual_rmse": 3.423865903137605
+    }
+  ],
+  "source_hashes": {
+    "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k1_w128_d16_slices_v1/baseline_validation.json": "8c0208338c93ec6d71762a0b9167b539252b3742f718c79370b43e58dd0dcd61",
+    "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k1_w128_d16_slices_v1/validation.jsonl": "dddd3dbc0cc54cf312b659825e2e890a92681209a0a6d250d091602a4adef59d",
+    "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json": "55f59a53463facad8a59ee0c3e91217d2c8523a8dd8bcb3ee146c2e56b86a82e"
+  }
+}

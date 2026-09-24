@@ -8,6 +8,21 @@ formula. All training curves use **optimizer update count** on the horizontal ax
 pairs have larger physical RMSE. The large loss reduction must not be reported
 as a comparable improvement in weather forecasting skill.
 
+**Upper-level improvements:** [new physical-time figures](upper_air_physical_time_20260924/README.md)
+show lower geopotential RMSE at every 1–30 hPa level for both widths and all K1/K2
+forecast leads in the 12-origin window, alongside worse 500 hPa results.
+[The cause analysis](upper_air_physical_time_20260924/ANALYSIS.md) separates removal
+of a large spatial-mean bias from remaining spatial errors and explains how this
+dominates the current aggregate objective. Seven headline-level degradations do
+not imply that every variable at every level worsened.
+
+**Physical quantities versus physical time:** the new [K=1/K=2 dated forecast
+comparison](paper_physical_time_20260924/README.md) evaluates all four completed
+1000-update stages using their best validation checkpoints. It separates +6 h
+and +12 h forecasts and shows seven variables, global means, and New York/Beijing
+point values against ERA5 and the frozen baseline. Its horizontal axis is forecast
+valid time, as requested; the training curves below retain optimizer updates.
+
 Snapshot: **2026-09-24T20:11:35.135269+00:00**. Both K=1 runs reached their 1000-update review
 milestone. Other runs are shown only through their available validation points.
 Missing results are not extrapolated. All configurations use d_inner=16.

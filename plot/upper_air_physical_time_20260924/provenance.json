@@ -1,0 +1,129 @@
+{
+  "exported_at": "2026-09-24T22:49:09.610318+00:00",
+  "source_directory": "/home/sh4809/weatherforecast/Weather_Global/plot/paper_physical_time_20260924",
+  "source_provenance_sha256": "6a2ed173c9e8218c79a7f26fec0838206427011b7aba05bb413a1a4acb4e9309",
+  "source_files": {
+    "timeseries.csv": "1cb724a6b66a23bc2bced745d777c2b3380c4f88be06adff62d2fc7e63c408d0",
+    "physical_errors.csv": "764a4d0d0c6d0cbe1b9a597742ce620e47a3c95bd759d2ae33ec84edcafbbe20",
+    "physical_rmse.csv": "a24b82b2c7c15e4916ad7049b60c9480ad1e4844e93a1830e590247a4f494422"
+  },
+  "plan": {
+    "origins": [
+      "2022-01-10T00",
+      "2022-01-10T06",
+      "2022-01-10T12",
+      "2022-01-10T18",
+      "2022-01-11T00",
+      "2022-01-11T06",
+      "2022-01-11T12",
+      "2022-01-11T18",
+      "2022-01-12T00",
+      "2022-01-12T06",
+      "2022-01-12T12",
+      "2022-01-12T18"
+    ],
+    "resources": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json",
+    "runs": {
+      "k1_w128_d16": {
+        "K": 1,
+        "checkpoint": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/k1_w128_milestone1000_source_v1/best.pkl",
+        "checkpoint_sha256": "2bc73b2bdd15065bfc9d84a39658969a5f3bace881809dec5e61148673bb3b86",
+        "d_inner": 16,
+        "stage_updates": 1000,
+        "update": 900,
+        "width": 128
+      },
+      "k1_w256_d16": {
+        "K": 1,
+        "checkpoint": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/k1_w256_milestone1000_source_v1/best.pkl",
+        "checkpoint_sha256": "baf82773163d907bc968decff35d0d2e0fe126af3bbf881baf4aa81619c0cb16",
+        "d_inner": 16,
+        "stage_updates": 1000,
+        "update": 900,
+        "width": 256
+      },
+      "k2_w128_d16": {
+        "K": 2,
+        "checkpoint": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/k2_w128_milestone1000_source_v1/best.pkl",
+        "checkpoint_sha256": "65932e949727d17129167ffeaea34d2466e74c854ae0b32c4894b9c41c5968d3",
+        "d_inner": 16,
+        "stage_updates": 1000,
+        "update": 800,
+        "width": 128
+      },
+      "k2_w256_d16": {
+        "K": 2,
+        "checkpoint": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/k2_w256_milestone1000_source_v1/best.pkl",
+        "checkpoint_sha256": "545bca1c14e8087e14ef7ca8e94ad8bc220f2ddf002c88f5648151686dd3d4c6",
+        "d_inner": 16,
+        "stage_updates": 1000,
+        "update": 900,
+        "width": 256
+      }
+    },
+    "selection": "Best validation loss within each completed 1000-update stage, selected before physical-window evaluation",
+    "sites": [
+      {
+        "latitude": 40.7128,
+        "longitude": -74.006,
+        "name": "New York"
+      },
+      {
+        "latitude": 39.9042,
+        "longitude": 116.4074,
+        "name": "Beijing"
+      }
+    ],
+    "source_root": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_transfer_v2",
+    "statistics": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json"
+  },
+  "upper_pressure_hpa": [
+    1,
+    2,
+    3,
+    5,
+    7,
+    10,
+    20,
+    30
+  ],
+  "comparison_pressure_hpa": 500,
+  "figures": [
+    "w128_geopotential_global",
+    "w128_geopotential_new_york",
+    "w128_geopotential_beijing",
+    "w128_geopotential_rmse",
+    "w128_temperature_global",
+    "w128_u_component_of_wind_global",
+    "w128_v_component_of_wind_global",
+    "w128_specific_humidity_global",
+    "w128_specific_cloud_ice_water_content_global",
+    "w128_specific_cloud_liquid_water_content_global",
+    "w256_geopotential_global",
+    "w256_geopotential_new_york",
+    "w256_geopotential_beijing",
+    "w256_geopotential_rmse",
+    "w256_temperature_global",
+    "w256_u_component_of_wind_global",
+    "w256_v_component_of_wind_global",
+    "w256_specific_humidity_global",
+    "w256_specific_cloud_ice_water_content_global",
+    "w256_specific_cloud_liquid_water_content_global",
+    "geopotential_overview"
+  ],
+  "checks": {
+    "input_hashes": true,
+    "paired_baselines": true,
+    "valid_times": true,
+    "origin_coverage": true,
+    "checkpoint_updates": true,
+    "rmse_reconstruction": true
+  },
+  "files": {
+    "timeseries.csv": "d0999e17cec4fe90e37f699f2b378f93d198986807c53b41e6a36ed2d5bcae06",
+    "physical_errors.csv": "9cedefded24184600e45762a6a83f0c16c98e6270afa6ea69e3838023d62196c",
+    "physical_rmse.csv": "2de3a618de9eb578ed9e996a4e40fce27433b66e018185446344776eec23418c"
+  },
+  "plotting_script_sha256": "e3a7b0566570bdd4855dbf74fddcb8e107d23eba3a4c79a62275dd7643bbb9f8",
+  "loss_decay_audit_sha256": "3c1be38f4933cb457e0cf3fd70a7fcab81aaf19d8f5f3632d22d21c0a8cc4d24"
+}

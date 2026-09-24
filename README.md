@@ -4,6 +4,15 @@ The active `residual_NGCM` branch trains a Residual Mamba head on the official
 frozen deterministic NeuralGCM 2.8° model, with matched K=1/K=2 training and
 validation and d_inner=16.
 
+**[Upper-air physical-time figures and analysis](plot/upper_air_physical_time_20260924/README.md)**
+show where the residual improves: geopotential at all eight 1–30 hPa levels,
+for both widths and all K1/K2 forecast leads in the paired 12-origin window.
+The comparison below also shows degradation at 500 hPa. Most of the upper-level
+gain removes a large spatial-mean bias; this dominates the current loss reduction.
+[中文原因分析及偏差分解](plot/upper_air_physical_time_20260924/ANALYSIS.md).
+
+![Upper-air geopotential versus physical time and RMSE](plot/upper_air_physical_time_20260924/geopotential_overview.png)
+
 **[Current training results and full evaluation report](plot/README.md)** replace
 the September 24 morning overview. These runs actually use the new five-term
 objective. Its large reduction does not imply broad forecast improvement;

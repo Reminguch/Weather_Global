@@ -1,0 +1,10 @@
+{
+  "source_sha256": "9cedefded24184600e45762a6a83f0c16c98e6270afa6ea69e3838023d62196c",
+  "method": "Per-origin spatial MSE = spatial-mean-error squared + centered spatial MSE; then time mean",
+  "rows": 54,
+  "script_sha256": "ee00878c72fdd9108ebf8f533870a8c758f4920b437521a8db63eb93c9d7e45e",
+  "files": {
+    "geopotential_bias_decomposition.csv": "5b93c578fb4682d38b59c9e3601e44e7bf7ba94896c753fff31e69abc071d7f8",
+    "ANALYSIS.md": "01160356f135b7d45d89d05c7c58d82c2efe0598c51d4555326b0e7eaaadfcbc"
+  }
+}
