@@ -134,8 +134,17 @@ All new local outputs are under `logs/ngcm_aligned_20260924/`, separate from
 existing v2 jobs and artifacts. Revised tests execute immutable
 `source_train_v4`, source ID
 `f4346f67bf51ca59dcd0d85d67dbaaebd802f2fab77c6c5ce330c059d9c44423`.
-The next production submissions will use this same pinned execution policy
-and depend on the corresponding detailed test and the CLI test.
+Eight replacement 2,000-update jobs now use this same pinned execution policy.
+Each waits for its corresponding detailed test and the CLI test to succeed.
+
+| Width | `d_inner` | K=1 job | K=2 job |
+| ---: | ---: | ---: | ---: |
+| 128 | 16 | 14374862 | 14374863 |
+| 128 | 32 | 14374864 | 14374865 |
+| 256 | 16 | 14374866 | 14374867 |
+| 256 | 32 | 14374868 | 14374870 |
+
+[Current exact commands and dependencies](evidence_20260924/training_jobs_v2.json).
 
 These tests assess loss arithmetic, the chosen gradient contract and operational
 correctness. Long-run stability and forecast skill require training and held-out
