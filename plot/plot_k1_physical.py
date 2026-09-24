@@ -166,9 +166,10 @@ def write_readme(output):
                   'weighted MSE. It borrows the amplitude factors (geopotential 2, humidity 0.66,',
                   'cloud species 0.05), but does not fully reproduce the original loss.',
                   'The reported 95% share is an empirical imbalance of this custom objective,',
-                  'not a prescribed NeuralGCM weighting. Changing the normalization interval alone',
-                  'has not yet been shown to remove this imbalance; these results still use the',
-                  'existing custom objective.', '']
+                  'not a prescribed NeuralGCM weighting. The subsequent',
+                  '[normalization audit](../loss_alignment_audit_20260924/README.md) finds that',
+                  '24-hour scales alone do not remove this imbalance. These physical results',
+                  'still describe checkpoints trained with the existing custom objective.', '']
     position = lines.index('## Individual figures and data')
     lines[position:position] = geo_lines
     (output / 'README.md').write_text('\n'.join(lines))

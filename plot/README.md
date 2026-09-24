@@ -1,138 +1,118 @@
-# K=1 improvement versus training step
+# NeuralGCM residual: loss comparisons and physical forecasts
 
-> **Important: the current training loss differs from the NeuralGCM paper.**
-> The custom objective is dominated by geopotential: it contributes **95.06%**
-> of baseline loss, and geopotential at **1–7 hPa alone contributes 88.81%**
-> of the total. The approximately **84% improvement below is a reduction in
-> this custom loss**, not an 84% improvement across weather variables.
-> Full-year physical evaluation shows that T850, Z500, wind, humidity, and cloud
-> errors at the reported standard levels worsen for the evaluated checkpoints.
+> **The original README loss, the running v2 loss, and the 24 h simplified
+> loss are different definitions.** Every curve below rescores the same
+> v2-trained checkpoints and the same frozen NGCM baseline. The 24 h panels
+> do **not** represent a model retrained with 24 h normalization.
 
-![K=1 improvement over NGCM versus training step](k1_improvement_vs_training_step.png)
+## Requested comparisons
 
-**Caption.** Relative reduction in the `neuralgcm_pooled_change_mse_v2`
-validation objective compared with frozen NGCM during K=1 pretraining at 2.8°.
-Improvement is `100 × (1 − residual_NGCM_loss / NGCM_loss)`.
-**Training step counts optimizer updates**, as requested for training plots.
-Markers show initialization and completed epochs, with 424 updates per epoch.
-The inset enlarges the post-initialization points using the same units on both
-axes. All configurations use the same 1,455 six-hour validation forecasts from
-2022 and seed 22. The baseline loss is **1.1389527632198793**.
-Only checkpoints with matching completed-validation receipts enter the snapshot.
-Training is ongoing, so each curve ends at its latest completed validation.
+All training curves use **training step (optimizer update count)** on the
+horizontal axis. Every definition provides total loss, seven separate variable
+contributions, and improvement over the baseline. The black dashed line is
+frozen NGCM; colored lines identify the four residual configurations.
 
-[PDF](k1_improvement_vs_training_step.pdf) ·
-[SVG](k1_improvement_vs_training_step.svg) ·
-[CSV data](k1_improvement_vs_training_step.csv) ·
-[Provenance and rollout context](k1_improvement_vs_training_step.provenance.json)
+| Scoring definition | Total + seven variables | Improvement | Interpretation |
+| --- | --- | --- | --- |
+| **1. Original README loss** | [Loss curves](loss_definitions_20260924/readme_v1/loss_by_training_step.png) | [Improvement curves](loss_definitions_20260924/readme_v1/improvement_by_training_step.png) | Per-level 6 h scales, pressure weights, seven-field mean |
+| Current training loss v2 | [Loss curves](loss_definitions_20260924/current_v2/loss_by_training_step.png) | [Improvement curves](loss_definitions_20260924/current_v2/improvement_by_training_step.png) | Pooled 6 h scales and additional variable amplitudes; this is the actual training objective |
+| **2. 24 h simplified MSE** | [Loss curves](loss_definitions_20260924/normalized24_mse/loss_by_training_step.png) | [Improvement curves](loss_definitions_20260924/normalized24_mse/improvement_by_training_step.png) | NeuralGCM-style 24 h normalization with reference default reductions; still differs from the complete paper loss |
 
-**Physical-variable follow-up:** [six-hour predictions versus ERA5 and NGCM](k1_physical_eval_20260924/README.md)
-now provides all seven variables, fixed-start time axes in 6 h increments,
-and full-year physical-unit errors. The aggregate improvement is concentrated
-in upper-atmosphere geopotential; standard-level forecast errors can worsen.
+![Three definitions compared](loss_definitions_20260924/total_improvement_comparison.png)
+
+[Complete figures, individual variable plots, checkpoint steps and validation details](loss_definitions_20260924/README.md) ·
+[Loss CSV](loss_definitions_20260924/loss_curves.csv) ·
+[Per-level physical MSE CSV](loss_definitions_20260924/physical_mse_by_step.csv) ·
+[Source hashes and scoring coefficients](loss_definitions_20260924/provenance.json)
+
+Loss magnitudes across definitions have different scales and are not directly
+comparable. Within each definition both models use exactly the same statistics,
+weights, forecast times, targets and grid. **Negative improvement means worse
+than baseline.** Each variable panel includes all 37 pressure levels and shows
+its contribution to total loss, not a single-level physical RMSE.
 
 ## Loss mismatch and geopotential dominance
 
-The current objective, `neuralgcm_pooled_change_mse_v2`, is **not the original
-NeuralGCM training loss**. Its main differences are:
+[Exact current loss, differences from the original README, diagnosed problems,
+and proposed redesign](LOSS_DEFINITION_AND_DESIGN.md)
 
-| Component | Current residual training | NeuralGCM paper |
-| --- | --- | --- |
-| Normalization interval | Standard deviations of **6 h** ERA5 changes | Standard deviations of **24 h** ERA5 changes |
-| Pooling | RMS of per-level standard deviations, except humidity | Standard deviation over longitude, latitude, level, and sample, except humidity, which is normalized per level |
-| Loss terms | Decoded pressure-level weighted MSE only | Filtered MSE and spectral loss in both data and model representations, plus bias loss |
-| Variable factors | Borrows geopotential 2, humidity 0.66, and cloud species 0.05 as amplitude factors before squaring | These factors accompany the paper's normalization and full objective; internal log surface pressure also has factor 5 |
+**The 95.06% geopotential share belongs to the modified v2 loss, not the
+original README formula.** Using identical baseline predictions from the full
+1,455-origin K=1 audit:
 
-See [NeuralGCM G.3–G.4](https://arxiv.org/pdf/2311.07222#page=41).
-The current implementation additionally uses pressure-proportional vertical
-weights. These choices have not been established as a reproduction of the
-paper's complete weighting and aggregation.
-
-The **95.06% / 88.81%** shares come from the paired physical audit of
-`w128/di16`, epoch 7, training step 2,968, over all **1,455** six-hour forecasts
-in the 2022 validation set. This audited checkpoint is later than the w128
-snapshot in the training plot. They are measured contributions to our
-custom objective, **not weights prescribed by NeuralGCM** and not physical
-energy fractions. The strong aggregate improvement is concentrated in
-upper-atmosphere geopotential and masks worse errors in other variables.
-
-The loss mismatch and imbalance are established; **changing 6 h normalization
-to 24 h has not yet been shown to remove the imbalance**. The relative effect
-of normalization, vertical weighting, and the baseline's pressure-level errors
-requires separate measurement. The existing plots and checkpoints still use
-the current custom objective.
-
-For the next alignment, the user has accepted a **simplified decoded MSE**,
-temporarily omitting filtering, model-space, spectral, and bias terms. Its
-retained normalization, variable factors, spatial/vertical reductions, and
-lead-time scaling must be checked against the paper and official reference
-code. Any revised metric must score baseline and residual predictions with
-the **same training-only statistics and evaluation protocol**. It must remain
-labeled a simplified objective, rather than the paper's full training loss.
-
-[Measured contributions by variable and pressure](k1_physical_eval_20260924/objective_contributions.csv) ·
-[Physical RMSE for all seven fields and 37 levels](k1_physical_eval_20260924/physical_metrics_all_levels.csv) ·
-[Geopotential loss breakdown](k1_physical_eval_20260924/r2p8_w128_di16/geopotential_loss_breakdown.png)
-
-## Current snapshot
-
-Captured on **September 24, 2026 at 12:44:00 UTC / 08:44:00 EDT** from
-`res2p8_w128_256_di16_32_train2015_2021_20260924_feedback_v2`.
-
-| Configuration | Completed epoch | Training step | K=1 validation loss | Improvement |
-| --- | ---: | ---: | ---: | ---: |
-| w128 / di16 | 6 | 2,544 | 0.179594 | 84.23% |
-| w128 / di32 | 6 | 2,544 | 0.180016 | 84.19% |
-| w256 / di16 | 5 | 2,120 | 0.178896 | 84.29% |
-| w256 / di32 | 5 | 2,120 | 0.178983 | 84.29% |
-
-## Interpretation and multi-step validation
-
-These are **single-step reductions of the new custom objective**, not evidence
-of improved five-day forecast skill. At epoch 5, all four models completed all
-32 cold and warm validation origins, but their five-day rollout losses were
-substantially worse than frozen NGCM.
-
-| Configuration | Cold five-day mean loss | Ratio to NGCM |
+| Baseline loss contribution | Original README | Current v2 |
 | --- | ---: | ---: |
-| w128 / di16 | 123.950 | 85.69× |
-| w128 / di32 | 123.083 | 85.09× |
-| w256 / di16 | 100.314 | 69.35× |
-| w256 / di32 | 102.711 | 71.01× |
+| Geopotential | **0.00048%** | **95.06%** |
+| Cloud liquid water | **97.01%** | **0.0229%** |
+| Cloud ice | **2.99%** | **0.0079%** |
 
-The common five-day baseline loss is 1.446498353779316. The provenance file
-includes the corresponding cold/warm summaries and their source hashes.
-Formal K=20 fine-tuning had not started at snapshot time.
+The original recipe is dominated by cloud terms. The v2 revision pools
+per-level scales and applies amplitudes before squaring: geopotential 2,
+humidity 0.66, and cloud species 0.05. Together with large normalized
+upper-atmosphere geopotential errors, these changes shift the dominant term
+to geopotential. The 1–7 hPa geopotential levels alone contribute **88.81%** of
+baseline v2 loss. These are empirical loss contributions, not NeuralGCM's
+prescribed percentages or physical-energy shares.
 
-This snapshot replaces the previous `20260920_scatter_v3` data. The restart
-uses `no_pressure_zero_mean_v2` corrections and a revised loss with pooled change
-scales and field weights. Its percentages must not be compared directly with
-those of the previous objective. The old metric-audit file was removed from this
-directory because it evaluates the superseded loss and checkpoints. Historical
-data remain in Git history. See the
-[restart description](../docs/experiments/neuralgcm_residual/FEEDBACK_V2_RESTART_20260924.md)
-for the current contracts and the
-[previous instability audit](../docs/experiments/neuralgcm_residual/INSTABILITY_AUDIT_20260924.md)
-for the earlier diagnosis.
+The previously reported roughly **84% improvement is a reduction in this
+custom v2 loss**. It does not mean that all weather variables improve by 84%.
+The physical audit shows worse standard-level temperature, wind, humidity,
+cloud and Z500 RMSE for those evaluated checkpoints.
 
-## Reproduce
+**24 h normalization alone does not fix the imbalance.** A train-only
+60-snapshot audit still gives geopotential **91.30%** with uniform statistical
+pooling and current pressure weights. Using equal-level averaging, the default
+in the official reference reducer, increases its share to **97.94%**. Neither
+calculation is a claim to reproduce the complete paper objective. See the
+[controlled normalization and weighting audit](loss_alignment_audit_20260924/README.md).
 
-Python and Matplotlib are sufficient. From the repository root, redraw all three
-figure formats from the committed CSV without access to the experiment files.
+The percentages in this section use the earlier w128/di16 checkpoint at epoch
+7, update 2,968, over all 1,455 six-hour 2022 validation forecasts. The new
+training-step figures include later completed epoch checkpoints and retain
+all checkpoint identities. Rescoring does not change any physical prediction.
+
+## What the README and paper actually specify
+
+The initial project specification is
+[section 9: Objective, validation and final report](../docs/experiments/neuralgcm_residual/README.md#9-objective-validation-and-final-report).
+It explicitly requests six-hour change standard deviations, pressure-proportional
+level weights and an average over seven decoded fields. It explicitly calls
+this a custom loss rather than the original NeuralGCM objective. The
+[v2 restart](../docs/experiments/neuralgcm_residual/FEEDBACK_V2_RESTART_20260924.md)
+subsequently changed pooling and variable amplitudes.
+
+The [paper, G.3–G.4](https://arxiv.org/pdf/2311.07222#page=41) instead uses
+24-hour difference scales and combines filtered MSE, model-space, spectral and
+bias terms. The user has accepted temporarily omitting these additional terms
+while checking the remaining normalization and reductions as closely as possible.
+The 24 h candidate remains explicitly labeled **simplified data MSE**.
+Exact paper statistical samples and full training-loss bindings, including
+level masks, have not been reproduced. Uniform and Gaussian choices for fitting
+statistics are both documented in the sensitivity audit. This is why the
+24 h panel cannot be labeled the paper's complete training loss.
+
+The 24 h interval is only the interval used to fit normalization scales from
+training ERA5. It does not require a 24 h forecast; all forecasts plotted here
+are K=1, six-hour predictions. Training has not been restarted with a new loss.
+
+## Physical-unit forecasts
+
+[ERA5 / baseline / residual three-line comparisons](k1_physical_eval_20260924/README.md)
+cover all seven available pressure-level variables, including the improved
+upper-atmosphere geopotential levels. Physical-time axes start from a fixed
+origin and use 6 h increments. Individual PNG, PDF, SVG and CSV files are
+available alongside whole-year RMSE for all 37 pressure levels.
+
+## Earlier snapshot and reproduction
+
+The [earlier v2 training snapshot](k1_training_snapshot_20260924.md), its
+[figure](k1_improvement_vs_training_step.png),
+[CSV](k1_improvement_vs_training_step.csv), and
+[provenance](k1_improvement_vs_training_step.provenance.json) are retained as
+history. Use the three-definition comparison above for the current analysis.
+
+Redraw the new comparisons from the committed portable data:
 
 ```bash
-python plot/plot_k1_improvement.py
+python plot/plot_loss_definitions.py
 ```
-
-Refresh CSV, provenance, and figures from the current experiment with
-
-```bash
-python plot/plot_k1_improvement.py --experiment-root /path/to/20260924_feedback_v2_experiment
-```
-
-When publishing a later snapshot, update this README's timestamp and tables too.
-The provenance records the source identity, loss/correction contracts, validation
-and checkpoint hashes, completion receipts, and the exact metrics prefix.
-CSV timing columns are retained as source metadata; the horizontal coordinate
-uses only `update`. The main plot has no embedded title, subtitle, caption, or
-endpoint annotations.

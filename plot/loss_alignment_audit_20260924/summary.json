@@ -1,0 +1,765 @@
+{
+  "version": "ngcm_simplified_mse_alignment_audit_v1",
+  "captured_at_utc": "2026-09-24T13:36:03.661488+00:00",
+  "script_sha256": "1cb0788ff5ce723d7d639c3983c2a54738e03ced5e177d18bd57d176fab4168a",
+  "plan_sha256": "04193bdee9afd68a36ce458bffa08ccebfd53a31d5809395419f1bee1a6e686c",
+  "physical_metrics_sha256": "01cb38566b25e63417ff0dd188e2b2f275ffd2f7634b4ff4dd980be8fb17aed1",
+  "physical_summary_sha256": "78300f114fe12b2d4ec88bd3065667801dcfa695ac164e94ab0f04b92efef181",
+  "historical_statistics_sha256": "a41acf47e327600f90021d406b4deb23a94cd0673d6f08aa5c0d34a2cfe84792",
+  "statistics_sha256": "9f7d5af05679905658e7fd184a4486c84442456f5d926378f577154d0d0f176b",
+  "contributions_sha256": "77bfcb3d4931bacd54eba25b1ae29156d51b661a2993ca180e9f412a1e5c9b2c",
+  "forecast_lead_hours": 6,
+  "evaluation_split": "2022 validation",
+  "records_per_run": 1455,
+  "recipes": {
+    "current_v2": {
+      "scale": "historical",
+      "level_reduction": "pressure",
+      "average_fields": true,
+      "apply_paper_lead_time_scaling": false
+    },
+    "6h_pooled_same_sample": {
+      "scale": "6h_gaussian",
+      "level_reduction": "pressure",
+      "average_fields": true,
+      "apply_paper_lead_time_scaling": false
+    },
+    "24h_pooled_same_sample": {
+      "scale": "24h_gaussian",
+      "level_reduction": "pressure",
+      "average_fields": true,
+      "apply_paper_lead_time_scaling": false
+    },
+    "24h_uniform_stats_pressure_weights": {
+      "scale": "24h_uniform",
+      "level_reduction": "pressure",
+      "average_fields": true,
+      "apply_paper_lead_time_scaling": false
+    },
+    "24h_uniform_stats_equal_levels": {
+      "scale": "24h_uniform",
+      "level_reduction": "equal",
+      "average_fields": false,
+      "apply_paper_lead_time_scaling": true
+    },
+    "24h_gaussian_stats_equal_levels": {
+      "scale": "24h_gaussian",
+      "level_reduction": "equal",
+      "average_fields": false,
+      "apply_paper_lead_time_scaling": true
+    }
+  },
+  "omitted_terms": [
+    "spatial filtering",
+    "model-space loss",
+    "spectral loss",
+    "bias loss"
+  ],
+  "omitted_global_multiplier": "lambda_data=20; multiplying the only retained term does not change ratios or shares",
+  "caveats": [
+    "Reweights existing K=1 forecasts; no retraining and no K=2 forecast.",
+    "Uniform levels follow the default official reference reducer; exact paper loss bindings and masks are not supplied here.",
+    "Statistical snapshot dates and training years differ from the paper.",
+    "Uniform/Gaussian statistics sensitivity is reported; G.3 does not specify latitude quadrature.",
+    "No training-only statistics here are promoted to production automatically."
+  ],
+  "totals": [
+    {
+      "recipe": "current_v2",
+      "run_id": "r2p8_w128_di16",
+      "baseline_score": 1.138952641687798,
+      "residual_score": 0.17766702740010168,
+      "improvement_pct": 84.40084153658756,
+      "baseline_geopotential_share_pct": 95.0613106599296,
+      "baseline_geo_1_7_share_pct": 88.80833790672717,
+      "fields": {
+        "baseline": {
+          "temperature": 0.01234224217381568,
+          "geopotential": 1.0827033089843126,
+          "u_component_of_wind": 0.015357475537710247,
+          "v_component_of_wind": 0.00935133270034378,
+          "specific_humidity": 0.018847286767748696,
+          "specific_cloud_ice_water_content": 9.034326429232382e-05,
+          "specific_cloud_liquid_water_content": 0.0002606522595746127
+        },
+        "residual": {
+          "temperature": 0.07659250769345911,
+          "geopotential": 0.033986281273010954,
+          "u_component_of_wind": 0.021714901504396346,
+          "v_component_of_wind": 0.01503526650650527,
+          "specific_humidity": 0.02970503996137283,
+          "specific_cloud_ice_water_content": 0.00013839494876593535,
+          "specific_cloud_liquid_water_content": 0.0004946355125912183
+        }
+      }
+    },
+    {
+      "recipe": "current_v2",
+      "run_id": "r2p8_w128_di32",
+      "baseline_score": 1.138952641687798,
+      "residual_score": 0.1777265714827024,
+      "improvement_pct": 84.39561356832783,
+      "baseline_geopotential_share_pct": 95.0613106599296,
+      "baseline_geo_1_7_share_pct": 88.80833790672717,
+      "fields": {
+        "baseline": {
+          "temperature": 0.01234224217381568,
+          "geopotential": 1.0827033089843126,
+          "u_component_of_wind": 0.015357475537710247,
+          "v_component_of_wind": 0.00935133270034378,
+          "specific_humidity": 0.018847286767748696,
+          "specific_cloud_ice_water_content": 9.034326429232382e-05,
+          "specific_cloud_liquid_water_content": 0.0002606522595746127
+        },
+        "residual": {
+          "temperature": 0.07635389113360966,
+          "geopotential": 0.034702196648196945,
+          "u_component_of_wind": 0.021574068960142967,
+          "v_component_of_wind": 0.01489101016669315,
+          "specific_humidity": 0.02956972356704878,
+          "specific_cloud_ice_water_content": 0.00013605673568980062,
+          "specific_cloud_liquid_water_content": 0.0004996242713210992
+        }
+      }
+    },
+    {
+      "recipe": "current_v2",
+      "run_id": "r2p8_w256_di16",
+      "baseline_score": 1.138952641687798,
+      "residual_score": 0.17889594844266343,
+      "improvement_pct": 84.29294231430377,
+      "baseline_geopotential_share_pct": 95.0613106599296,
+      "baseline_geo_1_7_share_pct": 88.80833790672717,
+      "fields": {
+        "baseline": {
+          "temperature": 0.01234224217381568,
+          "geopotential": 1.0827033089843126,
+          "u_component_of_wind": 0.015357475537710247,
+          "v_component_of_wind": 0.00935133270034378,
+          "specific_humidity": 0.018847286767748696,
+          "specific_cloud_ice_water_content": 9.034326429232382e-05,
+          "specific_cloud_liquid_water_content": 0.0002606522595746127
+        },
+        "residual": {
+          "temperature": 0.0743440640216203,
+          "geopotential": 0.038313602750067545,
+          "u_component_of_wind": 0.021607404712757326,
+          "v_component_of_wind": 0.014611869476872225,
+          "specific_humidity": 0.02939071761829074,
+          "specific_cloud_ice_water_content": 0.00012941101403069258,
+          "specific_cloud_liquid_water_content": 0.000498878849024606
+        }
+      }
+    },
+    {
+      "recipe": "current_v2",
+      "run_id": "r2p8_w256_di32",
+      "baseline_score": 1.138952641687798,
+      "residual_score": 0.1789825018564798,
+      "improvement_pct": 84.2853429277579,
+      "baseline_geopotential_share_pct": 95.0613106599296,
+      "baseline_geo_1_7_share_pct": 88.80833790672717,
+      "fields": {
+        "baseline": {
+          "temperature": 0.01234224217381568,
+          "geopotential": 1.0827033089843126,
+          "u_component_of_wind": 0.015357475537710247,
+          "v_component_of_wind": 0.00935133270034378,
+          "specific_humidity": 0.018847286767748696,
+          "specific_cloud_ice_water_content": 9.034326429232382e-05,
+          "specific_cloud_liquid_water_content": 0.0002606522595746127
+        },
+        "residual": {
+          "temperature": 0.07509764534116903,
+          "geopotential": 0.03730961292847017,
+          "u_component_of_wind": 0.021741835074582185,
+          "v_component_of_wind": 0.014711291203598209,
+          "specific_humidity": 0.02950413351445426,
+          "specific_cloud_ice_water_content": 0.000129474747395574,
+          "specific_cloud_liquid_water_content": 0.0004885090468103907
+        }
+      }
+    },
+    {
+      "recipe": "6h_pooled_same_sample",
+      "run_id": "r2p8_w128_di16",
+      "baseline_score": 1.1516861564345235,
+      "residual_score": 0.2250195413045231,
+      "improvement_pct": 80.46173082420688,
+      "baseline_geopotential_share_pct": 93.60416197132474,
+      "baseline_geo_1_7_share_pct": 87.44703800228021,
+      "fields": {
+        "baseline": {
+          "temperature": 0.012231525420047237,
+          "geopotential": 1.0780261752702958,
+          "u_component_of_wind": 0.015205070992129902,
+          "v_component_of_wind": 0.009274918342150015,
+          "specific_humidity": 0.0365996316867,
+          "specific_cloud_ice_water_content": 8.843185148785933e-05,
+          "specific_cloud_liquid_water_content": 0.0002604028717128764
+        },
+        "residual": {
+          "temperature": 0.07590543044320104,
+          "geopotential": 0.033839465076332675,
+          "u_component_of_wind": 0.02149940712265547,
+          "v_component_of_wind": 0.01491240591784024,
+          "specific_humidity": 0.0782332035955092,
+          "specific_cloud_ice_water_content": 0.00013546689564303206,
+          "specific_cloud_liquid_water_content": 0.0004941622533414221
+        }
+      }
+    },
+    {
+      "recipe": "6h_pooled_same_sample",
+      "run_id": "r2p8_w128_di32",
+      "baseline_score": 1.1516861564345235,
+      "residual_score": 0.22505352369983087,
+      "improvement_pct": 80.45878015964276,
+      "baseline_geopotential_share_pct": 93.60416197132474,
+      "baseline_geo_1_7_share_pct": 87.44703800228021,
+      "fields": {
+        "baseline": {
+          "temperature": 0.012231525420047237,
+          "geopotential": 1.0780261752702958,
+          "u_component_of_wind": 0.015205070992129902,
+          "v_component_of_wind": 0.009274918342150015,
+          "specific_humidity": 0.0365996316867,
+          "specific_cloud_ice_water_content": 8.843185148785933e-05,
+          "specific_cloud_liquid_water_content": 0.0002604028717128764
+        },
+        "residual": {
+          "temperature": 0.07566895440616175,
+          "geopotential": 0.034552287792698935,
+          "u_component_of_wind": 0.021359972172678383,
+          "v_component_of_wind": 0.0147693283678301,
+          "specific_humidity": 0.07807065656888601,
+          "specific_cloud_ice_water_content": 0.00013317815266794243,
+          "specific_cloud_liquid_water_content": 0.0004991462389077233
+        }
+      }
+    },
+    {
+      "recipe": "6h_pooled_same_sample",
+      "run_id": "r2p8_w256_di16",
+      "baseline_score": 1.1516861564345235,
+      "residual_score": 0.22242303526211443,
+      "improvement_pct": 80.6871833945883,
+      "baseline_geopotential_share_pct": 93.60416197132474,
+      "baseline_geo_1_7_share_pct": 87.44703800228021,
+      "fields": {
+        "baseline": {
+          "temperature": 0.012231525420047237,
+          "geopotential": 1.0780261752702958,
+          "u_component_of_wind": 0.015205070992129902,
+          "v_component_of_wind": 0.009274918342150015,
+          "specific_humidity": 0.0365996316867,
+          "specific_cloud_ice_water_content": 8.843185148785933e-05,
+          "specific_cloud_liquid_water_content": 0.0002604028717128764
+        },
+        "residual": {
+          "temperature": 0.07367715655744092,
+          "geopotential": 0.03814809310246529,
+          "u_component_of_wind": 0.021392977107886183,
+          "v_component_of_wind": 0.014492468674455559,
+          "specific_humidity": 0.07408726525400748,
+          "specific_cloud_ice_water_content": 0.00012667303603980856,
+          "specific_cloud_liquid_water_content": 0.0004984015298192142
+        }
+      }
+    },
+    {
+      "recipe": "6h_pooled_same_sample",
+      "run_id": "r2p8_w256_di32",
+      "baseline_score": 1.1516861564345235,
+      "residual_score": 0.223166754186305,
+      "improvement_pct": 80.62260686737771,
+      "baseline_geopotential_share_pct": 93.60416197132474,
+      "baseline_geo_1_7_share_pct": 87.44703800228021,
+      "fields": {
+        "baseline": {
+          "temperature": 0.012231525420047237,
+          "geopotential": 1.0780261752702958,
+          "u_component_of_wind": 0.015205070992129902,
+          "v_component_of_wind": 0.009274918342150015,
+          "specific_humidity": 0.0365996316867,
+          "specific_cloud_ice_water_content": 8.843185148785933e-05,
+          "specific_cloud_liquid_water_content": 0.0002604028717128764
+        },
+        "residual": {
+          "temperature": 0.07442397783483311,
+          "geopotential": 0.037148440382827566,
+          "u_component_of_wind": 0.02152607340942516,
+          "v_component_of_wind": 0.014591077977147265,
+          "specific_humidity": 0.0748624075118245,
+          "specific_cloud_ice_water_content": 0.00012673542098352476,
+          "specific_cloud_liquid_water_content": 0.00048804164926385984
+        }
+      }
+    },
+    {
+      "recipe": "24h_pooled_same_sample",
+      "run_id": "r2p8_w128_di16",
+      "baseline_score": 0.3104703817824488,
+      "residual_score": 0.06384506918454777,
+      "improvement_pct": 79.43601936583924,
+      "baseline_geopotential_share_pct": 93.13001735338023,
+      "baseline_geo_1_7_share_pct": 87.00408181795297,
+      "fields": {
+        "baseline": {
+          "temperature": 0.004401296800572539,
+          "geopotential": 0.2891411204311004,
+          "u_component_of_wind": 0.00416775206531143,
+          "v_component_of_wind": 0.0026565563737247335,
+          "specific_humidity": 0.009901890187407218,
+          "specific_cloud_ice_water_content": 5.121039840281168e-05,
+          "specific_cloud_liquid_water_content": 0.00015055552592958566
+        },
+        "residual": {
+          "temperature": 0.02731321864468251,
+          "geopotential": 0.009076199698496807,
+          "u_component_of_wind": 0.005893047029165302,
+          "v_component_of_wind": 0.004271266390408526,
+          "specific_humidity": 0.016927182539087118,
+          "specific_cloud_ice_water_content": 7.844813355767179e-05,
+          "specific_cloud_liquid_water_content": 0.0002857067491498331
+        }
+      }
+    },
+    {
+      "recipe": "24h_pooled_same_sample",
+      "run_id": "r2p8_w128_di32",
+      "baseline_score": 0.3104703817824488,
+      "residual_score": 0.06382832380341545,
+      "improvement_pct": 79.4414129177253,
+      "baseline_geopotential_share_pct": 93.13001735338023,
+      "baseline_geo_1_7_share_pct": 87.00408181795297,
+      "fields": {
+        "baseline": {
+          "temperature": 0.004401296800572539,
+          "geopotential": 0.2891411204311004,
+          "u_component_of_wind": 0.00416775206531143,
+          "v_component_of_wind": 0.0026565563737247335,
+          "specific_humidity": 0.009901890187407218,
+          "specific_cloud_ice_water_content": 5.121039840281168e-05,
+          "specific_cloud_liquid_water_content": 0.00015055552592958566
+        },
+        "residual": {
+          "temperature": 0.02722812695010717,
+          "geopotential": 0.00926738833900195,
+          "u_component_of_wind": 0.005854827523248862,
+          "v_component_of_wind": 0.004230285589996622,
+          "specific_humidity": 0.016881984356545757,
+          "specific_cloud_ice_water_content": 7.712273509971837e-05,
+          "specific_cloud_liquid_water_content": 0.00028858830941537163
+        }
+      }
+    },
+    {
+      "recipe": "24h_pooled_same_sample",
+      "run_id": "r2p8_w256_di16",
+      "baseline_score": 0.3104703817824488,
+      "residual_score": 0.06335131560576872,
+      "improvement_pct": 79.59505340185399,
+      "baseline_geopotential_share_pct": 93.13001735338023,
+      "baseline_geo_1_7_share_pct": 87.00408181795297,
+      "fields": {
+        "baseline": {
+          "temperature": 0.004401296800572539,
+          "geopotential": 0.2891411204311004,
+          "u_component_of_wind": 0.00416775206531143,
+          "v_component_of_wind": 0.0026565563737247335,
+          "specific_humidity": 0.009901890187407218,
+          "specific_cloud_ice_water_content": 5.121039840281168e-05,
+          "specific_cloud_liquid_water_content": 0.00015055552592958566
+        },
+        "residual": {
+          "temperature": 0.026511413932073125,
+          "geopotential": 0.01023183168923624,
+          "u_component_of_wind": 0.0058638742673876405,
+          "v_component_of_wind": 0.0041509864138821375,
+          "specific_humidity": 0.016231695899775984,
+          "specific_cloud_ice_water_content": 7.33556578693018e-05,
+          "specific_cloud_liquid_water_content": 0.0002881577455442918
+        }
+      }
+    },
+    {
+      "recipe": "24h_pooled_same_sample",
+      "run_id": "r2p8_w256_di32",
+      "baseline_score": 0.3104703817824488,
+      "residual_score": 0.06356583233699954,
+      "improvement_pct": 79.5259592969673,
+      "baseline_geopotential_share_pct": 93.13001735338023,
+      "baseline_geo_1_7_share_pct": 87.00408181795297,
+      "fields": {
+        "baseline": {
+          "temperature": 0.004401296800572539,
+          "geopotential": 0.2891411204311004,
+          "u_component_of_wind": 0.00416775206531143,
+          "v_component_of_wind": 0.0026565563737247335,
+          "specific_humidity": 0.009901890187407218,
+          "specific_cloud_ice_water_content": 5.121039840281168e-05,
+          "specific_cloud_liquid_water_content": 0.00015055552592958566
+        },
+        "residual": {
+          "temperature": 0.026780144281388217,
+          "geopotential": 0.009963711383784865,
+          "u_component_of_wind": 0.005900356332214007,
+          "v_component_of_wind": 0.0041792304546284294,
+          "specific_humidity": 0.016386830063183314,
+          "specific_cloud_ice_water_content": 7.339178464679535e-05,
+          "specific_cloud_liquid_water_content": 0.0002821680371539063
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_pressure_weights",
+      "run_id": "r2p8_w128_di16",
+      "baseline_score": 0.2395061761740319,
+      "residual_score": 0.055262936083306444,
+      "improvement_pct": 76.92630020398687,
+      "baseline_geopotential_share_pct": 91.30036757602605,
+      "baseline_geo_1_7_share_pct": 85.2947833183823,
+      "fields": {
+        "baseline": {
+          "temperature": 0.0037266505017525087,
+          "geopotential": 0.21867001921417564,
+          "u_component_of_wind": 0.003867289932111702,
+          "v_component_of_wind": 0.002478703926937355,
+          "specific_humidity": 0.010556039808411542,
+          "specific_cloud_ice_water_content": 5.864901874937403e-05,
+          "specific_cloud_liquid_water_content": 0.00014882377189376757
+        },
+        "residual": {
+          "temperature": 0.02312655214559518,
+          "geopotential": 0.006864097225267983,
+          "u_component_of_wind": 0.005468204703210621,
+          "v_component_of_wind": 0.003985311540766187,
+          "specific_humidity": 0.015446506840705178,
+          "specific_cloud_ice_water_content": 8.984319980655884e-05,
+          "specific_cloud_liquid_water_content": 0.0002824204279547407
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_pressure_weights",
+      "run_id": "r2p8_w128_di32",
+      "baseline_score": 0.2395061761740319,
+      "residual_score": 0.05520847791277573,
+      "improvement_pct": 76.94903789342797,
+      "baseline_geopotential_share_pct": 91.30036757602605,
+      "baseline_geo_1_7_share_pct": 85.2947833183823,
+      "fields": {
+        "baseline": {
+          "temperature": 0.0037266505017525087,
+          "geopotential": 0.21867001921417564,
+          "u_component_of_wind": 0.003867289932111702,
+          "v_component_of_wind": 0.002478703926937355,
+          "specific_humidity": 0.010556039808411542,
+          "specific_cloud_ice_water_content": 5.864901874937403e-05,
+          "specific_cloud_liquid_water_content": 0.00014882377189376757
+        },
+        "residual": {
+          "temperature": 0.023054503606118607,
+          "geopotential": 0.007008688294260377,
+          "u_component_of_wind": 0.005432740522970359,
+          "v_component_of_wind": 0.003947074343199175,
+          "specific_humidity": 0.015391877023745344,
+          "specific_cloud_ice_water_content": 8.832527919989872e-05,
+          "specific_cloud_liquid_water_content": 0.00028526884328196827
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_pressure_weights",
+      "run_id": "r2p8_w256_di16",
+      "baseline_score": 0.2395061761740319,
+      "residual_score": 0.05489678449396669,
+      "improvement_pct": 77.07917792730441,
+      "baseline_geopotential_share_pct": 91.30036757602605,
+      "baseline_geo_1_7_share_pct": 85.2947833183823,
+      "fields": {
+        "baseline": {
+          "temperature": 0.0037266505017525087,
+          "geopotential": 0.21867001921417564,
+          "u_component_of_wind": 0.003867289932111702,
+          "v_component_of_wind": 0.002478703926937355,
+          "specific_humidity": 0.010556039808411542,
+          "specific_cloud_ice_water_content": 5.864901874937403e-05,
+          "specific_cloud_liquid_water_content": 0.00014882377189376757
+        },
+        "residual": {
+          "temperature": 0.022447650887637612,
+          "geopotential": 0.007738072083090818,
+          "u_component_of_wind": 0.005441135068033988,
+          "v_component_of_wind": 0.0038730841274514562,
+          "specific_humidity": 0.015027988084612674,
+          "specific_cloud_ice_water_content": 8.401101119949766e-05,
+          "specific_cloud_liquid_water_content": 0.0002848432319406399
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_pressure_weights",
+      "run_id": "r2p8_w256_di32",
+      "baseline_score": 0.2395061761740319,
+      "residual_score": 0.05509549625248284,
+      "improvement_pct": 76.99621064784196,
+      "baseline_geopotential_share_pct": 91.30036757602605,
+      "baseline_geo_1_7_share_pct": 85.2947833183823,
+      "fields": {
+        "baseline": {
+          "temperature": 0.0037266505017525087,
+          "geopotential": 0.21867001921417564,
+          "u_component_of_wind": 0.003867289932111702,
+          "v_component_of_wind": 0.002478703926937355,
+          "specific_humidity": 0.010556039808411542,
+          "specific_cloud_ice_water_content": 5.864901874937403e-05,
+          "specific_cloud_liquid_water_content": 0.00014882377189376757
+        },
+        "residual": {
+          "temperature": 0.022675189301084524,
+          "geopotential": 0.007535299567520059,
+          "u_component_of_wind": 0.005474987063017071,
+          "v_component_of_wind": 0.0038994372722229533,
+          "specific_humidity": 0.01514760824329081,
+          "specific_cloud_ice_water_content": 8.405238561009896e-05,
+          "specific_cloud_liquid_water_content": 0.00027892241973732153
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_equal_levels",
+      "run_id": "r2p8_w128_di16",
+      "baseline_score": 263.94315371623725,
+      "residual_score": 16.6862728385659,
+      "improvement_pct": 93.67808082777356,
+      "baseline_geopotential_share_pct": 97.94310878362587,
+      "baseline_geo_1_7_share_pct": 97.21910511733095,
+      "fields": {
+        "baseline": {
+          "temperature": 0.48878545367286813,
+          "geopotential": 258.5141301712271,
+          "u_component_of_wind": 0.779997685944636,
+          "v_component_of_wind": 0.11498030341178204,
+          "specific_humidity": 4.044407672418095,
+          "specific_cloud_ice_water_content": 0.0004089499675958587,
+          "specific_cloud_liquid_water_content": 0.0004434795951646499
+        },
+        "residual": {
+          "temperature": 8.908899644865015,
+          "geopotential": 4.902110556206833,
+          "u_component_of_wind": 1.2949647819141838,
+          "v_component_of_wind": 0.16099458803636826,
+          "specific_humidity": 1.4178410266455381,
+          "specific_cloud_ice_water_content": 0.0006529292014159571,
+          "specific_cloud_liquid_water_content": 0.0008093116965465369
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_equal_levels",
+      "run_id": "r2p8_w128_di32",
+      "baseline_score": 263.94315371623725,
+      "residual_score": 16.8953228678333,
+      "improvement_pct": 93.59887815616642,
+      "baseline_geopotential_share_pct": 97.94310878362587,
+      "baseline_geo_1_7_share_pct": 97.21910511733095,
+      "fields": {
+        "baseline": {
+          "temperature": 0.48878545367286813,
+          "geopotential": 258.5141301712271,
+          "u_component_of_wind": 0.779997685944636,
+          "v_component_of_wind": 0.11498030341178204,
+          "specific_humidity": 4.044407672418095,
+          "specific_cloud_ice_water_content": 0.0004089499675958587,
+          "specific_cloud_liquid_water_content": 0.0004434795951646499
+        },
+        "residual": {
+          "temperature": 8.901059390936364,
+          "geopotential": 5.126665399363673,
+          "u_component_of_wind": 1.290261391154912,
+          "v_component_of_wind": 0.16054103841906872,
+          "specific_humidity": 1.415339484639505,
+          "specific_cloud_ice_water_content": 0.00064035079429963,
+          "specific_cloud_liquid_water_content": 0.0008158125254767748
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_equal_levels",
+      "run_id": "r2p8_w256_di16",
+      "baseline_score": 263.94315371623725,
+      "residual_score": 17.525569990835002,
+      "improvement_pct": 93.36009676929277,
+      "baseline_geopotential_share_pct": 97.94310878362587,
+      "baseline_geo_1_7_share_pct": 97.21910511733095,
+      "fields": {
+        "baseline": {
+          "temperature": 0.48878545367286813,
+          "geopotential": 258.5141301712271,
+          "u_component_of_wind": 0.779997685944636,
+          "v_component_of_wind": 0.11498030341178204,
+          "specific_humidity": 4.044407672418095,
+          "specific_cloud_ice_water_content": 0.0004089499675958587,
+          "specific_cloud_liquid_water_content": 0.0004434795951646499
+        },
+        "residual": {
+          "temperature": 8.576124327821299,
+          "geopotential": 6.102910999450799,
+          "u_component_of_wind": 1.3008748420522005,
+          "v_component_of_wind": 0.15927567334641937,
+          "specific_humidity": 1.3849738019652047,
+          "specific_cloud_ice_water_content": 0.000595627707583837,
+          "specific_cloud_liquid_water_content": 0.0008147184914977151
+        }
+      }
+    },
+    {
+      "recipe": "24h_uniform_stats_equal_levels",
+      "run_id": "r2p8_w256_di32",
+      "baseline_score": 263.94315371623725,
+      "residual_score": 17.32317124191015,
+      "improvement_pct": 93.43677947391122,
+      "baseline_geopotential_share_pct": 97.94310878362587,
+      "baseline_geo_1_7_share_pct": 97.21910511733095,
+      "fields": {
+        "baseline": {
+          "temperature": 0.48878545367286813,
+          "geopotential": 258.5141301712271,
+          "u_component_of_wind": 0.779997685944636,
+          "v_component_of_wind": 0.11498030341178204,
+          "specific_humidity": 4.044407672418095,
+          "specific_cloud_ice_water_content": 0.0004089499675958587,
+          "specific_cloud_liquid_water_content": 0.0004434795951646499
+        },
+        "residual": {
+          "temperature": 8.666418909351115,
+          "geopotential": 5.795520297319173,
+          "u_component_of_wind": 1.2987026307976943,
+          "v_component_of_wind": 0.15919832234736445,
+          "specific_humidity": 1.4019359215581824,
+          "specific_cloud_ice_water_content": 0.000595709730161995,
+          "specific_cloud_liquid_water_content": 0.0007994508064594181
+        }
+      }
+    },
+    {
+      "recipe": "24h_gaussian_stats_equal_levels",
+      "run_id": "r2p8_w128_di16",
+      "baseline_score": 348.0068919487247,
+      "residual_score": 20.326108670185448,
+      "improvement_pct": 94.15927984748639,
+      "baseline_geopotential_share_pct": 98.22387377134899,
+      "baseline_geo_1_7_share_pct": 97.49779466674092,
+      "fields": {
+        "baseline": {
+          "temperature": 0.5772716954286746,
+          "geopotential": 341.8258502633102,
+          "u_component_of_wind": 0.8405982027726587,
+          "v_component_of_wind": 0.12323039252968959,
+          "specific_humidity": 4.639135672948029,
+          "specific_cloud_ice_water_content": 0.00035708169060585303,
+          "specific_cloud_liquid_water_content": 0.00044864004479548957
+        },
+        "residual": {
+          "temperature": 10.52170346672618,
+          "geopotential": 6.481920767156011,
+          "u_component_of_wind": 1.3955747407284167,
+          "v_component_of_wind": 0.17254630306397664,
+          "specific_humidity": 1.7529745470919267,
+          "specific_cloud_ice_water_content": 0.0005701163505603868,
+          "specific_cloud_liquid_water_content": 0.0008187290683742695
+        }
+      }
+    },
+    {
+      "recipe": "24h_gaussian_stats_equal_levels",
+      "run_id": "r2p8_w128_di32",
+      "baseline_score": 348.0068919487247,
+      "residual_score": 20.60523710472704,
+      "improvement_pct": 94.07907211568586,
+      "baseline_geopotential_share_pct": 98.22387377134899,
+      "baseline_geo_1_7_share_pct": 97.49779466674092,
+      "fields": {
+        "baseline": {
+          "temperature": 0.5772716954286746,
+          "geopotential": 341.8258502633102,
+          "u_component_of_wind": 0.8405982027726587,
+          "v_component_of_wind": 0.12323039252968959,
+          "specific_humidity": 4.639135672948029,
+          "specific_cloud_ice_water_content": 0.00035708169060585303,
+          "specific_cloud_liquid_water_content": 0.00044864004479548957
+        },
+        "residual": {
+          "temperature": 10.512443868994755,
+          "geopotential": 6.7788432221954675,
+          "u_component_of_wind": 1.390505928486502,
+          "v_component_of_wind": 0.1720602102662272,
+          "specific_humidity": 1.7499994359430906,
+          "specific_cloud_ice_water_content": 0.0005591332982700746,
+          "specific_cloud_liquid_water_content": 0.0008253055427245424
+        }
+      }
+    },
+    {
+      "recipe": "24h_gaussian_stats_equal_levels",
+      "run_id": "r2p8_w256_di16",
+      "baseline_score": 348.0068919487247,
+      "residual_score": 21.48063182439122,
+      "improvement_pct": 93.82752689060072,
+      "baseline_geopotential_share_pct": 98.22387377134899,
+      "baseline_geo_1_7_share_pct": 97.49779466674092,
+      "fields": {
+        "baseline": {
+          "temperature": 0.5772716954286746,
+          "geopotential": 341.8258502633102,
+          "u_component_of_wind": 0.8405982027726587,
+          "v_component_of_wind": 0.12323039252968959,
+          "specific_humidity": 4.639135672948029,
+          "specific_cloud_ice_water_content": 0.00035708169060585303,
+          "specific_cloud_liquid_water_content": 0.00044864004479548957
+        },
+        "residual": {
+          "temperature": 10.12868487334715,
+          "geopotential": 8.069704894223095,
+          "u_component_of_wind": 1.401943972355404,
+          "v_component_of_wind": 0.17070405247250928,
+          "specific_humidity": 1.7082497506481003,
+          "specific_cloud_ice_water_content": 0.0005200825666916593,
+          "specific_cloud_liquid_water_content": 0.0008241987782674518
+        }
+      }
+    },
+    {
+      "recipe": "24h_gaussian_stats_equal_levels",
+      "run_id": "r2p8_w256_di32",
+      "baseline_score": 348.0068919487247,
+      "residual_score": 21.197200319316956,
+      "improvement_pct": 93.90897111243413,
+      "baseline_geopotential_share_pct": 98.22387377134899,
+      "baseline_geo_1_7_share_pct": 97.49779466674092,
+      "fields": {
+        "baseline": {
+          "temperature": 0.5772716954286746,
+          "geopotential": 341.8258502633102,
+          "u_component_of_wind": 0.8405982027726587,
+          "v_component_of_wind": 0.12323039252968959,
+          "specific_humidity": 4.639135672948029,
+          "specific_cloud_ice_water_content": 0.00035708169060585303,
+          "specific_cloud_liquid_water_content": 0.00044864004479548957
+        },
+        "residual": {
+          "temperature": 10.235325743643234,
+          "geopotential": 7.66325094894133,
+          "u_component_of_wind": 1.3996029950557483,
+          "v_component_of_wind": 0.17062115136950928,
+          "specific_humidity": 1.7270705726867415,
+          "specific_cloud_ice_water_content": 0.0005201541861150542,
+          "specific_cloud_liquid_water_content": 0.0008087534342782613
+        }
+      }
+    }
+  ],
+  "current_training_modified": false
+}
