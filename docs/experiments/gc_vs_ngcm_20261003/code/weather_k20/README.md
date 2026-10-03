@@ -1,0 +1,9 @@
+# K=20 training, not just K=20 evaluation
+
+This independent campaign trains the loss over all twenty 6-hour forecast steps (6–120h) and backpropagates across the full 20-step residual-memory tape. NeuralGCM parameters stay frozen and the existing stop-gradient through physical feedback remains unchanged. This is memory BPTT, not full differentiation through the physics solver.
+
+Initialization is fresh seed 22, zero residual head and the frozen original NeuralGCM. It does not inherit a K=2-trained residual. The main trial uses 2,000 updates, K=20, batch size 2, width 128, d_inner 16, original optimizer schedule, and seven strict >30hPa data-only objectives with EMA-window balancing (window 100, probe interval 20). Upper data loss and all native objectives stay disabled. Calibration origins must support complete K20 trajectories; they therefore may differ from the K2 campaign. Selection retains the same eight origins, now evaluated over all twenty leads, with per-field physical RMSE ratios. Validation is every 100 updates to bound cost; checkpoints remain every 20 updates and at time boundaries.
+
+Pilot statistics/checkpoints are separate. The independent real-model smoke explicitly checks 20 captured steps per trajectory, finite real K20 gradients and updates, excluded-output invariance and zero cotangents, dynamic weights and frozen backbone. A separate-process K20 lifecycle smoke verifies exact params/optimizer/RNG/controller restoration before production starts.
+
+Production uses H200 on ailab / gpu-test, one-hour allocations and approximately 55-minute checkpoint boundaries. Up to 40 slices are allowed to reach the 2,000-update budget; this is an allocation cap, not permission for extra optimizer steps. A requeueing CPU watcher saves immutable checkpoints and submits independent all-variable evaluations throughout training. It does not modify training.

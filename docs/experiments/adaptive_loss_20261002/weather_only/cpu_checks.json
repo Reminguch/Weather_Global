@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "tests": 5,
+  "command": "JAX_PLATFORMS=cpu python -m unittest experimental.weather_only.test_weather_only -v",
+  "checks": [
+    "selected-component equivalence",
+    "exact excluded cotangents",
+    "excluded-output invariance including calibration",
+    "window weights cannot restore excluded groups",
+    "dynamic JIT coefficients"
+  ]
+}

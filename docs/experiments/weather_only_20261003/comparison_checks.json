@@ -1,0 +1,6 @@
+{
+  "baseline_physical_rmse_exact_match_to_prior_campaign": true,
+  "long_evaluation_origins_exact_match": true,
+  "all_checkpoint_evaluations_finite": true,
+  "evaluated_checkpoints": 29
+}

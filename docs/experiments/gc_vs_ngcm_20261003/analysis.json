@@ -1,0 +1,1693 @@
+{
+  "metric": "100 * (1 - full physical RMSE / own frozen baseline RMSE)",
+  "display_tolerance_percent": 0.1,
+  "records": [
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "10m_u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.6187285818140262,
+      "rmse": 0.595850473691055,
+      "improvement_percent": 3.6976000132232123
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "10m_u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 2.3550867542735783,
+      "rmse": 2.361506074395607,
+      "improvement_percent": -0.2725725542967794
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "10m_u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 4.259111510737994,
+      "rmse": 4.270606063595345,
+      "improvement_percent": -0.2698814724237941
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "10m_v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.6405217295367328,
+      "rmse": 0.6171735402834234,
+      "improvement_percent": 3.645183008888131
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "10m_v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 2.4870283035430547,
+      "rmse": 2.4953576914517543,
+      "improvement_percent": -0.33491327367820567
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "10m_v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 4.507878919538544,
+      "rmse": 4.519422139109356,
+      "improvement_percent": -0.2560676490395597
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "2m_temperature",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.5436926838075647,
+      "rmse": 0.5459756647292152,
+      "improvement_percent": -0.41990282187767125
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "2m_temperature",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.4131870668574325,
+      "rmse": 1.4051062475852178,
+      "improvement_percent": 0.5718152579887614
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "2m_temperature",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 2.5772100819236345,
+      "rmse": 2.575069501087033,
+      "improvement_percent": 0.08305806544897099
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "geopotential",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 40.6805797029974,
+      "rmse": 40.14857508124899,
+      "improvement_percent": 1.3077606701588085
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "geopotential",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 308.1337928987534,
+      "rmse": 307.98760446153204,
+      "improvement_percent": 0.04744316936033943
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "geopotential",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 789.1349341753522,
+      "rmse": 788.782272022039,
+      "improvement_percent": 0.044689715033552346
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "mean_sea_level_pressure",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 41.905061458883495,
+      "rmse": 40.20718499686735,
+      "improvement_percent": 4.051721684460652
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "mean_sea_level_pressure",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 300.41940674045856,
+      "rmse": 299.93455218714485,
+      "improvement_percent": 0.16139255402117803
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "mean_sea_level_pressure",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 722.3478085003875,
+      "rmse": 721.4208825947236,
+      "improvement_percent": 0.1283212733195982
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "specific_humidity",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0002676553289191112,
+      "rmse": 0.0002633903473051119,
+      "improvement_percent": 1.5934603772780442
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "specific_humidity",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.0006881710521601352,
+      "rmse": 0.0006929635508128523,
+      "improvement_percent": -0.6964109631862225
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "specific_humidity",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 0.0010672371052065787,
+      "rmse": 0.0010755586504994882,
+      "improvement_percent": -0.7797278835520505
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "temperature",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.48635630257874113,
+      "rmse": 0.47991779137419804,
+      "improvement_percent": 1.3238260037764626
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "temperature",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.6245626516702019,
+      "rmse": 1.625755246883392,
+      "improvement_percent": -0.07341023209932462
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "temperature",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 3.096068111046885,
+      "rmse": 3.097768454425688,
+      "improvement_percent": -0.05491944355928702
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "total_precipitation_6hr",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0008200339378077058,
+      "rmse": 0.0007982856917305367,
+      "improvement_percent": 2.652115366750707
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "total_precipitation_6hr",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.0018991345395422087,
+      "rmse": 0.0019072767538444468,
+      "improvement_percent": -0.4287328850435701
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "total_precipitation_6hr",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 0.0023358615476544602,
+      "rmse": 0.0023359284104201876,
+      "improvement_percent": -0.002862445584339568
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3085888890987472,
+      "rmse": 1.3008636514379084,
+      "improvement_percent": 0.5903487126624807
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.550383980237216,
+      "rmse": 4.554685896910816,
+      "improvement_percent": -0.09453964088050881
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 8.728107831250387,
+      "rmse": 8.736548110781413,
+      "improvement_percent": -0.09670228294849093
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3356833676337683,
+      "rmse": 1.3285812814287385,
+      "improvement_percent": 0.5317192964386042
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.63614459447894,
+      "rmse": 4.639572049786545,
+      "improvement_percent": -0.07392899936051744
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 9.250003776034022,
+      "rmse": 9.256028318100952,
+      "improvement_percent": -0.06513015791993482
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "vertical_velocity",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.08680414146316275,
+      "rmse": 0.08302602068614251,
+      "improvement_percent": 4.352466038297909
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "vertical_velocity",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.12718906165626986,
+      "rmse": 0.12408762014030764,
+      "improvement_percent": 2.438449875779347
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "field": "vertical_velocity",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 0.15200826188820118,
+      "rmse": 0.14885692431212763,
+      "improvement_percent": 2.073135720998698
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "10m_u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.6186894538907116,
+      "rmse": 0.6250832420287953,
+      "improvement_percent": -1.033440621603532
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "10m_u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 2.354481398416527,
+      "rmse": 2.2517726822592987,
+      "improvement_percent": 4.362264922810766
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "10m_u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 4.255801788262593,
+      "rmse": 3.8445372550621335,
+      "improvement_percent": 9.663620480040159
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "10m_v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.6404377638984372,
+      "rmse": 0.6420405183999506,
+      "improvement_percent": -0.2502592120360303
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "10m_v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 2.485523288392475,
+      "rmse": 2.366325432325216,
+      "improvement_percent": 4.795684539506007
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "10m_v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 4.508692448906808,
+      "rmse": 4.122449400604569,
+      "improvement_percent": 8.566631072737918
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "2m_temperature",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.5436183963213315,
+      "rmse": 0.5352628190200358,
+      "improvement_percent": 1.5370299014598965
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "2m_temperature",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.4119077132231745,
+      "rmse": 1.363591765424924,
+      "improvement_percent": 3.4220329944902983
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "2m_temperature",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 2.580144438082715,
+      "rmse": 2.429232392204394,
+      "improvement_percent": 5.848976656146531
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "geopotential",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 40.69835755879343,
+      "rmse": 42.80997413924964,
+      "improvement_percent": -5.1884565056605325
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "geopotential",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 308.1315880618594,
+      "rmse": 303.77084145963346,
+      "improvement_percent": 1.4152221879148996
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "geopotential",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 789.6948190450299,
+      "rmse": 753.7855402068947,
+      "improvement_percent": 4.547234953568524
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "mean_sea_level_pressure",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 41.90934506450025,
+      "rmse": 43.256913883850785,
+      "improvement_percent": -3.2154375528335555
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "mean_sea_level_pressure",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 300.012609394836,
+      "rmse": 291.88700415290737,
+      "improvement_percent": 2.708421242133452
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "mean_sea_level_pressure",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 724.4349940104184,
+      "rmse": 677.9819520781876,
+      "improvement_percent": 6.412313363697441
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "specific_humidity",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.00026766164535480495,
+      "rmse": 0.0002691828260093714,
+      "improvement_percent": -0.5683222385299169
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "specific_humidity",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.0006880419319074503,
+      "rmse": 0.0006587012843642416,
+      "improvement_percent": 4.264369100567455
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "specific_humidity",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 0.001066246194233375,
+      "rmse": 0.0009762761354390745,
+      "improvement_percent": 8.438019219284376
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "temperature",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.48634175057454576,
+      "rmse": 0.49032165312748244,
+      "improvement_percent": -0.8183345452523749
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "temperature",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.6241909612798653,
+      "rmse": 1.5927715172864236,
+      "improvement_percent": 1.9344673589787198
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "temperature",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 3.0971178041425267,
+      "rmse": 2.9272611412444247,
+      "improvement_percent": 5.4843462095923945
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "total_precipitation_6hr",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0008197671118054641,
+      "rmse": 0.0008157270068911842,
+      "improvement_percent": 0.4928356915151144
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "total_precipitation_6hr",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.0018992621320585014,
+      "rmse": 0.0018240388767552912,
+      "improvement_percent": 3.960656827379583
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "total_precipitation_6hr",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 0.002336019975935068,
+      "rmse": 0.0021230166370211005,
+      "improvement_percent": 9.11821564491142
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3085357154958759,
+      "rmse": 1.3244149884118175,
+      "improvement_percent": -1.2135146735314128
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.549795287892821,
+      "rmse": 4.44204518093214,
+      "improvement_percent": 2.3682407700277963
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "u_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 8.728608406412002,
+      "rmse": 8.204883844644833,
+      "improvement_percent": 6.000092310046156
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3357116873670252,
+      "rmse": 1.3477150904207977,
+      "improvement_percent": -0.8986522441406297
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.634957838031314,
+      "rmse": 4.537868257296539,
+      "improvement_percent": 2.0947241404899786
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "v_component_of_wind",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 9.249316860438729,
+      "rmse": 8.704062728084736,
+      "improvement_percent": 5.895074637200059
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "vertical_velocity",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0868024053577351,
+      "rmse": 0.08391165348529071,
+      "improvement_percent": 3.3302670133746326
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "vertical_velocity",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.1271642087806925,
+      "rmse": 0.12146101440758772,
+      "improvement_percent": 4.484905326577016
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "field": "vertical_velocity",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "baseline_rmse": 0.1520417502924122,
+      "rmse": 0.14077548991553784,
+      "improvement_percent": 7.409978085102731
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "geopotential",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 39.36390717790979,
+      "rmse": 38.99839906892758,
+      "improvement_percent": 0.9285361519887902
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "geopotential",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 304.9955450131093,
+      "rmse": 327.66832470574894,
+      "improvement_percent": -7.433806841888502
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 4.387682196276017e-06,
+      "rmse": 4.39098032012265e-06,
+      "improvement_percent": -0.07516779244933769
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 7.2062673140971705e-06,
+      "rmse": 7.349110300100771e-06,
+      "improvement_percent": -1.9822049304799583
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.0641146207692206e-05,
+      "rmse": 1.0643128991699769e-05,
+      "improvement_percent": -0.018633180757632317
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 1.6023022978193518e-05,
+      "rmse": 1.6189983485824284e-05,
+      "improvement_percent": -1.042003795775548
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_humidity",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 0.00031666928083967394,
+      "rmse": 0.00031643213478895746,
+      "improvement_percent": 0.07488760832363717
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_humidity",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 0.00074175448884145,
+      "rmse": 0.0007776661561722353,
+      "improvement_percent": -4.841449276144716
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "temperature",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 0.491455477181503,
+      "rmse": 0.492785630259495,
+      "improvement_percent": -0.27065586604517744
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "temperature",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 1.581170620310525,
+      "rmse": 1.7594639940785997,
+      "improvement_percent": -11.276036341546746
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "u_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.2646849549783243,
+      "rmse": 1.2663354882686586,
+      "improvement_percent": -0.13050944299108913
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "u_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 4.200844065305577,
+      "rmse": 4.353263155620651,
+      "improvement_percent": -3.628296788588048
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "v_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.315061892697342,
+      "rmse": 1.317178966554258,
+      "improvement_percent": -0.16098663254346945
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "v_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 4.526281696549591,
+      "rmse": 4.616887846027735,
+      "improvement_percent": -2.0017788452542318
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "geopotential",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 40.869241613350155,
+      "rmse": 40.61520735708316,
+      "improvement_percent": 0.6215781018652833
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "geopotential",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 320.81109036471605,
+      "rmse": 351.24342872387933,
+      "improvement_percent": -9.486061820545565
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 4.8162724461491245e-06,
+      "rmse": 4.8205143698297736e-06,
+      "improvement_percent": -0.08807482815971213
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 8.001113265515521e-06,
+      "rmse": 8.172985230155125e-06,
+      "improvement_percent": -2.148100632200345
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 8.97952519641047e-06,
+      "rmse": 8.977047029989487e-06,
+      "improvement_percent": 0.027597967228532028
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.3488723409288407e-05,
+      "rmse": 1.3625435473074966e-05,
+      "improvement_percent": -1.0135285574350172
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_humidity",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0002654031749523188,
+      "rmse": 0.0002653921093651333,
+      "improvement_percent": 0.004169349966320901
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "specific_humidity",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.000616669311673654,
+      "rmse": 0.000646084184110539,
+      "improvement_percent": -4.769958854779444
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "temperature",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.4870470668348766,
+      "rmse": 0.48898971493643334,
+      "improvement_percent": -0.39886249889178327
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "temperature",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.5546151422957992,
+      "rmse": 1.8265687358676985,
+      "improvement_percent": -17.493306618015314
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "u_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3095107314980472,
+      "rmse": 1.3115283201311958,
+      "improvement_percent": -0.15407194340748553
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "u_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.41302248621354,
+      "rmse": 4.608556768546295,
+      "improvement_percent": -4.430847178857844
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "v_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3537978801549224,
+      "rmse": 1.3565029688794468,
+      "improvement_percent": -0.1998148146172829
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "field": "v_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.761647678275887,
+      "rmse": 4.860664347035188,
+      "improvement_percent": -2.0794623090457875
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "geopotential",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 39.36390717790979,
+      "rmse": 38.656939040872786,
+      "improvement_percent": 1.7959806018284175
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "geopotential",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 304.9955450131093,
+      "rmse": 314.13434614324837,
+      "improvement_percent": -2.996372005940695
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_ice_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 4.387682196276017e-06,
+      "rmse": 4.389830309469362e-06,
+      "improvement_percent": -0.048957811829852815
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_ice_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 7.2062673140971705e-06,
+      "rmse": 7.266167148376495e-06,
+      "improvement_percent": -0.8312185999837407
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.0641146207692206e-05,
+      "rmse": 1.0641355747036916e-05,
+      "improvement_percent": -0.001969142615099173
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 1.6023022978193518e-05,
+      "rmse": 1.605927345215555e-05,
+      "improvement_percent": -0.22623991746979488
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_humidity",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 0.00031666928083967394,
+      "rmse": 0.00031620001368797284,
+      "improvement_percent": 0.1481884035157477
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_humidity",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 0.00074175448884145,
+      "rmse": 0.0007657354514551463,
+      "improvement_percent": -3.233005391197863
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "temperature",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 0.491455477181503,
+      "rmse": 0.4920861305003262,
+      "improvement_percent": -0.1283235914756542
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "temperature",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 1.581170620310525,
+      "rmse": 1.6580179044594912,
+      "improvement_percent": -4.860151280440195
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "u_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.2646849549783243,
+      "rmse": 1.2648939590698782,
+      "improvement_percent": -0.016526178375975142
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "u_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 4.200844065305577,
+      "rmse": 4.271414767392884,
+      "improvement_percent": -1.6799172021200404
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "v_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.315061892697342,
+      "rmse": 1.31544549408849,
+      "improvement_percent": -0.029169835524722743
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "v_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 4.526281696549591,
+      "rmse": 4.5749134287972435,
+      "improvement_percent": -1.0744300842946641
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "geopotential",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 40.869241613350155,
+      "rmse": 40.172988870242165,
+      "improvement_percent": 1.703610626531804
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "geopotential",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 320.81109036471605,
+      "rmse": 333.8741042534728,
+      "improvement_percent": -4.071871042209296
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_ice_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 4.8162724461491245e-06,
+      "rmse": 4.81958180980498e-06,
+      "improvement_percent": -0.06871213563721668
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_ice_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 8.001113265515521e-06,
+      "rmse": 8.072097640758736e-06,
+      "improvement_percent": -0.88718123200624
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 8.97952519641047e-06,
+      "rmse": 8.979246458318455e-06,
+      "improvement_percent": 0.0031041517888574788
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.3488723409288407e-05,
+      "rmse": 1.3522527625660206e-05,
+      "improvement_percent": -0.2506109388270339
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_humidity",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0002654031749523188,
+      "rmse": 0.0002651728927428535,
+      "improvement_percent": 0.08676693845379724
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "specific_humidity",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.000616669311673654,
+      "rmse": 0.0006374288020437878,
+      "improvement_percent": -3.3663894046862985
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "temperature",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.4870470668348766,
+      "rmse": 0.48797830880727106,
+      "improvement_percent": -0.19120163856980454
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "temperature",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.5546151422957992,
+      "rmse": 1.6576888201946518,
+      "improvement_percent": -6.630173288202834
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "u_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3095107314980472,
+      "rmse": 1.310146043969596,
+      "improvement_percent": -0.04851525506950338
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "u_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.41302248621354,
+      "rmse": 4.49796632233154,
+      "improvement_percent": -1.9248448514225247
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "v_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3537978801549224,
+      "rmse": 1.3542294073290597,
+      "improvement_percent": -0.0318753028397456
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "field": "v_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.761647678275887,
+      "rmse": 4.813297255423744,
+      "improvement_percent": -1.084699680396306
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "geopotential",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 39.36390717790979,
+      "rmse": 39.501916171540785,
+      "improvement_percent": -0.3505978027212864
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "geopotential",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 304.9955450131093,
+      "rmse": 346.7825988704768,
+      "improvement_percent": -13.700873517864487
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 4.387682196276017e-06,
+      "rmse": 4.395498031180535e-06,
+      "improvement_percent": -0.1781312901638854
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 7.2062673140971705e-06,
+      "rmse": 7.401510525659473e-06,
+      "improvement_percent": -2.7093528875949513
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.0641146207692206e-05,
+      "rmse": 1.0653955477947453e-05,
+      "improvement_percent": -0.12037491079661677
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 1.6023022978193518e-05,
+      "rmse": 1.6225770686718868e-05,
+      "improvement_percent": -1.2653524169645047
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_humidity",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 0.00031666928083967394,
+      "rmse": 0.0003165929772649191,
+      "improvement_percent": 0.02409566679550945
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_humidity",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 0.00074175448884145,
+      "rmse": 0.0007813567388073194,
+      "improvement_percent": -5.3389970079890325
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "temperature",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 0.491455477181503,
+      "rmse": 0.4934568826603779,
+      "improvement_percent": -0.4072404463478563
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "temperature",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 1.581170620310525,
+      "rmse": 1.82889029073791,
+      "improvement_percent": -15.666852599293545
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "u_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.2646849549783243,
+      "rmse": 1.2663238388890132,
+      "improvement_percent": -0.1295883140095544
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "u_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 4.200844065305577,
+      "rmse": 4.41659188660863,
+      "improvement_percent": -5.135820752902864
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "v_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "baseline_rmse": 1.315061892697342,
+      "rmse": 1.3158903909226043,
+      "improvement_percent": -0.06300070208580255
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "v_component_of_wind",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "baseline_rmse": 4.526281696549591,
+      "rmse": 4.6551715566580345,
+      "improvement_percent": -2.847588125297129
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "geopotential",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 40.869241613350155,
+      "rmse": 41.208472808079044,
+      "improvement_percent": -0.8300403465722139
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "geopotential",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 320.81109036471605,
+      "rmse": 377.7755705146967,
+      "improvement_percent": -17.756393672432026
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 4.8162724461491245e-06,
+      "rmse": 4.826278506981074e-06,
+      "improvement_percent": -0.20775529091900946
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_ice_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 8.001113265515521e-06,
+      "rmse": 8.237089299959587e-06,
+      "improvement_percent": -2.949290012692529
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 8.97952519641047e-06,
+      "rmse": 8.9865764675803e-06,
+      "improvement_percent": -0.07852610261229742
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_cloud_liquid_water_content",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.3488723409288407e-05,
+      "rmse": 1.3627179820021342e-05,
+      "improvement_percent": -1.0264604479738537
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_humidity",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.0002654031749523188,
+      "rmse": 0.0002652364363516464,
+      "improvement_percent": 0.06282464431797141
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "specific_humidity",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 0.000616669311673654,
+      "rmse": 0.0006488932790027932,
+      "improvement_percent": -5.225485802379648
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "temperature",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 0.4870470668348766,
+      "rmse": 0.4902791065391957,
+      "improvement_percent": -0.6635990491274057
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "temperature",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 1.5546151422957992,
+      "rmse": 1.9018382772210876,
+      "improvement_percent": -22.33498989418834
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "u_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3095107314980472,
+      "rmse": 1.311768050478364,
+      "improvement_percent": -0.17237880729197297
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "u_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.41302248621354,
+      "rmse": 4.691470178071088,
+      "improvement_percent": -6.309682144775608
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "v_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "baseline_rmse": 1.3537978801549224,
+      "rmse": 1.3550817407538611,
+      "improvement_percent": -0.09483399388923175
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "field": "v_component_of_wind",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "baseline_rmse": 4.761647678275887,
+      "rmse": 4.899865848752351,
+      "improvement_percent": -2.9027382917694355
+    }
+  ],
+  "counts": [
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "improved": 3,
+      "worse": 8,
+      "unchanged": 0
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "improved": 11,
+      "worse": 0,
+      "unchanged": 0
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K22_step26000",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "improved": 11,
+      "worse": 0,
+      "unchanged": 0
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "band": "native GC task levels",
+      "lead_hours": 12,
+      "improved": 10,
+      "worse": 1,
+      "unchanged": 0
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "band": "native GC task levels",
+      "lead_hours": 120,
+      "improved": 3,
+      "worse": 4,
+      "unchanged": 4
+    },
+    {
+      "model": "GraphCast",
+      "checkpoint": "v22_K2_step26000",
+      "band": "native GC task levels",
+      "lead_hours": 240,
+      "improved": 2,
+      "worse": 3,
+      "unchanged": 6
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "improved": 1,
+      "worse": 1,
+      "unchanged": 5
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "improved": 0,
+      "worse": 7,
+      "unchanged": 0
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "improved": 2,
+      "worse": 1,
+      "unchanged": 4
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step1840",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "improved": 0,
+      "worse": 7,
+      "unchanged": 0
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "improved": 1,
+      "worse": 3,
+      "unchanged": 3
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "improved": 0,
+      "worse": 7,
+      "unchanged": 0
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "improved": 1,
+      "worse": 3,
+      "unchanged": 3
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_adaptive_step2000",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "improved": 0,
+      "worse": 7,
+      "unchanged": 0
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "band": "common_gc_13levels",
+      "lead_hours": 12,
+      "improved": 0,
+      "worse": 4,
+      "unchanged": 3
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "band": "common_gc_13levels",
+      "lead_hours": 120,
+      "improved": 0,
+      "worse": 7,
+      "unchanged": 0
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "band": "weather_gt30hpa",
+      "lead_hours": 12,
+      "improved": 0,
+      "worse": 5,
+      "unchanged": 2
+    },
+    {
+      "model": "NeuralGCM",
+      "checkpoint": "K2_calibrated_step2000",
+      "band": "weather_gt30hpa",
+      "lead_hours": 120,
+      "improved": 0,
+      "worse": 7,
+      "unchanged": 0
+    }
+  ],
+  "gc_K2_K22_max_relative_baseline_difference": {
+    "10m_u_component_of_wind": 0.0015873643517806783,
+    "10m_v_component_of_wind": 0.001600687074272404,
+    "2m_temperature": 0.001288752477433362,
+    "geopotential": 0.0014261860952533081,
+    "mean_sea_level_pressure": 0.0028894467256210185,
+    "specific_humidity": 0.0009519231171839082,
+    "temperature": 0.0007392652999795795,
+    "total_precipitation_6hr": 0.0009882365876495566,
+    "u_component_of_wind": 0.0009466879997825925,
+    "v_component_of_wind": 0.001047466245015387,
+    "vertical_velocity": 0.0006119964532509342
+  },
+  "gc_raw_json_anchor_ids_available": false,
+  "causal_head_to_head_between_models": false,
+  "source_sha256": {
+    "gc_vs_ngcm_20261003/evidence/gc/v22_K2_K40.json": "26c5b8891e2352ff90b74c797d04a7431565581270b58df3ba91305031eb907b",
+    "gc_vs_ngcm_20261003/evidence/gc/v22_K22_K40.json": "7fad228fd289a71d0eb6de34bef998b336a27b05c9328c318f6293d1a84f59d1",
+    "weather_only_20261003/results/H200_adaptive_step2000.json": "a75f564ef50ed5e2254e16e879b454733c8b3361751c69d3fb92d68a2c06776e",
+    "weather_only_20261003/baselines/H200_b77fe41fe0886047eed0f5c601c164f0a7e8fd594e946a195dec5b6389f3ecc3.json": "0235ba596626ebdaad8ae38b04884592972c3fb9c02d1256112e3e03e07ca6eb",
+    "weather_only_20261003/results/H200_adaptive_step1840.json": "1bff4ce85db304ce64c5eff5981b1e1bdbe14df2c22e55f112333c739047835d",
+    "weather_only_20261003/results/H200_calibrated_step2000.json": "4d5b7f3af1f225f011f9951e55bcffc20c7e5d74af4a7b736d442c2af5ecf272"
+  }
+}
