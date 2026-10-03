@@ -1,5 +1,13 @@
 # NeuralGCM residual GC–Mamba pipeline
 
+**Architecture proposal, October 3:** the user requested aligning correction
+placement, two-frame weather inputs and memory training with the GC residual
+pipeline. See the [weather-space residual design](../../../experimental/weather_space_residual/README.md)
+for the proposed forward/feedback contract, 24-step BPTT, 96-step memory carry,
+normalization, tests, and the distinction between native and re-encoded baselines.
+This is a design document, not an implemented replacement. The native-state
+protocols below remain the historical specifications for existing runs.
+
 **Latest user direction, September 24:** freeze NeuralGCM and train only the
 residual head, comparing **K=1 / 6 h and K=2 / 12 h** with the public five-term
 loss reconstruction. Physical feedback stays stop-gradient; Mamba memory carries
