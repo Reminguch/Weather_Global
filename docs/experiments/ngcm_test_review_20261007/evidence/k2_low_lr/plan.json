@@ -1,0 +1,57 @@
+{
+  "updates": 2000,
+  "modes": [
+    "adaptive"
+  ],
+  "K": 2,
+  "seed": 22,
+  "width": 128,
+  "batch_size": 2,
+  "window": 100,
+  "probe_interval": 20,
+  "peak_lr": 0.0001,
+  "warmup": 200,
+  "validate_every": 20,
+  "short_validation_origins": 8,
+  "long_validation_origins": 16,
+  "source_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/source_v1",
+  "resources": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_pressure_20260929/resources.json",
+  "statistics": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json",
+  "preflight": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/preflight_v1/report.json",
+  "lifecycle_report": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/schedule_smoke/report.json",
+  "initialization": "Fresh seed 22 with zero residual head; no old trained checkpoint.",
+  "training_qos": "gpu-test",
+  "training_time_limit": "01:00:00",
+  "evaluation_qos": "gpu-test",
+  "evaluation_time_limit": "01:00:00",
+  "restart_policy": "One-hour allocations, checkpoint near 55 minutes, same-job requeue; no 500-update cap; six slices maximum.",
+  "early_results": "100-update results are preliminary; no efficacy conclusion before 2k analysis",
+  "hardware": "H200",
+  "a100_jobs_preserved": [],
+  "slice_seconds": 3300,
+  "slice_updates": 2000,
+  "max_slices": 6,
+  "partition": "ailab",
+  "partition_authorization": "User instruction: H200 jobs use ailab.",
+  "pressure_mask": ">30 hPa",
+  "upper_loss_weight": 0.0,
+  "native_loss_weight": 0.0,
+  "a100_jobs_cancelled": [
+    14857473,
+    14857474,
+    14857475,
+    14857476
+  ],
+  "reference_campaign": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k",
+  "numerical_source_reuse": "Byte-identical completed strict-mask K2 source",
+  "changed_training_factors": {
+    "peak_lr": [
+      0.002,
+      0.0001
+    ],
+    "warmup": [
+      2000,
+      200
+    ]
+  }
+}

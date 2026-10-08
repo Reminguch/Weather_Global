@@ -1,0 +1,408 @@
+{
+  "audit_date": "2026-10-07",
+  "scope": "Read-only review of saved training/evaluation artifacts; no new GPU execution",
+  "entries": [
+    {
+      "path": "evidence/native_k20/training/config.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/trial_adaptive/config.json",
+      "sha256": "81a10f5dc72f60153aefb04e402207357931be3180c21e95d398ccb0cd0761fe",
+      "bytes": 28330
+    },
+    {
+      "path": "evidence/native_k20/training/calibration.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/trial_adaptive/calibration.json",
+      "sha256": "060b409c080a2cd3bdbeb97cebc48f15ee38180a248b5ec51710cf38eafb633a",
+      "bytes": 1008
+    },
+    {
+      "path": "evidence/native_k20/training/DONE.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/trial_adaptive/DONE.json",
+      "sha256": "405251452953a2132ac79e88d6524a25e4072adde80fcef92d6002340abc79fd",
+      "bytes": 273
+    },
+    {
+      "path": "evidence/native_k20/evaluation/plan.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/plan.json",
+      "sha256": "456b3a04b895cbb8c3e29d80f006b2247e6be97e9e022a828a916a7cfd8a7ae6",
+      "bytes": 1040
+    },
+    {
+      "path": "evidence/native_k20/evaluation/watch_status.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/watch_status.json",
+      "sha256": "59c52d4ddf520e9035669eeee38ff0e6c61ce361f77c163218b4b648f788fa06",
+      "bytes": 168
+    },
+    {
+      "path": "evidence/native_k20/plan.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/plan.json",
+      "sha256": "afa8e18d46a3f97c268ef3fb79c2ef69ee52b1f72ead24dff68c08b8adc46323",
+      "bytes": 1975
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step1000.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step1000.json",
+      "sha256": "badcc24175575dad8b0972fd0ddefff811d0d68ae6ead4c06f98852dbd1d5ac1",
+      "bytes": 155414
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step1020.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step1020.json",
+      "sha256": "3f18262b26e365bcfeb754cfffb468dffb088c7ba8b6c140d9b8e18a148720ca",
+      "bytes": 155424
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step1100.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step1100.json",
+      "sha256": "3c2b5eae13a6176cdfc5a334194bf1490890cfb10a5a7f21b1187eb3b2b743af",
+      "bytes": 155447
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step1220.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step1220.json",
+      "sha256": "f73a254507fb5c9697b9cf95e2798b064212fc6c32877f460e78c3496ced6bb9",
+      "bytes": 155343
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step1420.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step1420.json",
+      "sha256": "8b8237ddee5e06b6d855f98286c88243e7af19d5b25344490c5bd0a5b6cc6dff",
+      "bytes": 155429
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step1620.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step1620.json",
+      "sha256": "0080e80566cc37d337f8b5ad96e2406a30d4a33f50e8c47b5b22bc0f363531cd",
+      "bytes": 155492
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step20.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step20.json",
+      "sha256": "53a67906a889ccd2b72b221db61a451c63148b3bbd360551a36a62ce0377222c",
+      "bytes": 155409
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step220.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step220.json",
+      "sha256": "1b7aa15a43bfab4c3751400b10d80a9fdcb0f09cbe38e49460e408f4ddcf9dea",
+      "bytes": 155137
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step420.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step420.json",
+      "sha256": "7e5e05f243c7d9c19ce5bc1f22a0f3596db07d3e64beb792ab2f98bc5e1077e2",
+      "bytes": 155344
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step620.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step620.json",
+      "sha256": "cbeec47adc381942a49d320f48982c84f398616b757545d4f7775b59cbf5cf0c",
+      "bytes": 155396
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step800.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step800.json",
+      "sha256": "24b25dbc732341317fcd9204cf38bfb43ba8fc5b2bad35122a3007865736734f",
+      "bytes": 155372
+    },
+    {
+      "path": "evidence/native_k20/results/H200_adaptive_step820.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/results/H200_adaptive_step820.json",
+      "sha256": "e1c994727da8fd01274ecbcf44ec278ac67f78e0b7812f8b8829304927da252d",
+      "bytes": 154565
+    },
+    {
+      "path": "evidence/native_k20/baselines/H200_ba52e4cbf7a2ab520bd155033ee12d9866746c03241b6592643582845a5acb6f.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/baselines/H200_ba52e4cbf7a2ab520bd155033ee12d9866746c03241b6592643582845a5acb6f.json",
+      "sha256": "781d5a71b1858ae3343617c7114138fbbb8a3cd217ff187983c96792e2368dbc",
+      "bytes": 181502
+    },
+    {
+      "path": "evidence/native_k20/training/validation.jsonl",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/trial_adaptive/validation.jsonl",
+      "sha256": "352d7aab263d769b1c831933d5285265f1287db045aac4b22668e62828f8c6f8",
+      "bytes": 2331958
+    },
+    {
+      "path": "evidence/native_k20/training/selected_metrics.json",
+      "source": "derived subset; source and hash embedded",
+      "sha256": "1be0d3acf36a0118d8e9e4c1214522a0f6d38b1b366b2c88003db2a7ed2111c4",
+      "bytes": 15310
+    },
+    {
+      "path": "evidence/k2_low_lr/training/config.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/trial_adaptive/config.json",
+      "sha256": "2c7a0f59b02ecbe13f42e4f63ad05244a012bef13ac6c76b4c171a9e03d0cf51",
+      "bytes": 27869
+    },
+    {
+      "path": "evidence/k2_low_lr/training/calibration.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/trial_adaptive/calibration.json",
+      "sha256": "d1718c891fa8eb58adb9e561bb28a71a464f83aa99ad7e495dfc0cba86f2b6ea",
+      "bytes": 1010
+    },
+    {
+      "path": "evidence/k2_low_lr/training/DONE.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/trial_adaptive/DONE.json",
+      "sha256": "d6e0e3fd8bbf187278fe7b9afc754988fbb4a76da403c49dc6ef42d9e085b35c",
+      "bytes": 275
+    },
+    {
+      "path": "evidence/k2_low_lr/evaluation/plan.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/plan.json",
+      "sha256": "18622d5e3eaedbb5002a474f81f590ad134a28fe0a2c7f916e40330226124315",
+      "bytes": 1062
+    },
+    {
+      "path": "evidence/k2_low_lr/evaluation/watch_status.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/watch_status.json",
+      "sha256": "069a9fb9f61c49e095c840298002682188cb9ac9f852f448c955dc58377e079b",
+      "bytes": 135
+    },
+    {
+      "path": "evidence/k2_low_lr/plan.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/plan.json",
+      "sha256": "03bea710ca953b1e419989433e299578a61aff99f4847718d93620ddc24c57bf",
+      "bytes": 2164
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1020.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1020.json",
+      "sha256": "e78a4f298249a064ef73683b1c78eb33a8f86a38defc9f6209157a0bf757663d",
+      "bytes": 155467
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1220.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1220.json",
+      "sha256": "5fda981e536de5eb173be103a4c1267f4a815d776a107ba150c57b171d143bad",
+      "bytes": 155453
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1400.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1400.json",
+      "sha256": "04feaa68e92b148dc817ed5ff94e3602377539a0bc6334ea86631b6518c723db",
+      "bytes": 155458
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1420.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1420.json",
+      "sha256": "79592ffda4c74f072a48e14a102161c847d11ec41e4db7d46850bf4bfde3e211",
+      "bytes": 155460
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1560.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1560.json",
+      "sha256": "ad13a977f50e62668df68b0a63f9503bdc8e764873dba3abd0542b23f2c08fe3",
+      "bytes": 155453
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1620.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1620.json",
+      "sha256": "960b0033f9e04bb24fdcdae6cfd8eeeca3e144ffc8a7a59e3a79c398696ff397",
+      "bytes": 155428
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1800.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1800.json",
+      "sha256": "c5641575008bc50c2b6feaf8a4232f45bfd3e2f29d2402a5e80f5673551fa72e",
+      "bytes": 155467
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1820.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1820.json",
+      "sha256": "5af18ed1109b7a81633d09e2888c386582c69862e6a7bc871e385436d04eabc1",
+      "bytes": 155428
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step1840.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step1840.json",
+      "sha256": "aaf62f1697c99c9fc72224973eeb3db8c2184560159f6774c648cc0eb3d3d3c6",
+      "bytes": 155443
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step20.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step20.json",
+      "sha256": "f2ab19f6c1c162dc9593e936c50e17dc234e8a6338be0f7fd90f87f7b59b59b7",
+      "bytes": 155381
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step2000.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step2000.json",
+      "sha256": "ec23d68abde9fe435cd98535f7481e9811e39b63fd0f3843a1ce4ed4c80dd316",
+      "bytes": 155431
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step220.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step220.json",
+      "sha256": "71c8402f547bd4946d4dce725a852a55c2c2a10b66bf9c29aba9729f7e889f36",
+      "bytes": 155447
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step420.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step420.json",
+      "sha256": "8f8abd56733f6bfa1a4e82db5a633898a4fc47384323226c3677b92e52b3d555",
+      "bytes": 155408
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step620.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step620.json",
+      "sha256": "36b5e2f4829ac0ce373fdc47e71a21dc5f61ede34249a7f1bee7ff6c86d4a8dd",
+      "bytes": 155413
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step80.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step80.json",
+      "sha256": "a866ae9bf57b08c7b57281ed9c5ad823481bc0208b7718433b5677064e0336e3",
+      "bytes": 155473
+    },
+    {
+      "path": "evidence/k2_low_lr/results/H200_adaptive_step820.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/results/H200_adaptive_step820.json",
+      "sha256": "aae7c391022048c8801eec37617fbd6e9f9843bbf7578e429c3d6a1db92a743a",
+      "bytes": 155379
+    },
+    {
+      "path": "evidence/k2_low_lr/baselines/H200_b77fe41fe0886047eed0f5c601c164f0a7e8fd594e946a195dec5b6389f3ecc3.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval/baselines/H200_b77fe41fe0886047eed0f5c601c164f0a7e8fd594e946a195dec5b6389f3ecc3.json",
+      "sha256": "0235ba596626ebdaad8ae38b04884592972c3fb9c02d1256112e3e03e07ca6eb",
+      "bytes": 181041
+    },
+    {
+      "path": "evidence/k2_low_lr/training/validation.jsonl",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/trial_adaptive/validation.jsonl",
+      "sha256": "40f8f44d1a2699d75c375e4660585c44a37677e4d3c1c8adca1d784833bcdc2e",
+      "bytes": 1208588
+    },
+    {
+      "path": "evidence/k2_low_lr/training/selected_metrics.json",
+      "source": "derived subset; source and hash embedded",
+      "sha256": "d3fe9c56c7f2e13904633c784b7c3f69a7c7ef0a716c47590e460f213c37d257",
+      "bytes": 15616
+    },
+    {
+      "path": "evidence/smoke/strict_k2_numerical.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/preflight_v1/report.json",
+      "sha256": "07213a54e48565c91b64168afe34f597089a247fc82f52fb51815e9b976e2f5b",
+      "bytes": 30286
+    },
+    {
+      "path": "evidence/smoke/strict_k2_resume.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/lifecycle_v1/report.json",
+      "sha256": "cbe9c5cd76abc01c155108463e01b2a2a582e366f5c695f76f3bf60735090f97",
+      "bytes": 26118
+    },
+    {
+      "path": "evidence/smoke/native_k20_numerical.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/preflight_v1/report.json",
+      "sha256": "f498dffc61c4c407473c3650ca0791871e12e5996271fb1f948250678d749a67",
+      "bytes": 30717
+    },
+    {
+      "path": "evidence/smoke/native_k20_resume.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/lifecycle_v1/report.json",
+      "sha256": "66f1398c9395e908c7883ab9897c7e2bb37656d680c17bd24f2e16b97a64f753",
+      "bytes": 26573
+    },
+    {
+      "path": "evidence/smoke/k2_low_lr_resume.json",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/schedule_smoke/report.json",
+      "sha256": "aa296416d50b37a4b7af5efe4765b1b24c527b5435652c4b221e2513dd2dc7cb",
+      "bytes": 26340
+    },
+    {
+      "path": "evidence/monitoring/watcher_error.log",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/watch-14937574.err",
+      "sha256": "24b9b1705a6ec215009d08e4a73f29df2517ba6b1f2066906e3af4efa116b6c9",
+      "bytes": 2407
+    },
+    {
+      "path": "evidence/monitoring/report.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/report.py",
+      "sha256": "94655238f753f8cd95a25805c4dfbad4b4af7870afa74039c77d956860a0e13f",
+      "bytes": 9856
+    },
+    {
+      "path": "evidence/monitoring/watch.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/watch.py",
+      "sha256": "fa276e9d8ed03d5dc8c601170720d16894c8c136216b3066e108e81b1bcdfafe",
+      "bytes": 4318
+    },
+    {
+      "path": "evidence/monitoring/evaluate.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/evaluate.py",
+      "sha256": "6d18e3a138e26fc43e0562f4206a0d1b39c82663e536b24b949fbeb0b8218a6b",
+      "bytes": 7140
+    },
+    {
+      "path": "evidence/monitoring/run_watch.sbatch",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/run_watch.sbatch",
+      "sha256": "b47497f5abb5aa0c91cc0fff839b0ec2bc98807df271849dc6c4fcaf8d8c683f",
+      "bytes": 1211
+    },
+    {
+      "path": "evidence/native_k20/training/slurm_stderr.log",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/ngcm-weather-k20-2k-14937573.err",
+      "sha256": "5e0443a01f035fc229651dec2b3fb42a9311210d21e41469bba64f6bff499c84",
+      "bytes": 2178
+    },
+    {
+      "path": "evidence/numerical_source/experimental/weather_only/objective.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/experimental/weather_only/objective.py",
+      "sha256": "30015888d82656c2995dbd058cdf5044d0a175dd5252507bc28c3cac80300f02",
+      "bytes": 2953
+    },
+    {
+      "path": "evidence/numerical_source/experimental/adaptive_loss/objective.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/experimental/adaptive_loss/objective.py",
+      "sha256": "d57e98bbc5769e9e9e009ed10acc82c9c8d92ca36a78cbc5b249fe709bff2f24",
+      "bytes": 4915
+    },
+    {
+      "path": "evidence/numerical_source/experimental/adaptive_loss/controller.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/experimental/adaptive_loss/controller.py",
+      "sha256": "0deb41d4112330d1228bc0729bbf436cd3cd8d84ad67f9cd60cd8ca635c1b0e3",
+      "bytes": 7897
+    },
+    {
+      "path": "evidence/numerical_source/experimental/adaptive_loss/trainer.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/experimental/adaptive_loss/trainer.py",
+      "sha256": "c8396de7bbecc19ea5a70c2366a16406a3970666e3893416cd2bfa06369c3fe6",
+      "bytes": 3898
+    },
+    {
+      "path": "evidence/numerical_source/experimental/weather_k20/train.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/experimental/weather_k20/train.py",
+      "sha256": "19a0b9f41982c50604dc338b739a181305829c4af5e0190b806b06b34b0fd09f",
+      "bytes": 14715
+    },
+    {
+      "path": "evidence/numerical_source/src/models/neuralgcm_residual/paper_loss.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/src/models/neuralgcm_residual/paper_loss.py",
+      "sha256": "83a71dad358d3e3ac1b2ac673e3d385531b82ec0a95177a14e9b8b7990bca367",
+      "bytes": 5562
+    },
+    {
+      "path": "evidence/numerical_source/src/models/neuralgcm_residual/paper_statistics.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/src/models/neuralgcm_residual/paper_statistics.py",
+      "sha256": "1e223b2cb19ec0173b737a96cd6ae3d68401b3451e26ec5738976f9d7c2756e7",
+      "bytes": 4858
+    },
+    {
+      "path": "evidence/numerical_source/src/models/neuralgcm_residual/trajectory_training.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/src/models/neuralgcm_residual/trajectory_training.py",
+      "sha256": "3783074fc6c888757720b2303ddd1001bc8edb46f048ff9632e5208cd304f218",
+      "bytes": 6235
+    },
+    {
+      "path": "evidence/numerical_source/src/models/neuralgcm_residual/normalization.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/src/models/neuralgcm_residual/normalization.py",
+      "sha256": "1499d8477ad6b72a7ee09cca05c568dee69e48a87f4562a8c63dd88a7545f692",
+      "bytes": 6004
+    },
+    {
+      "path": "evidence/numerical_source/src/models/neuralgcm_residual/corrections.py",
+      "source": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/source_v1/src/models/neuralgcm_residual/corrections.py",
+      "sha256": "757f85b7451bfddc087bb3df02d2d6c5aae9250834d50720b66ff0f28433f5eb",
+      "bytes": 1601
+    }
+  ]
+}

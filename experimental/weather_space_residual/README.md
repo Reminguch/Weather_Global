@@ -2,6 +2,11 @@
 
 Date: October 3, 2026. **Status: design proposal. This architecture has not been implemented or trained.** This README is the deliverable for the architecture discussion.
 
+**October 7 evidence update:** the [standalone test review](../../docs/experiments/ngcm_test_review_20261007/REPORT.md)
+documents positive native K20 checkpoints, remaining forecast regressions, and a
+failed evaluation watcher. Native K20 remains a comparison baseline for this
+proposal; the weather-space architecture has not yet demonstrated an advantage.
+
 The proposed change moves the residual from NeuralGCM's native prognostic state to its decoded weather fields. The residual branch will use two weather frames, an independent graph network with Mamba memory, 24-step memory BPTT, and memory carry within a 96-step segment. This requires a new forward path and training loop, rather than a different `K` setting in the existing runner.
 
 The reference is the **frozen GraphCast + independent GC–Mamba residual branch** on `minimalistic_code`, pinned at commit `4b318ee488cb3820f8819c956f4691aa09e57239`. GraphCast itself and the residual branch are separate components. The initial implementation will follow the fresh width128 residual configuration. Pretrained GC input/output projections will not be transferred into an incompatible NGCM field schema.

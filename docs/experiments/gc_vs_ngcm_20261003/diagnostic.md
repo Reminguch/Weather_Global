@@ -1,5 +1,10 @@
 # 2026-10-03：GraphCast residual 与当前 NeuralGCM residual 的诊断
 
+**October 7 update:** see the [standalone test review](../ngcm_test_review_20261007/REPORT.md)
+for completed native K20 and lower-LR runs, positive K20 checkpoint results,
+remaining regressions, and the evaluation-watcher failure. The experiment status
+below is the historical October 3 snapshot.
+
 **当前证据不能说明 residual 思路本身对 NeuralGCM 无效，但能确认：我们没有复现 GC 成功实验的训练条件。** 差异包括修正所在空间、可学习的历史长度、逐层归一化与目标函数，以及学习率和训练预算。滑窗调权只能调整现有目标之间的比例，无法自动补齐这些差异。
 
 本次直接读取 `Weather_Global/minimalistic_code` 的提交 `4b318ee488cb3820f8819c956f4691aa09e57239`，对照完成的 NGCM strict >30 hPa 实验冻结源码，而非当前工作区中不断变化的文件。历史 v22 的结果与维护中的 v24 实现分开讨论，不把 v24 配置倒推为每个历史 checkpoint 的实际配置。
@@ -49,7 +54,7 @@ best1840 的云冰、云液水五天改善率也分别为 −0.831%、−0.226%�
 | 修正位置 | 对 GC 预测的天气场直接加 residual | 修正 NeuralGCM native prognostic state，再经过 decoder |
 | 分支输入 | 两帧天气场及 forcings，独立 residual 图网络 | 当前一帧 native 状态及 known features |
 | memory 训练 | v24：BPTT 24，96-step segment 内 carry，AR tail 20 | 每个 origin 的两步 memory BPTT，下一 origin 清零 |
-| 输出尺度 | 逐变量、逐层的 `diffs_stddev_by_level` | 训练集 24h 差分统计；除比湿外跨层合并尺度 |
+| Loss 尺度 | 逐变量、逐层的 `diffs_stddev_by_level` | 训练集 24h 差分统计；除比湿外跨层合并尺度；native head 的输出增量使用另一套统计 |
 | 天气场 loss | 归一化格点 MSE，纬度面积权重、气压权重 `p/mean(p)` | >30 hPa：20×谱系数误差 + 0.1×谱振幅误差 + 2×batch/time bias；含时效降权 |
 | 层范围 | GC-small 的 13 层，50–1000 hPa | 原始 37 层；当前严格截去 ≤30 hPa，剩余 29 层 |
 | 变量 | 6 个高空变量 + 5 个地表变量 | T/Z/u/v/q/云冰/云液水，共 7 个 |

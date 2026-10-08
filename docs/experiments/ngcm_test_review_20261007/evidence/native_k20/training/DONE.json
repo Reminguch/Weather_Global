@@ -1,0 +1,10 @@
+{
+  "backbone_frozen": true,
+  "best_score": 0.980246397922898,
+  "best_update": 1100,
+  "identity": "64a51150a51695c1e577c066c11816c26a425210983d742b79e4b79b0923d11f",
+  "mode": "adaptive",
+  "seconds": 2136.693901676219,
+  "slurm_job_id": "14937573",
+  "updates": 2000
+}

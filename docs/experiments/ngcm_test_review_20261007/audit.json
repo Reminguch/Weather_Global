@@ -1,0 +1,305 @@
+{
+  "audit_date": "2026-10-07",
+  "gpu_execution_in_this_audit": false,
+  "copied_artifacts_verified": 67,
+  "evaluator_checkpoints": 32,
+  "comparison_rows": 3360,
+  "origins_count": 16,
+  "frozen_baseline_arrays_and_origins_exactly_match": true,
+  "source_equality": {
+    "experimental/weather_only/objective.py": true,
+    "experimental/adaptive_loss/controller.py": true,
+    "experimental/adaptive_loss/trainer.py": true,
+    "src/models/neuralgcm_residual/paper_loss.py": true,
+    "src/models/neuralgcm_residual/normalization.py": true
+  },
+  "recorded_smoke_reports": {
+    "k2_low_lr_resume": {
+      "passed": true,
+      "K": 2,
+      "slurm_job_id": "14938454",
+      "updates": 6
+    },
+    "native_k20_numerical": {
+      "passed": true,
+      "K": 20,
+      "slurm_job_id": "14937571",
+      "updates": 6
+    },
+    "native_k20_resume": {
+      "passed": true,
+      "K": 20,
+      "slurm_job_id": "14937572",
+      "updates": 6
+    },
+    "strict_k2_numerical": {
+      "passed": true,
+      "K": 2,
+      "slurm_job_id": "14891022",
+      "updates": 6
+    },
+    "strict_k2_resume": {
+      "passed": true,
+      "K": 2,
+      "slurm_job_id": "14891023",
+      "updates": 6
+    }
+  },
+  "native_k20_completed_updates": 2000,
+  "native_k20_independent_evaluation_steps": [
+    20,
+    220,
+    420,
+    620,
+    800,
+    820,
+    1000,
+    1020,
+    1100,
+    1220,
+    1420,
+    1620
+  ],
+  "native_k20_final_independent_evaluation_available": false,
+  "source_sha256": {
+    "evidence/k2_low_lr/results/H200_adaptive_step20.json": "f2ab19f6c1c162dc9593e936c50e17dc234e8a6338be0f7fd90f87f7b59b59b7",
+    "evidence/k2_low_lr/baselines/H200_b77fe41fe0886047eed0f5c601c164f0a7e8fd594e946a195dec5b6389f3ecc3.json": "0235ba596626ebdaad8ae38b04884592972c3fb9c02d1256112e3e03e07ca6eb",
+    "evidence/k2_low_lr/results/H200_adaptive_step80.json": "a866ae9bf57b08c7b57281ed9c5ad823481bc0208b7718433b5677064e0336e3",
+    "evidence/k2_low_lr/results/H200_adaptive_step220.json": "71c8402f547bd4946d4dce725a852a55c2c2a10b66bf9c29aba9729f7e889f36",
+    "evidence/k2_low_lr/results/H200_adaptive_step420.json": "8f8abd56733f6bfa1a4e82db5a633898a4fc47384323226c3677b92e52b3d555",
+    "evidence/k2_low_lr/results/H200_adaptive_step620.json": "36b5e2f4829ac0ce373fdc47e71a21dc5f61ede34249a7f1bee7ff6c86d4a8dd",
+    "evidence/k2_low_lr/results/H200_adaptive_step820.json": "aae7c391022048c8801eec37617fbd6e9f9843bbf7578e429c3d6a1db92a743a",
+    "evidence/k2_low_lr/results/H200_adaptive_step1020.json": "e78a4f298249a064ef73683b1c78eb33a8f86a38defc9f6209157a0bf757663d",
+    "evidence/k2_low_lr/results/H200_adaptive_step1220.json": "5fda981e536de5eb173be103a4c1267f4a815d776a107ba150c57b171d143bad",
+    "evidence/k2_low_lr/results/H200_adaptive_step1400.json": "04feaa68e92b148dc817ed5ff94e3602377539a0bc6334ea86631b6518c723db",
+    "evidence/k2_low_lr/results/H200_adaptive_step1420.json": "79592ffda4c74f072a48e14a102161c847d11ec41e4db7d46850bf4bfde3e211",
+    "evidence/k2_low_lr/results/H200_adaptive_step1560.json": "ad13a977f50e62668df68b0a63f9503bdc8e764873dba3abd0542b23f2c08fe3",
+    "evidence/k2_low_lr/results/H200_adaptive_step1620.json": "960b0033f9e04bb24fdcdae6cfd8eeeca3e144ffc8a7a59e3a79c398696ff397",
+    "evidence/k2_low_lr/results/H200_adaptive_step1800.json": "c5641575008bc50c2b6feaf8a4232f45bfd3e2f29d2402a5e80f5673551fa72e",
+    "evidence/k2_low_lr/results/H200_adaptive_step1820.json": "5af18ed1109b7a81633d09e2888c386582c69862e6a7bc871e385436d04eabc1",
+    "evidence/k2_low_lr/results/H200_adaptive_step1840.json": "aaf62f1697c99c9fc72224973eeb3db8c2184560159f6774c648cc0eb3d3d3c6",
+    "evidence/k2_low_lr/results/H200_adaptive_step2000.json": "ec23d68abde9fe435cd98535f7481e9811e39b63fd0f3843a1ce4ed4c80dd316",
+    "../adaptive_loss_20261002/results/H200_adaptive_step2000.json": "a3d0e746a0fbccea4ef629dbea1391772407352253ed98f5609b9fdada47d306",
+    "../adaptive_loss_20261002/baselines/H200_80ab242c79451aa643760a8611430fbfff03283dccfd436ada392328650aeebf.json": "b5eae585cbd489efc5f8c87c2aaf824e59d4d6f049b581d572bad27662666cfb",
+    "../weather_only_20261003/results/H200_adaptive_step1840.json": "1bff4ce85db304ce64c5eff5981b1e1bdbe14df2c22e55f112333c739047835d",
+    "../weather_only_20261003/baselines/H200_b77fe41fe0886047eed0f5c601c164f0a7e8fd594e946a195dec5b6389f3ecc3.json": "0235ba596626ebdaad8ae38b04884592972c3fb9c02d1256112e3e03e07ca6eb",
+    "../weather_only_20261003/results/H200_adaptive_step2000.json": "a75f564ef50ed5e2254e16e879b454733c8b3361751c69d3fb92d68a2c06776e",
+    "../weather_only_20261003/results/H200_calibrated_step2000.json": "4d5b7f3af1f225f011f9951e55bcffc20c7e5d74af4a7b736d442c2af5ecf272",
+    "evidence/native_k20/results/H200_adaptive_step20.json": "53a67906a889ccd2b72b221db61a451c63148b3bbd360551a36a62ce0377222c",
+    "evidence/native_k20/baselines/H200_ba52e4cbf7a2ab520bd155033ee12d9866746c03241b6592643582845a5acb6f.json": "781d5a71b1858ae3343617c7114138fbbb8a3cd217ff187983c96792e2368dbc",
+    "evidence/native_k20/results/H200_adaptive_step220.json": "1b7aa15a43bfab4c3751400b10d80a9fdcb0f09cbe38e49460e408f4ddcf9dea",
+    "evidence/native_k20/results/H200_adaptive_step420.json": "7e5e05f243c7d9c19ce5bc1f22a0f3596db07d3e64beb792ab2f98bc5e1077e2",
+    "evidence/native_k20/results/H200_adaptive_step620.json": "cbeec47adc381942a49d320f48982c84f398616b757545d4f7775b59cbf5cf0c",
+    "evidence/native_k20/results/H200_adaptive_step800.json": "24b25dbc732341317fcd9204cf38bfb43ba8fc5b2bad35122a3007865736734f",
+    "evidence/native_k20/results/H200_adaptive_step820.json": "e1c994727da8fd01274ecbcf44ec278ac67f78e0b7812f8b8829304927da252d",
+    "evidence/native_k20/results/H200_adaptive_step1000.json": "badcc24175575dad8b0972fd0ddefff811d0d68ae6ead4c06f98852dbd1d5ac1",
+    "evidence/native_k20/results/H200_adaptive_step1020.json": "3f18262b26e365bcfeb754cfffb468dffb088c7ba8b6c140d9b8e18a148720ca",
+    "evidence/native_k20/results/H200_adaptive_step1100.json": "3c2b5eae13a6176cdfc5a334194bf1490890cfb10a5a7f21b1187eb3b2b743af",
+    "evidence/native_k20/results/H200_adaptive_step1220.json": "f73a254507fb5c9697b9cf95e2798b064212fc6c32877f460e78c3496ced6bb9",
+    "evidence/native_k20/results/H200_adaptive_step1420.json": "8b8237ddee5e06b6d855f98286c88243e7af19d5b25344490c5bd0a5b6cc6dff",
+    "evidence/native_k20/results/H200_adaptive_step1620.json": "0080e80566cc37d337f8b5ad96e2406a30d4a33f50e8c47b5b22bc0f363531cd",
+    "../weather_only_20261003/training/adaptive/config.json": "b265f9934afac576811d90704e04f7b0119ec678309879a998991d7e371020c3",
+    "evidence/native_k20/training/config.json": "81a10f5dc72f60153aefb04e402207357931be3180c21e95d398ccb0cd0761fe",
+    "evidence/smoke/k2_low_lr_resume.json": "aa296416d50b37a4b7af5efe4765b1b24c527b5435652c4b221e2513dd2dc7cb",
+    "evidence/smoke/native_k20_numerical.json": "f498dffc61c4c407473c3650ca0791871e12e5996271fb1f948250678d749a67",
+    "evidence/smoke/native_k20_resume.json": "66f1398c9395e908c7883ab9897c7e2bb37656d680c17bd24f2e16b97a64f753",
+    "evidence/smoke/strict_k2_numerical.json": "07213a54e48565c91b64168afe34f597089a247fc82f52fb51815e9b976e2f5b",
+    "evidence/smoke/strict_k2_resume.json": "cbe9c5cd76abc01c155108463e01b2a2a582e366f5c695f76f3bf60735090f97",
+    "evidence/native_k20/training/DONE.json": "405251452953a2132ac79e88d6524a25e4072adde80fcef92d6002340abc79fd",
+    "evidence/k2_low_lr/training/DONE.json": "d6e0e3fd8bbf187278fe7b9afc754988fbb4a76da403c49dc6ef42d9e085b35c"
+  },
+  "checkpoints": [
+    {
+      "campaign": "k2_low_lr",
+      "update": 20,
+      "checkpoint_sha256": "7cabbe2aa51da39557f11c482af2d88097e02aa5379dd1af4d478cbf4f0c7b4b",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step20.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 80,
+      "checkpoint_sha256": "349bd375051d585529b4a687650449f297a2ceebd5ba4c0b5171a335b241845d",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step80.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 220,
+      "checkpoint_sha256": "4d48f0a6fbd4443b7899f5d60f2c77f32f42f5eff2f9ae0dfdf0a84ba52d0f43",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step220.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 420,
+      "checkpoint_sha256": "40a51c024ece3f56032e8184b11b0576b9510d1afcab0e5b81626efe06da011d",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step420.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 620,
+      "checkpoint_sha256": "6c191af098c9eb6751d689b10aae9cd5c1ed368948ce49756c28c68929976a04",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step620.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 820,
+      "checkpoint_sha256": "c46c1a6d5713d604ffe67df4dd9e7c0f0bdd852fbfb1ef8c16072e7a343aceb2",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step820.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1020,
+      "checkpoint_sha256": "93f61a0fbdc0d70979de7e2e337e864b00502a162599891f9752745d662e6a9b",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1020.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1220,
+      "checkpoint_sha256": "cc7fd1192af56b558caa412bf50f23ecf5a0dc21339dfce39ef5a47a1ebefcdf",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1220.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1400,
+      "checkpoint_sha256": "88fc856ab9707a6d3c7548c5a5010db69ff752220dcec573d01ef74078fefa15",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1400.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1420,
+      "checkpoint_sha256": "c01c525a2d05e74c2f59499406a4c25616eb50534ef4c5e11091654ee52dd9e3",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1420.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1560,
+      "checkpoint_sha256": "7313a46f6acb1684725dec0a9bee7d33b8f9dba0f89c61bafe81fdc4d3af1dfe",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1560.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1620,
+      "checkpoint_sha256": "9a008fe9ac8d5328b44c152910cf9f52498651fe06290b8d1f119e0f9adb3de6",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1620.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1800,
+      "checkpoint_sha256": "5b51f31017f77193f99e74fcbd2fa9c88de5f5d06c48e40d9f0f0c17bf1cb0ac",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1800.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1820,
+      "checkpoint_sha256": "81b20a1f35ba344b12d6c2fbb54a3be718b5d1f7668ce03e09ac862b8a8e5c13",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1820.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 1840,
+      "checkpoint_sha256": "5c6e74ff80082e3ab45532e3efcf3971b789c84d1d156ffaf90d1bd0d6f337d9",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step1840.json"
+    },
+    {
+      "campaign": "k2_low_lr",
+      "update": 2000,
+      "checkpoint_sha256": "951ca796de2c512b5f03391fc37ba26e9f6f322ffbcb8c4da4a0fe149ee84c78",
+      "source": "ngcm_test_review_20261007/evidence/k2_low_lr/results/H200_adaptive_step2000.json"
+    },
+    {
+      "campaign": "k2_original_adaptive",
+      "update": 2000,
+      "checkpoint_sha256": "eb3cc329ace6f98e9823a96787b748e03f3d5d7134e9165c1a93aad5a00ce2fb",
+      "source": "adaptive_loss_20261002/results/H200_adaptive_step2000.json"
+    },
+    {
+      "campaign": "k2_strict_adaptive",
+      "update": 1840,
+      "checkpoint_sha256": "9fce26068f9b7bb4554b8e4f199a4ab47ef7674e0378b7157222a5d28e69280b",
+      "source": "weather_only_20261003/results/H200_adaptive_step1840.json"
+    },
+    {
+      "campaign": "k2_strict_adaptive",
+      "update": 2000,
+      "checkpoint_sha256": "794a538ac05203105ab27f41096c052d80d2070b9f7810b71ae0eff4a905f933",
+      "source": "weather_only_20261003/results/H200_adaptive_step2000.json"
+    },
+    {
+      "campaign": "k2_strict_calibrated",
+      "update": 2000,
+      "checkpoint_sha256": "b058c8f0e68947a480566f278e42d3a601b4b80813fb533975e1774ff8a9a5d0",
+      "source": "weather_only_20261003/results/H200_calibrated_step2000.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 20,
+      "checkpoint_sha256": "2a3f32bcdc6ceebfd7afbe9153c0c9e987bf14a1ff6d459daa80c7c021f5a226",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step20.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 220,
+      "checkpoint_sha256": "5e31b2074ca5b64de929983bc37306e8feca757a38469847b9c33323b7c3b200",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step220.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 420,
+      "checkpoint_sha256": "a381e969a8e406693332d17cdb14a187502f10dbc37c64b4451c88f9d277434b",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step420.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 620,
+      "checkpoint_sha256": "d6c3a88a77b2334a72ca438d5076552354b012a78b9e9ae058ef49778434d2b3",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step620.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 800,
+      "checkpoint_sha256": "0dbf984a1d612d8bd328bfefcdcc4f38f5f440df8badafa0155e20e1eee8000a",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step800.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 820,
+      "checkpoint_sha256": "05bf71e52a3cc41624da893f54df0fae08d03bbd4b86f0e398ea2143de38bfa1",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step820.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 1000,
+      "checkpoint_sha256": "cf0a2c622885e47ca9d481510dbff576abd123b6eae5498e35f0d916823cd4fa",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step1000.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 1020,
+      "checkpoint_sha256": "eae65ba0e190eb7be86f0815470866441520212f508f445185cb004a5038cc23",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step1020.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 1100,
+      "checkpoint_sha256": "f05115f2415607f0d0d986b15f6ca731a5c96bca77ae74f608604ecbfe7390fb",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step1100.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 1220,
+      "checkpoint_sha256": "b9ec68dfcb5d199d0a908373316cae2602b72ceb23715c7a6985b4a372cd2e8b",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step1220.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 1420,
+      "checkpoint_sha256": "f13976927d98f1e700a325c3721d1a9e55636bf0d5acd781a45b99fb5f2b78fc",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step1420.json"
+    },
+    {
+      "campaign": "native_k20",
+      "update": 1620,
+      "checkpoint_sha256": "6930646510288983253a3eed7fe995ae6d9671e065db5f135a8f61b30b5a93ff",
+      "source": "ngcm_test_review_20261007/evidence/native_k20/results/H200_adaptive_step1620.json"
+    }
+  ]
+}
