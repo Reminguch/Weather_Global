@@ -46,7 +46,7 @@ baseline too, so it comes from run-to-run GPU numerics. Expect these T2m diagnos
 
 ```
 k= 0  base RMSE ~0.43   full RMSE ~0.42
-k=39  base RMSE ~2.66-2.72   full RMSE ~2.88-2.90
+k=39  base RMSE ~2.66-2.74   full RMSE ~2.88-2.91
 ```
 
 Values far outside this range (for example, full RMSE in the thousands) mean the wrong code tree is in use.
