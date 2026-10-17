@@ -41,6 +41,7 @@ from pathlib import Path
 import haiku as hk
 import jax
 import numpy as np
+import pandas as pd
 import xarray as xr
 from wb2_conservative_regrid import regrid_dataset as _wb2_regrid, TGT_LAT as _WB2_LAT
 
@@ -118,7 +119,60 @@ def parse_args():
     p.add_argument("--force-idx", type=int, default=None,
                    help="DIAG: override chosen_idx to [force_idx], n_samples=1. "
                         "Used for same-anchor comparison with eval_city_trace.")
+    p.add_argument("--all-val", action="store_true", default=False,
+                   help="Use ALL val_indices (full-year inits) instead of sampling "
+                        "n_samples; overrides --n-samples.")
+    p.add_argument("--idx-stride", type=int, default=1,
+                   help="With --all-val: subsample val_indices by this stride "
+                        "(2 = 12h cadence, matches WB2).")
+    p.add_argument("--shard", default=None,
+                   help="With --all-val: 'k/N' -> run only interleaved shard k of N "
+                        "(1-based). Combine shard JSONs afterward.")
+    p.add_argument("--init-range", nargs=3, default=None,
+                   metavar=("START", "END", "EVERY_HOURS"),
+                   help="Explicit initializations, e.g. 2023-01-01T00 2023-12-30T00 72. "
+                        "The init time is the last input frame. Uses the dataset as one "
+                        "continuous time axis (no train/val year split), so inputs and "
+                        "targets may cross year boundaries; only the W+K future steps this "
+                        "mode needs are required. Overrides --val-year/--all-val/--n-samples.")
+    p.add_argument("--per-init-npz", default=None,
+                   help="Also save per-init, per-lead, per-channel lat-weighted MSE on the "
+                        "1.5-deg grid (baseline and full) to this .npz.")
     return p.parse_args()
+
+
+def _open_init_window(cfg, task_cfg, n_future):
+    """Continuous dataset window covering --init-range, preprocessed like
+    base_train._open_local_splits but without the calendar-year split.
+    Returns (window_ds, chosen_idx, init_times)."""
+    start, end, every = cfg.init_range
+    init_times = pd.date_range(pd.Timestamp(start), pd.Timestamp(end),
+                               freq=pd.Timedelta(hours=int(every)))
+    print(f"Opening local dataset: {cfg.data_path}")
+    ds = base_train._ensure_datetime_coord(base_train.open_graphcast_era5(cfg.data_path))
+    ds = ds[[name for name in base_train.GRAPHCAST_VARS if name in ds.data_vars]]
+    ratio = cfg.resolution / base_train._infer_base_resolution_deg(ds)
+    stride = int(round(ratio))
+    if not (np.isclose(ratio, stride, atol=1e-6) and np.isclose(np.mod(180.0, cfg.resolution), 0.0, atol=1e-6)):
+        raise ValueError(f"--init-range supports integer strides on pole-including grids only (ratio={ratio}).")
+    ds = ds.isel(lat=slice(0, None, stride), lon=slice(0, None, stride))
+    for name in list(ds.data_vars):
+        if ds[name].dtype.kind == "f" and ds[name].dtype != np.float32:
+            ds[name] = ds[name].astype(np.float32)
+    dt = base_train.infer_time_step(ds)
+    input_steps = base_train.input_steps_from_duration(task_cfg.input_duration, dt)
+    lo = init_times[0] - (input_steps - 1) * dt
+    hi = init_times[-1] + n_future * dt
+    ds = ds.sel(time=slice(lo, hi))
+    missing = pd.date_range(lo, hi, freq=dt).difference(pd.DatetimeIndex(ds.time.values))
+    if len(missing):
+        raise ValueError(f"{len(missing)} required time steps missing from {cfg.data_path}, "
+                         f"first {missing[0]}, last {missing[-1]} (need {lo} .. {hi}).")
+    time_index = pd.DatetimeIndex(ds.time.values)
+    chosen_idx = [int(time_index.get_loc(t)) for t in init_times]
+    print(f"[clean-eval] INIT-RANGE {init_times[0]} .. {init_times[-1]} every {every}h: "
+          f"{len(init_times)} inits; window {lo} .. {hi}")
+    return ds, chosen_idx, init_times
 
 
 def main():
@@ -155,7 +209,10 @@ def main():
         val_year = cfg.val_year
         train_start_year = cfg.train_start_year
         train_end_year = cfg.train_end_year
-    _train_ds, eval_ds = base_train._open_local_splits(_SplitCfg)
+    if cfg.init_range is None:
+        _train_ds, eval_ds = base_train._open_local_splits(_SplitCfg)
+    else:
+        eval_ds, range_idx, _ = _open_init_window(cfg, task_cfg, n_future=W + K)
     eval_ds = base_train.prepare_dataset_for_task(eval_ds, task_cfg)
     dt = base_train.infer_time_step(eval_ds)
     input_steps = base_train.input_steps_from_duration(task_cfg.input_duration, dt)
@@ -199,6 +256,8 @@ def main():
     # support warmup_steps + target_steps future steps even if this mode has
     # W=0, so cold and warm always use the same chosen_idx.
     sample_total_steps = cfg.warmup_steps + cfg.target_steps
+    if cfg.init_range is not None:
+        sample_total_steps = total_steps   # explicit inits: require only what this mode uses
 
     rng = jax.random.PRNGKey(cfg.seed)
     val_indices = base_train.valid_final_input_indices(
@@ -356,12 +415,24 @@ def main():
         return baseline_pred, full_pred_traj
 
     rng_np = np.random.default_rng(cfg.seed)
-    if cfg.force_idx is not None:
+    if cfg.init_range is not None:
+        bad = sorted(set(range_idx) - set(int(i) for i in val_indices))
+        assert not bad, f"init indices without enough history/future: {bad}"
+        chosen_idx = range_idx
+    elif cfg.force_idx is not None:
         assert cfg.force_idx in val_indices, (
             f"--force-idx {cfg.force_idx} not in val_indices "
             f"(range {int(val_indices.min())}..{int(val_indices.max())})")
         chosen_idx = [int(cfg.force_idx)]
         print(f"[clean-eval] DIAG: force_idx={cfg.force_idx}, running single anchor")
+    elif cfg.all_val:
+        allidx = sorted(int(i) for i in val_indices)[::cfg.idx_stride]
+        if cfg.shard is not None:
+            k, N = (int(x) for x in cfg.shard.split("/"))
+            allidx = allidx[k - 1::N]     # interleaved -> balances hard/easy days
+        chosen_idx = allidx
+        print(f"[clean-eval] ALL-VAL full-year stride={cfg.idx_stride} "
+              f"shard={cfg.shard}: {len(chosen_idx)} inits")
     else:
         chosen_idx = sorted(rng_np.choice(val_indices, size=cfg.n_samples,
                                            replace=False).tolist())
@@ -389,6 +460,9 @@ def main():
     # square, lat-weight sum.
     sum_err_cell_b, sum_err_cell_f = {}, {}     # shape (K, n_lat, n_lon) per var
     sum_err_cell_b_pl, sum_err_cell_f_pl = {}, {}   # nested {var: {lev: (K, lat, lon)}}
+    # Per-init lat-weighted MSE per channel ({channel: [ (K,) per init ]}) for --per-init-npz.
+    per_init_b, per_init_f = {}, {}
+    init_time_str = [str(eval_ds.time.values[int(i)])[:16] for i in chosen_idx]
 
     for s_i, idx in enumerate(chosen_idx):
         inp, tgt, frc = base_train.build_batch_from_indices(
@@ -429,13 +503,16 @@ def main():
                 sum_norm_r_sq[var] = np.zeros(K)
                 sum_norm_e_sq[var] = np.zeros(K)
                 n_per_var[var] = 0
+            mse_b, mse_f = np.zeros(K), np.zeros(K)
             for k in range(K):
                 err_b_k = bp.isel(time=k) - truth.isel(time=k)
                 err_f_k = fp.isel(time=k) - truth.isel(time=k)
                 r_k     = fp.isel(time=k) - bp.isel(time=k)         # residual
                 e_pre_k = -err_b_k                                  # = truth - bp
-                sum_sq_b[var][k] += float(((err_b_k ** 2) * cos_lat_da).mean().values)
-                sum_sq_f[var][k] += float(((err_f_k ** 2) * cos_lat_da).mean().values)
+                mse_b[k] = float(((err_b_k ** 2) * cos_lat_da).mean().values)
+                mse_f[k] = float(((err_f_k ** 2) * cos_lat_da).mean().values)
+                sum_sq_b[var][k] += mse_b[k]
+                sum_sq_f[var][k] += mse_f[k]
                 sum_abs_b[var][k] += float((np.abs(err_b_k) * cos_lat_da).mean().values)
                 sum_abs_f[var][k] += float((np.abs(err_f_k) * cos_lat_da).mean().values)
                 sum_dot_re[var][k]    += float(((r_k * e_pre_k) * cos_lat_da).mean().values)
@@ -445,6 +522,8 @@ def main():
             # err has dims (batch, time, lat, lon) for surface vars; we squeeze batch (=1)
             # and want (K=time, lat, lon).
             if "level" not in truth.dims:
+                per_init_b.setdefault(var, []).append(mse_b)
+                per_init_f.setdefault(var, []).append(mse_f)
                 err_b_full = (bp - truth).transpose(..., "time", "lat", "lon").values.astype(np.float32)
                 err_f_full = (fp - truth).transpose(..., "time", "lat", "lon").values.astype(np.float32)
                 # drop leading batch dim if present (we eval with batch=1)
@@ -469,13 +548,18 @@ def main():
                         sum_sq_b_pl[var][lev] = np.zeros(K); sum_sq_f_pl[var][lev] = np.zeros(K)
                         sum_abs_b_pl[var][lev] = np.zeros(K); sum_abs_f_pl[var][lev] = np.zeros(K)
                         n_per_pl[var][lev] = 0
+                    mse_bl, mse_fl = np.zeros(K), np.zeros(K)
                     for k in range(K):
                         eb = bp.isel(level=lev_i, time=k) - truth.isel(level=lev_i, time=k)
                         ef = fp.isel(level=lev_i, time=k) - truth.isel(level=lev_i, time=k)
-                        sum_sq_b_pl[var][lev][k] += float(((eb ** 2) * cos_lat_da).mean().values)
-                        sum_sq_f_pl[var][lev][k] += float(((ef ** 2) * cos_lat_da).mean().values)
+                        mse_bl[k] = float(((eb ** 2) * cos_lat_da).mean().values)
+                        mse_fl[k] = float(((ef ** 2) * cos_lat_da).mean().values)
+                        sum_sq_b_pl[var][lev][k] += mse_bl[k]
+                        sum_sq_f_pl[var][lev][k] += mse_fl[k]
                         sum_abs_b_pl[var][lev][k] += float((np.abs(eb) * cos_lat_da).mean().values)
                         sum_abs_f_pl[var][lev][k] += float((np.abs(ef) * cos_lat_da).mean().values)
+                    per_init_b.setdefault(f"{var}_level{lev}", []).append(mse_bl)
+                    per_init_f.setdefault(f"{var}_level{lev}", []).append(mse_fl)
                     # RMSB per-level: per-cell errors → (K, lat, lon) after squeezing batch dim
                     eb_full = (bp.isel(level=lev_i) - truth.isel(level=lev_i)).transpose(..., "time", "lat", "lon").values.astype(np.float32)
                     ef_full = (fp.isel(level=lev_i) - truth.isel(level=lev_i)).transpose(..., "time", "lat", "lon").values.astype(np.float32)
@@ -505,6 +589,8 @@ def main():
         "sample_total_steps": sample_total_steps,
         "n_samples": cfg.n_samples,
         "chosen_idx": chosen_idx,
+        "init_times": init_time_str,
+        "data_path": cfg.data_path,
         "ckpt": str(ckpt_path),
         "per_variable_per_step": {},
         "per_channel_per_step": {},
@@ -600,6 +686,17 @@ def main():
 
     Path(cfg.out_json).parent.mkdir(parents=True, exist_ok=True)
     Path(cfg.out_json).write_text(json.dumps(out, indent=1))
+    if cfg.per_init_npz:
+        channels = sorted(per_init_b)
+        assert all(len(per_init_b[c]) == len(chosen_idx) for c in channels)
+        Path(cfg.per_init_npz).parent.mkdir(parents=True, exist_ok=True)
+        np.savez(cfg.per_init_npz,
+                 init_times=np.array(init_time_str), channels=np.array(channels),
+                 lead_hours=(np.arange(W + 1, W + K + 1) * dt / pd.Timedelta(hours=1)).astype(int),
+                 # (n_init, K, n_channel) lat-weighted MSE on the 1.5-deg grid
+                 mse_baseline=np.stack([np.stack(per_init_b[c]) for c in channels], axis=-1),
+                 mse_full=np.stack([np.stack(per_init_f[c]) for c in channels], axis=-1))
+        print(f"[clean-eval] per-init MSE -> {cfg.per_init_npz}")
     print(f"\n[clean-eval] wrote {cfg.out_json}")
 
 
