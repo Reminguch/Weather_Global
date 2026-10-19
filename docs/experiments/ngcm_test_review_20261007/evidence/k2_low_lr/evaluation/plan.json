@@ -1,0 +1,15 @@
+{
+  "campaigns": {
+    "H200": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k"
+  },
+  "source_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/source_v1",
+  "resources": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_pressure_20260929/resources.json",
+  "statistics": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json",
+  "snapshot_interval_updates": 200,
+  "long_origins": 16,
+  "origin_offset": 96,
+  "threshold_percent": 0.1,
+  "time_axis": "Cumulative recorded training-step compute seconds, excluding queue, initialization outside steps, validation and saving",
+  "output": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/live_eval",
+  "code": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/workflow_v1/live_eval"
+}

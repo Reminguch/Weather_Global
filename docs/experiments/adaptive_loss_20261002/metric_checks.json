@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "checks": [
+    "percent_sign",
+    "zero_baseline_undefined",
+    "display_tolerance",
+    "MSE_before_RMSE_level_aggregation",
+    "all_7_fields_and_levels_counted",
+    "explicit_pressure_band"
+  ]
+}

@@ -1,0 +1,8 @@
+number,id,label,mean_rmse_reduction_pct,power_error_reduction_pct,exact_gc_loss_reduction_pct,eligible
+1,mature_mse,MSE · update 2000,4.855320802390217,-14.684968791683994,13.577712801788632,False
+2,confirmation_mse_seed22_step02000,MSE confirmation · seed 22 · update 2000,4.594350541625481,-13.182406527870594,12.701968670866437,False
+3,confirmation_amse_seed22_step02000,AMSE confirmation · seed 22 · update 2000,4.112393390669434,-9.555790479955384,11.477836101701,False
+4,confirmation_mse_seed23_step02000,MSE confirmation · seed 23 · update 2000,4.598702255992215,-13.170732356734938,12.718258111458702,False
+5,confirmation_amse_seed23_step02000,AMSE confirmation · seed 23 · update 2000,4.117620005233135,-9.539273823616634,11.502000306156912,False
+6,confirmation_mse_seed24_step02000,MSE confirmation · seed 24 · update 2000,4.606884599082662,-13.168676928843892,12.76661469561029,False
+7,confirmation_amse_seed24_step02000,AMSE confirmation · seed 24 · update 2000,4.121273487014454,-9.539866619714399,11.465859387260613,False

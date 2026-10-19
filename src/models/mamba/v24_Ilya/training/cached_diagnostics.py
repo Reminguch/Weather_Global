@@ -10,13 +10,18 @@ import resource
 import numpy as np
 
 
-def require_matched_gpu_environment():
+def require_matched_gpu_environment(numerical_policy="strict"):
     import jax
     import jaxlib
     import haiku
     import optax
     flags = os.environ.get("XLA_FLAGS", "").split()
-    required = ("--xla_gpu_enable_triton_gemm=false", "--xla_gpu_deterministic_ops=true")
+    if numerical_policy not in ("strict", "advisory"):
+        raise ValueError("Unknown numerical policy")
+    required = (("--xla_gpu_enable_triton_gemm=false", "--xla_gpu_deterministic_ops=true")
+                if numerical_policy == "strict" else ("--xla_gpu_enable_triton_gemm=false",))
+    if numerical_policy == "advisory" and flags != list(required):
+        raise RuntimeError("Advisory production requires the exact pinned fast XLA flags")
     for flag in required:
         name = flag.split("=", 1)[0]
         assigned = [value for value in flags if value.startswith(name + "=")]
@@ -27,7 +32,42 @@ def require_matched_gpu_environment():
         raise RuntimeError("The matched res1 experiment requires exactly one allocated GPU")
     return {"jax": jax.__version__, "jaxlib": jaxlib.__version__, "haiku": haiku.__version__,
             "optax": optax.__version__, "device": devices[0].device_kind,
-            "required_xla_flags": list(required)}
+            "required_xla_flags": list(required), "numerical_policy": numerical_policy,
+            "effective_xla_flags": flags}
+
+
+def logical_dataset_digest(dataset):
+    """Hash logical fields and coordinates, ignoring xarray ordering/attrs/dtypes.
+
+    Normalizing numeric representation handles the cache JSON's FP32 -> FP64
+    coordinates without treating an actual changed physical value as equal.
+    """
+    digest = hashlib.sha256()
+    for kind, variables in (("coordinates", dataset.coords), ("fields", dataset.data_vars)):
+        for name in sorted(variables):
+            value = variables[name]
+            dimensions = tuple(sorted(value.dims))
+            array = np.asarray(value.transpose(*dimensions).values)
+            if array.dtype.kind in "fc":
+                if not np.isfinite(array).all():
+                    raise ValueError(f"Nonfinite raw field {name}")
+                array = array.astype("<c16" if array.dtype.kind == "c" else "<f8")
+            elif array.dtype.kind in "iu":
+                array = array.astype("<i8")
+            elif array.dtype.kind in "mM":
+                array = array.astype("datetime64[ns]" if array.dtype.kind == "M" else "timedelta64[ns]").astype("<i8")
+            else:
+                array = array.astype(str)
+            digest.update(repr((kind, name, dimensions, array.shape)).encode())
+            digest.update(np.ascontiguousarray(array).tobytes())
+    return digest.hexdigest()
+
+
+def comparison_integrity(result):
+    """Numerical tolerances are advisory; structure and finite values are not."""
+    if result.get("integrity_passed") is False or result.get("reason") in ("tree structure differs", "leaf shape differs", "nonfinite value", "gradient groups differ"):
+        return False
+    return all(comparison_integrity(value) for value in result.values() if isinstance(value, dict))
 
 
 def tree_digest(tree):

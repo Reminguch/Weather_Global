@@ -92,7 +92,26 @@ def build_provenance(config, shared_init_path: Path, cache_root: Path, repo_root
     }
 
 
-def require_production_gates(parity_report: Path, paired_report: Path, provenance: Mapping[str, Any]) -> dict:
+def require_integrity_report(path: Path, provenance: Mapping[str, Any]) -> dict:
+    path = Path(path)
+    report = json.loads(path.read_text())
+    if (report.get("kind") != "cached_integrity" or report.get("numerical_policy") != "advisory"
+            or report.get("integrity_passed") is not True or not report.get("checks")
+            or not all(value is True for value in report["checks"].values())):
+        raise ValueError(f"Required cached integrity checks failed: {path}")
+    if report.get("provenance") != dict(provenance):
+        raise ValueError("Stale cached integrity report")
+    return {"integrity": {"path": str(path.resolve()), "sha256": file_sha256(path)}}
+
+
+def require_production_gates(parity_report: Path, paired_report: Path, provenance: Mapping[str, Any],
+                             *, numerical_policy="strict", integrity_report: Path | None = None) -> dict:
+    if numerical_policy == "advisory":
+        if integrity_report is None:
+            raise ValueError("Advisory production requires an immutable integrity report")
+        return require_integrity_report(integrity_report, provenance)
+    if numerical_policy != "strict":
+        raise ValueError("Unknown numerical policy")
     reports = {}
     for kind, path in (("full_parity", Path(parity_report)), ("paired20", Path(paired_report))):
         report = json.loads(path.read_text())

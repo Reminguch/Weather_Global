@@ -1,0 +1,3 @@
+number,id,label,mean_rmse_reduction_pct,power_error_reduction_pct,exact_gc_loss_reduction_pct,eligible
+1,confirmation_mse,MSE confirmation · 3 seeds,4.599979132233456,-13.173938604483148,12.72894715931181,False
+2,confirmation_amse,AMSE confirmation · 3 seeds,4.117095627639012,-9.544976974428799,11.481898598372842,False

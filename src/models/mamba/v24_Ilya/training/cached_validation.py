@@ -43,8 +43,10 @@ def run_cached_validation(
     """
     if config.feedback_mode != "baseline" or config.loss_mode != "all_steps":
         raise ValueError("Common cached validation requires baseline feedback and all_steps loss")
-    if config.distributed.global_batch_size != 1:
-        raise ValueError("Common cached validation currently requires batch size one")
+    # Evaluation streams one independent segment at a time, including after
+    # training with several lanes. This must not slice or modify train state.
+    from .cached_batching import state_lane
+    zero_state = state_lane(zero_state, 0, config.distributed.per_device_batch_size)
     segment_ids = np.arange(len(cached_data.training_data.validation_segments), dtype=np.int64)
     if segment_ids.size == 0:
         raise ValueError("Cached validation has no complete validation segments")

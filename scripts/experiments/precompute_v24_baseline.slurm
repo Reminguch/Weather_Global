@@ -10,16 +10,20 @@
 #SBATCH --output=logs/v24_baseline_%A_%a.out
 #SBATCH --error=logs/v24_baseline_%A_%a.err
 set -euo pipefail
-cd "${SLURM_SUBMIT_DIR:?Submit from the repository root}"
 MODE="${1:?pilot or generate}"
 CONFIG="${2:?config path}"
 CACHE_ROOT="${3:?cache output root}"
+WORKSPACE="${4:?Use submit_v24_baseline.py prepare --submit to pin the workspace}"
+SOURCE_ROOT="${5:?Missing source snapshot; prepare a new frozen pilot workflow}"
+PILOT_ROOT="${6:?original frozen pilot root}"
+cd "${WORKSPACE}"
+export PROJECT_ROOT="${WORKSPACE}"
 export MPLCONFIGDIR="/tmp/mpl-v24-baseline-${SLURM_JOB_ID}"
 mkdir -p logs "${MPLCONFIGDIR}"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false --xla_gpu_deterministic_ops=true"
-source scripts/graphcast_env.sh
+source "${SOURCE_ROOT}/scripts/graphcast_env.sh"
 # The CPU submission job exports JAX_PLATFORMS=cpu; do not inherit it here.
 unset JAX_PLATFORMS JAX_PLATFORM_NAME
 monitor_gpu() {
@@ -33,8 +37,12 @@ MONITOR_PID=$!
 cleanup() { kill "${MONITOR_PID}" 2>/dev/null || true; wait "${MONITOR_PID}" 2>/dev/null || true; }
 trap cleanup EXIT
 case "${MODE}" in
-  pilot) EXTRA=(--num-shards 1 --shard-index 0 --max-chunks 4 --pilot-parity) ;;
-  generate) EXTRA=(--num-shards 8 --shard-index "${SLURM_ARRAY_TASK_ID:?array task required}") ;;
+  pilot) EXTRA=(--shard-index 0) ;;
+  generate) EXTRA=(--shard-index "${SLURM_ARRAY_TASK_ID:?array task required}") ;;
   *) echo "Unsupported mode ${MODE}" >&2; exit 2 ;;
 esac
-python -u scripts/preprocessing/precompute_v24_baseline.py --config "${CONFIG}" --output-root "${CACHE_ROOT}" --resume "${EXTRA[@]}"
+python -u "${SOURCE_ROOT}/scripts/experiments/frozen_runtime.py" exec \
+  --source "${SOURCE_ROOT}" --workspace "${WORKSPACE}" \
+  --script scripts/preprocessing/submit_v24_baseline.py -- run \
+  --phase "${MODE}" --pilot-root "${PILOT_ROOT}" --config "${CONFIG}" \
+  --output-root "${CACHE_ROOT}" "${EXTRA[@]}"

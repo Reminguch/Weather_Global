@@ -8,9 +8,14 @@
 #SBATCH --output=logs/v24_baseline_release_%j.out
 #SBATCH --error=logs/v24_baseline_release_%j.err
 set -euo pipefail
-cd "${SLURM_SUBMIT_DIR:?}"
-source scripts/graphcast_env.sh
+WORKSPACE="${5:?Use submit_v24_baseline.py prepare --submit to pin the workspace}"
+SOURCE_ROOT="${6:?Missing source snapshot; prepare a new frozen pilot workflow}"
+cd "${WORKSPACE}"
+export PROJECT_ROOT="${WORKSPACE}"
+source "${SOURCE_ROOT}/scripts/graphcast_env.sh"
 export JAX_PLATFORMS=cpu
-python -u scripts/preprocessing/submit_v24_baseline_production.py \
+python -u "${SOURCE_ROOT}/scripts/experiments/frozen_runtime.py" exec \
+  --source "${SOURCE_ROOT}" --workspace "${WORKSPACE}" \
+  --script scripts/preprocessing/submit_v24_baseline_production.py -- \
   --config "${1:?config}" --output-root "${2:?production root}" \
   --pilot-root "${3:?pilot root}" --pilot-job-id "${4:?pilot job}"

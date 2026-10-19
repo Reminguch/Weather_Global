@@ -23,7 +23,8 @@ from .endpoint_step import build_optimizer, cast_physical_boundary_fp32, cast_st
 from .validation import append_validation_record, load_validation_records, update_best_validation
 
 
-def prepare_shared_initialization(config_path: Path, output_dir: Path) -> Path:
+def prepare_shared_initialization(config_path: Path, output_dir: Path, *, numerical_policy="strict",
+                                  init_from: Path | None = None) -> Path:
     """Reproduce the maintained initializer, including its baseline RNG split.
 
     This is the sole preparation stage that initializes the frozen GraphCast.
@@ -38,19 +39,22 @@ def prepare_shared_initialization(config_path: Path, output_dir: Path) -> Path:
     from .runner import _validate_tree_shapes, validate_input_paths
     from .cached_diagnostics import require_matched_gpu_environment
 
-    runtime = require_matched_gpu_environment()
+    runtime = require_matched_gpu_environment(numerical_policy)
     config = load_training_config(Path(config_path))
-    if config.distributed.mode != "single" or config.distributed.per_device_batch_size != 1:
-        raise ValueError("Canonical paired initialization requires a single-device batch of one")
+    if config.distributed.mode != "single":
+        raise ValueError("Canonical paired initialization requires a single device")
     output_dir = Path(output_dir)
     output_path = output_dir / "checkpoint_step00000000.pkl"
     marker = output_dir / "shared_init.json"
     identity = {"config_sha256": digest_json(config.to_dict()),
+                "init_from_sha256": None,
                 "baseline_sha256": file_sha256(config.baseline_checkpoint),
                 "anchor_manifest_sha256": manifest_sha256(config.anchor_manifest_root),
                 "prepared_metadata_sha256": file_sha256(config.prepared_root / "metadata.json"),
                 "stats_sha256": {path.name: file_sha256(path) for path in sorted(config.stats_dir.glob("*.nc"))},
                 "code_sha256": code_fingerprints(Path(__file__).resolve().parents[5])}
+    if init_from is not None:
+        identity['init_from_sha256'] = file_sha256(Path(init_from))
     if marker.is_file():
         existing = json.loads(marker.read_text())
         if any(existing.get(key) != value for key, value in identity.items()):
@@ -69,7 +73,7 @@ def prepare_shared_initialization(config_path: Path, output_dir: Path) -> Path:
     transforms = build_training_transforms(build_model_configs(baseline_checkpoint.model_config, config.architecture),
                                            task_config, stats, config)
     anchor = int(data.anchor_indices[int(data.train_split[0])])
-    sample = data.store.build_batch_from_indices(indices=[anchor], input_steps=data.input_steps,
+    sample = data.store.build_batch_from_indices(indices=[anchor] * config.distributed.per_device_batch_size, input_steps=data.input_steps,
                                                  target_steps=config.target_steps, task_cfg=task_config, dt=data.time_step)
     sample = tuple(cast_physical_boundary_fp32(value) for value in sample)
     rng_key = jax.random.PRNGKey(config.seed)
@@ -93,6 +97,19 @@ def prepare_shared_initialization(config_path: Path, output_dir: Path) -> Path:
                "baseline_copied": baseline_overlay.copied, "baseline_fresh": 0,
                "baseline_ignored_source_count": len(baseline_overlay.ignored_source),
                "baseline_ignored_source": list(baseline_overlay.ignored_source)}
+    if init_from is not None:
+        from ..checkpoint import load_v24_Ilya_training_checkpoint
+        parent = load_v24_Ilya_training_checkpoint(Path(init_from))
+        if (parent.baseline_checkpoint_fingerprint != identity['baseline_sha256']
+                or parent.resolved_training_config['architecture'] != config.to_dict()['architecture']):
+            raise ValueError('Warm-start architecture or frozen baseline differs')
+        validate_param_tree_compatible(params, parent.residual_params)
+        if not all(bool(jnp.isfinite(v).all()) for v in jax.tree_util.tree_leaves(parent.residual_params)):
+            raise ValueError('Nonfinite warm-start parameters')
+        params = jax.device_put(parent.residual_params)
+        state = jax.tree_util.tree_map(jnp.zeros_like, state)
+        overlay.update(init_from=str(init_from), init_from_sha256=identity['init_from_sha256'],
+                       parent_completed_step=parent.completed_step, zero_state_on_init=True)
     payload = training_checkpoint_payload(
         completed_step=0, residual_params=params, residual_state=state,
         optimizer_state=optimizer.init(params), rng_key=rng_key, training_cursor=TrainingCursor().to_dict(),
@@ -129,14 +146,15 @@ def run_cached_training(config_path: Path, shared_init_path: Path, *, cache_root
                         prefetch_batches: int = 0, expected_manifest_sha256: str | None = None,
                         resume: Path | None = None, max_steps: int | None = None,
                         backend: str = "cached_stepwise",
-                        parity_report: Path | None = None, paired_report: Path | None = None) -> Path:
+                        parity_report: Path | None = None, paired_report: Path | None = None,
+                        numerical_policy="strict", integrity_report: Path | None = None) -> Path:
     from .cached_config import load_cached_training_config
     from .cached_data import open_cached_training_data
     from .cached_stepwise import make_cached_stepwise_train_step
     from .cached_diagnostics import require_matched_gpu_environment
 
     startup_started = time.monotonic()
-    runtime = require_matched_gpu_environment()
+    runtime = require_matched_gpu_environment(numerical_policy)
     if backend != "cached_stepwise":
         raise ValueError("The cached runner supports only backend='cached_stepwise'")
     resolved = load_cached_training_config(Path(config_path), cache_root=Path(cache_root),
@@ -150,9 +168,10 @@ def run_cached_training(config_path: Path, shared_init_path: Path, *, cache_root
     provenance = build_provenance(config, Path(shared_init_path), Path(cache_root), execution=execution)
     gates = None
     if stop > 20:
-        if parity_report is None or paired_report is None:
+        if numerical_policy == "strict" and (parity_report is None or paired_report is None):
             raise ValueError("Production training requires full-parity and paired-20 reports")
-        gates = require_production_gates(parity_report, paired_report, provenance)
+        gates = require_production_gates(parity_report, paired_report, provenance,
+                                         numerical_policy=numerical_policy, integrity_report=integrity_report)
     if resume is None:
         from ..checkpoint import load_v24_Ilya_training_checkpoint
         existing = latest_checkpoint_for_run(config)
@@ -174,7 +193,7 @@ def run_cached_training(config_path: Path, shared_init_path: Path, *, cache_root
         return Path(resume)
     if checkpoint.completed_step < stop:
         validate_resume_config(config, checkpoint.resolved_training_config, completed_step=checkpoint.completed_step)
-    cached = open_cached_training_data(resolved)
+    cached = open_cached_training_data(resolved, numerical_policy=numerical_policy)
     if checkpoint.anchor_manifest_fingerprint != cached.training_data.manifest_fingerprint:
         raise ValueError("Shared initialization and cache use different anchor manifests")
     if checkpoint.baseline_checkpoint_fingerprint != cached.manifest["compatibility"]["baseline_sha256"]:
@@ -242,8 +261,11 @@ def run_cached_training(config_path: Path, shared_init_path: Path, *, cache_root
             record = {"step": step, "loss": float(loss), "gradient_norm": float(grad_norm),
                       "step_seconds": completed - loaded, "end_to_end_seconds": completed - started,
                       "data_wait_seconds": loaded - started, "learning_rate": float(jax.device_get(learning_rate(step - 1))) if callable(learning_rate) else float(learning_rate),
-                      "batch_size": 1, "anchors_seen": step * config.bptt_steps,
+                      "batch_size": config.distributed.per_device_batch_size,
+                      "anchors_seen": step * config.bptt_steps * config.distributed.per_device_batch_size,
                       **consumed_cursor.to_dict(), "chunk_id": batch.chunk_id,
+                      "chunk_ids": list(batch.chunk_ids or (batch.chunk_id,)),
+                      "segment_ids": list(batch.segment_ids or (batch.segment_id,)),
                       "loss_by_horizon": {str(h): float(components[i]) for i, h in enumerate(config.supervised_horizon_labels)}}
             _append(metrics_path, record)
             if step <= 5 or step % 10 == 0:

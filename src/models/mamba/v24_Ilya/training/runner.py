@@ -70,6 +70,257 @@ from .validation import (
 from .endpoint_step import is_mamba_parameter
 
 
+def _archive_resume_tails(run_dir: Path, completed_step: int) -> Path | None:
+    """Keep active logs at the accepted checkpoint boundary, retaining originals."""
+    changes = []
+    for name in ("train_metrics.jsonl", "checkpoint_metrics.jsonl", "validation_metrics.jsonl",
+                 "backtracking_trials.jsonl"):
+        path = run_dir / name
+        if not path.is_file():
+            continue
+        original = path.read_text(encoding="utf-8")
+        kept, seen = [], set()
+        for line in original.splitlines(keepends=True):
+            try:
+                record = json.loads(line)
+                step = int(record["step"])
+            except (ValueError, TypeError, KeyError):
+                # A process may die midway through its final JSONL write.
+                continue
+            if step > completed_step:
+                continue
+            if name == "train_metrics.jsonl":
+                if step in seen:
+                    raise ValueError(f"Duplicate committed metric step {step} in {path}")
+                seen.add(step)
+            kept.append(line if line.endswith("\n") else line + "\n")
+        replacement = "".join(kept)
+        if replacement != original:
+            changes.append((path, original, replacement))
+    if not changes:
+        return None
+    archive = run_dir / "resume_archives" / f"from_step{completed_step:08d}_{time.time_ns()}"
+    archive.mkdir(parents=True)
+    for path, original, replacement in changes:
+        (archive / path.name).write_text(original, encoding="utf-8")
+        temporary = path.with_name(path.name + ".resume.tmp")
+        temporary.write_text(replacement, encoding="utf-8")
+        temporary.replace(path)
+    atomic_json_dump({"completed_step": completed_step, "logs": [p.name for p, _, _ in changes]},
+                     archive / "archive.json")
+    return archive
+
+
+def _calibrate_initialized_training(*, config, transforms, training_data, task_config,
+                                    params, zero_state, rng_key, baseline_params,
+                                    baseline_state, batches, provenance):
+    """Two replayed forward-only passes; caller's RNG/cursor/state are untouched."""
+    from .mgda_step import make_multiobjective_train_step
+    from .power_loss import build_power_loss, make_power_calibration, truth_powers
+
+    if type(batches) is not int or batches <= 0:
+        raise ValueError("Calibration batches must be a positive integer")
+    if getattr(config, "objective_pair", None) == "mse_amse_excess":
+        import resource
+
+        # Numerical qualification uses the initialized parent without committing
+        # any trial update. Fixed-input replay isolates the optimizer arithmetic;
+        # the subsequent closed-loop replay checks the actual feedback trajectory.
+        optimizer, _ = build_optimizer(dataclasses.replace(config, mgda_direction="mgda"))
+        steps = {}
+        for mode in ("baseline", "closed_loop_sg"):
+            replay_config = dataclasses.replace(config, feedback_mode=mode, mgda_direction="mgda")
+            steps[mode] = make_multiobjective_train_step(
+                transforms=transforms, optimizer=optimizer, baseline_params=baseline_params,
+                baseline_state=baseline_state, config=replay_config,
+                time_step=training_data.time_step, input_steps=training_data.input_steps)
+        state, key, cursor = zero_state, rng_key, TrainingCursor()
+        records, elapsed = [], []
+        for index in range(batches):
+            if index and cursor.segment_offset == 0:
+                state = jax.tree_util.tree_map(jnp.zeros_like, state)
+            chunk = training_data.build_chunk(cursor, config, task_config)
+            key, *step_keys = jax.random.split(key, config.bptt_steps + 1)
+            args = (jnp.stack(step_keys), chunk.input_frames, chunk.static_inputs,
+                    chunk.truths, chunk.forcings)
+            record = {"cursor": cursor.to_dict(),
+                      "anchor_indices": np.asarray(chunk.raw_anchor_indices).tolist()}
+            for mode, step in steps.items():
+                started = time.monotonic()
+                result = step(params, state, optimizer.init(params), *args)
+                seconds = time.monotonic() - started
+                record[mode] = {"diagnostics": {name: np.asarray(value).item()
+                                                for name, value in result.diagnostics.items()},
+                                "seconds": seconds,
+                                "acceptance_record": step.last_acceptance_record}
+                if mode == "closed_loop_sg":
+                    elapsed.append(seconds)
+            # Carry only the unchanged parent's memory into the next batch.
+            _, state, _, _ = steps["closed_loop_sg"].forward_only(params, state, *args)
+            records.append(record)
+            cursor = chunk.next_cursor
+        return dict(version=1, kind="mse_amse_excess_qualification", passed=True,
+                    batches=batches, records=records,
+                    steady_p90_seconds=float(np.percentile(elapsed[1:] or elapsed, 90)),
+                    peak_rss_gib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 ** 2),
+                    protocol="discarded_fixed_input_and_closed_loop_candidate_trials_v1",
+                    parameters_updated=False, optimizer_updates=0, **provenance)
+    if getattr(config, "objective_pair", None) == "amse_split":
+        from .amse_split_loss import make_amse_split_calibration_record
+
+        if config.distributed.mode != "single" or transforms.full_field_objectives is None:
+            raise ValueError("AMSE split calibration requires single-device component objectives")
+        step = make_multiobjective_train_step(
+            transforms=transforms, optimizer=None, baseline_params=baseline_params,
+            baseline_state=baseline_state, config=config, time_step=training_data.time_step,
+            input_steps=training_data.input_steps)
+        state, key, cursor = zero_state, rng_key, TrainingCursor()
+        raw_values, manifest = [], []
+        for index in range(batches):
+            if index and cursor.segment_offset == 0:
+                state = jax.tree_util.tree_map(jnp.zeros_like, state)
+            chunk = training_data.build_chunk(cursor, config, task_config)
+            manifest.append({"cursor": cursor.to_dict(),
+                             "anchor_indices": np.asarray(chunk.raw_anchor_indices).tolist()})
+            key, *step_keys = jax.random.split(key, config.bptt_steps + 1)
+            values, state, _, _ = step.forward_only(
+                params, state, jnp.stack(step_keys), chunk.input_frames,
+                chunk.static_inputs, chunk.truths, chunk.forcings)
+            if not np.all(np.isfinite(values)):
+                raise FloatingPointError("Nonfinite AMSE split calibration losses")
+            raw_values.append(np.asarray(values, np.float64).tolist())
+            cursor = chunk.next_cursor
+        return make_amse_split_calibration_record(
+            raw_values, manifest, protocol="one_forward_only_pass_with_segment_state_carry_v1",
+            **provenance)
+    if config.distributed.mode != "single" or config.loss_kind != "mse_fp32":
+        raise ValueError("Calibration requires single-device full-field mse_fp32")
+    powers_kernel = jax.jit(truth_powers)
+    weights = config.normalized_supervised_weights
+
+    def run_pass(current_transforms, collect_power):
+        step = make_multiobjective_train_step(
+            transforms=current_transforms, optimizer=None, baseline_params=baseline_params,
+            baseline_state=baseline_state, config=config, time_step=training_data.time_step,
+            input_steps=training_data.input_steps)
+        state, key, cursor = zero_state, rng_key, TrainingCursor()
+        powers_sum, loss_sum, floor_sum, manifest = None, np.zeros(2, np.float64), 0., []
+        for index in range(batches):
+            if index and cursor.segment_offset == 0:
+                state = jax.tree_util.tree_map(jnp.zeros_like, state)
+            chunk = training_data.build_chunk(cursor, config, task_config)
+            manifest.append({"cursor": cursor.to_dict(),
+                             "anchor_indices": np.asarray(chunk.raw_anchor_indices).tolist()})
+            key, *step_keys = jax.random.split(key, config.bptt_steps + 1)
+            if collect_power:
+                for weight, truth in zip(weights, chunk.truths, strict=True):
+                    power = np.asarray(jax.device_get(powers_kernel(truth)), np.float64)
+                    mean = np.mean(power, axis=(0, 1)) * weight
+                    powers_sum = mean if powers_sum is None else powers_sum + mean
+            values, state, _, fraction = step.forward_only(
+                params, state, jnp.stack(step_keys), chunk.input_frames,
+                chunk.static_inputs, chunk.truths, chunk.forcings)
+            if not np.all(np.isfinite(values)):
+                raise FloatingPointError("Nonfinite calibration losses")
+            loss_sum += values
+            floor_sum += fraction
+            cursor = chunk.next_cursor
+        return powers_sum, loss_sum / batches, floor_sum / batches, manifest
+
+    powers_sum, _, _, manifest = run_pass(transforms, True)
+    mean_power = powers_sum / batches
+    provisional = make_power_calibration(mean_power, 1., 1.)
+    power_loss = build_power_loss(provisional)
+
+    def pair(prediction, truth):
+        gc, _ = transforms.full_field_loss(prediction, truth)
+        power, diagnostics = power_loss(prediction, truth)
+        return jnp.stack((gc, power)), diagnostics
+
+    calibrated_transforms = dataclasses.replace(transforms, full_field_objectives=pair)
+    _, scales, fraction, repeated_manifest = run_pass(calibrated_transforms, False)
+    if repeated_manifest != manifest:
+        raise RuntimeError("Calibration passes consumed different training batches")
+    return make_power_calibration(
+        mean_power, scales[0], scales[1], batches=batches, seed=config.seed,
+        batch_manifest=manifest, floor_activation_fraction=fraction,
+        protocol="two_forward_only_passes_with_segment_state_carry_v1",
+        **provenance)
+
+
+def calibrate_training(config_path: Path, init_from: Path, output_path: Path,
+                       batches: int = 32) -> Path:
+    """Public campaign entrypoint; writes only the requested frozen calibration."""
+    from .config import load_training_config
+
+    config_path, init_from, output_path = map(Path, (config_path, init_from, output_path))
+    if output_path.exists():
+        raise FileExistsError(f"Calibration output already exists: {output_path}")
+    config = load_training_config(config_path)
+    invocation = V24IlyaTrainInvocation(config, config_path, init_from=init_from,
+                                       zero_state_on_init=True)
+    result = run_training(invocation, calibration_output=output_path, calibration_batches=batches)
+    assert result is not None
+    return result
+
+
+def qualify_mgda_training(config_path: Path, init_from: Path, output_path: Path,
+                          batches: int = 4) -> Path:
+    """Initialize and qualify MSE/excess updates without consuming production updates."""
+    from .config import load_training_config
+
+    if load_training_config(Path(config_path)).objective_pair != "mse_amse_excess":
+        raise ValueError("Measured-loss qualification requires MSE/AMSE-excess objectives")
+    return calibrate_training(config_path, init_from, output_path, batches)
+
+
+def _validate_calibration_provenance(config, baseline_fingerprint, manifest_fingerprint,
+                                     overlay_metadata):
+    if getattr(config, "objective_pair", None) == "amse_split":
+        from .amse_split_loss import (calibration_signature,
+                                      validate_amse_split_calibration)
+
+        pooled = validate_amse_split_calibration(config.amse_split_calibration)
+        matches = [record for record in pooled["initializations"]
+                   if record["init_from_sha256"] == overlay_metadata.get("init_from_sha256")]
+        if len(matches) != 1:
+            raise ValueError("AMSE split calibration init_from_sha256 does not identify this initialization")
+        record = matches[0]
+        if record["source_config"]["architecture"] != config.to_dict()["architecture"]:
+            raise ValueError("AMSE split calibration initialization architecture differs")
+        if calibration_signature(record["source_config"]) != calibration_signature(config.to_dict()):
+            raise ValueError("AMSE split calibration forward configuration differs")
+        calibration = pooled["provenance"]
+        comparisons = {"baseline_checkpoint_fingerprint": baseline_fingerprint,
+                       "anchor_manifest_fingerprint": manifest_fingerprint,
+                       "prepared_metadata_sha256": file_sha256(config.prepared_root / "metadata.json")}
+        for name, actual in comparisons.items():
+            if calibration[name] != actual:
+                raise ValueError(f"AMSE split calibration provenance differs: {name}")
+        for name, expected in calibration["stats_sha256"].items():
+            if file_sha256(config.stats_dir / name) != expected:
+                raise ValueError(f"AMSE split calibration statistics differ: {name}")
+        return
+    calibration = getattr(config, "power_calibration", None)
+    if calibration is None:
+        return
+    comparisons = {
+        "baseline_checkpoint_fingerprint": baseline_fingerprint,
+        "anchor_manifest_fingerprint": manifest_fingerprint,
+        "init_from_sha256": overlay_metadata.get("init_from_sha256"),
+    }
+    if "prepared_metadata_sha256" in calibration:
+        comparisons["prepared_metadata_sha256"] = file_sha256(config.prepared_root / "metadata.json")
+    for name, actual in comparisons.items():
+        if name in calibration and calibration[name] != actual:
+            raise ValueError(f"Power calibration provenance differs: {name}")
+    for name, expected in calibration.get("stats_sha256", {}).items():
+        if name not in ("stddev_by_level.nc", "mean_by_level.nc", "diffs_stddev_by_level.nc"):
+            raise ValueError(f"Unknown calibration statistics file: {name}")
+        if file_sha256(config.stats_dir / name) != expected:
+            raise ValueError(f"Power calibration statistics differ: {name}")
+
+
 def validate_input_paths(config: V24IlyaTrainConfig) -> None:
     required_files = [
         config.baseline_checkpoint,
@@ -255,9 +506,19 @@ def _save_data_parallel_checkpoint(
     return path
 
 
-def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None) -> Path | None:
+def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None,
+                 calibration_output: Path | None = None, calibration_batches: int = 32) -> Path | None:
     startup_started = time.monotonic()
     config = invocation.config
+    if (getattr(config, "objective_pair", None) == "amse_split"
+            and calibration_output is None and config.amse_split_calibration is None):
+        raise ValueError("Uncalibrated AMSE split configuration is forward-calibration only")
+    if calibration_output is not None and (
+        invocation.resume is not None or invocation.init_from is None
+        or invocation.baseline_validation_only or invocation.validation_compare is not None
+        or validation_callback is not None
+    ):
+        raise ValueError("Calibration requires only a warm-start checkpoint")
     if validation_callback is not None and (
         invocation.baseline_validation_only or invocation.validation_compare is not None
     ):
@@ -304,7 +565,8 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         devices = validate_data_parallel_runtime(config.distributed.num_devices)
         print(f"[v24_Ilya] data_parallel devices={[str(device) for device in devices]}")
 
-    _prepare_run_directory(invocation)
+    if calibration_output is None:
+        _prepare_run_directory(invocation)
     baseline_fingerprint = file_sha256(config.baseline_checkpoint)
     baseline_checkpoint = load_graphcast_checkpoint(config.baseline_checkpoint)
     task_config = baseline_checkpoint.task_config
@@ -384,7 +646,7 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
     )
     del sample_inputs, sample_targets, sample_forcings
     optimizer, learning_rate = build_optimizer(config)
-    initial_optimizer_state = optimizer.init(residual_params)
+    initial_optimizer_state = optimizer.init(residual_params) if calibration_output is None else None
     residual_state = zero_residual_state
     optimizer_state = initial_optimizer_state
     cursor = TrainingCursor()
@@ -510,6 +772,35 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         overlay_metadata["zero_state_on_init"] = invocation.zero_state_on_init
 
     comparison_params = None
+    if calibration_output is not None:
+        provenance = {
+            "init_from_sha256": overlay_metadata["init_from_sha256"],
+            "initialization_checkpoint": str(invocation.init_from),
+            "baseline_checkpoint_fingerprint": baseline_fingerprint,
+            "anchor_manifest_fingerprint": training_data.manifest_fingerprint,
+            "source_config_sha256": file_sha256(invocation.config_path),
+            "source_config": config.to_dict(),
+            "prepared_metadata_sha256": file_sha256(config.prepared_root / "metadata.json"),
+            "stats_sha256": {name: file_sha256(config.stats_dir / name) for name in
+                             ("stddev_by_level.nc", "mean_by_level.nc", "diffs_stddev_by_level.nc")},
+        }
+        calibration = _calibrate_initialized_training(
+            config=config, transforms=transforms, training_data=training_data, task_config=task_config,
+            params=residual_params, zero_state=zero_residual_state, rng_key=rng_key,
+            baseline_params=baseline_params, baseline_state=baseline_state,
+            batches=calibration_batches, provenance=provenance)
+        atomic_json_dump(calibration, calibration_output)
+        return calibration_output
+    _validate_calibration_provenance(config, baseline_fingerprint,
+                                    training_data.manifest_fingerprint, overlay_metadata)
+    if invocation.resume is not None and getattr(config, "optimizer_kind", "adamw") != "adamw":
+        if int(np.asarray(jax.device_get(optimizer_state.count))) != completed_step:
+            raise ValueError("RMS optimizer update count differs from checkpoint completed_step")
+        _archive_resume_tails(config.run_dir, completed_step)
+    stop_after = getattr(invocation, "stop_after_steps", None)
+    stop_step = min(config.max_steps, stop_after) if stop_after is not None else config.max_steps
+    if stop_step <= completed_step:
+        raise ValueError("Operational stop must be later than the resumed checkpoint")
     if invocation.validation_compare is not None:
         comparison_checkpoint = load_v24_Ilya_checkpoint(
             invocation.validation_compare
@@ -852,7 +1143,7 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
                 subset_policy=training_data.validation_subset_policy,
             )
 
-        for step in range(completed_step + 1, config.max_steps + 1):
+        for step in range(completed_step + 1, stop_step + 1):
             if replica_cursor.segment_offset == 0 and has_consumed_update:
                 replica_states = replicate_tree(zero_residual_state, devices)
             consumed_cursor = replica_cursor
@@ -904,6 +1195,7 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
             )
             should_checkpoint = (
                 step % config.checkpoint_every == 0
+                or step == stop_step
                 or step == config.max_steps
                 or should_validate
             )
@@ -1026,7 +1318,8 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
 
         if last_checkpoint is None:
             raise RuntimeError("Data-parallel training completed without a checkpoint")
-        print(f"[v24_Ilya] training complete at step {config.max_steps}")
+        status = "complete" if stop_step == config.max_steps else "stopped at operational boundary"
+        print(f"[v24_Ilya] training {status} at step {stop_step}")
         return last_checkpoint
 
     last_checkpoint: Path | None = invocation.resume
@@ -1048,7 +1341,7 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
             subset_policy=training_data.validation_subset_policy,
         )
 
-    for step in range(completed_step + 1, config.max_steps + 1):
+    for step in range(completed_step + 1, stop_step + 1):
         update_started = time.monotonic()
         if cursor.segment_offset == 0 and has_consumed_update:
             residual_state = jax.tree_util.tree_map(
@@ -1062,23 +1355,30 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         rng_key, *step_keys = jax.random.split(rng_key, config.bptt_steps + 1)
         keys = jnp.stack(step_keys)
         started = time.monotonic()
-        (
-            residual_params,
-            residual_state,
-            optimizer_state,
-            loss,
-            gradient_norm,
-            loss_components,
-        ) = train_step(
-            residual_params,
-            residual_state,
-            optimizer_state,
-            keys,
-            chunk.input_frames,
-            chunk.static_inputs,
-            chunk.truths,
-            chunk.forcings,
-        )
+        try:
+            step_result = train_step(
+                residual_params,
+                residual_state,
+                optimizer_state,
+                keys,
+                chunk.input_frames,
+                chunk.static_inputs,
+                chunk.truths,
+                chunk.forcings,
+                **({"optimizer_step": jnp.asarray(step - 1, dtype=jnp.int32)}
+                   if config.amse_lambda_ramp_steps else {}),
+            )
+        except Exception as error:
+            from .mgda_step import JointDescentFailure
+
+            if isinstance(error, JointDescentFailure):
+                atomic_json_dump({"attempted_step": step, "last_committed_step": step - 1,
+                                  "cursor": consumed_cursor.to_dict(), "parameters_committed": False,
+                                  **error.diagnostics}, config.run_dir / "failed_update.json")
+            raise
+        (residual_params, residual_state, optimizer_state, loss,
+         gradient_norm, loss_components) = step_result[:6]
+        objective_diagnostics = getattr(step_result, "diagnostics", {})
         loss = jax.block_until_ready(loss)
         gradient_norm = jax.block_until_ready(gradient_norm)
         update_finished = time.monotonic()
@@ -1105,6 +1405,18 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
             "mamba_learning_rate": _learning_rate_value(learning_rate, step - 1) * config.mamba_lr_multiplier,
             "spatial_learning_rate": _learning_rate_value(learning_rate, step - 1) * config.spatial_lr_multiplier,
         }
+        record.update({name: np.asarray(value).item() for name, value in objective_diagnostics.items()})
+        acceptance_record = getattr(train_step, "last_acceptance_record", None)
+        if acceptance_record is not None:
+            _append_jsonl(config.run_dir / "backtracking_trials.jsonl",
+                          {"step": step, "cursor": consumed_cursor.to_dict(), **acceptance_record})
+        if config.loss_kind == "amse":
+            from .spectral_loss import scheduled_amse_lambda
+
+            record["amse_lambda"] = float(scheduled_amse_lambda(
+                config.amse_lambda, config.amse_lambda_ramp_steps, step - 1,
+                start=config.amse_lambda_start,
+            ))
         if config.loss_mode == "sparse_steps":
             record["loss_by_horizon"] = {
                 str(horizon): float(loss_components[position])
@@ -1140,6 +1452,7 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         )
         should_checkpoint = (
             step % config.checkpoint_every == 0
+            or step == stop_step
             or step == config.max_steps
             or should_validate
         )
@@ -1189,5 +1502,6 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
 
     if last_checkpoint is None:
         raise RuntimeError("Training completed without writing a checkpoint")
-    print(f"[v24_Ilya] training complete at step {config.max_steps}")
+    status = "complete" if stop_step == config.max_steps else "stopped at operational boundary"
+    print(f"[v24_Ilya] training {status} at step {stop_step}")
     return last_checkpoint

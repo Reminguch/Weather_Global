@@ -1,0 +1,29 @@
+{
+  "observed_at_utc": "2026-10-03T17:40:48.834847+00:00",
+  "accounting_timezone": "America/New_York",
+  "accounting": [
+    "14937571|ngcm-k20-mask-smoke|COMPLETED|0:0|00:07:19|2026-10-03T12:54:38|2026-10-03T13:01:57",
+    "14937572|ngcm-k20-resume-smoke|COMPLETED|0:0|00:18:40|2026-10-03T13:02:23|2026-10-03T13:21:03",
+    "14937573|ngcm-weather-k20-2k|RUNNING|0:0|00:19:37|2026-10-03T13:21:11|Unknown",
+    "14937574|ngcm-k20-eval-watch|RUNNING|0:0|00:19:37|2026-10-03T13:21:11|Unknown",
+    "14938454|ngcm-k2-lr-smoke|COMPLETED|0:0|00:09:19|2026-10-03T13:27:28|2026-10-03T13:36:47",
+    "14938455|ngcm-k2-lr-2k|PENDING|0:0|00:00:00|Unknown|Unknown",
+    "14938456|ngcm-k2-lr-eval-watch|RUNNING|0:0|00:03:32|2026-10-03T13:37:16|Unknown",
+    "14938837|ngcm-live-batch_0001|PENDING|0:0|00:00:00|Unknown|Unknown"
+  ],
+  "progress": {
+    "k20": {
+      "last_completed_update": 24,
+      "peak_lr": 0.002,
+      "warmup_updates": 2000,
+      "last_completed_update_lr": 2.3e-05
+    },
+    "lr_control": {
+      "last_completed_update": 0,
+      "peak_lr": 0.0001,
+      "warmup_updates": 200,
+      "last_completed_update_lr": null
+    }
+  },
+  "note": "Point-in-time snapshot; no completed 2k efficacy result for either new control."
+}

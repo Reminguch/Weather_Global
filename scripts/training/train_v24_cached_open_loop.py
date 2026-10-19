@@ -25,12 +25,14 @@ def main():
     parser.add_argument("--expected-manifest-sha256")
     parser.add_argument("--parity-report", type=Path)
     parser.add_argument("--paired-report", type=Path)
+    parser.add_argument("--numerical-policy", choices=("strict", "advisory"), default="strict")
+    parser.add_argument("--integrity-report", type=Path)
     args = parser.parse_args()
     from src.models.mamba.v24_Ilya.training.cached_runner import prepare_shared_initialization, run_cached_training
     if args.stage == "prepare":
         if args.output_dir is None:
             parser.error("prepare requires --output-dir")
-        print(prepare_shared_initialization(args.config, args.output_dir), flush=True)
+        print(prepare_shared_initialization(args.config, args.output_dir, numerical_policy=args.numerical_policy), flush=True)
     else:
         if args.shared_init is None or args.cache_root is None:
             parser.error("train requires --shared-init and --cache-root")
@@ -39,7 +41,8 @@ def main():
                                   backend=args.backend,
                                   prefetch_batches=args.prefetch_batches,
                                   expected_manifest_sha256=args.expected_manifest_sha256,
-                                  parity_report=args.parity_report, paired_report=args.paired_report), flush=True)
+                                  parity_report=args.parity_report, paired_report=args.paired_report,
+                                  numerical_policy=args.numerical_policy, integrity_report=args.integrity_report), flush=True)
 
 
 if __name__ == "__main__":

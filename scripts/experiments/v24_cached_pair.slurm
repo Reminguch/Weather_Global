@@ -17,10 +17,12 @@ WORKSPACE="${3:?absolute Weather_global workspace}"
 mkdir -p "${EXPERIMENT}/logs"
 export PROJECT_ROOT="${WORKSPACE}"
 source "${SNAPSHOT}/scripts/graphcast_env.sh"
+# CPU-only submission processes must never force a GPU allocation onto CPU.
+unset JAX_PLATFORMS
 export PYTHONPATH="${SNAPSHOT}:${SNAPSHOT}/third_party/graphcast${PYTHONPATH:+:${PYTHONPATH}}"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_PYTHON_CLIENT_ALLOCATOR=platform
-export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false --xla_gpu_deterministic_ops=true"
+export XLA_FLAGS="$(python -c 'import json,sys; m=json.load(open(sys.argv[1])); print(m["runtime"]["XLA_FLAGS"] if m.get("numerical_policy")=="advisory" else "--xla_gpu_enable_triton_gemm=false --xla_gpu_deterministic_ops=true")' "${EXPERIMENT}/manifest.json")"
 export MPLCONFIGDIR="/tmp/v24-cached-${SLURM_JOB_ID}"
 mkdir -p "${MPLCONFIGDIR}"
 cd "${SNAPSHOT}"

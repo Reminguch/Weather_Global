@@ -91,7 +91,7 @@ def transforms():
     return V24IlyaTrainingTransforms(Baseline(), residual, legacy, legacy, full_loss)
 
 
-def reference(params, initial_state, cfg, args):
+def reference(params, initial_state, cfg, args, amse_lambda=1.0):
     _, input_frames, _, truths, _ = args
     frames = [xarray_jax.unwrap_data(frame['x'])[:, 0, :] for frame in input_frames]
     state = initial_state['s']
@@ -103,7 +103,9 @@ def reference(params, initial_state, cfg, args):
         prediction = jnp.asarray([1.25, -.5]) + residual
         if i in positions:
             truth = xarray_jax.unwrap_data(truths[positions[i]]['x'])[:, 0, :]
-            components.append(jnp.mean(coefficient_amse(prediction, truth)))
+            adjusted = coefficient_amse(prediction, truth)
+            mse = jnp.mean((prediction-truth)**2, axis=-1)
+            components.append(jnp.mean((1-amse_lambda)*mse + amse_lambda*adjusted))
         if i >= cfg.truth_prefix_steps - 1 and i < 3:
             frames.append(jax.lax.stop_gradient(prediction))
     return jnp.dot(jnp.stack(components), jnp.asarray(cfg.normalized_supervised_weights)), {'s': state}
@@ -195,3 +197,154 @@ def test_single_replica_fused_forward_and_reverse_match_direct_ad():
     assert_trees_close(result[0], replicate_tree(expected_params, devices))
     assert_trees_close(result[1], replicate_tree(expected_state, devices))
     np.testing.assert_allclose(result[3], expected_loss, rtol=3e-5)
+
+
+def test_full_field_transform_preserves_supervised_training_flag_and_init(monkeypatch):
+    import haiku as hk
+    from types import SimpleNamespace
+    from src.models.mamba.v24_Ilya.training import endpoint_step, spectral_loss
+
+    class Predictor:
+        def __call__(self, inputs, targets_template, forcings, is_training=False):
+            weight = hk.get_parameter('weight', (), init=hk.initializers.RandomNormal())
+            prediction = jax.tree_util.tree_map(
+                lambda t: jnp.ones_like(t) * (weight + float(is_training)), targets_template,
+            )
+            return prediction
+
+        def loss_and_predictions(self, inputs, targets, forcings):
+            prediction = self(inputs, targets, forcings, is_training=True)
+            loss = xr.DataArray(jnp.zeros((4,)), dims=('batch',))
+            return (loss, {}), prediction
+
+    monkeypatch.setattr(endpoint_step, 'make_residual_predictor', lambda *a, **k: Predictor())
+    monkeypatch.setattr(endpoint_step, 'make_baseline_predictor', lambda *a, **k: Predictor())
+    monkeypatch.setattr(spectral_loss, 'build_full_field_loss', lambda *a, **k: full_loss)
+    models = SimpleNamespace(baseline=None, residual=None)
+    legacy = endpoint_step.build_training_transforms(models, None, {}, config('mse'))
+    adjusted = endpoint_step.build_training_transforms(models, None, {}, config('amse'))
+    args = arguments(config())
+    inputs, target, forcing = args[1][0], args[3][0], args[4][0]
+    key = jax.random.PRNGKey(7)
+    params, state = legacy.residual_loss.init(key, inputs, target, forcing)
+    assert_trees_close((params, state), adjusted.residual_loss.init(key, inputs, target, forcing))
+    (legacy_output, _), _state = legacy.residual_loss.apply(params, state, key, inputs, target, forcing)
+    del legacy_output
+    (_, expected), _ = legacy.residual_loss_and_predictions.apply(params, state, key, inputs, target, forcing)
+    actual, _ = adjusted.residual_supervised_predict.apply(params, state, key, inputs, target, forcing)
+    assert_trees_close(actual, expected)
+    inference, _ = adjusted.residual_predict.apply(params, state, key, inputs, target, forcing)
+    np.testing.assert_allclose(xarray_jax.unwrap_data(actual['x']) - xarray_jax.unwrap_data(inference['x']), 1.)
+
+
+def test_ramp_and_multiplier_metadata_roundtrip_and_resume_identity(tmp_path):
+    from src.models.mamba.v24_Ilya.training.config import validate_resume_config
+
+    cfg = replace(config(), amse_lambda=.5, amse_lambda_ramp_steps=100,
+                  amse_lambda_start=.1, amse_lmax=2,
+                  amse_variable_lambda_multipliers={'temperature': .4, 'total_precipitation_6hr': 0.},
+                  amse_degree_lambda_multipliers=(0., 1., .5),
+                  learning_rate_schedule='cosine', end_learning_rate=1e-5)
+    path = tmp_path/'ramp.json'
+    path.write_text(json.dumps(cfg.to_dict()))
+    assert load_training_config(path) == cfg
+    validate_resume_config(cfg, cfg.to_dict(), completed_step=50)
+    with pytest.raises(ValueError, match='Resume configuration differs'):
+        validate_resume_config(replace(cfg, amse_lambda_ramp_steps=75), cfg.to_dict(), completed_step=50)
+    with pytest.raises(ValueError, match='Resume configuration differs'):
+        validate_resume_config(replace(cfg, amse_degree_lambda_multipliers=(0., .5, .5)),
+                               cfg.to_dict(), completed_step=50)
+    original = config().to_dict()['objective']
+    assert not any('ramp' in name or 'multipliers' in name or 'start' in name for name in original)
+
+
+@pytest.mark.parametrize('options', [
+    {'amse_lambda_ramp_steps': -1}, {'amse_lambda_ramp_steps': 1.5},
+    {'amse_lambda_start': .1}, {'amse_lambda_ramp_steps': 10, 'amse_lambda_start': .9, 'amse_lambda': .5},
+    {'amse_variable_lambda_multipliers': {'temperature': -1}},
+    {'amse_variable_lambda_multipliers': {'temperature': True}},
+    {'amse_degree_lambda_multipliers': (1., float('nan'))},
+    {'amse_lmax': 2, 'amse_degree_lambda_multipliers': (1., 1.)},
+])
+def test_invalid_ramp_and_multiplier_config_fails(options):
+    with pytest.raises(ValueError):
+        replace(config(), **options)
+
+
+def test_ramp_rejects_unsupported_distributed_backend_and_non_amse_objective():
+    with pytest.raises(ValueError, match='single-device'):
+        replace(config(), amse_lambda_ramp_steps=100,
+                distributed=V24IlyaDistributedConfig(mode='data_parallel', num_devices=2))
+    with pytest.raises(ValueError, match='AMSE options require'):
+        replace(config('mse_fp32'), amse_lambda_ramp_steps=100)
+
+
+def test_differentiable_feedback_config_backend_and_bounds(tmp_path):
+    cfg = replace(config(), feedback_mode='closed_loop', ar_tail_k=3)
+    assert cfg.to_dict()['memory']['bptt_backend'] == 'explicit_weather_reverse_vjp'
+    path = tmp_path/'feedback.json'
+    path.write_text(json.dumps(cfg.to_dict()))
+    assert load_training_config(path) == cfg
+    with pytest.raises(ValueError, match='ar_tail_k'):
+        replace(cfg, ar_tail_k=2)
+    with pytest.raises(ValueError, match='bptt_steps'):
+        replace(cfg, segment_steps=16, bptt_steps=16, ar_tail_k=15)
+    with pytest.raises(ValueError, match='full-field'):
+        replace(cfg, loss_kind='mse')
+
+
+@pytest.mark.parametrize('update_index', [0, 25, 50, 100, 150])
+def test_ramped_streaming_and_custom_reverse_match_direct_ad(update_index):
+    from src.models.mamba.v24_Ilya.training.spectral_loss import scheduled_amse_lambda
+
+    cfg = replace(config(), amse_lambda=.5, amse_lambda_ramp_steps=100)
+    coefficient = .5*min(update_index/100, 1.)
+
+    def scheduled_full_loss(prediction, truth, *, optimizer_step):
+        f, y = (xarray_jax.unwrap_data(d['x'])[:, 0, :] for d in (prediction, truth))
+        lam = scheduled_amse_lambda(.5, 100, optimizer_step)
+        mse = jnp.mean((f-y)**2, axis=-1)
+        return (1-lam)*mse + lam*coefficient_amse(f, y), {}
+
+    model = replace(transforms(), full_field_loss=scheduled_full_loss)
+    args = arguments(cfg)
+    params = {'a': jnp.asarray(.11), 'b': jnp.asarray(.23)}
+    state = {'s': jnp.arange(4, dtype=jnp.float32)/10}
+    kwargs = dict(transforms=model, baseline_params={}, baseline_state={}, config=cfg,
+                  time_step=pd.Timedelta('6h'), input_steps=2)
+    expected, expected_gradient = jax.value_and_grad(
+        lambda p: reference(p, state, cfg, args, coefficient), has_aux=True)(params)
+    objective = make_bptt_objective(**kwargs)
+    # Counter stays a runtime JAX scalar through the custom-VJP boundary.
+    compiled = jax.jit(jax.value_and_grad(
+        lambda p, step: objective(p, state, *args, optimizer_step=step), has_aux=True))
+    actual, gradient = compiled(params, jnp.int32(update_index))
+    assert_trees_close(actual, expected)
+    assert_trees_close(gradient, expected_gradient)
+    opt = optax.sgd(.01)
+    train = make_train_step(**kwargs, optimizer=opt)
+    updated, last_state, _, value, _, _ = train(
+        params, state, opt.init(params), *args, optimizer_step=jnp.int32(update_index))
+    expected_params = jax.tree_util.tree_map(lambda p, g: p-.01*g, params, expected_gradient)
+    assert_trees_close((updated, last_state, value), (expected_params, expected[1], expected[0]))
+    with pytest.raises(ValueError, match='explicit optimizer_step'):
+        train(params, state, opt.init(params), *args)
+
+
+def test_ramped_validation_scores_fixed_target_lambda():
+    cfg = replace(config(), amse_lambda=.5, amse_lambda_ramp_steps=100)
+
+    def loss(prediction, truth, *, optimizer_step):
+        from src.models.mamba.v24_Ilya.training.spectral_loss import scheduled_amse_lambda
+        f, y = (xarray_jax.unwrap_data(d['x'])[:, 0, :] for d in (prediction, truth))
+        lam = scheduled_amse_lambda(.5, 100, optimizer_step)
+        return (1-lam)*jnp.mean((f-y)**2, axis=-1) + lam*coefficient_amse(f, y), {}
+
+    model = replace(transforms(), full_field_loss=loss)
+    args = arguments(cfg)
+    params, state = {'a': jnp.asarray(.11), 'b': jnp.asarray(.23)}, {'s': jnp.arange(4, dtype=jnp.float32)/10}
+    expected = reference(params, state, cfg, args, .5)
+    validate = make_validation_step(transforms=model, baseline_params={}, baseline_state={}, config=cfg,
+                                    time_step=pd.Timedelta('6h'), input_steps=2)
+    value, final_state, _ = validate(params, state, *args)
+    assert_trees_close((value, final_state), expected)

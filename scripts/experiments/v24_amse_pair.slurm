@@ -5,9 +5,14 @@ STAGE="${1:?stage}"
 EXPERIMENT="${2:?absolute experiment path}"
 TASK="${3:-${SLURM_ARRAY_TASK_ID:-0}}"
 SNAPSHOT="${EXPERIMENT}/source"
-export PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
+# Every submission sets --chdir to the original workspace, including releases
+# submitted from the snapshot; SLURM_SUBMIT_DIR would instead be the snapshot.
+export PROJECT_ROOT="${PWD}"
 source "${SNAPSHOT}/scripts/graphcast_env.sh"
-export PYTHONPATH="${SNAPSHOT}:${SNAPSHOT}/third_party/graphcast${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH="${SNAPSHOT}:${SNAPSHOT}/third_party/graphcast"
+export PYTHONSAFEPATH=1
+export WEATHER_WORKSPACE="${PROJECT_ROOT}"
+export WEATHER_SOURCE_ROOT="${SNAPSHOT}"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false"

@@ -542,7 +542,17 @@ def build_v24_Ilya_swa(
     inputs: list[Path],
     source_steps: list[int],
     output: Path,
+    *,
+    residual_state_policy: str = "preserve",
 ) -> dict[str, Any]:
+    """Average weights, optionally omitting state for zero-initialized evaluation.
+
+    ``preserve`` retains the historical behavior. ``zero`` stores no recurrent
+    state: the evaluator or warm-start caller must initialize its own zero state.
+    Neither policy averages recurrent state or creates a resumable optimizer.
+    """
+    if residual_state_policy not in ("preserve", "zero"):
+        raise ValueError("SWA residual_state_policy must be preserve or zero")
     if len(inputs) < 2:
         raise ValueError("SWA requires at least two checkpoints")
     if output.exists():
@@ -637,7 +647,8 @@ def build_v24_Ilya_swa(
         # have no canonical recurrent state for SWA evaluation or warm start.
         "residual_state": (
             first.residual_state
-            if all(value == TRAINING_CHECKPOINT_FORMAT for value in checkpoint_formats)
+            if residual_state_policy == "preserve"
+            and all(value == TRAINING_CHECKPOINT_FORMAT for value in checkpoint_formats)
             else None
         ),
         "swa_source_steps": list(source_steps),
@@ -647,6 +658,8 @@ def build_v24_Ilya_swa(
         "baseline_checkpoint_fingerprint": first.baseline_checkpoint_fingerprint,
         "anchor_manifest_fingerprint": first.anchor_manifest_fingerprint,
     }
+    if residual_state_policy != "preserve":
+        payload["residual_state_policy"] = residual_state_policy
     atomic_pickle_dump(payload, output)
     return payload
 

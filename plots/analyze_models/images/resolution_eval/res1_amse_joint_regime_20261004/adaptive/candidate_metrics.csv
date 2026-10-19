@@ -1,0 +1,11 @@
+number,id,label,mean_rmse_reduction_pct,power_error_reduction_pct,exact_gc_loss_reduction_pct,eligible
+1,mature_mse,MSE · update 2000,4.679612389522402,-15.124682627675657,13.13454310249309,False
+2,adaptive_uniform_step00100,adaptive uniform · update 100,4.040266115078117,-10.775848956397137,11.44974746107481,False
+3,adaptive_uniform_step00300,adaptive uniform · update 300,4.068103948757318,-10.864371207101332,11.437727466674708,False
+4,adaptive_uniform_step00500,adaptive uniform · update 500,4.040809350761753,-10.975974770069241,11.349202157749605,False
+5,adaptive_precip_step00100,adaptive precip · update 100,4.16072931485183,-11.163148082962927,11.699009061027866,False
+6,adaptive_precip_step00300,adaptive precip · update 300,4.0408277847903795,-11.497155031915241,11.166767337180605,False
+7,adaptive_precip_step00500,adaptive precip · update 500,4.160828163615172,-11.486864221409988,11.516815661887215,False
+8,adaptive_degrees_step00100,adaptive degrees · update 100,4.110809293772711,-11.132426726968436,11.610453664638376,False
+9,adaptive_degrees_step00300,adaptive degrees · update 300,4.068562955769417,-11.403601524767137,11.381946880859584,False
+10,adaptive_degrees_step00500,adaptive degrees · update 500,4.122226807727936,-11.395135720697835,11.52184952266535,False

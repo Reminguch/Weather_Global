@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.data_operations.loaders.zarr_metadata import (  # noqa: E402
+    frozen_zarr_metadata, verify_frozen_zarr_metadata,
+)
 from scripts.experiments.run_v24_spectral_pilot import (  # noqa: E402
     check_file, frozen_file, protocol_digest, read_json, write_json,
 )
@@ -48,6 +51,22 @@ EXACT_DATA = ("/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphc
 def resolve_path(path, workspace):
     value = Path(path)
     return value if value.is_absolute() else workspace / value
+
+
+def validate_evaluation_data(experiment):
+    """Check both production datasets before allocating training/evaluation work."""
+    manifest, workspace = load_experiment(experiment)
+    pilot = read_json(resolve_path(manifest.get("spectral_protocol", PILOT), workspace))
+    _require(protocol_digest(pilot) == pilot["protocol_hash"], "Saved spectral protocol hash mismatch")
+    records = {
+        "exact": frozen_zarr_metadata(resolve_path(manifest.get("exact_data_path", EXACT_DATA), workspace)),
+        "spectral": verify_frozen_zarr_metadata(pilot["data_path"], pilot["data_metadata"]),
+    }
+    if "evaluation_data_metadata" in manifest:
+        _require(records == manifest["evaluation_data_metadata"],
+                 "Evaluation dataset metadata changed after preparation")
+    check_file(pilot["initialization_manifest"])
+    return records
 
 
 def load_experiment(experiment):
@@ -81,6 +100,8 @@ def make_specification(experiment, task, tag, stage):
     manifest, workspace = load_experiment(experiment)
     _require(0 <= task < len(ARMS), "Invalid arm task")
     _require(tag in TAGS and stage in ("exact", "spectral"), "Invalid evaluation stage/tag")
+    if "evaluation_data_metadata" in manifest:
+        validate_evaluation_data(experiment)
     entry = manifest["entries"][task]
     run_dir = Path(entry.get("run_dir", experiment / "runs" / entry["name"]))
     # The resolved configuration is the actual training configuration.
@@ -119,14 +140,17 @@ def make_specification(experiment, task, tag, stage):
         _require(pilot["baseline"]["checkpoint_sha256"] == baseline["sha256"],
                  "Training baseline differs from original spectral pilot GC")
         check_file(pilot["initialization_manifest"])
-        check_file(pilot["data_metadata"])
+        verify_frozen_zarr_metadata(pilot["data_path"], pilot["data_metadata"])
         spec.update(data_path=pilot["data_path"], evaluation_year=2023, n_samples=8, warmup_steps=0,
                     source_spectral_protocol=protocol_file,
                     initialization_times=pilot["initialization_times"],
                     initialization_manifest=pilot["initialization_manifest"],
                     initialization_manifest_sha256=pilot["initialization_manifest_sha256"],
                     spectral_variables=pilot["spectral_variables"], spectral_metadata=pilot["spectral_metadata"])
-    spec["data_metadata"] = frozen_file(Path(spec["data_path"]) / ".zmetadata")
+    spec["data_metadata"] = frozen_zarr_metadata(spec["data_path"])
+    if "evaluation_data_metadata" in manifest:
+        _require(spec["data_metadata"] == manifest["evaluation_data_metadata"][stage],
+                 "Evaluation dataset metadata changed after preparation")
     spec["protocol_hash"] = protocol_digest(spec)
     return spec
 
@@ -141,6 +165,8 @@ def verify_specification(spec):
             records.append(spec[key])
     for record in records:
         check_file(record)
+    if "data_path" in spec:
+        verify_frozen_zarr_metadata(spec["data_path"], spec["data_metadata"])
 
 
 def exact_arrays(result, spec):
@@ -385,7 +411,7 @@ def load_results(experiment):
     return exact, pooled, wavenumber, specifications, audit, sources
 
 
-def plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected):
+def plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected, labels):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -418,7 +444,7 @@ def plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected):
                                 ax.plot(wavenumber[1:], curves[f"{arm}_{tag}"][branch][metric][li, vi, 1:],
                                         color=colors[arm] if branch == "full" else ("#666666", "#999999")[ai],
                                         ls="-" if branch == "full" else ("--", ":")[ai], lw=1.4,
-                                        label=arm if branch == "full" else f"Original GC, {arm} evaluation")
+                                        label=labels[arm] if branch == "full" else f"Original GC, {labels[arm]} evaluation")
                         ax.set_xscale("log")
                         ax.tick_params(labelbottom=True)
                         ax.set_title(f"Day {lead // 24}")
@@ -432,8 +458,8 @@ def plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected):
                                "relative_power_error_pct": "100 × |forecast power − ERA5 power| / ERA5 power · Lower is better",
                                "coherence": "Real cospectrum / sqrt(forecast power × ERA5 power) · Higher is better"}[metric]
                     fig.text(.5, .932, formula, ha="center", fontsize=10)
-                    handles, labels = axes[0, 0].get_legend_handles_labels()
-                    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(.5, .074), ncol=2, frameon=False)
+                    handles, legend_labels = axes[0, 0].get_legend_handles_labels()
+                    fig.legend(handles, legend_labels, loc="lower center", bbox_to_anchor=(.5, .074), ncol=2, frameon=False)
                     fig.text(.5, .048, "1° · Eight fixed 2023 starts · 30–60° both hemispheres · Pooled powers before ratios",
                              ha="center", fontsize=9)
                     fig.text(.5, .025, note, ha="center", fontsize=9)
@@ -448,15 +474,15 @@ def plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected):
             ax = axes[ai, ti]
             for arm in ARMS:
                 row = exact[f"{stage}/{arm}_{tag}"]
-                ax.plot(np.arange(1, 41) / 4, row["improvement_pct_per_step"], label=arm, color=colors[arm])
+                ax.plot(np.arange(1, 41) / 4, row["improvement_pct_per_step"], label=labels[arm], color=colors[arm])
             ax.axhline(0, color="black", lw=.8)
             ax.grid(alpha=.2)
             ax.set_title(f"{'32 starts, 2022' if stage == 'exact' else '8 starts, 2023'} · {tag}")
             ax.set_xlabel("Forecast lead (days)")
             ax.set_ylabel("Exact GraphCast loss reduction (%)")
     fig.suptitle("Exact GraphCast loss reduction versus each paired original GC baseline", y=.975)
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(.5, .06), ncol=2, frameon=False)
+    handles, legend_labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, legend_labels, loc="lower center", bbox_to_anchor=(.5, .06), ncol=2, frameon=False)
     fig.text(.5, .025, note, ha="center", fontsize=9)
     fig.subplots_adjust(top=.9, bottom=.19, left=.095, right=.97, hspace=.35, wspace=.25)
     fig.savefig(image_dir / "exact_graphcast_loss.pdf")
@@ -464,11 +490,14 @@ def plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected):
     plt.close(fig)
 
 
-def report(experiment, *, make_plots=True):
-    _, workspace = load_experiment(experiment)
+def report(experiment, *, make_plots=True, output_dir=None, output_image_dir=None):
+    manifest, workspace = load_experiment(experiment)
+    blend = float(manifest.get("amse_lambda", 1.0))
+    labels = {"mse_fp32": "FP32 MSE",
+              "amse": "Full AMSE" if blend == 1.0 else f"MSE/AMSE blend (λ={blend:g})"}
     exact, pooled, wavenumber, specs, audit, sources = load_results(experiment)
-    data_dir = workspace / "plots/analyze_models/data/resolution_eval" / experiment.name
-    image_dir = workspace / "plots/analyze_models/images/resolution_eval" / experiment.name
+    data_dir = Path(output_dir) if output_dir else workspace / "plots/analyze_models/data/resolution_eval" / experiment.name
+    image_dir = Path(output_image_dir) if output_image_dir else workspace / "plots/analyze_models/images/resolution_eval" / experiment.name
     data_dir.mkdir(parents=True, exist_ok=True)
     image_dir.mkdir(parents=True, exist_ok=True)
     drift_detected = any(row["baseline_drift_vs_mse_step2000"]["outside_tolerance"] for row in exact.values())
@@ -504,15 +533,15 @@ def report(experiment, *, make_plots=True):
                             writer.writerow([model, branch, variable, lead, wavenumber[ki],
                                              *[curves[key][li, vi, ki] for key in ("power", "relative_power_error_pct", "coherence")]])
     if make_plots:
-        plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected)
-    lines = ["# Matched MSE versus full-forecast AMSE", "", summary["scope"], "", summary["baseline_policy"], "",
+        plot_report(image_dir, exact, pooled, wavenumber, spec, drift_detected, labels)
+    lines = [f"# Matched FP32 MSE versus {labels['amse']}", "", summary["scope"], "", summary["baseline_policy"], "",
              f"Baseline drift detected: **{bool(drift_detected)}**. See comparison.json for all tolerances and differences.", "",
              "| Evaluation | Arm | Checkpoint | Exact GC rollout loss reduction |", "|---|---|---|---:|"]
-    lines.extend(f"| {row['stage']} | {row['arm']} | {row['tag']} | {row['improvement_pct_rollout']:.3f}% |" for row in exact.values())
+    lines.extend(f"| {row['stage']} | {labels[row['arm']]} | {row['tag']} | {row['improvement_pct_rollout']:.3f}% |" for row in exact.values())
     lines += ["", "Powers and cospectra are averaged over starts before ratios. Relative power error is "
               "100 × |forecast power − truth power| / truth power; coherence is the real cospectrum divided "
               "by the geometric mean of forecast and truth powers. Zero-power ratios are undefined (omitted).",
-              "", "Training uses global spherical AMSE; these zonal diagnostics retain the previous pilot's "
+              "", f"Training uses global spherical AMSE with interpolation λ={blend:g} (λ=0 is the spectral MSE decomposition; λ=1 is full AMSE); these zonal diagnostics retain the previous pilot's "
               "30–60° latitude bands and are a separate verification measure.", "",
               "SWA averages residual parameters from updates 500, 1000, 1500 and 2000. All evaluations use "
               "cold full feedback, zero recurrent state, and the frozen original GraphCast checkpoint.", "",
@@ -520,7 +549,7 @@ def report(experiment, *, make_plots=True):
     lines.extend(f"- `{key}`: `{value['checkpoint']}` (SHA256 `{value['checkpoint_sha256']}`)" for key, value in specs.items())
     text = "\n".join(lines) + "\n"
     (data_dir / "README.md").write_text(text)
-    destination = experiment / "eval/report"
+    destination = data_dir if output_dir else experiment / "eval/report"
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "README.md").write_text(text)
     write_json(destination / "comparison.json", summary)
@@ -536,10 +565,12 @@ def main(argv=None):
     parser.add_argument("--tag", choices=TAGS)
     parser.add_argument("--stage", choices=("exact", "spectral"))
     parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--output-image-dir", type=Path)
     args = parser.parse_args(argv)
     experiment = args.experiment.resolve()
     if args.phase == "report":
-        report(experiment)
+        report(experiment, output_dir=args.output_dir, output_image_dir=args.output_image_dir)
         return
     if args.task not in (0, 1):
         parser.error("--task 0 or 1 is required outside report")

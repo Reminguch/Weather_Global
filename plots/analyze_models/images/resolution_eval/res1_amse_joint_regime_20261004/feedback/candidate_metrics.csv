@@ -1,0 +1,4 @@
+number,id,label,mean_rmse_reduction_pct,power_error_reduction_pct,exact_gc_loss_reduction_pct,eligible
+1,mature_mse,MSE · update 2000,4.6997091946347265,-15.069438547829762,13.135836024308645,False
+2,feedback_sg_b8_step00100,feedback sg b8 · update 100,1.0095421987353026,-2.0242288200027048,2.393852172713562,False
+3,feedback_differentiable_b8_step00100,feedback differentiable b8 · update 100,1.6264349012595658,-2.419243714288477,4.252241297781911,False

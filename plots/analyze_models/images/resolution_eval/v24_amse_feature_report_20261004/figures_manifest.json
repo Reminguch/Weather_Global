@@ -1,0 +1,295 @@
+{
+  "script": {
+    "path": "scripts/analyze_models/plot_v24_amse_feature_report.py",
+    "sha256": "0e557c6b18d936925e02fd7df207466476227d38b19b1d7615652f929b8d96fc"
+  },
+  "source": {
+    "path": "plots/analyze_models/data/resolution_eval/v24_amse_feature_report_20261004/spectra.npz",
+    "sha256": "a663cec3d6d9eb10a1fab2c2d5d0242d128a95021c47bc161b5302409773166c"
+  },
+  "model_labels": [
+    "Original GC",
+    "MSE",
+    "Full AMSE",
+    "AMSE \u03bb=0.1"
+  ],
+  "lead_days": [
+    1,
+    3,
+    7,
+    10
+  ],
+  "variable_order": [
+    "T2m",
+    "U10",
+    "V10",
+    "MSLP",
+    "TP6",
+    "T850",
+    "Q700",
+    "U850",
+    "V850",
+    "WS10",
+    "WS850"
+  ],
+  "figures": [
+    {
+      "title": "Spectral power error across all fields",
+      "metric": "overview_relative_power_error_pct",
+      "variable": null,
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/overview_relative_power_error_pct.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/overview_relative_power_error_pct.pdf"
+    },
+    {
+      "title": "Forecast\u2013truth coherence across all fields",
+      "metric": "overview_coherence",
+      "variable": null,
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/overview_coherence.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/overview_coherence.pdf"
+    },
+    {
+      "title": "2 m temperature (T2m; K): spectral power",
+      "metric": "power",
+      "variable": "T2m",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_T2m.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_T2m.pdf"
+    },
+    {
+      "title": "2 m temperature (T2m; K): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "T2m",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_T2m.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_T2m.pdf"
+    },
+    {
+      "title": "2 m temperature (T2m; K): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "T2m",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_T2m.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_T2m.pdf"
+    },
+    {
+      "title": "10 m zonal wind (U10; m s\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "U10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_U10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_U10.pdf"
+    },
+    {
+      "title": "10 m zonal wind (U10; m s\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "U10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_U10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_U10.pdf"
+    },
+    {
+      "title": "10 m zonal wind (U10; m s\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "U10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_U10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_U10.pdf"
+    },
+    {
+      "title": "10 m meridional wind (V10; m s\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "V10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_V10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_V10.pdf"
+    },
+    {
+      "title": "10 m meridional wind (V10; m s\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "V10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_V10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_V10.pdf"
+    },
+    {
+      "title": "10 m meridional wind (V10; m s\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "V10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_V10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_V10.pdf"
+    },
+    {
+      "title": "Mean sea-level pressure (MSLP; Pa): spectral power",
+      "metric": "power",
+      "variable": "MSLP",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_MSLP.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_MSLP.pdf"
+    },
+    {
+      "title": "Mean sea-level pressure (MSLP; Pa): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "MSLP",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_MSLP.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_MSLP.pdf"
+    },
+    {
+      "title": "Mean sea-level pressure (MSLP; Pa): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "MSLP",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_MSLP.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_MSLP.pdf"
+    },
+    {
+      "title": "6-hour accumulated precipitation (TP6; m): spectral power",
+      "metric": "power",
+      "variable": "TP6",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_TP6.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_TP6.pdf"
+    },
+    {
+      "title": "6-hour accumulated precipitation (TP6; m): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "TP6",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_TP6.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_TP6.pdf"
+    },
+    {
+      "title": "6-hour accumulated precipitation (TP6; m): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "TP6",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_TP6.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_TP6.pdf"
+    },
+    {
+      "title": "Temperature at 850 hPa (T850; K): spectral power",
+      "metric": "power",
+      "variable": "T850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_T850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_T850.pdf"
+    },
+    {
+      "title": "Temperature at 850 hPa (T850; K): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "T850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_T850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_T850.pdf"
+    },
+    {
+      "title": "Temperature at 850 hPa (T850; K): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "T850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_T850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_T850.pdf"
+    },
+    {
+      "title": "Specific humidity at 700 hPa (Q700; kg kg\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "Q700",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_Q700.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_Q700.pdf"
+    },
+    {
+      "title": "Specific humidity at 700 hPa (Q700; kg kg\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "Q700",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_Q700.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_Q700.pdf"
+    },
+    {
+      "title": "Specific humidity at 700 hPa (Q700; kg kg\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "Q700",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_Q700.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_Q700.pdf"
+    },
+    {
+      "title": "Zonal wind at 850 hPa (U850; m s\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "U850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_U850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_U850.pdf"
+    },
+    {
+      "title": "Zonal wind at 850 hPa (U850; m s\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "U850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_U850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_U850.pdf"
+    },
+    {
+      "title": "Zonal wind at 850 hPa (U850; m s\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "U850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_U850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_U850.pdf"
+    },
+    {
+      "title": "Meridional wind at 850 hPa (V850; m s\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "V850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_V850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_V850.pdf"
+    },
+    {
+      "title": "Meridional wind at 850 hPa (V850; m s\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "V850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_V850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_V850.pdf"
+    },
+    {
+      "title": "Meridional wind at 850 hPa (V850; m s\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "V850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_V850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_V850.pdf"
+    },
+    {
+      "title": "10 m wind speed (WS10; m s\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "WS10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_WS10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_WS10.pdf"
+    },
+    {
+      "title": "10 m wind speed (WS10; m s\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "WS10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_WS10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_WS10.pdf"
+    },
+    {
+      "title": "10 m wind speed (WS10; m s\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "WS10",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_WS10.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_WS10.pdf"
+    },
+    {
+      "title": "Wind speed at 850 hPa (WS850; m s\u207b\u00b9): spectral power",
+      "metric": "power",
+      "variable": "WS850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_WS850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/power_WS850.pdf"
+    },
+    {
+      "title": "Wind speed at 850 hPa (WS850; m s\u207b\u00b9): relative spectral power error",
+      "metric": "relative_power_error_pct",
+      "variable": "WS850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_WS850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/relative_power_error_pct_WS850.pdf"
+    },
+    {
+      "title": "Wind speed at 850 hPa (WS850; m s\u207b\u00b9): forecast\u2013truth spectral coherence",
+      "metric": "coherence",
+      "variable": "WS850",
+      "png": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_WS850.png",
+      "pdf": "plots/analyze_models/images/resolution_eval/v24_amse_feature_report_20261004/coherence_WS850.pdf"
+    }
+  ],
+  "validation": {
+    "four_models_per_line_panel": true,
+    "absolute_power_has_separate_era5_truth_reference": true,
+    "positive_finite_powers": true,
+    "finite_power_errors_and_coherences": true,
+    "coherence_range_valid_and_no_clipping": true,
+    "spectral_error_identity_rtol_atol": [
+      1e-10,
+      1e-10
+    ],
+    "coherence_minimum": -0.13526423346181335,
+    "coherence_maximum": 0.9994817375475777
+  }
+}

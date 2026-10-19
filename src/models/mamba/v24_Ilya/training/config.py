@@ -18,14 +18,25 @@ from ..config import (
 )
 
 
-FEEDBACK_MODES = ("baseline", "closed_loop_sg")
+FEEDBACK_MODES = ("baseline", "closed_loop_sg", "closed_loop")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
 LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
 LOSS_KINDS = ("mse", "mse_fp32", "amse")
-LEARNING_RATE_SCHEDULES = ("constant", "cosine")
+LEARNING_RATE_SCHEDULES = ("constant", "cosine", "warmup_cosine_constant")
+OPTIMIZER_KINDS = ("adamw", "rms_mse", "mgda_rms")
+MGDA_DIRECTIONS = ("mgda", "mse_control", "fixed_sum")
+MGDA_BACKTRACKING_DEFAULTS = {
+    "max_halvings": 8,
+    "shrink": 0.5,
+    "absolute_floor": 1e-8,
+    "relative_floor": 1e-7,
+    "max_relative_noise": 1e-3,
+    "repeatability_repeats": 3,
+}
 WEATHER_TAPE_PRECISIONS = ("fp32",)
 BPTT_BACKEND = "explicit_reverse_vjp"
+CLOSED_LOOP_BPTT_BACKEND = "explicit_weather_reverse_vjp"
 DISTRIBUTED_MODES = ("single", "data_parallel")
 WEIGHT_DECAY_POLICIES = ("all", "mamba_standard")
 
@@ -122,8 +133,16 @@ class V24IlyaTrainConfig:
     temporal_state_policy: str = "carry"
     loss_mode: str = "last_step"
     loss_kind: str = "mse"
+    power_calibration: Mapping[str, Any] | None = None
+    objective_pair: str | None = None
+    amse_split_calibration: Mapping[str, Any] | None = None
     amse_lmax: int | None = None
+    amse_lambda: float = 1.0
     amse_power_epsilon: float = 1e-12
+    amse_lambda_ramp_steps: int = 0
+    amse_lambda_start: float = 0.0
+    amse_variable_lambda_multipliers: Mapping[str, float] = field(default_factory=dict)
+    amse_degree_lambda_multipliers: tuple[float, ...] = ()
     supervised_horizons: tuple[int, ...] = ()
     supervised_weights: tuple[float, ...] = ()
     weather_tape_precision: str = "fp32"
@@ -134,6 +153,13 @@ class V24IlyaTrainConfig:
     spatial_lr_multiplier: float = 1.0
     learning_rate_schedule: str = "constant"
     end_learning_rate: float | None = None
+    optimizer_kind: str = "adamw"
+    mgda_direction: str = "mgda"
+    mgda_backtracking: Mapping[str, Any] | None = None
+    rms_decay: float = 0.98
+    rms_epsilon: float = 1e-8
+    warmup_start_learning_rate: float = 1e-6
+    decay_end_step: int = 1000
     adam_beta1: float = 0.9
     adam_beta2: float = 0.999
     weight_decay: float = 1e-4
@@ -150,6 +176,90 @@ class V24IlyaTrainConfig:
     )
 
     def __post_init__(self) -> None:
+        if self.optimizer_kind not in OPTIMIZER_KINDS:
+            raise ValueError(f"optimizer_kind must be one of {OPTIMIZER_KINDS}")
+        if self.mgda_direction not in MGDA_DIRECTIONS:
+            raise ValueError(f"mgda_direction must be one of {MGDA_DIRECTIONS}")
+        if self.objective_pair != "mse_amse_excess" and (
+                self.mgda_direction != "mgda" or self.mgda_backtracking is not None):
+            raise ValueError("MGDA direction controls and backtracking require objective_pair='mse_amse_excess'")
+        if self.mgda_backtracking is not None:
+            if not isinstance(self.mgda_backtracking, Mapping):
+                raise ValueError("mgda_backtracking must be an object or null")
+            unknown = set(self.mgda_backtracking) - set(MGDA_BACKTRACKING_DEFAULTS)
+            if unknown:
+                raise ValueError(f"Unknown mgda_backtracking keys: {sorted(unknown)}")
+            backtracking = {**MGDA_BACKTRACKING_DEFAULTS, **self.mgda_backtracking}
+            for name, minimum in (("max_halvings", 0), ("repeatability_repeats", 3)):
+                if type(backtracking[name]) is not int or backtracking[name] < minimum:
+                    raise ValueError(f"mgda_backtracking.{name} must be an integer >= {minimum}")
+            for name in ("shrink", "absolute_floor", "relative_floor", "max_relative_noise"):
+                value = backtracking[name]
+                if (isinstance(value, bool) or not isinstance(value, (int, float))
+                        or not math.isfinite(value) or value < 0):
+                    raise ValueError(f"mgda_backtracking.{name} must be finite and nonnegative")
+            if backtracking["max_halvings"] > 8:
+                raise ValueError("mgda_backtracking.max_halvings must not exceed eight")
+            if backtracking["shrink"] != 0.5:
+                raise ValueError("mgda_backtracking.shrink must equal 0.5")
+            if backtracking["max_relative_noise"] >= 1:
+                raise ValueError("mgda_backtracking.max_relative_noise must be less than one")
+            object.__setattr__(self, "mgda_backtracking", backtracking)
+        if not math.isfinite(self.rms_decay) or not 0 <= self.rms_decay < 1:
+            raise ValueError("rms_decay must be finite and in [0, 1)")
+        if not math.isfinite(self.rms_epsilon) or self.rms_epsilon <= 0:
+            raise ValueError("rms_epsilon must be positive and finite")
+        if self.objective_pair not in (None, "amse_split", "mse_amse_excess"):
+            raise ValueError("objective_pair must be null, 'amse_split' or 'mse_amse_excess'")
+        if self.objective_pair == "amse_split":
+            if (self.loss_kind != "amse" or self.amse_lambda != 1.0
+                    or self.amse_lambda_ramp_steps or self.amse_variable_lambda_multipliers
+                    or self.amse_degree_lambda_multipliers or self.power_calibration is not None):
+                raise ValueError("AMSE split requires unmodified lambda=1 AMSE and no power calibration")
+            if self.optimizer_kind not in ("adamw", "mgda_rms"):
+                raise ValueError("AMSE split supports Adam bootstrap or MGDA")
+            if self.amse_split_calibration is not None:
+                from .amse_split_loss import validate_amse_split_calibration
+                object.__setattr__(self, "amse_split_calibration",
+                                   validate_amse_split_calibration(self.amse_split_calibration))
+        elif self.amse_split_calibration is not None:
+            raise ValueError("AMSE split calibration requires objective_pair='amse_split'")
+        if self.objective_pair == "mse_amse_excess":
+            if (self.loss_kind != "amse" or self.amse_lambda != 1.0
+                    or self.amse_lambda_ramp_steps or self.amse_variable_lambda_multipliers
+                    or self.amse_degree_lambda_multipliers or self.power_calibration is not None):
+                raise ValueError("MSE/AMSE excess requires unmodified lambda=1 AMSE and no power calibration")
+            if self.optimizer_kind != "mgda_rms":
+                raise ValueError("MSE/AMSE excess requires mgda_rms with an explicit direction mode")
+            if self.mgda_backtracking is None:
+                raise ValueError("MSE/AMSE excess requires post-update backtracking")
+        if self.power_calibration is not None:
+            from .power_loss import validate_power_calibration
+            object.__setattr__(self, "power_calibration", validate_power_calibration(self.power_calibration))
+            if self.loss_kind != "mse_fp32":
+                raise ValueError("Power calibration requires exact full-field mse_fp32")
+        if self.optimizer_kind != "adamw":
+            if self.objective_pair == "amse_split":
+                if self.amse_split_calibration is None:
+                    raise ValueError("AMSE split MGDA requires frozen shared calibration")
+            elif self.objective_pair == "mse_amse_excess":
+                # Both objectives already share physical GC normalization and
+                # weights; no pooled or separate objective scale is applied.
+                pass
+            elif self.loss_kind != "mse_fp32" or self.power_calibration is None:
+                raise ValueError("RMS/MGDA requires mse_fp32 and embedded power_calibration")
+            allowed_feedback = (("baseline", "closed_loop_sg")
+                                if self.objective_pair == "mse_amse_excess" else ("closed_loop_sg",))
+            if self.distributed.mode != "single" or self.feedback_mode not in allowed_feedback:
+                raise ValueError("RMS/MGDA requires single-device closed_loop_sg training")
+            if self.learning_rate_schedule != "warmup_cosine_constant":
+                raise ValueError("RMS/MGDA requires warmup_cosine_constant schedule")
+            if self.weight_decay != 0:
+                raise ValueError("RMS/MGDA requires zero weight_decay")
+            if self.spatial_lr_multiplier <= 0 or self.mamba_lr_multiplier <= 0:
+                raise ValueError("RMS/MGDA requires positive parameter-group multipliers")
+        elif self.power_calibration is not None or self.amse_split_calibration is not None:
+            raise ValueError("Embedded calibration requires an RMS/MGDA optimizer")
         for name in ("mamba_lr_multiplier", "spatial_lr_multiplier"):
             if not math.isfinite(getattr(self, name)) or getattr(self, name) < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -187,6 +297,16 @@ class V24IlyaTrainConfig:
             )
         if self.feedback_mode not in FEEDBACK_MODES:
             raise ValueError(f"feedback_mode must be one of {FEEDBACK_MODES}")
+        if self.feedback_mode == "closed_loop":
+            if self.bptt_steps not in (2, 4, 8) or self.ar_tail_k != self.bptt_steps - 1:
+                raise ValueError(
+                    "closed_loop requires bptt_steps in (2, 4, 8) and "
+                    "ar_tail_k=bptt_steps-1 for fully differentiable short forecasts"
+                )
+            if self.distributed.mode != "single":
+                raise ValueError("closed_loop currently requires single-device training")
+            if self.loss_kind not in ("mse_fp32", "amse"):
+                raise ValueError("closed_loop requires a full-field mse_fp32 or amse objective")
         if self.temporal_state_policy not in TEMPORAL_STATE_POLICIES:
             raise ValueError(
                 "temporal_state_policy must be one of "
@@ -204,8 +324,44 @@ class V24IlyaTrainConfig:
             raise ValueError("amse_lmax must be a non-negative integer or null")
         if not math.isfinite(self.amse_power_epsilon) or self.amse_power_epsilon <= 0:
             raise ValueError("amse_power_epsilon must be positive and finite")
+        if not math.isfinite(self.amse_lambda) or not 0 <= self.amse_lambda <= 1:
+            raise ValueError("amse_lambda must be finite and in [0, 1]")
+        if type(self.amse_lambda_ramp_steps) is not int or self.amse_lambda_ramp_steps < 0:
+            raise ValueError("amse_lambda_ramp_steps must be a non-negative integer")
+        if not math.isfinite(self.amse_lambda_start) or not 0 <= self.amse_lambda_start <= 1:
+            raise ValueError("amse_lambda_start must be finite and in [0, 1]")
+        if self.amse_lambda_ramp_steps == 0 and self.amse_lambda_start != 0:
+            raise ValueError("amse_lambda_start requires a nonzero amse_lambda_ramp_steps")
+        if self.amse_lambda_ramp_steps and self.amse_lambda_start > self.amse_lambda:
+            raise ValueError("amse_lambda_start must not exceed the target amse_lambda")
+        if self.amse_lambda_ramp_steps and self.distributed.mode != "single":
+            raise ValueError("AMSE lambda ramps currently require single-device training")
+        if not isinstance(self.amse_variable_lambda_multipliers, Mapping):
+            raise ValueError("amse_variable_lambda_multipliers must be a mapping")
+        for name, value in self.amse_variable_lambda_multipliers.items():
+            if not isinstance(name, str) or not name:
+                raise ValueError("amse_variable_lambda_multipliers requires non-empty variable names")
+            if (isinstance(value, bool) or not isinstance(value, (float, int))
+                    or not math.isfinite(value) or not 0 <= value <= 1):
+                raise ValueError("amse_variable_lambda_multipliers values must be finite and in [0, 1]")
+        if not isinstance(self.amse_degree_lambda_multipliers, (tuple, list)):
+            raise ValueError("amse_degree_lambda_multipliers must be a sequence")
+        for value in self.amse_degree_lambda_multipliers:
+            if (isinstance(value, bool) or not isinstance(value, (float, int))
+                    or not math.isfinite(value) or not 0 <= value <= 1):
+                raise ValueError("amse_degree_lambda_multipliers values must be finite and in [0, 1]")
+        if (self.amse_degree_lambda_multipliers and self.amse_lmax is not None
+                and len(self.amse_degree_lambda_multipliers) != self.amse_lmax + 1):
+            raise ValueError("amse_degree_lambda_multipliers must contain amse_lmax+1 entries")
+        # Canonicalize caller-owned containers before serializing checkpoint identity.
+        object.__setattr__(self, "amse_variable_lambda_multipliers",
+                           dict(sorted(self.amse_variable_lambda_multipliers.items())))
+        object.__setattr__(self, "amse_degree_lambda_multipliers",
+                           tuple(self.amse_degree_lambda_multipliers))
         if self.loss_kind != "amse" and (
-            self.amse_lmax is not None or self.amse_power_epsilon != 1e-12
+            self.amse_lmax is not None or self.amse_lambda != 1.0 or self.amse_power_epsilon != 1e-12
+            or self.amse_lambda_ramp_steps or self.amse_lambda_start != 0
+            or self.amse_variable_lambda_multipliers or self.amse_degree_lambda_multipliers
         ):
             raise ValueError("AMSE options require loss_kind='amse'")
         if self.loss_mode == "sparse_steps":
@@ -272,7 +428,7 @@ class V24IlyaTrainConfig:
                     "constant learning_rate_schedule requires end_learning_rate "
                     "to be null or omitted"
                 )
-        else:
+        elif self.learning_rate_schedule == "cosine":
             if self.learning_rate <= 0:
                 raise ValueError("cosine learning_rate_schedule requires learning_rate > 0")
             if self.warmup_steps >= self.max_steps:
@@ -291,6 +447,18 @@ class V24IlyaTrainConfig:
                     "end_learning_rate must be finite and between zero and "
                     f"learning_rate={self.learning_rate}, got {self.end_learning_rate}"
                 )
+        else:
+            if self.learning_rate <= 0 or self.end_learning_rate is None:
+                raise ValueError("warmup_cosine_constant requires positive learning_rate and end_learning_rate")
+            if (not math.isfinite(self.end_learning_rate)
+                    or not 0 <= self.end_learning_rate <= self.learning_rate):
+                raise ValueError("end_learning_rate must be finite and between zero and learning_rate")
+            if (not math.isfinite(self.warmup_start_learning_rate)
+                    or not 0 < self.warmup_start_learning_rate <= self.learning_rate):
+                raise ValueError("warmup_start_learning_rate must be positive and no greater than learning_rate")
+            if (type(self.warmup_steps) is not int or self.warmup_steps < 2
+                    or type(self.decay_end_step) is not int or self.decay_end_step <= self.warmup_steps):
+                raise ValueError("warmup_cosine_constant requires 2 <= warmup_steps < decay_end_step")
         for name in ("adam_beta1", "adam_beta2"):
             value = float(getattr(self, name))
             if not math.isfinite(value) or not 0 <= value < 1:
@@ -308,6 +476,10 @@ class V24IlyaTrainConfig:
     @property
     def truth_prefix_steps(self) -> int:
         return self.bptt_steps - self.ar_tail_k
+
+    @property
+    def bptt_backend(self) -> str:
+        return CLOSED_LOOP_BPTT_BACKEND if self.feedback_mode == "closed_loop" else BPTT_BACKEND
 
     @property
     def supervised_step_indices(self) -> tuple[int, ...]:
@@ -349,11 +521,26 @@ class V24IlyaTrainConfig:
         # Preserve the serialized legacy contract for existing checkpoints.
         if self.loss_kind != "mse":
             objective["loss_kind"] = self.loss_kind
+        if self.power_calibration is not None:
+            objective["power_calibration"] = json.loads(json.dumps(self.power_calibration))
+        if self.objective_pair is not None:
+            objective["objective_pair"] = self.objective_pair
+        if self.amse_split_calibration is not None:
+            objective["amse_split_calibration"] = json.loads(json.dumps(self.amse_split_calibration))
         if self.loss_kind == "amse":
             objective.update(
                 amse_lmax=self.amse_lmax,
+                amse_lambda=self.amse_lambda,
                 amse_power_epsilon=self.amse_power_epsilon,
             )
+            # Omit disabled additions so existing exact-resume metadata is unchanged.
+            if self.amse_lambda_ramp_steps:
+                objective.update(amse_lambda_ramp_steps=self.amse_lambda_ramp_steps,
+                                 amse_lambda_start=self.amse_lambda_start)
+            if self.amse_variable_lambda_multipliers:
+                objective["amse_variable_lambda_multipliers"] = dict(self.amse_variable_lambda_multipliers)
+            if self.amse_degree_lambda_multipliers:
+                objective["amse_degree_lambda_multipliers"] = list(self.amse_degree_lambda_multipliers)
         if self.loss_mode == "sparse_steps":
             objective.update(
                 supervised_horizons=list(self.supervised_horizons),
@@ -389,6 +576,16 @@ class V24IlyaTrainConfig:
                 adam_beta1=self.adam_beta1,
                 adam_beta2=self.adam_beta2,
             )
+        if self.optimizer_kind != "adamw":
+            optimizer.update(optimizer_kind=self.optimizer_kind,
+                             rms_decay=self.rms_decay, rms_epsilon=self.rms_epsilon)
+        if self.objective_pair == "mse_amse_excess":
+            optimizer["mgda_direction"] = self.mgda_direction
+        if self.mgda_backtracking is not None:
+            optimizer["mgda_backtracking"] = json.loads(json.dumps(self.mgda_backtracking))
+        if self.learning_rate_schedule == "warmup_cosine_constant":
+            optimizer.update(warmup_start_learning_rate=self.warmup_start_learning_rate,
+                             decay_end_step=self.decay_end_step)
         return optimizer
 
     def to_dict(self) -> dict[str, Any]:
@@ -417,7 +614,7 @@ class V24IlyaTrainConfig:
             "objective": self._objective_dict(),
             "memory": {
                 "weather_tape_precision": self.weather_tape_precision,
-                "bptt_backend": BPTT_BACKEND,
+                "bptt_backend": self.bptt_backend,
             },
             "optimizer": self._optimizer_dict(),
             "distributed": self.distributed.to_dict(),
@@ -439,8 +636,11 @@ class V24IlyaTrainInvocation:
     baseline_validation_only: bool = False
     validation_compare: Path | None = None
     zero_state_on_init: bool = False
+    stop_after_steps: int | None = None
 
     def __post_init__(self) -> None:
+        if self.stop_after_steps is not None and (type(self.stop_after_steps) is not int or self.stop_after_steps <= 0):
+            raise ValueError("--stop-after-steps must be a positive integer")
         if self.zero_state_on_init and (
             self.init_from is None or self.resume is not None
             or self.baseline_validation_only or self.validation_compare is not None
@@ -532,6 +732,13 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
             "spatial_lr_multiplier",
             "learning_rate_schedule",
             "end_learning_rate",
+            "optimizer_kind",
+            "mgda_direction",
+            "mgda_backtracking",
+            "rms_decay",
+            "rms_epsilon",
+            "warmup_start_learning_rate",
+            "decay_end_step",
             "adam_beta1",
             "adam_beta2",
             "weight_decay",
@@ -545,7 +752,10 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
     objective = _section(
         payload,
         "objective",
-        {"loss_mode", "loss_kind", "amse_lmax", "amse_power_epsilon",
+        {"loss_mode", "loss_kind", "power_calibration", "objective_pair", "amse_split_calibration",
+         "amse_lmax", "amse_lambda", "amse_power_epsilon",
+         "amse_lambda_ramp_steps", "amse_lambda_start", "amse_variable_lambda_multipliers",
+         "amse_degree_lambda_multipliers",
          "supervised_horizons", "supervised_weights"},
     )
     memory = _section(
@@ -553,10 +763,12 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
         "memory",
         {"weather_tape_precision", "bptt_backend"},
     )
-    backend = memory.pop("bptt_backend", BPTT_BACKEND)
-    if backend != BPTT_BACKEND:
+    expected_backend = (CLOSED_LOOP_BPTT_BACKEND
+                        if sequence.get("feedback_mode") == "closed_loop" else BPTT_BACKEND)
+    backend = memory.pop("bptt_backend", expected_backend)
+    if backend != expected_backend:
         raise ValueError(
-            f"memory.bptt_backend must be {BPTT_BACKEND!r}, got {backend!r}"
+            f"memory.bptt_backend must be {expected_backend!r}, got {backend!r}"
         )
     if "distributed" in payload:
         distributed_values = _section(
@@ -599,7 +811,7 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
         if name in data:
             data[name] = Path(data[name])
     output["output_root"] = Path(output["output_root"])
-    for name in ("supervised_horizons", "supervised_weights"):
+    for name in ("supervised_horizons", "supervised_weights", "amse_degree_lambda_multipliers"):
         if name in objective:
             value = objective[name]
             if not isinstance(value, list):
@@ -650,6 +862,8 @@ def build_cli_parser() -> argparse.ArgumentParser:
         help="Start --init-from with zero recurrent state instead of checkpoint state.",
     )
     parser.add_argument("--max-steps", type=int)
+    parser.add_argument("--stop-after-steps", type=int,
+                        help="Stop after this many total updates without changing the immutable training schedule/configuration.")
     parser.add_argument("--checkpoint-every", type=int)
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--run-name")
@@ -694,6 +908,7 @@ def parse_cli(argv: Sequence[str] | None = None) -> V24IlyaTrainInvocation:
         baseline_validation_only=args.baseline_validation_only,
         validation_compare=args.validation_compare,
         zero_state_on_init=args.zero_state_on_init,
+        stop_after_steps=args.stop_after_steps,
     )
 
 

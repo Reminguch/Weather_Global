@@ -11,20 +11,13 @@
 #SBATCH --output=logs/v24_r1_b4lr_%A_%a.out
 #SBATCH --error=logs/v24_r1_b4lr_%A_%a.err
 set -euo pipefail
-cd "${SLURM_SUBMIT_DIR}"
-STAGE="${1:?stage required}"
-EXPERIMENT="artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908"
-export MPLCONFIGDIR="/tmp/mpl-v24-b4lr-${SLURM_JOB_ID}"
-export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export XLA_PYTHON_CLIENT_ALLOCATOR=platform
-export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false"
-source scripts/graphcast_env.sh
-sha256sum --quiet -c "${EXPERIMENT}/source/SHA256SUMS"
-GPU_LOG="${EXPERIMENT}/logs/${STAGE}_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}_gpu.csv"
-nvidia-smi --query-gpu=timestamp,index,name,memory.used,memory.total,utilization.gpu \
-  --format=csv,noheader,nounits -l 5 > "${GPU_LOG}" &
-MONITOR_PID=$!
-trap 'kill "${MONITOR_PID}" 2>/dev/null || true' EXIT
-echo "stage=${STAGE} task=${SLURM_ARRAY_TASK_ID} job=${SLURM_JOB_ID}"
-git rev-parse HEAD
-python -u scripts/experiments/run_v24_res1_batch4_lr.py "${STAGE}" --task "${SLURM_ARRAY_TASK_ID}"
+WORKSPACE="${3:-${SLURM_SUBMIT_DIR:?workspace required}}"
+EXPERIMENT="${2:-${WORKSPACE}/artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908}"
+SOURCE_ROOT="${EXPERIMENT}/source"
+if [[ ! -f "${SOURCE_ROOT}/snapshot.json" ]]; then
+  echo "Prepare a complete source snapshot before submission; historical partial snapshots need explicit recovery: ${EXPERIMENT}" >&2
+  exit 1
+fi
+source "${SOURCE_ROOT}/scripts/experiments/run_frozen_experiment.sh"
+run_frozen_experiment "${WORKSPACE}" "${EXPERIMENT}" \
+  "scripts/experiments/run_v24_res1_batch4_lr.py" "${1:?stage required}" "${SLURM_ARRAY_TASK_ID:-0}"

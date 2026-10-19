@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # 16 starts: approximately 523s compilation/first + 15*104s steady; 62min allows I/O margin.
-# Completed V24 res1 evaluations peaked at 9.5-9.8GiB; allocate 16GiB host RAM.
+# Completed legacy res1 controls peaked at 12.1GiB; the gate allows at most 80% of 16GiB.
+# Frozen numerical policy separates repeat diagnostics from integrity/resource release.
 #SBATCH --job-name=v24-2023-eval
 #SBATCH --account=dabanin
 #SBATCH --qos=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a100:1
 #SBATCH --constraint=gpu80
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
@@ -19,10 +20,18 @@ source scripts/graphcast_env.sh
 export PYTHONPATH="${WORKFLOW}/source:${WORKFLOW}/source/third_party/graphcast"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_PYTHON_CLIENT_ALLOCATOR=platform
-export XLA_FLAGS="--xla_gpu_enable_triton_gemm=false --xla_gpu_deterministic_ops=true"
+XLA_FLAGS="$(python -c 'import json, sys; print(json.load(open(sys.argv[1]))["numerics"]["xla_flags"])' "${WORKFLOW}/protocol.json")"
+export XLA_FLAGS
+if [[ "$(python -c 'import json, sys; print(json.load(open(sys.argv[1])).get("numerical_policy", "strict"))' "${WORKFLOW}/protocol.json")" == "advisory" ]]; then
+  export TF_DETERMINISTIC_OPS=0 TF_CUDNN_DETERMINISTIC=0
+fi
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export MPLCONFIGDIR="/tmp/mpl-v24-2023-${SLURM_JOB_ID}"
 mkdir -p "${MPLCONFIGDIR}"
 nvidia-smi --query-gpu=name,uuid,driver_version,memory.total --format=csv
+if [[ "${PHASE}" == "numerics" ]]; then
+  exec python -u "${WORKFLOW}/source/scripts/analyze_models/diagnose_v24_2023_numerics.py" \
+    --workflow "${WORKFLOW}" "${@:3}"
+fi
 exec python -u "${WORKFLOW}/source/scripts/experiments/run_v24_2023_eval.py" \
   "${PHASE}" --workflow "${WORKFLOW}" --task "${SLURM_ARRAY_TASK_ID}"

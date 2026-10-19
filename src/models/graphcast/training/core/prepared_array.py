@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterable
@@ -21,11 +22,38 @@ SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS = (
 )
 
 
+class PreparedFileArray:
+    """Read an owned selection, then immediately release the source mapping.
+
+    Keeping paths instead of live memmaps prevents a multi-decade traversal from
+    accumulating mapped resident weather pages in a long-running worker.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        mapped = np.load(self.path, mmap_mode="r", allow_pickle=False)
+        try:
+            self.shape = mapped.shape
+            self.dtype = mapped.dtype
+            self.nbytes = mapped.nbytes
+        finally:
+            mapped._mmap.close()
+
+    def take(self, indices: np.ndarray, *, axis: int = 0) -> np.ndarray:
+        mapped = np.load(self.path, mmap_mode="r", allow_pickle=False)
+        try:
+            if mapped.shape != self.shape or mapped.dtype != self.dtype:
+                raise ValueError(f"Prepared array schema changed: {self.path}")
+            return np.array(np.take(mapped, indices, axis=axis), copy=True)
+        finally:
+            mapped._mmap.close()
+
+
 @dataclasses.dataclass(frozen=True)
 class _PreparedArrayShard:
     start: int
     stop: int
-    data: np.ndarray
+    data: np.ndarray | PreparedFileArray
 
 
 class PreparedShardedArray:
@@ -86,7 +114,7 @@ class PreparedShardedArray:
             positions = np.flatnonzero((flat >= shard.start) & (flat < shard.stop))
             if positions.size == 0:
                 continue
-            output[positions] = np.take(shard.data, flat[positions] - shard.start, axis=0)
+            output[positions] = _take_array(shard.data, flat[positions] - shard.start, axis=0)
             assigned[positions] = True
         if not np.all(assigned):
             missing = flat[~assigned]
@@ -94,15 +122,15 @@ class PreparedShardedArray:
         return output.reshape((*requested.shape, *self.shape[1:]))
 
 
-def _take_array(data: np.ndarray | PreparedShardedArray, indices: np.ndarray, *, axis: int) -> np.ndarray:
-    if isinstance(data, PreparedShardedArray):
+def _take_array(data: np.ndarray | PreparedShardedArray | PreparedFileArray, indices: np.ndarray, *, axis: int) -> np.ndarray:
+    if isinstance(data, (PreparedShardedArray, PreparedFileArray)):
         return data.take(indices, axis=axis)
     return np.take(data, indices, axis=axis)
 
 
 @dataclasses.dataclass(frozen=True)
 class PreparedArrayVar:
-    data: np.ndarray | PreparedShardedArray
+    data: np.ndarray | PreparedShardedArray | PreparedFileArray
     dims: tuple[str, ...]
     coords: dict[str, np.ndarray]
 
@@ -132,10 +160,15 @@ class PreparedArrayStore:
         time_start: str | np.datetime64 | pd.Timestamp | None = None,
         time_end: str | np.datetime64 | pd.Timestamp | None = None,
         allow_incomplete: bool = False,
+        bounded_reads: bool | None = None,
         label: str = "prepared-array",
     ) -> None:
         self.root = Path(root)
         self.label = label
+        self.bounded_reads = (
+            os.environ.get("WEATHER_PREPARED_BOUNDED_READS", "0") == "1"
+            if bounded_reads is None else bool(bounded_reads)
+        )
         metadata_path = self.root / "metadata.json"
         if not metadata_path.exists():
             raise FileNotFoundError(f"Prepared array metadata not found: {metadata_path}")
@@ -156,7 +189,7 @@ class PreparedArrayStore:
                 f"expected one of {SUPPORTED_PREPARED_ARRAY_FORMAT_VERSIONS}."
             )
         self.coords = {
-            path.stem: np.load(path, mmap_mode="r")
+            path.stem: np.load(path, mmap_mode=None if self.bounded_reads else "r")
             for path in sorted((self.root / "coords").glob("*.npy"))
         }
         if "time" not in self.coords:
@@ -273,7 +306,8 @@ class PreparedArrayStore:
                         raise FileNotFoundError(
                             f"Prepared array selection requires missing shard: {shard_path}"
                         )
-                    shard_data = np.load(shard_path, mmap_mode="r")
+                    shard_data = (PreparedFileArray(shard_path) if self.bounded_reads
+                                  else np.load(shard_path, mmap_mode="r"))
                     shards.append(_PreparedArrayShard(start=start, stop=stop, data=shard_data))
                 data = PreparedShardedArray(
                     shards,
@@ -282,7 +316,9 @@ class PreparedArrayStore:
                     require_full_coverage=(time_start is None and time_indices is None),
                 )
             else:
-                data = np.load(self.root / "vars" / f"{name}.npy", mmap_mode="r")
+                path = self.root / "vars" / f"{name}.npy"
+                data = (PreparedFileArray(path) if self.bounded_reads and "time" in dims
+                        else np.load(path, mmap_mode=None if self.bounded_reads else "r"))
             coords = {
                 dim: np.asarray(self.coords[dim])
                 for dim in dims
@@ -310,6 +346,7 @@ class PreparedArrayStore:
             time_start=self._requested_time_start,
             time_end=self._requested_time_end,
             allow_incomplete=self._allow_incomplete,
+            bounded_reads=self.bounded_reads,
             label=label or self.label,
         )
 

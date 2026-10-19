@@ -1,0 +1,19 @@
+[2026-10-03T19:11:52.502] error: *** JOB 14937574 ON della-h14n5 CANCELLED AT 2026-10-03T19:11:52 DUE TO JOB REQUEUE ***
+[2026-10-04T01:04:53.714] error: *** JOB 14937574 ON della-r3c3n1 CANCELLED AT 2026-10-04T01:04:53 DUE TO JOB REQUEUE ***
+Traceback (most recent call last):
+  File "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/report.py", line 104, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/report.py", line 62, in main
+    temp=target.with_name('.'+name+'.tmp.png');fig.savefig(temp,dpi=150);plt.close(fig);os.replace(temp,target);plots.append(name)
+                                                                                        ^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/plots/.H200_long_120h_all_levels.png.tmp.png' -> '/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval/plots/H200_long_120h_all_levels.png'
+Traceback (most recent call last):
+  File "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/watch.py", line 68, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/watch.py", line 52, in main
+    subprocess.run([sys.executable,str(Path(__file__).with_name('report.py')),'--root',str(a.root)],check=True)
+  File "/scratch/gpfs/MENGDIW/sh4809/Weather_Global/.conda/envs/graphcast311/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/.venv_neuralgcm/bin/python', '/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/workflow_v1/live_eval/report.py', '--root', '/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_k20_20261003_h200_2k/live_eval']' returned non-zero exit status 1.

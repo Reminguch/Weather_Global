@@ -105,7 +105,12 @@ def initialization_rng_key(seed: int, initialization_time: str, *, stream: str):
     return key
 
 
-def build_initialization_loss_record(metadata: Mapping[str, Any], losses: Mapping[str, Sequence[float]]) -> dict:
+def build_initialization_loss_record(
+    metadata: Mapping[str, Any],
+    losses: Mapping[str, Sequence[float]],
+    *,
+    variable_mse: Mapping[str, Mapping[str, Sequence[float]]] | None = None,
+) -> dict:
     """Validate and retain exact sample losses alongside their verification dates."""
 
     output = dict(metadata)
@@ -115,7 +120,49 @@ def build_initialization_loss_record(metadata: Mapping[str, Any], losses: Mappin
         if values.shape != (steps,) or not np.all(np.isfinite(values)) or np.any(values < 0):
             raise ValueError(f"Incomplete or invalid per-initialization {branch} losses")
         output[f"{branch}_per_step"] = values.tolist()
+    if variable_mse is not None:
+        if not variable_mse:
+            raise ValueError("Per-initialization physical variable MSE is empty")
+        output["variable_mse"] = {}
+        for variable, branches in variable_mse.items():
+            if set(branches) != {"baseline_per_step", "full_per_step"}:
+                raise ValueError(f"Physical variable MSE branches are incomplete for {variable!r}")
+            output["variable_mse"][variable] = {}
+            for branch, raw_values in branches.items():
+                values = np.asarray(raw_values, dtype=np.float64)
+                if values.shape != (steps,) or not np.all(np.isfinite(values)) or np.any(values < 0):
+                    raise ValueError(f"Incomplete or invalid physical variable MSE for {variable!r} {branch}")
+                output["variable_mse"][variable][branch] = values.tolist()
     return output
+
+
+def collect_initialization_variable_mse(
+    destination: dict[str, dict[str, np.ndarray]],
+    *,
+    step_index: int,
+    target_steps: int,
+    contributions: Mapping[str, Mapping[str, float]],
+) -> None:
+    """Retain one directly scored scalar per variable, branch, and lead."""
+
+    if not 0 <= step_index < target_steps or not contributions:
+        raise ValueError("Invalid physical variable MSE lead or empty contributions")
+    if destination and set(destination) != set(contributions):
+        raise ValueError("Physical variable MSE variables changed within an initialization")
+    for variable, branches in contributions.items():
+        if set(branches) != {"baseline", "full"}:
+            raise ValueError(f"Physical variable MSE branches are incomplete for {variable!r}")
+        values = destination.setdefault(variable, {
+            f"{branch}_per_step": np.full(target_steps, np.nan, dtype=np.float64)
+            for branch in ("baseline", "full")
+        })
+        for branch, contribution in branches.items():
+            key = f"{branch}_per_step"
+            if not np.isfinite(contribution) or contribution < 0:
+                raise ValueError(f"Invalid physical variable MSE contribution for {variable!r}")
+            if np.isfinite(values[key][step_index]):
+                raise ValueError(f"Duplicate physical variable MSE lead for {variable!r}")
+            values[key][step_index] = contribution
 
 
 def partial_result_path(out_json: Path) -> Path:
@@ -188,7 +235,9 @@ def write_evaluation_snapshot(
     return output
 
 
-def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) -> dict:
+def evaluate_v24_Ilya(
+    config: V24IlyaEvalConfig, *, prediction_observer=None, numerical_observer=None,
+) -> dict:
     """Evaluate a checkpoint, optionally observing physical host fields.
 
     An observer implements ``begin_sample(metadata)``, ``update_step(index,
@@ -198,6 +247,8 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) ->
 
     if prediction_observer is not None and config.initialization_manifest is None:
         raise ValueError("Prediction observers require an initialization manifest")
+    if numerical_observer is not None and config.initialization_manifest is None:
+        raise ValueError("Numerical observers require an initialization manifest")
 
     evaluation_started = time.monotonic()
     warmup_steps = config.effective_warmup_steps
@@ -312,6 +363,17 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) ->
     )
     baseline_state_init = state_boundary_fp32(baseline_state_init)
     residual_state_init = state_boundary_fp32(residual_state_init)
+    if numerical_observer is not None:
+        numerical_observer.setup(
+            config=config,
+            baseline_model_config=baseline_checkpoint.model_config,
+            task_config=task_config,
+            baseline_params=baseline_params,
+            residual_params=residual_params,
+            baseline_state=baseline_state_init,
+            residual_state=residual_state_init,
+            stats=stats,
+        )
     parameter_count = sum(leaf.size for leaf in jax.tree_util.tree_leaves(residual_params))
     print(
         f"[v24_Ilya] loaded residual parameters={parameter_count:,} "
@@ -398,6 +460,7 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) ->
             initialization_selection="explicit_utc_manifest",
             rng_scheme="sha256_utc_stream_fold_in_v1",
             original_graphcast_loss_per_initialization=loss_records,
+            variable_mse_metadata=metrics.variable_mse_metadata,
         )
     base_output["setup_elapsed_seconds"] = time.monotonic() - evaluation_started
     partial_json = partial_result_path(config.out_json)
@@ -431,10 +494,13 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) ->
             task_config=task_config,
         )
         rollout_key = rollout_keys[index]
+        if numerical_observer is not None:
+            numerical_observer.initialization(metadata_by_index[index], inputs, rollout_key)
         sample_losses = {
             branch: np.full(config.target_steps, np.nan, dtype=np.float64)
             for branch in ("baseline", "full")
         }
+        sample_variable_mse = {}
         previous_step_finished = time.monotonic()
         def consume_prediction(
             step_index,
@@ -460,8 +526,18 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) ->
                     if values.size != 1 or np.isfinite(sample_losses[branch][step_index]):
                         raise ValueError("Each initialization must provide exactly one loss per lead")
                     sample_losses[branch][step_index] = float(values.reshape(-1)[0])
+                collect_initialization_variable_mse(
+                    sample_variable_mse,
+                    step_index=step_index,
+                    target_steps=config.target_steps,
+                    contributions=metrics.last_step_variable_mse,
+                )
             if prediction_observer is not None:
                 prediction_observer.update_step(step_index, truth_host, baseline_host, full_host)
+            if numerical_observer is not None:
+                numerical_observer.prediction(
+                    metadata_by_index[index], step_index, truth_host, baseline_host, full_host,
+                )
             del truth_host, baseline_host, full_host
             _release_host_memory()
             finished = time.monotonic()
@@ -499,7 +575,9 @@ def evaluate_v24_Ilya(config: V24IlyaEvalConfig, *, prediction_observer=None) ->
             skip_baseline_warmup=True,
         )
         if initialization_records is not None:
-            loss_records.append(build_initialization_loss_record(metadata_by_index[index], sample_losses))
+            loss_records.append(build_initialization_loss_record(
+                metadata_by_index[index], sample_losses, variable_mse=sample_variable_mse,
+            ))
         if prediction_observer is not None:
             prediction_observer.finish_sample()
         del inputs, step_data

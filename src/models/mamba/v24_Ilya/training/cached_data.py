@@ -20,7 +20,7 @@ import jax
 from .. import baseline_cache
 from .cached_config import CachedTrainingConfig
 from .config import load_training_config
-from .data import TrainingCursor, advance_cursor
+from .data import TrainingCursor, advance_cursor, concatenate_batch
 
 
 def owned_dataset(dataset: xr.Dataset) -> xr.Dataset:
@@ -76,6 +76,8 @@ class CachedSequenceBatch:
     raw_anchor_indices: np.ndarray
     timestamps: tuple[str, ...]
     next_cursor: TrainingCursor | None
+    chunk_ids: tuple[int, ...] = ()
+    segment_ids: tuple[int, ...] = ()
 
     @property
     def reset_state(self) -> bool:
@@ -129,6 +131,8 @@ class CachedTrainingData:
             "train_chunks": sum(item["split"] == "train" for item in self._items.values()),
             "validation_chunks": sum(item["split"] == "val" for item in self._items.values()),
             "checksum_policy": "READY provenance; shard schema/coverage on first read",
+            "batch_size": self.common.distributed.per_device_batch_size,
+            "dropped_training_segments": len(self.training_data.segments) % self.common.distributed.per_device_batch_size,
         }
 
     def _materialize(
@@ -183,10 +187,37 @@ class CachedTrainingData:
         self, cursor: TrainingCursor, *, include_validation_fields: bool = False,
     ) -> CachedSequenceBatch:
         self.training_data.validate_cursor(cursor, self.common)
+        batch_size = self.common.distributed.per_device_batch_size
+        if cursor.segment_index % batch_size or cursor.segment_index + batch_size > len(self.training_data.segments):
+            raise ValueError("Batched cached cursor must address a complete aligned segment group")
+        next_cursor = advance_cursor(cursor, self.common, len(self.training_data.segments))
+        if batch_size > 1:
+            lanes = tuple(self._materialize(
+                split="train", segment_id=cursor.segment_index + lane,
+                segment_offset=cursor.segment_offset, next_cursor=None,
+                include_validation_fields=include_validation_fields,
+            ) for lane in range(batch_size))
+
+            def combine(name):
+                if getattr(lanes[0], name) is None:
+                    return None
+                return tuple(concatenate_batch([getattr(lane, name)[step] for lane in lanes])
+                             for step in range(self.common.bptt_steps))
+
+            return CachedSequenceBatch(
+                inputs=combine("inputs"), targets=combine("targets"), forcings=combine("forcings"),
+                truths=combine("truths"), baselines=combine("baselines"),
+                chunk_id=lanes[0].chunk_id, split="train", segment_id=cursor.segment_index,
+                segment_offset=cursor.segment_offset, chunk_index=lanes[0].chunk_index,
+                raw_anchor_indices=np.stack([lane.raw_anchor_indices for lane in lanes]),
+                timestamps=tuple(timestamp for lane in lanes for timestamp in lane.timestamps),
+                next_cursor=next_cursor, chunk_ids=tuple(lane.chunk_id for lane in lanes),
+                segment_ids=tuple(lane.segment_id for lane in lanes),
+            )
         return self._materialize(
             split="train", segment_id=cursor.segment_index,
             segment_offset=cursor.segment_offset,
-            next_cursor=advance_cursor(cursor, self.common, len(self.training_data.segments)),
+            next_cursor=next_cursor,
             include_validation_fields=include_validation_fields,
         )
 
@@ -277,11 +308,31 @@ class CachedTrainingData:
                     future.cancel()
 
 
-def open_cached_training_data(config: CachedTrainingConfig) -> CachedTrainingData:
+def validate_consumer_manifest(saved: dict, expected: dict, *, numerical_policy="strict"):
+    """Retain original producer hashes while checking the consumer's raw inputs."""
+    import copy
+    if numerical_policy not in ("strict", "advisory"):
+        raise ValueError("Unknown numerical policy")
+    if numerical_policy == "strict":
+        if saved != expected:
+            raise ValueError("Cached manifest differs from current source/configuration/code identity")
+        return
+    baseline_cache.validate_manifest(saved)
+    baseline_cache.validate_manifest(expected)
+    left, right = copy.deepcopy(saved), copy.deepcopy(expected)
+    for record in (left, right):
+        record.pop("manifest_sha256")
+        record.pop("compatibility_sha256")
+        record["compatibility"].pop("generation_code_sha256")
+    if left != right:
+        raise ValueError("Cached raw data/model/statistics/schedule identity differs from consumer")
+
+
+def open_cached_training_data(config: CachedTrainingConfig, *, numerical_policy="strict") -> CachedTrainingData:
     """Check actual producer/source identity and require complete production data.
 
-    Whole-file producer hashes deliberately remain enforced. New cached modules
-    do not change those files; no legacy compatibility bypass is introduced.
+    Legacy readers require the original producer code. Advisory recoveries pin
+    the immutable producer manifest and separately validate current raw inputs.
     """
     if load_training_config(config.config_path) != config.common:
         raise ValueError("Cached common configuration differs from its source JSON")
@@ -295,9 +346,10 @@ def open_cached_training_data(config: CachedTrainingConfig) -> CachedTrainingDat
         raise ValueError("Cached manifest differs from expected_manifest_sha256")
     context = baseline_cache.load_context(config.config_path)
     expected = baseline_cache.build_manifest(context, num_shards=saved["num_shards"])
-    if saved != expected:
-        raise ValueError("Cached manifest differs from current source/configuration/code identity")
-    reader = baseline_cache.BaselineCacheReader(root, expected["compatibility_sha256"])
+    if numerical_policy == "advisory" and pinned is None:
+        raise ValueError("Recovery cache reuse requires its pinned original manifest hash")
+    validate_consumer_manifest(saved, expected, numerical_policy=numerical_policy)
+    reader = baseline_cache.BaselineCacheReader(root, saved["compatibility_sha256"])
     ready = json.loads((root / "READY.json").read_text())
     required_ready = {
         "manifest_sha256": saved["manifest_sha256"],
@@ -308,4 +360,8 @@ def open_cached_training_data(config: CachedTrainingConfig) -> CachedTrainingDat
     }
     if any(ready.get(key) != value for key, value in required_ready.items()):
         raise ValueError("READY marker coverage differs from the production manifest")
-    return CachedTrainingData(context, reader)
+    result = CachedTrainingData(context, reader)
+    result.identity.update(numerical_policy=numerical_policy,
+                           producer_generation_code_sha256=saved["compatibility"].get("generation_code_sha256", {}),
+                           consumer_generation_code_sha256=expected["compatibility"].get("generation_code_sha256", {}))
+    return result

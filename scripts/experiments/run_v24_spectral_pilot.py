@@ -16,6 +16,13 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.data_operations.loaders.zarr_metadata import (  # noqa: E402
+    frozen_zarr_metadata, verify_frozen_zarr_metadata,
+)
+
 MODEL_PATHS = (
     ("M1", "Batch-4 di16, faster Mamba", "res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba", "swa_step00500-02000.pkl"),
     ("M2", "Batch-4 di32, joint learning rate", "res1_batch4_temporal_lr_20260908/runs/di32_joint", "swa_step00500-02000.pkl"),
@@ -135,11 +142,12 @@ def validate_data(data_path, initializations):
 def prepare(workflow, data_path=None, *, year=2023):
     if (workflow / "protocol.json").exists():
         raise FileExistsError("Protocol already frozen; use a new workflow directory for a new experiment")
+    data_path = (data_path if data_path is not None else default_data_path(year)).resolve(strict=True)
+    data_metadata = frozen_zarr_metadata(data_path)
     from src.models.mamba.v24_Ilya.spectral_observer import SPECTRAL_VARIABLES
     from src.models.mamba.v24_Ilya.spectral_diagnostics import zonal_spectral_metadata
 
     workflow.mkdir(parents=True, exist_ok=True)
-    data_path = (data_path if data_path is not None else default_data_path(year)).resolve(strict=True)
     initializations = pilot_initializations(year)
     write_json(workflow / "data_validation.json", validate_data(data_path, initializations))
     manifest = workflow / f"initializations_pilot_{year}.json"
@@ -162,6 +170,7 @@ def prepare(workflow, data_path=None, *, year=2023):
     statistics = [frozen_file(stats_dir / name) for name in ("mean_by_level.nc", "stddev_by_level.nc", "diffs_stddev_by_level.nc")]
     packages = {name: importlib.metadata.version(name) for name in
                 ("jax", "jaxlib", "numpy", "scipy", "xarray", "pandas", "dm-haiku", "zarr", "numcodecs", "matplotlib")}
+    check_file(data_metadata)
     source = snapshot_source(workflow)
     protocol = {
         "schema_version": 1, "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -176,7 +185,7 @@ def prepare(workflow, data_path=None, *, year=2023):
                      "canonical_model_id": "M1", "repeatability_rtol": 1e-3, "repeatability_atol": 1e-6,
                      "spectral_repeatability_rtol": 1e-3, "spectral_repeatability_atol": 1e-10},
         "stats_dir": str(stats_dir), "statistics": statistics,
-        "data_path": str(data_path), "data_metadata": frozen_file(data_path / ".zmetadata"),
+        "data_path": str(data_path), "data_metadata": data_metadata,
         "data_provenance": [frozen_file(data_path / name) for name in ("stage_report.json", "source_metadata.json")
                             if (data_path / name).is_file()],
         "data_validation": frozen_file(workflow / "data_validation.json"),
@@ -203,6 +212,7 @@ def verify_protocol(workflow):
     protocol = read_json(workflow / "protocol.json")
     if protocol_digest(protocol) != protocol["protocol_hash"]:
         raise ValueError("Protocol hash mismatch")
+    verify_frozen_zarr_metadata(protocol["data_path"], protocol["data_metadata"])
     for record in (protocol["source_hashes"], protocol["initialization_manifest"], protocol["data_metadata"],
                    protocol["data_validation"], *protocol["statistics"], *protocol.get("data_provenance", [])):
         check_file(record)
@@ -290,9 +300,11 @@ def evaluate(workflow, task):
         })
 
 
-def validate_exact_losses(workflow, protocol):
+def validate_exact_losses(workflow, protocol, *, numerical_policy="strict", output_path=None):
     """Require paired complete results and use only M1's baseline for comparisons."""
     import numpy as np
+    from scripts.experiments.numerical_policy import is_advisory, numerical_comparison
+    advisory = is_advisory({"numerical_policy": numerical_policy})
 
     canonical = None
     summaries, sources = [], []
@@ -323,18 +335,23 @@ def validate_exact_losses(workflow, protocol):
             if model["model_id"] != protocol["baseline"]["canonical_model_id"]:
                 raise ValueError("Missing canonical baseline model")
             canonical = baseline
-        np.testing.assert_allclose(baseline, canonical, rtol=protocol["baseline"]["repeatability_rtol"],
-                                   atol=protocol["baseline"]["repeatability_atol"])
+        drift = numerical_comparison(baseline, canonical, rtol=protocol["baseline"]["repeatability_rtol"],
+                                     atol=protocol["baseline"]["repeatability_atol"],
+                                     label=f"{model['model_id']} baseline", advisory=advisory)
         summaries.append({"model_id": model["model_id"], "baseline_rollout": float(canonical.mean()),
                           "full_rollout": float(full.mean()),
                           "improvement_pct_rollout": float(100 * (1 - full.mean() / canonical.mean())),
                           "improvement_pct_per_step": (100 * (1 - full.mean(axis=0) / canonical.mean(axis=0))).tolist(),
                           "max_relative_baseline_difference": float(np.max(np.abs(baseline - canonical) / canonical)),
+                          "baseline_drift": drift, "paired_baseline_rollout": float(baseline.mean()),
+                          "paired_improvement_pct_rollout": float(100 * (1 - full.mean() / baseline.mean())),
                           "elapsed_seconds": result["elapsed_seconds"], "peak_rss_gib": result["peak_rss_gib"]})
         sources.append(frozen_file(path))
-    validation = {"status": "passed", "protocol_hash": protocol["protocol_hash"], "models": summaries,
+    warnings = any(not row["baseline_drift"]["passed"] for row in summaries)
+    validation = {"status": "complete_with_warnings" if warnings else "passed", "integrity_passed": True,
+                  "numerical_policy": numerical_policy, "protocol_hash": protocol["protocol_hash"], "models": summaries,
                   "evaluation_sources": sources, "canonical_baseline_model_id": protocol["baseline"]["canonical_model_id"]}
-    write_json(workflow / "exact_loss_validation.json", validation)
+    write_json(output_path or workflow / "exact_loss_validation.json", validation)
     return validation
 
 

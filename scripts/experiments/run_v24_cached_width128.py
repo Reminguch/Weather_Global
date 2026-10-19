@@ -32,7 +32,8 @@ def arm_config(reference: dict, *, di: int, stateful: bool) -> dict:
     return value
 
 
-def prepare(root: Path, *, reference_path: Path = REFERENCE, cache_root: Path = CACHE) -> dict:
+def prepare(root: Path, *, reference_path: Path = REFERENCE, cache_root: Path = CACHE,
+            numerical_policy="strict", recovery_of: Path | None = None) -> dict:
     root, reference_path, cache_root = (Path(path).resolve() for path in (root, reference_path, cache_root))
     reference = json.loads(reference_path.read_text())
     entries = []
@@ -43,8 +44,11 @@ def prepare(root: Path, *, reference_path: Path = REFERENCE, cache_root: Path = 
         experiment = root / name
         manifest = pair.prepare_experiment(
             experiment, cache_root=cache_root, workspace=ROOT, training_config=config_path,
-            cached_only=True, smoke_time_minutes=360, smoke_memory_gib=64,
+            cached_only=True, smoke_time_minutes=120 if numerical_policy == "advisory" else 360,
+            smoke_memory_gib=128 if numerical_policy == "advisory" else 64,
             job_name=f"v24-w128-{name}",
+            numerical_policy=numerical_policy,
+            recovery_of=Path(recovery_of) / name if recovery_of else None,
         )
         entries.append({"name": name, "di": di, "stateful": stateful,
                         "experiment_root": str(experiment), "source_digest": manifest["source_digest"],
@@ -60,6 +64,8 @@ def prepare(root: Path, *, reference_path: Path = REFERENCE, cache_root: Path = 
         "validation": "all 15 complete held-out 2022 segments every 2000 updates; exact original GraphCast loss",
         "production": "cached only; online executions are limited to correctness checks",
     }
+    if numerical_policy == "advisory":
+        sweep["numerical_policy"] = numerical_policy
     pair.write_once_json(root / "manifest.json", sweep)
     return sweep
 
@@ -89,8 +95,11 @@ def main():
     parser.add_argument("--reference-config", type=Path, default=REFERENCE)
     parser.add_argument("--cache-root", type=Path, default=CACHE)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--numerical-policy", choices=("strict", "advisory"), default="strict")
+    parser.add_argument("--recovery-of", type=Path)
     args = parser.parse_args()
-    result = (prepare(args.experiment_root, reference_path=args.reference_config, cache_root=args.cache_root)
+    result = (prepare(args.experiment_root, reference_path=args.reference_config, cache_root=args.cache_root,
+                      numerical_policy=args.numerical_policy, recovery_of=args.recovery_of)
               if args.stage == "prepare" else submit(args.experiment_root, dry_run=args.dry_run))
     print(json.dumps(result, indent=2), flush=True)
 

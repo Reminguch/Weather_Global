@@ -1,0 +1,30 @@
+{
+  "status": "plots_regenerated_from_saved_qc_analysis",
+  "summary_at_render": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/data/resolution_eval/public_checkpoints_2023_qc_20261018/summary.json",
+    "sha256": "7301ef3a0de4407144ed329b259f82cdd95014ab4edef3fbc5b4bfac5e392abc"
+  },
+  "plotter": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/scripts/analyze_models/plot_public_checkpoints_2023_qc.py",
+    "sha256": "5704fd88d6b85da977d084f04785cd01e003cf490e12b78ff6677ddc798d7c19"
+  },
+  "outputs": [
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/public_checkpoints_2023_qc_20261018/fig5_public_checkpoints_2023_qc_preview.pdf",
+      "sha256": "ca5486b12dab7cf1a9474332579491bc48991d2aa5bb70c5bfe4fdbdd6e7cebf"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/public_checkpoints_2023_qc_20261018/fig5_public_checkpoints_2023_qc_preview.png",
+      "sha256": "075795b2758fd721a5e8894b7fe6254a825d7a8082bc20b4668bdf3781c24e87"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/public_checkpoints_2023_qc_20261018/fig9_public_checkpoints_2023_qc_preview.pdf",
+      "sha256": "d49fc210264e5b31b9357190ee4632ab39dfca6bf639b81737143215a4726fe6"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/public_checkpoints_2023_qc_20261018/fig9_public_checkpoints_2023_qc_preview.png",
+      "sha256": "2fe7caa6ea544c43195729e344c541eafc43dcbe00f73a554d33837d5d50147c"
+    }
+  ],
+  "display": "Physical-unit RMSE; no shading; detailed eligibility remains in analysis metadata."
+}

@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 from src.models.mamba.v24_Ilya.baseline_cache import (
     atomic_json, build_manifest, ensure_manifest, load_context, verify_cache,
 )
+from scripts.preprocessing.submit_v24_baseline import verify_workflow
 
 
 def memory_gib(value: str) -> float:
@@ -55,13 +56,20 @@ def main():
     args = parser.parse_args()
     if not args.pilot_job_id.isdigit():
         raise ValueError('Expected numeric pilot job ID')
+    workflow = verify_workflow(args.pilot_root, config=args.config,
+                               output_root=args.output_root, source=ROOT)
+    workspace, source = Path(workflow['workspace']), Path(workflow['source'])
+    args.config = Path(workflow['config'])
+    args.pilot_root = Path(workflow['pilot_root'])
+    args.output_root = Path(workflow['output_root'])
     report = json.loads((args.pilot_root / 'pilot_report.json').read_text())
     if report.get('passed') is not True or report['chunks'] != 4 or max(report['max_normalized_errors'].values()) > 1e-5:
         raise ValueError('Pilot parity did not pass for all four chunks')
     context = load_context(args.config)
-    manifest = build_manifest(context, 8)
+    num_shards = int(workflow.get('num_shards', 8))
+    manifest = build_manifest(context, num_shards)
     if manifest['compatibility_sha256'] != report['compatibility_sha256']:
-        raise ValueError('Pilot is incompatible with current source/configuration/code')
+        raise ValueError('Pilot is incompatible with its frozen source/configuration/code')
     pilot_manifest = json.loads((args.pilot_root / 'manifest.json').read_text())
     if pilot_manifest != build_manifest(context, 1, 4) or report['manifest_sha256'] != pilot_manifest['manifest_sha256']:
         raise ValueError('Pilot manifest does not match the required four representative chunks')
@@ -74,12 +82,14 @@ def main():
     if not any(row[0] == args.pilot_job_id and row[1] == 'COMPLETED' for row in rows):
         raise ValueError(f'Pilot is not COMPLETED in accounting: {accounting}')
     peak = max([memory_gib(row[2]) for row in rows if len(row) > 2] + [0.0])
-    largest = max(sum(c['shard'] == i for c in manifest['chunks']) for i in range(8))
+    largest = max(sum(c['shard'] == i for c in manifest['chunks']) for i in range(num_shards))
     memory, minutes = production_budget(report, largest, peak)
-    estimate = {'host_memory_gib': memory, 'time_minutes': minutes, 'num_shards': 8,
+    estimate = {'host_memory_gib': memory, 'time_minutes': minutes, 'num_shards': num_shards,
                 'largest_shard_chunks': largest, 'accounting_peak_host_gib': peak,
                 'pilot_job_id': args.pilot_job_id, 'pilot_report': report,
-                'manifest_sha256': manifest['manifest_sha256'], 'accounting': accounting}
+                'manifest_sha256': manifest['manifest_sha256'], 'accounting': accounting,
+                'source': str(source), 'source_manifest_sha256': workflow['source_manifest_sha256'],
+                'config_sha256': workflow['config_sha256'], 'workspace': str(workspace)}
     print(json.dumps(estimate, indent=2), flush=True)
     if args.dry_run:
         return
@@ -95,24 +105,30 @@ def main():
             record = json.loads(record_path.read_text())
             if record['manifest_sha256'] != manifest['manifest_sha256']:
                 raise ValueError('Existing submission belongs to another cache')
+            for name in ('source', 'source_manifest_sha256', 'config_sha256', 'workspace'):
+                if record.get(name) != estimate[name]:
+                    raise ValueError(f'Existing submission has different frozen provenance: {name}')
         else:
             record = estimate
         if 'array_job_id' not in record:
             record['array_job_id'] = submit([
-                '--array=0-7', f'--mem={memory}G', f'--time={minutes}',
-                'scripts/experiments/precompute_v24_baseline.slurm',
+                f'--chdir={workspace}', f'--array=0-{num_shards - 1}', f'--mem={memory}G', f'--time={minutes}',
+                str(source / 'scripts/experiments/precompute_v24_baseline.slurm'),
                 'generate', str(args.config), str(args.output_root),
+                str(workspace), str(source), str(args.pilot_root),
             ])
             atomic_json(record_path, record)
         if 'verification_job_id' not in record:
             record['verification_job_id'] = submit([
+                f'--chdir={workspace}',
                 f"--dependency=afterok:{record['array_job_id']}",
-                'scripts/experiments/verify_v24_baseline.slurm', str(args.config), str(args.output_root),
+                str(source / 'scripts/experiments/verify_v24_baseline.slurm'), str(args.config), str(args.output_root),
+                str(workspace), str(source), str(args.pilot_root),
             ])
             atomic_json(record_path, record)
         print(json.dumps(record, indent=2), flush=True)
-        with Path('current_experiments.md').open('a') as f:
-            f.write(f"\n- Baseline cache production submission: pilot `{args.pilot_job_id}` passed; array `{record['array_job_id']}` (8 shards), verification `{record['verification_job_id']}`; {memory}G host RAM / {minutes} minutes per shard. Cache: `{args.output_root}`.\n")
+        with (workspace / 'current_experiments.md').open('a') as f:
+            f.write(f"\n- Baseline cache production submission: pilot `{args.pilot_job_id}` passed; array `{record['array_job_id']}` ({num_shards} shards), verification `{record['verification_job_id']}`; {memory}G host RAM / {minutes} minutes per shard. Cache: `{args.output_root}`.\n")
 
 
 if __name__ == '__main__':

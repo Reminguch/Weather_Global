@@ -163,6 +163,23 @@ def test_rejects_incomplete_or_scientifically_inconsistent_records(workflow, mut
         load_spectra(workflow)
 
 
+def test_advisory_spectral_drift_is_allowed_but_truth_mismatch_is_not(workflow):
+    path = workflow / "models/M2/start0.npz"
+    def change_baseline(data):
+        for suffix, factor in (("power", .75 ** 2), ("cross_power", .75), ("error_power", .25 ** 2)):
+            data[f"baseline_{suffix}"] = data["truth_power"] * factor
+    _rewrite(path, change_baseline)
+    _, _, _, audit = load_spectra(workflow, numerical_policy="advisory")
+    assert audit["numerical_status"] == "warning"
+    def change_truth(data):
+        for key in ("truth_power", "baseline_power", "baseline_cross_power", "baseline_error_power",
+                    "full_power", "full_cross_power", "full_error_power"):
+            data[key] *= 1 + 1e-12
+    _rewrite(path, change_truth)
+    with pytest.raises(ValueError, match="truth_power repeatability failed"):
+        load_spectra(workflow, numerical_policy="advisory")
+
+
 @pytest.mark.parametrize("workflow", [2022, 2023], indirect=True)
 def test_report_writes_interpretable_figures_csv_and_auditable_summary(workflow, monkeypatch):
     from matplotlib.figure import Figure

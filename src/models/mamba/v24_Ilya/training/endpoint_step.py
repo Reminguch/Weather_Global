@@ -39,6 +39,9 @@ class V24IlyaTrainingTransforms:
     residual_loss_and_predictions: hk.TransformedWithState
     # Physical-field scoring lives outside mixed-precision predictor wrappers.
     full_field_loss: Callable | None = None
+    residual_supervised_predict: hk.TransformedWithState | None = None
+    # Raw FP32 pair ordered by config: GC/power, amplitude/pattern or GC/excess.
+    full_field_objectives: Callable | None = None
 
 
 def build_training_transforms(
@@ -75,6 +78,15 @@ def build_training_transforms(
             use_bf16=use_bf16,
         ).loss_and_predictions(inputs, residual_targets, forcings)
 
+    def residual_training_prediction(inputs, targets, forcings):
+        # Match GraphCast.loss_and_predictions' training flag without computing
+        # its BF16 residual-only loss. Unsupervised state steps retain their
+        # original residual_prediction behavior.
+        return make_residual_predictor(
+            model_configs.residual, task_config, stats, config.architecture,
+            use_bf16=use_bf16,
+        )(inputs, targets_template=targets, forcings=forcings, is_training=True)
+
     combined = hk.transform_with_state(residual_loss_and_predictions)
     full_field_loss = None
     if config.loss_kind != "mse":
@@ -83,7 +95,31 @@ def build_training_transforms(
         full_field_loss = build_full_field_loss(
             stats, config.loss_kind, lmax=config.amse_lmax,
             power_epsilon=config.amse_power_epsilon,
+            amse_lambda=config.amse_lambda,
+            amse_lambda_ramp_steps=config.amse_lambda_ramp_steps,
+            amse_lambda_start=config.amse_lambda_start,
+            amse_variable_lambda_multipliers=config.amse_variable_lambda_multipliers,
+            amse_degree_lambda_multipliers=config.amse_degree_lambda_multipliers,
         )
+    full_field_objectives = None
+    if getattr(config, "objective_pair", None) == "amse_split":
+        from .amse_split_loss import build_amse_split_objectives
+
+        full_field_objectives = build_amse_split_objectives(full_field_loss)
+    elif getattr(config, "objective_pair", None) == "mse_amse_excess":
+        from .mse_amse_excess_loss import build_mse_amse_excess_objectives
+
+        full_field_objectives = build_mse_amse_excess_objectives(full_field_loss)
+    elif getattr(config, "optimizer_kind", "adamw") != "adamw" and config.power_calibration:
+        from .power_loss import build_power_loss
+
+        power_loss = build_power_loss(config.power_calibration)
+
+        def full_field_objectives(prediction, truth):
+            gc, _ = full_field_loss(prediction, truth)
+            power, diagnostics = power_loss(prediction, truth)
+            return jnp.stack((gc, power)), diagnostics
+
     return V24IlyaTrainingTransforms(
         baseline_predict=hk.transform_with_state(baseline_prediction),
         residual_predict=hk.transform_with_state(residual_prediction),
@@ -92,11 +128,24 @@ def build_training_transforms(
         residual_loss=combined,
         residual_loss_and_predictions=combined,
         full_field_loss=full_field_loss,
+        residual_supervised_predict=(
+            hk.transform_with_state(residual_training_prediction)
+            if full_field_loss is not None else None
+        ),
+        full_field_objectives=full_field_objectives,
     )
 
 
 def build_optimizer(config: V24IlyaTrainConfig):
-    if config.learning_rate_schedule == "cosine":
+    if getattr(config, "optimizer_kind", "adamw") != "adamw":
+        from .mgda_optimizer import build_rms_optimizer
+
+        return build_rms_optimizer(config)
+    if config.learning_rate_schedule == "warmup_cosine_constant":
+        from .mgda_optimizer import warmup_cosine_constant_schedule
+
+        learning_rate = warmup_cosine_constant_schedule(config)
+    elif config.learning_rate_schedule == "cosine":
         assert config.end_learning_rate is not None
         cosine = optax.cosine_decay_schedule(
             init_value=config.learning_rate,
@@ -338,7 +387,7 @@ def supervision_target(transforms, truth, baseline_prediction):
             _tree_stop(_cast_floating(baseline_prediction, jnp.float32)))
 
 
-def supervised_step(transforms, params, state, key, inputs, target, forcing):
+def supervised_step(transforms, params, state, key, inputs, target, forcing, *, optimizer_step=None):
     if transforms.full_field_loss is None:
         output, next_state = transforms.residual_loss_and_predictions.apply(
             params, state, key, inputs, target, forcing,
@@ -347,7 +396,8 @@ def supervised_step(transforms, params, state, key, inputs, target, forcing):
         loss = scalarize_loss(loss_array)
     else:
         truth, baseline = target
-        prediction, next_state = transforms.residual_predict.apply(
+        predictor = transforms.residual_supervised_predict or transforms.residual_predict
+        prediction, next_state = predictor.apply(
             params, state, key, inputs, _template_like(truth, jnp.float32), forcing,
         )
         full_prediction = jax.tree_util.tree_map(
@@ -357,6 +407,7 @@ def supervised_step(transforms, params, state, key, inputs, target, forcing):
         )
         loss_array, _diagnostics = transforms.full_field_loss(
             full_prediction, _tree_stop(_cast_floating(truth, jnp.float32)),
+            **({"optimizer_step": optimizer_step} if optimizer_step is not None else {}),
         )
         loss = jnp.mean(loss_array)
     return loss, prediction, cast_state_boundary_fp32(next_state)
@@ -463,8 +514,9 @@ def memory_contract(
     sample_frame = _cast_floating(input_frames[0], tape_dtype)
     target_tape_bytes = sum(tree_nbytes(value) for value in truths)
     target_staging_bytes = max((tree_nbytes(value) for value in truths), default=0)
+    differentiable_weather = config.feedback_mode == "closed_loop"
     return {
-        "bptt_backend": BPTT_BACKEND,
+        "bptt_backend": "explicit_weather_reverse_vjp" if differentiable_weather else BPTT_BACKEND,
         "teacher_input_windows": config.truth_prefix_steps,
         "unique_weather_tape_frames": config.bptt_steps + 1,
         "weather_tape_precision": config.weather_tape_precision,
@@ -474,15 +526,21 @@ def memory_contract(
         "truth_targets_loaded": len(truths),
         "truth_target_bytes": target_tape_bytes,
         "frozen_baseline_target_bytes": (
-            target_tape_bytes if config.loss_kind != "mse" else 0
+            target_tape_bytes if config.loss_kind != "mse" and not differentiable_weather else 0
         ),
         "truth_target_logical_bytes": target_tape_bytes,
-        "truth_target_storage": "reuse_owned_fp32_truth_buffer",
+        "truth_target_storage": (
+            "immutable_fp32_truth" if differentiable_weather else "reuse_owned_fp32_truth_buffer"
+        ),
         "truth_target_retained_copies": 1,
         "truth_target_staging_frames": 1,
         "truth_target_staging_bytes": target_staging_bytes,
         "static_input_bytes": tree_nbytes(static_inputs),
-        "graphcast_backward_calls": 0,
+        "graphcast_backward_calls": config.bptt_steps if differentiable_weather else 0,
+        **({"weather_cotangent_tape_bytes": tree_nbytes(sample_frame) * (config.bptt_steps + 1),
+            "graphcast_parameters_trainable": False,
+            "graphcast_input_gradients": True}
+           if differentiable_weather else {}),
     }
 
 
@@ -497,6 +555,14 @@ def make_bptt_objective(
     return_loss_components: bool = False,
 ) -> Callable[..., tuple[Any, ...]]:
     """Build an objective whose custom VJP rematerializes residual steps only."""
+
+    if config.feedback_mode == "closed_loop":
+        from .weather_feedback_step import make_weather_feedback_objective
+        return make_weather_feedback_objective(
+            transforms=transforms, baseline_params=baseline_params, baseline_state=baseline_state,
+            config=config, time_step=time_step, input_steps=input_steps,
+            return_loss_components=return_loss_components,
+        )
 
     if input_steps != 2:
         raise ValueError("v24_Ilya explicit reverse BPTT requires input_steps=2")
@@ -543,8 +609,12 @@ def make_bptt_objective(
         inputs,
         target,
         forcing,
+        optimizer_step,
     ):
-        return supervised_step(transforms, params, state, key, inputs, target, forcing)
+        return supervised_step(
+            transforms, params, state, key, inputs, target, forcing,
+            optimizer_step=optimizer_step if config.amse_lambda_ramp_steps else None,
+        )
 
     def run_forward(
         residual_params,
@@ -554,6 +624,7 @@ def make_bptt_objective(
         static_inputs,
         truths,
         forcings,
+        optimizer_step,
         *,
         save_tape: bool,
     ):
@@ -625,6 +696,7 @@ def make_bptt_objective(
                     current_inputs,
                     target,
                     forcing,
+                    optimizer_step,
                 )
                 losses.append(loss)
                 if save_tape:
@@ -691,7 +763,11 @@ def make_bptt_objective(
         static_inputs,
         truths,
         forcings,
+        *,
+        optimizer_step=None,
     ):
+        if config.amse_lambda_ramp_steps and optimizer_step is None:
+            raise ValueError("Ramped AMSE requires an explicit optimizer_step")
         initial_state = cast_state_boundary_fp32(initial_state)
         input_frames = tuple(
             _cast_floating(frame, jnp.float32) for frame in input_frames
@@ -744,6 +820,7 @@ def make_bptt_objective(
             static_leaves,
             truth_leaves,
             forcing_leaves,
+            update_index,
         ):
             frames, static, truth_values, forcing_values = unpack_data(
                 frame_leaves,
@@ -759,6 +836,7 @@ def make_bptt_objective(
                 static,
                 truth_values,
                 forcing_values,
+                update_index,
                 save_tape=False,
             )
             if return_loss_components:
@@ -773,6 +851,7 @@ def make_bptt_objective(
             static_leaves,
             truth_leaves,
             forcing_leaves,
+            update_index,
         ):
             frames, static, truth_values, forcing_values = unpack_data(
                 frame_leaves,
@@ -788,6 +867,7 @@ def make_bptt_objective(
                 static,
                 truth_values,
                 forcing_values,
+                update_index,
                 save_tape=True,
             )
             (
@@ -807,6 +887,7 @@ def make_bptt_objective(
                 tape_keys,
                 pack(tape_static),
                 tuple(pack(forcing) for forcing in tape_forcings),
+                update_index,
             )
             output = (
                 (loss, final_state, loss_components)
@@ -824,6 +905,7 @@ def make_bptt_objective(
                 tape_keys,
                 static_leaves,
                 forcing_leaves,
+                update_index,
             ) = packed_tape
             weather_frames = tuple(
                 unpack(frame_treedef, leaves) for leaves in weather_leaves
@@ -867,6 +949,7 @@ def make_bptt_objective(
                             current_inputs,
                             target,
                             forcing,
+                            update_index,
                         )
                         return loss, next_state
 
@@ -941,6 +1024,7 @@ def make_bptt_objective(
                 zero_static_leaves,
                 zero_truth_leaves,
                 zero_forcing_leaves,
+                None,
             )
 
         flat_objective.defvjp(flat_objective_fwd, flat_objective_bwd)
@@ -952,6 +1036,7 @@ def make_bptt_objective(
             packed_static_inputs,
             packed_truths,
             packed_forcings,
+            optimizer_step,
         )
 
     return objective
@@ -968,6 +1053,22 @@ def make_train_step(
     input_steps: int,
 ) -> Callable[..., tuple[Any, Any, Any, Any, Any, Any]]:
     """Build host-orchestrated BPTT with device-resident one-step kernels."""
+
+    if getattr(config, "optimizer_kind", "adamw") != "adamw":
+        from .mgda_step import make_multiobjective_train_step
+
+        return make_multiobjective_train_step(
+            transforms=transforms, optimizer=optimizer, baseline_params=baseline_params,
+            baseline_state=baseline_state, config=config, time_step=time_step,
+            input_steps=input_steps,
+        )
+
+    if config.feedback_mode == "closed_loop":
+        from .weather_feedback_step import make_weather_feedback_train_step
+        return make_weather_feedback_train_step(
+            transforms=transforms, optimizer=optimizer, baseline_params=baseline_params,
+            baseline_state=baseline_state, config=config, time_step=time_step, input_steps=input_steps,
+        )
 
     if input_steps != 2:
         raise ValueError("v24_Ilya streaming BPTT requires input_steps=2")
@@ -1015,8 +1116,11 @@ def make_train_step(
         return prediction, cast_state_boundary_fp32(next_state)
 
     @jax.jit
-    def supervised_forward(params, state, key, inputs, target, forcing):
-        return supervised_step(transforms, params, state, key, inputs, target, forcing)
+    def supervised_forward(params, state, key, inputs, target, forcing, optimizer_step):
+        return supervised_step(
+            transforms, params, state, key, inputs, target, forcing,
+            optimizer_step=optimizer_step if config.amse_lambda_ramp_steps else None,
+        )
 
     @jax.jit
     def state_pullback(
@@ -1056,6 +1160,7 @@ def make_train_step(
         forcing,
         loss_cotangent,
         state_cotangent,
+        optimizer_step,
     ):
         def rematerialized_step(candidate_params, candidate_state):
             loss, _prediction, next_state = supervised_forward(
@@ -1065,6 +1170,7 @@ def make_train_step(
                 inputs,
                 target,
                 forcing,
+                optimizer_step,
             )
             return loss, next_state
 
@@ -1099,7 +1205,11 @@ def make_train_step(
         static_inputs,
         truths,
         forcings,
+        *,
+        optimizer_step=None,
     ):
+        if config.amse_lambda_ramp_steps and optimizer_step is None:
+            raise ValueError("Ramped AMSE training requires an explicit optimizer_step")
         if len(input_frames) != config.truth_prefix_steps + 1:
             raise ValueError(
                 f"Expected {config.truth_prefix_steps + 1} teacher frames, "
@@ -1176,6 +1286,7 @@ def make_train_step(
                     current_inputs,
                     target,
                     forcing,
+                    optimizer_step,
                 )
                 host_losses.append(np.asarray(jax.device_get(loss)))
                 if transforms.full_field_loss is None:
@@ -1259,6 +1370,7 @@ def make_train_step(
                         supervised_weights[supervised_position], dtype=jnp.float32
                     ),
                     state_cotangent,
+                    optimizer_step,
                 )
             else:
                 template = _template_like(host_truths[-1], tape_dtype)
@@ -1374,6 +1486,8 @@ def _make_forward_kernels(
         target = supervision_target(transforms, truth, baseline_prediction)
         loss, prediction, next_state = supervised_step(
             transforms, params, state, key, inputs, target, forcing,
+            # Streaming validation always compares the fixed target objective.
+            optimizer_step=config.amse_lambda_ramp_steps or None,
         )
         frame = next_dynamic_frame(
             inputs,
@@ -1422,6 +1536,7 @@ def _make_forward_kernels(
         target = supervision_target(transforms, truth, baseline_prediction)
         loss, _prediction, next_state = supervised_step(
             transforms, params, state, key, inputs, target, forcing,
+            optimizer_step=config.amse_lambda_ramp_steps or None,
         )
         return (
             loss,
@@ -2204,6 +2319,12 @@ def make_validation_step(
     makes the full-resolution all-steps objective exceed an 80 GB GPU even
     without autodiff. Only the active weather pair and state survive each step.
     """
+    if config.feedback_mode == "closed_loop":
+        from .weather_feedback_step import make_weather_feedback_validation_step
+        return make_weather_feedback_validation_step(
+            transforms=transforms, baseline_params=baseline_params, baseline_state=baseline_state,
+            config=config, time_step=time_step, input_steps=input_steps,
+        )
     if input_steps != 2:
         raise ValueError("v24_Ilya streaming validation requires input_steps=2")
     if jax.tree_util.tree_leaves(baseline_state):

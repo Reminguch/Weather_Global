@@ -170,6 +170,38 @@ def test_one_batch_prefetch_preserves_owned_values_and_order(toy_cache):
     assert list(toy_cache.adapter.iter_chunks(TrainingCursor(), max_chunks=0)) == []
 
 
+def test_batched_real_cache_reconstruction_owns_each_lane(toy_cache):
+    toy = toy_cache
+    config = dataclasses.replace(toy.context[0], distributed=dataclasses.replace(
+        toy.context[0].distributed, per_device_batch_size=2))
+    adapter = CachedTrainingData((config, *toy.context[1:]), toy.reader)
+    independent = [toy.adapter.build_chunk(TrainingCursor(segment_index=lane), include_validation_fields=True)
+                   for lane in range(2)]
+    batch = adapter.build_chunk(TrainingCursor(), include_validation_fields=True)
+    assert batch.segment_ids == (0, 1) and batch.chunk_ids == (0, 2)
+    assert batch.raw_anchor_indices.shape == (2, 4)
+    # Reusing the source workspace must preserve every lane, including truths.
+    adapter.build_chunk(batch.next_cursor)
+    for lane in range(2):
+        for name in ("inputs", "targets", "forcings", "truths", "baselines"):
+            for actual, expected in zip(getattr(batch, name), getattr(independent[lane], name)):
+                actual = actual.isel(batch=slice(lane, lane + 1)).assign_coords(batch=[0])
+                xr.testing.assert_identical(actual, expected)
+    assert adapter.build_chunk(batch.next_cursor).next_cursor == TrainingCursor(epoch=1)
+
+
+def test_batch4_qualification_raw_integrity_reads_individual_cache_chunks(toy_cache):
+    from src.models.mamba.v24_Ilya.training.cached_parity import _raw_integrity
+    toy = toy_cache
+    config = dataclasses.replace(toy.context[0], distributed=dataclasses.replace(
+        toy.context[0].distributed, per_device_batch_size=4))
+    adapter = CachedTrainingData((config, *toy.context[1:]), toy.reader)
+    resolved = SimpleNamespace(common=config)
+    report = _raw_integrity(({}, resolved, adapter, None, None, None, None))
+    assert report["integrity_passed"]
+    assert report["checks"]["raw_indices_timestamps_and_coverage"]
+
+
 def test_open_validates_current_identity_and_ready_counts(toy_cache, monkeypatch):
     toy = toy_cache
     monkeypatch.setattr(cache, "load_context", lambda _: toy.context)

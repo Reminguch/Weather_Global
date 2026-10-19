@@ -1,0 +1,1504 @@
+{
+  "source": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_amse_joint_regime_20261004/confirmation/evaluation/report/joint_selection.json",
+    "sha256": "d1e6ccc3bb875283a60832ffdcdeba1ca330aedd0a4b59b0b4f7565a8738dd0d"
+  },
+  "status": "complete",
+  "evaluation_role": "confirmation",
+  "figures": [
+    {
+      "name": "joint_rmse_power",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/joint_rmse_power.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/joint_rmse_power.pdf"
+      },
+      "candidates": [
+        {
+          "number": 1,
+          "id": "mature_mse",
+          "label": "MSE \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.855320802390217,
+          "power_error_reduction_pct": -14.684968791683994,
+          "exact_gc_loss_reduction_pct": 13.577712801788632,
+          "eligible": false
+        },
+        {
+          "number": 2,
+          "id": "confirmation_mse_seed22_step02000",
+          "label": "MSE confirmation \u00b7 seed 22 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.594350541625481,
+          "power_error_reduction_pct": -13.182406527870594,
+          "exact_gc_loss_reduction_pct": 12.701968670866437,
+          "eligible": false
+        },
+        {
+          "number": 3,
+          "id": "confirmation_amse_seed22_step02000",
+          "label": "AMSE confirmation \u00b7 seed 22 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.112393390669434,
+          "power_error_reduction_pct": -9.555790479955384,
+          "exact_gc_loss_reduction_pct": 11.477836101701,
+          "eligible": false
+        },
+        {
+          "number": 4,
+          "id": "confirmation_mse_seed23_step02000",
+          "label": "MSE confirmation \u00b7 seed 23 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.598702255992215,
+          "power_error_reduction_pct": -13.170732356734938,
+          "exact_gc_loss_reduction_pct": 12.718258111458702,
+          "eligible": false
+        },
+        {
+          "number": 5,
+          "id": "confirmation_amse_seed23_step02000",
+          "label": "AMSE confirmation \u00b7 seed 23 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.117620005233135,
+          "power_error_reduction_pct": -9.539273823616634,
+          "exact_gc_loss_reduction_pct": 11.502000306156912,
+          "eligible": false
+        },
+        {
+          "number": 6,
+          "id": "confirmation_mse_seed24_step02000",
+          "label": "MSE confirmation \u00b7 seed 24 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.606884599082662,
+          "power_error_reduction_pct": -13.168676928843892,
+          "exact_gc_loss_reduction_pct": 12.76661469561029,
+          "eligible": false
+        },
+        {
+          "number": 7,
+          "id": "confirmation_amse_seed24_step02000",
+          "label": "AMSE confirmation \u00b7 seed 24 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.121273487014454,
+          "power_error_reduction_pct": -9.539866619714399,
+          "exact_gc_loss_reduction_pct": 11.465859387260613,
+          "eligible": false
+        }
+      ],
+      "reference": "canonical Original GC",
+      "metric_aggregation": "equal feature/selected-lead RMSE ratios and equal spectral power-error bins",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "exact_graphcast_loss",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/exact_graphcast_loss.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/exact_graphcast_loss.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "confirmation_mse_seed22_step02000",
+        "confirmation_amse_seed22_step02000",
+        "confirmation_mse_seed23_step02000",
+        "confirmation_amse_seed23_step02000",
+        "confirmation_mse_seed24_step02000",
+        "confirmation_amse_seed24_step02000"
+      ],
+      "metric": "exact_gc_loss_ratio_vs_gc",
+      "reference": "canonical Original GC",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "feature_physical_rmse",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_physical_rmse.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_physical_rmse.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "confirmation_mse_seed22_step02000",
+        "confirmation_amse_seed22_step02000",
+        "confirmation_mse_seed23_step02000",
+        "confirmation_amse_seed23_step02000",
+        "confirmation_mse_seed24_step02000",
+        "confirmation_amse_seed24_step02000"
+      ],
+      "metric": "rmse_ratio_vs_gc",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -13.869717999985054,
+        13.869717999985054
+      ]
+    },
+    {
+      "name": "feature_power_error",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_power_error.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_power_error.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "confirmation_mse_seed22_step02000",
+        "confirmation_amse_seed22_step02000",
+        "confirmation_mse_seed23_step02000",
+        "confirmation_amse_seed23_step02000",
+        "confirmation_mse_seed24_step02000",
+        "confirmation_amse_seed24_step02000"
+      ],
+      "metric": "power_error_ratio_vs_gc",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -97.98704154275195,
+        97.98704154275195
+      ]
+    },
+    {
+      "name": "feature_coherence",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_coherence.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_coherence.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "confirmation_mse_seed22_step02000",
+        "confirmation_amse_seed22_step02000",
+        "confirmation_mse_seed23_step02000",
+        "confirmation_amse_seed23_step02000",
+        "confirmation_mse_seed24_step02000",
+        "confirmation_amse_seed24_step02000"
+      ],
+      "metric": "coherence_change_vs_mse",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -0.7914374078879349,
+        0.7914374078879349
+      ]
+    },
+    {
+      "name": "confirmation_recipe_joint",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_joint.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_joint.pdf"
+      },
+      "candidates": [
+        {
+          "number": 1,
+          "id": "confirmation_mse",
+          "label": "MSE confirmation \u00b7 3 seeds",
+          "mean_rmse_reduction_pct": 4.599979132233456,
+          "power_error_reduction_pct": -13.173938604483148,
+          "exact_gc_loss_reduction_pct": 12.72894715931181,
+          "eligible": false
+        },
+        {
+          "number": 2,
+          "id": "confirmation_amse",
+          "label": "AMSE confirmation \u00b7 3 seeds",
+          "mean_rmse_reduction_pct": 4.117095627639012,
+          "power_error_reduction_pct": -9.544976974428799,
+          "exact_gc_loss_reduction_pct": 11.481898598372842,
+          "eligible": false
+        }
+      ],
+      "reference": "canonical Original GC",
+      "metric_aggregation": "equal feature/selected-lead RMSE ratios and equal spectral power-error bins",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "confirmation_recipe_exact_graphcast_loss",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_exact_graphcast_loss.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_exact_graphcast_loss.pdf"
+      },
+      "ids": [
+        "confirmation_mse",
+        "confirmation_amse"
+      ],
+      "metric": "exact_gc_loss_ratio_vs_gc",
+      "reference": "canonical Original GC",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "confirmation_recipe_physical_rmse",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_physical_rmse.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_physical_rmse.pdf"
+      },
+      "ids": [
+        "confirmation_mse",
+        "confirmation_amse"
+      ],
+      "metric": "rmse_ratio_vs_gc",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -13.134915756196774,
+        13.134915756196774
+      ]
+    },
+    {
+      "name": "confirmation_recipe_power_error",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_power_error.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_power_error.pdf"
+      },
+      "ids": [
+        "confirmation_mse",
+        "confirmation_amse"
+      ],
+      "metric": "power_error_ratio_vs_gc",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -80.91436954862337,
+        80.91436954862337
+      ]
+    },
+    {
+      "name": "confirmation_recipe_coherence",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_coherence.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_coherence.pdf"
+      },
+      "ids": [
+        "confirmation_mse",
+        "confirmation_amse"
+      ],
+      "metric": "coherence_change_vs_mse",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -0.7661256293390067,
+        0.7661256293390067
+      ]
+    },
+    {
+      "name": "confirmation_recipe_feature_intervals_vs_gc",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_feature_intervals_vs_gc.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_feature_intervals_vs_gc.pdf"
+      },
+      "ids": [
+        "confirmation_mse",
+        "confirmation_amse"
+      ],
+      "reference": "Original GC",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "interval": "pointwise paired hierarchical seed/seasonal-block 95% percentile",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "confirmation_recipe_feature_intervals_vs_mse",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_feature_intervals_vs_mse.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_feature_intervals_vs_mse.pdf"
+      },
+      "ids": [
+        "confirmation_mse",
+        "confirmation_amse"
+      ],
+      "reference": "matched MSE seed",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "interval": "pointwise paired hierarchical seed/seasonal-block 95% percentile",
+      "no_forecast_averaging": true
+    }
+  ],
+  "no_forecast_averaging": true,
+  "scope": "Same spectral starts for exact GC loss, global primitive-field RMSE, zonal power and coherence. Exact32 remains a separate 2022 diagnostic.",
+  "selection_policy": {
+    "qualification": "All three aggregate conditions use the same spectral initializations; exploratory selection.",
+    "selected_days": [
+      1,
+      3,
+      7,
+      10
+    ],
+    "features": [
+      "T2m",
+      "U10",
+      "V10",
+      "MSLP",
+      "TP6",
+      "T850",
+      "Q700",
+      "U850",
+      "V850"
+    ],
+    "safety_features": [
+      "T2m",
+      "U10",
+      "V10",
+      "MSLP",
+      "TP6",
+      "T850",
+      "Q700",
+      "U850",
+      "V850"
+    ],
+    "maximum_safety_rmse_harm_pct": 2.0,
+    "coherence_drop_tolerance": 0.001,
+    "max_finalists": 2,
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": 20261004,
+    "bootstrap_calendar_block_days": 14
+  },
+  "tables": [
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/candidate_metrics.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_candidate_metrics.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_feature_lead_metrics.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_paired_aggregate_intervals.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/confirmation_recipe_paired_feature_intervals.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/feature_lead_metrics.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/paired_aggregate_intervals.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/confirmation/paired_feature_intervals.csv"
+  ]
+}

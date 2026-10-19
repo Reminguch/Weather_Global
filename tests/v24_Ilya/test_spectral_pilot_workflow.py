@@ -57,6 +57,24 @@ def test_pilot_uses_canonical_baseline_and_binds_source_hashes(completed_pilot):
         workflow.check_file(record)
 
 
+def test_advisory_loss_report_uses_new_destination_and_keeps_original_protocol(completed_pilot):
+    directory, protocol = completed_pilot
+    path = directory / "models/M2/evaluation.json"
+    payload = workflow.read_json(path)
+    for row in payload["original_graphcast_loss_per_initialization"]:
+        row["baseline_per_step"] = (np.asarray(row["baseline_per_step"]) * 1.03).tolist()
+    payload["original_graphcast_loss"]["baseline_per_step"] = (np.asarray(payload["original_graphcast_loss"]["baseline_per_step"]) * 1.03).tolist()
+    payload["original_graphcast_loss"]["baseline_rollout"] *= 1.03
+    workflow.write_json(path, payload)
+    before = copy.deepcopy(protocol)
+    validation = workflow.validate_exact_losses(directory, protocol, numerical_policy="advisory",
+                                                output_path=directory / "recovery/validation.json")
+    assert validation["status"] == "complete_with_warnings"
+    assert protocol == before
+    assert not (directory / "exact_loss_validation.json").exists()
+    assert validation["models"][1]["paired_improvement_pct_rollout"] > 20
+
+
 @pytest.mark.parametrize("defect", ["baseline", "dates", "lead", "partial", "aggregate", "rollout", "identity", "nan"])
 def test_invalid_pilot_cannot_produce_validated_comparison(completed_pilot, defect):
     directory, protocol = completed_pilot
@@ -105,9 +123,13 @@ def test_frozen_source_verification_rejects_post_freeze_edits(tmp_path):
     workflow.write_json(tmp_path / "source_hashes.json", {"evaluator.py": workflow.sha256(code)})
     metadata = tmp_path / "metadata.json"
     workflow.write_json(metadata, {"status": "fixture"})
+    workflow.write_json(tmp_path / "dataset/.zmetadata", {
+        "zarr_consolidated_format": 1, "metadata": {".zgroup": {"zarr_format": 2}},
+    })
     protocol = {
         "source_root": str(source), "source_hashes": workflow.frozen_file(tmp_path / "source_hashes.json"),
-        "initialization_manifest": workflow.frozen_file(metadata), "data_metadata": workflow.frozen_file(metadata),
+        "initialization_manifest": workflow.frozen_file(metadata), "data_path": str(tmp_path / "dataset"),
+        "data_metadata": workflow.frozen_zarr_metadata(tmp_path / "dataset"),
         "data_validation": workflow.frozen_file(metadata), "statistics": [],
     }
     protocol["protocol_hash"] = workflow.protocol_digest(protocol)

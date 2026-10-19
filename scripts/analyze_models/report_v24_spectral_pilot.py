@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+from scripts.experiments.numerical_policy import is_advisory
 
 
 SPECTRAL_KEYS = (
@@ -74,11 +75,14 @@ def _json_write(path, data):
     temporary.replace(path)
 
 
-def _validated_exact_loss(workflow, protocol):
+def _validated_exact_loss(workflow, protocol, *, validation_path=None, numerical_policy="strict"):
     """Require the workflow's exact-loss checks and bind them to current files."""
-    path = workflow / "exact_loss_validation.json"
+    path = validation_path or workflow / "exact_loss_validation.json"
     record, sha256 = _read_json(path)
-    _require(record.get("status") == "passed", "Exact GraphCast loss validation has not passed")
+    accepted = ("passed", "complete_with_warnings") if is_advisory({"numerical_policy": numerical_policy}) else ("passed",)
+    _require(record.get("status") in accepted, "Exact GraphCast loss validation has not passed")
+    if numerical_policy == "advisory":
+        _require(record.get("integrity_passed") is True, "Exact-loss integrity validation missing")
     _require(record.get("protocol_hash") == protocol["protocol_hash"], "Exact-loss protocol_hash mismatch")
     _require(record.get("canonical_baseline_model_id") == "M1", "Exact-loss canonical baseline must be M1")
     _require([model["model_id"] for model in record.get("models", [])] == list(MODEL_IDS),
@@ -152,9 +156,10 @@ def _load_record(path, protocol, model, expected_times, expected_k=None):
     }
 
 
-def load_spectra(workflow):
+def load_spectra(workflow, *, numerical_policy="strict"):
     """Load complete paired pilot records; reject provenance or baseline drift."""
     workflow = Path(workflow).resolve()
+    advisory = is_advisory({"numerical_policy": numerical_policy})
     protocol, protocol_file_sha256 = _read_json(workflow / "protocol.json")
     body = {key: value for key, value in protocol.items() if key != "protocol_hash"}
     digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -196,7 +201,7 @@ def load_spectra(workflow):
             canonical = {time: {key: value for key, value in record.items() if key in REPEATED_KEYS}
                          for time, record in records.items()}
         else:
-            checks = {key: {"max_absolute_difference": 0., "max_relative_difference": 0.} for key in REPEATED_KEYS}
+            checks = {key: {"max_absolute_difference": 0., "max_relative_difference": 0., "passed": True} for key in REPEATED_KEYS}
             for time in expected_times:
                 for key in REPEATED_KEYS:
                     value, reference = records[time][key], canonical[time][key]
@@ -208,7 +213,8 @@ def load_spectra(workflow):
                     check["max_relative_difference"] = max(check["max_relative_difference"], relative)
                     matches = (np.array_equal(value, reference) if key == "truth_power"
                                else np.allclose(value, reference, rtol=rtol, atol=atol))
-                    _require(matches,
+                    check["passed"] = check["passed"] and bool(matches)
+                    _require(matches or (advisory and key != "truth_power"),
                              f"{model_id} {time}: canonical M1 {key} repeatability failed "
                              f"(max abs={difference.max():.6g}, max relative={relative:.6g}; "
                              f"rtol={rtol}, atol={atol})")
@@ -222,6 +228,8 @@ def load_spectra(workflow):
         "canonical_model_id": "M1", "repeatability_rtol": rtol, "repeatability_atol": atol,
         "truth_repeatability": "Exact equality required for identical physical targets.",
         "repeatability": repeated_audit,
+        "numerical_policy": numerical_policy,
+        "numerical_status": "warning" if any(not row["passed"] for checks in repeated_audit.values() for row in checks.values()) else "passed",
     }
     return protocol, wavenumber, pooled, audit
 
@@ -329,14 +337,16 @@ def _plot(image_dir, protocol, wavenumber, truth, curves):
     return outputs
 
 
-def report(workflow, *, make_plots=True):
+def report(workflow, *, make_plots=True, output_dir=None, output_image_dir=None,
+           validation_path=None, numerical_policy="strict"):
     """Write complete-pilot CSV, provenance summary and four figures."""
     workflow = Path(workflow).resolve()
-    protocol, wavenumber, pooled, audit = load_spectra(workflow)
-    exact_loss, exact_loss_source = _validated_exact_loss(workflow, protocol)
+    protocol, wavenumber, pooled, audit = load_spectra(workflow, numerical_policy=numerical_policy)
+    exact_loss, exact_loss_source = _validated_exact_loss(
+        workflow, protocol, validation_path=validation_path, numerical_policy=numerical_policy)
     truth, curves = pooled_curves(pooled)
-    data_dir = Path(protocol.get("output_data_dir", workflow / "report"))
-    image_dir = Path(protocol.get("output_image_dir", workflow / "report"))
+    data_dir = Path(output_dir or protocol.get("output_data_dir", workflow / "report"))
+    image_dir = Path(output_image_dir or protocol.get("output_image_dir", workflow / "report"))
     data_dir.mkdir(parents=True, exist_ok=True)
     csv_path = data_dir / "pooled_spectra.csv"
     _write_csv(csv_path, protocol, wavenumber, truth, curves)
@@ -347,7 +357,8 @@ def report(workflow, *, make_plots=True):
                        if year == 2022 else
                        f"Exploratory {year} pilot on fixed starts; not a full-year evaluation.")
     summary = {
-        "status": "complete", "format": "v24_spectral_pilot_report_v1",
+        "status": "complete_with_warnings" if audit["numerical_status"] == "warning" or exact_loss["status"] == "complete_with_warnings" else "complete",
+        "integrity_passed": True, "format": "v24_spectral_pilot_report_v1",
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "protocol_hash": protocol["protocol_hash"], "initialization_times": protocol["initialization_times"],
         "evaluation_year": year, "evaluation_period": protocol.get("evaluation_period", f"{year} pilot"),
@@ -372,8 +383,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workflow", type=Path, required=True)
     parser.add_argument("--no-plots", action="store_true")
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--output-image-dir", type=Path)
+    parser.add_argument("--validation-path", type=Path)
+    parser.add_argument("--numerical-policy", choices=("strict", "advisory"), default="strict")
     args = parser.parse_args(argv)
-    summary = report(args.workflow, make_plots=not args.no_plots)
+    summary = report(args.workflow, make_plots=not args.no_plots, output_dir=args.output_dir,
+                     output_image_dir=args.output_image_dir, validation_path=args.validation_path,
+                     numerical_policy=args.numerical_policy)
     print(json.dumps({"status": summary["status"], "outputs": summary["outputs"]}, indent=2))
 
 

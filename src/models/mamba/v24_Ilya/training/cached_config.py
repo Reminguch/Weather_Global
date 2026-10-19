@@ -55,8 +55,8 @@ class CachedTrainingConfig:
             raise ValueError("Cached training requires feedback_mode='baseline'")
         if self.common.loss_mode != "all_steps":
             raise ValueError("The first cached backend requires loss_mode='all_steps'")
-        if self.common.distributed.mode != "single" or self.common.distributed.global_batch_size != 1:
-            raise ValueError("The first cached backend requires single-device batch size 1")
+        if self.common.distributed.mode != "single":
+            raise ValueError("Cached training requires a single device")
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -1,0 +1,754 @@
+{
+  "source": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_amse_joint_regime_20261004/trajectory/evaluation/report/joint_selection.json",
+    "sha256": "9b5c53881d901519676f9691c2d974a876a0d9275df61f89df21e94bcc953679"
+  },
+  "status": "complete",
+  "evaluation_role": "development",
+  "figures": [
+    {
+      "name": "joint_rmse_power",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/joint_rmse_power.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/joint_rmse_power.pdf"
+      },
+      "candidates": [
+        {
+          "number": 1,
+          "id": "mature_mse",
+          "label": "MSE \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.641103923180012,
+          "power_error_reduction_pct": -15.152161310969102,
+          "exact_gc_loss_reduction_pct": 13.1558568158076,
+          "eligible": false
+        },
+        {
+          "number": 2,
+          "id": "mse_trajectory_step00500",
+          "label": "MSE \u00b7 update 500",
+          "mean_rmse_reduction_pct": 3.573868055333007,
+          "power_error_reduction_pct": -13.309395966731108,
+          "exact_gc_loss_reduction_pct": 10.399268984858168,
+          "eligible": false
+        },
+        {
+          "number": 3,
+          "id": "mse_trajectory_step01000",
+          "label": "MSE \u00b7 update 1000",
+          "mean_rmse_reduction_pct": 3.7438213448724,
+          "power_error_reduction_pct": -14.488541204383365,
+          "exact_gc_loss_reduction_pct": 10.415553199387551,
+          "eligible": false
+        },
+        {
+          "number": 4,
+          "id": "mse_trajectory_step01500",
+          "label": "MSE \u00b7 update 1500",
+          "mean_rmse_reduction_pct": 4.039456937336583,
+          "power_error_reduction_pct": -14.234245066923945,
+          "exact_gc_loss_reduction_pct": 11.759029541240007,
+          "eligible": false
+        },
+        {
+          "number": 5,
+          "id": "mse_trajectory_step02000",
+          "label": "MSE \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.119950216470913,
+          "power_error_reduction_pct": -15.2233652286895,
+          "exact_gc_loss_reduction_pct": 11.188531508028055,
+          "eligible": false
+        },
+        {
+          "number": 6,
+          "id": "full_amse_step00500",
+          "label": "Full AMSE \u00b7 update 500",
+          "mean_rmse_reduction_pct": -5.2815484093230225,
+          "power_error_reduction_pct": 31.841242707617003,
+          "exact_gc_loss_reduction_pct": -10.59695492228736,
+          "eligible": false
+        },
+        {
+          "number": 7,
+          "id": "full_amse_step01000",
+          "label": "Full AMSE \u00b7 update 1000",
+          "mean_rmse_reduction_pct": -3.900342403985224,
+          "power_error_reduction_pct": 34.736228357429475,
+          "exact_gc_loss_reduction_pct": -7.91670131963802,
+          "eligible": false
+        },
+        {
+          "number": 8,
+          "id": "full_amse_step01500",
+          "label": "Full AMSE \u00b7 update 1500",
+          "mean_rmse_reduction_pct": -2.625344733055379,
+          "power_error_reduction_pct": 37.11576411611953,
+          "exact_gc_loss_reduction_pct": -4.30940954851684,
+          "eligible": false
+        },
+        {
+          "number": 9,
+          "id": "full_amse_step02000",
+          "label": "Full AMSE \u00b7 update 2000",
+          "mean_rmse_reduction_pct": -4.46442965483016,
+          "power_error_reduction_pct": 40.3115662386339,
+          "exact_gc_loss_reduction_pct": -9.737198361051224,
+          "eligible": false
+        },
+        {
+          "number": 10,
+          "id": "full_amse_swa",
+          "label": "Full AMSE \u00b7 SWA \u00b7 update 2000",
+          "mean_rmse_reduction_pct": -2.732312706207485,
+          "power_error_reduction_pct": 35.80086593810306,
+          "exact_gc_loss_reduction_pct": -4.329085767260654,
+          "eligible": false
+        },
+        {
+          "number": 11,
+          "id": "amse_lambda0p1_step00500",
+          "label": "AMSE \u03bb=0.1 \u00b7 update 500",
+          "mean_rmse_reduction_pct": 3.296288757171595,
+          "power_error_reduction_pct": -10.3464290975952,
+          "exact_gc_loss_reduction_pct": 9.961426076973401,
+          "eligible": false
+        },
+        {
+          "number": 12,
+          "id": "amse_lambda0p1_step01000",
+          "label": "AMSE \u03bb=0.1 \u00b7 update 1000",
+          "mean_rmse_reduction_pct": 3.714144135011288,
+          "power_error_reduction_pct": -13.03741045864375,
+          "exact_gc_loss_reduction_pct": 10.85097155695236,
+          "eligible": false
+        },
+        {
+          "number": 13,
+          "id": "amse_lambda0p1_step01500",
+          "label": "AMSE \u03bb=0.1 \u00b7 update 1500",
+          "mean_rmse_reduction_pct": 3.5581665398468743,
+          "power_error_reduction_pct": -11.18524631209883,
+          "exact_gc_loss_reduction_pct": 10.422035260839802,
+          "eligible": false
+        },
+        {
+          "number": 14,
+          "id": "amse_lambda0p1_step02000",
+          "label": "AMSE \u03bb=0.1 \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 3.6902141624438944,
+          "power_error_reduction_pct": -11.676818497378406,
+          "exact_gc_loss_reduction_pct": 10.120826737569955,
+          "eligible": false
+        },
+        {
+          "number": 15,
+          "id": "amse_lambda0p1_swa",
+          "label": "AMSE \u03bb=0.1 \u00b7 SWA \u00b7 update 2000",
+          "mean_rmse_reduction_pct": 4.346273895555441,
+          "power_error_reduction_pct": -12.241206997666554,
+          "exact_gc_loss_reduction_pct": 12.662657954391921,
+          "eligible": false
+        }
+      ],
+      "reference": "canonical Original GC",
+      "metric_aggregation": "equal feature/selected-lead RMSE ratios and equal spectral power-error bins",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "exact_graphcast_loss",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/exact_graphcast_loss.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/exact_graphcast_loss.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "mse_trajectory_step00500",
+        "mse_trajectory_step01000",
+        "mse_trajectory_step01500",
+        "mse_trajectory_step02000",
+        "full_amse_step00500",
+        "full_amse_step01000",
+        "full_amse_step01500",
+        "full_amse_step02000",
+        "full_amse_swa",
+        "amse_lambda0p1_step00500",
+        "amse_lambda0p1_step01000",
+        "amse_lambda0p1_step01500",
+        "amse_lambda0p1_step02000",
+        "amse_lambda0p1_swa"
+      ],
+      "metric": "exact_gc_loss_ratio_vs_gc",
+      "reference": "canonical Original GC",
+      "no_forecast_averaging": true
+    },
+    {
+      "name": "feature_physical_rmse",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_physical_rmse.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_physical_rmse.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "mse_trajectory_step00500",
+        "mse_trajectory_step01000",
+        "mse_trajectory_step01500",
+        "mse_trajectory_step02000",
+        "full_amse_step00500",
+        "full_amse_step01000",
+        "full_amse_step01500",
+        "full_amse_step02000",
+        "full_amse_swa",
+        "amse_lambda0p1_step00500",
+        "amse_lambda0p1_step01000",
+        "amse_lambda0p1_step01500",
+        "amse_lambda0p1_step02000",
+        "amse_lambda0p1_swa"
+      ],
+      "metric": "rmse_ratio_vs_gc",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -21.058706271631642,
+        21.058706271631642
+      ]
+    },
+    {
+      "name": "feature_power_error",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_power_error.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_power_error.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "mse_trajectory_step00500",
+        "mse_trajectory_step01000",
+        "mse_trajectory_step01500",
+        "mse_trajectory_step02000",
+        "full_amse_step00500",
+        "full_amse_step01000",
+        "full_amse_step01500",
+        "full_amse_step02000",
+        "full_amse_swa",
+        "amse_lambda0p1_step00500",
+        "amse_lambda0p1_step01000",
+        "amse_lambda0p1_step01500",
+        "amse_lambda0p1_step02000",
+        "amse_lambda0p1_swa"
+      ],
+      "metric": "power_error_ratio_vs_gc",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -99.46675581061892,
+        99.46675581061892
+      ]
+    },
+    {
+      "name": "feature_coherence",
+      "files": {
+        "png": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_coherence.png",
+        "pdf": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_coherence.pdf"
+      },
+      "ids": [
+        "mature_mse",
+        "mse_trajectory_step00500",
+        "mse_trajectory_step01000",
+        "mse_trajectory_step01500",
+        "mse_trajectory_step02000",
+        "full_amse_step00500",
+        "full_amse_step01000",
+        "full_amse_step01500",
+        "full_amse_step02000",
+        "full_amse_swa",
+        "amse_lambda0p1_step00500",
+        "amse_lambda0p1_step01000",
+        "amse_lambda0p1_step01500",
+        "amse_lambda0p1_step02000",
+        "amse_lambda0p1_swa"
+      ],
+      "metric": "coherence_change_vs_mse",
+      "coordinates": [
+        [
+          "T2m",
+          1
+        ],
+        [
+          "T2m",
+          3
+        ],
+        [
+          "T2m",
+          7
+        ],
+        [
+          "T2m",
+          10
+        ],
+        [
+          "U10",
+          1
+        ],
+        [
+          "U10",
+          3
+        ],
+        [
+          "U10",
+          7
+        ],
+        [
+          "U10",
+          10
+        ],
+        [
+          "V10",
+          1
+        ],
+        [
+          "V10",
+          3
+        ],
+        [
+          "V10",
+          7
+        ],
+        [
+          "V10",
+          10
+        ],
+        [
+          "MSLP",
+          1
+        ],
+        [
+          "MSLP",
+          3
+        ],
+        [
+          "MSLP",
+          7
+        ],
+        [
+          "MSLP",
+          10
+        ],
+        [
+          "TP6",
+          1
+        ],
+        [
+          "TP6",
+          3
+        ],
+        [
+          "TP6",
+          7
+        ],
+        [
+          "TP6",
+          10
+        ],
+        [
+          "T850",
+          1
+        ],
+        [
+          "T850",
+          3
+        ],
+        [
+          "T850",
+          7
+        ],
+        [
+          "T850",
+          10
+        ],
+        [
+          "Q700",
+          1
+        ],
+        [
+          "Q700",
+          3
+        ],
+        [
+          "Q700",
+          7
+        ],
+        [
+          "Q700",
+          10
+        ],
+        [
+          "U850",
+          1
+        ],
+        [
+          "U850",
+          3
+        ],
+        [
+          "U850",
+          7
+        ],
+        [
+          "U850",
+          10
+        ],
+        [
+          "V850",
+          1
+        ],
+        [
+          "V850",
+          3
+        ],
+        [
+          "V850",
+          7
+        ],
+        [
+          "V850",
+          10
+        ]
+      ],
+      "color_limits": [
+        -10.26317764743181,
+        10.26317764743181
+      ]
+    }
+  ],
+  "no_forecast_averaging": true,
+  "scope": "Same spectral starts for exact GC loss, global primitive-field RMSE, zonal power and coherence. Exact32 remains a separate 2022 diagnostic.",
+  "selection_policy": {
+    "qualification": "All three aggregate conditions use the same spectral initializations; exploratory selection.",
+    "selected_days": [
+      1,
+      3,
+      7,
+      10
+    ],
+    "features": [
+      "T2m",
+      "U10",
+      "V10",
+      "MSLP",
+      "TP6",
+      "T850",
+      "Q700",
+      "U850",
+      "V850"
+    ],
+    "safety_features": [
+      "T2m",
+      "U10",
+      "V10",
+      "MSLP",
+      "TP6",
+      "T850",
+      "Q700",
+      "U850",
+      "V850"
+    ],
+    "maximum_safety_rmse_harm_pct": 2.0,
+    "coherence_drop_tolerance": 0.001,
+    "max_finalists": 2,
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": 20261004,
+    "bootstrap_calendar_block_days": 14
+  },
+  "tables": [
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/candidate_metrics.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/feature_lead_metrics.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/paired_aggregate_intervals.csv",
+    "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/res1_amse_joint_regime_20261004/trajectory/paired_feature_intervals.csv"
+  ]
+}

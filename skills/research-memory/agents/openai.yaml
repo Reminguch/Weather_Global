@@ -1,0 +1,7 @@
+interface:
+  display_name: "Research Memory"
+  short_description: "Track research directions, evidence, and next steps"
+  default_prompt: "Use $research-memory to update this project’s research history and development handoff."
+
+policy:
+  allow_implicit_invocation: true

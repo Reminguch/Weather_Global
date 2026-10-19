@@ -1,0 +1,7 @@
+{
+  "protocol_hash": "b4c66901988e0ccf15dbc40c67d236ed853c72d553da9b37b6d5586bf2b8a228",
+  "summary_sha256": "fd9938b58a497fc52b7c0af6a71af5b686b27e9af6e1bf4d1de7f07123a85188",
+  "plotter": "/scratch/gpfs/DABANIN/iv9432/Weather_global/scripts/analyze_models/report_k22_common_grid_2022.py",
+  "plotter_sha256": "d46d285395f7f69491ce73ed1d414ab43c588b5e419023386610325a7d41aea1",
+  "uncertainty_shading": false
+}

@@ -206,7 +206,7 @@ def test_existing_cached_run_requires_explicit_resume(config, tmp_path, monkeypa
     from types import SimpleNamespace
     from src.models.mamba.v24_Ilya import checkpoint as native_checkpoint
     from src.models.mamba.v24_Ilya.training import cached_config, cached_diagnostics, cached_runner
-    monkeypatch.setattr(cached_diagnostics, "require_matched_gpu_environment", lambda: {}, raising=False)
+    monkeypatch.setattr(cached_diagnostics, "require_matched_gpu_environment", lambda *args: {}, raising=False)
     monkeypatch.setattr(cached_config, "load_cached_training_config", lambda *args, **kwargs:
                         SimpleNamespace(common=config, execution={"backend": "cached_stepwise"}))
     monkeypatch.setattr(cached_runner, "build_provenance", lambda *args, **kwargs: {})

@@ -1,0 +1,10 @@
+{
+  "backbone_frozen": true,
+  "completed": true,
+  "job_id": "14917641",
+  "seconds": 500.19008346414194,
+  "snapshots": [
+    "H200_adaptive_step2000",
+    "H200_adaptive_step1840"
+  ]
+}

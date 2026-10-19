@@ -213,6 +213,12 @@ def test_submission_chain_is_gated_and_idempotent(setup, monkeypatch):
     monkeypatch.chdir(root)
     pilot = root / 'pilot'
     pilot.mkdir()
+    source = root / 'source'
+    monkeypatch.setattr(launcher, 'verify_workflow', lambda *args, **kwargs: {
+        'workspace': str(root), 'source': str(source), 'source_manifest_sha256': 'frozen-source',
+        'config_sha256': 'pinned-config', 'config': str(root / 'config.json'),
+        'pilot_root': str(pilot), 'output_root': str(root / 'production'),
+    })
     report = {'passed': True, 'chunks': 4, 'max_normalized_errors': {'inputs': 0., 'predictions': 0., 'residuals': 0.},
               'compatibility_sha256': manifest['compatibility_sha256'],
               'manifest_sha256': manifest['manifest_sha256'],
@@ -233,6 +239,11 @@ def test_submission_chain_is_gated_and_idempotent(setup, monkeypatch):
     assert '--array=0-7' in calls[0]
     assert '--mem=48G' in calls[0]
     assert '--dependency=afterok:201' in calls[1]
+    assert calls[0][0] == f'--chdir={root}'
+    assert str(source / 'scripts/experiments/precompute_v24_baseline.slurm') in calls[0]
+    assert str(source / 'scripts/experiments/verify_v24_baseline.slurm') in calls[1]
+    assert calls[0][-3:] == [str(root), str(source), str(pilot)]
+    assert calls[1][-3:] == [str(root), str(source), str(pilot)]
     launcher.main()
     assert len(calls) == 2  # No duplicate production or verification submissions.
     report['passed'] = False
@@ -240,3 +251,9 @@ def test_submission_chain_is_gated_and_idempotent(setup, monkeypatch):
     with pytest.raises(ValueError, match='did not pass'):
         launcher.main()
     assert len(calls) == 2
+    report['passed'] = True
+    report['compatibility_sha256'] = 'different-source'
+    cache.atomic_json(pilot / 'pilot_report.json', report)
+    with pytest.raises(ValueError, match='incompatible with its frozen source'):
+        launcher.main()
+    assert len(calls) == 2  # Provenance freezing does not weaken cache compatibility.

@@ -1,0 +1,81 @@
+{
+  "version": "ngcm_five_term_sg_k1k2_v1",
+  "source_id": "b9b4e8b3d7d27aac76f8332e568c355560cdc50cd627415aa6c97fae2ae4c5a9",
+  "source_root": "/home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3",
+  "jobs": [
+    {
+      "K": 1,
+      "width": 128,
+      "d_inner": 16,
+      "job_id": 14374583,
+      "detailed_gate": 14374516,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374516:14374360 --job-name=ngcm-five-k1-w128-d16 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k1_w128_d16_v1 --steps 1 --width 128 --d-inner 16 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 2,
+      "width": 128,
+      "d_inner": 16,
+      "job_id": 14374584,
+      "detailed_gate": 14374516,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374516:14374360 --job-name=ngcm-five-k2-w128-d16 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k2_w128_d16_v1 --steps 2 --width 128 --d-inner 16 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 1,
+      "width": 128,
+      "d_inner": 32,
+      "job_id": 14374585,
+      "detailed_gate": 14374517,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374517:14374360 --job-name=ngcm-five-k1-w128-d32 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k1_w128_d32_v1 --steps 1 --width 128 --d-inner 32 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 2,
+      "width": 128,
+      "d_inner": 32,
+      "job_id": 14374586,
+      "detailed_gate": 14374517,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374517:14374360 --job-name=ngcm-five-k2-w128-d32 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k2_w128_d32_v1 --steps 2 --width 128 --d-inner 32 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 1,
+      "width": 256,
+      "d_inner": 16,
+      "job_id": 14374587,
+      "detailed_gate": 14374518,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374518:14374360 --job-name=ngcm-five-k1-w256-d16 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k1_w256_d16_v1 --steps 1 --width 256 --d-inner 16 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 2,
+      "width": 256,
+      "d_inner": 16,
+      "job_id": 14374588,
+      "detailed_gate": 14374518,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374518:14374360 --job-name=ngcm-five-k2-w256-d16 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k2_w256_d16_v1 --steps 2 --width 256 --d-inner 16 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 1,
+      "width": 256,
+      "d_inner": 32,
+      "job_id": 14374589,
+      "detailed_gate": 14374519,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374519:14374360 --job-name=ngcm-five-k1-w256-d32 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k1_w256_d32_v1 --steps 1 --width 256 --d-inner 32 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    },
+    {
+      "K": 2,
+      "width": 256,
+      "d_inner": 32,
+      "job_id": 14374590,
+      "detailed_gate": 14374519,
+      "cli_gate": 14374360,
+      "command": "sbatch --parsable --qos=gpu-short --time=24:00:00 --dependency=afterok:14374519:14374360 --job-name=ngcm-five-k2-w256-d32 scripts/training/run_neuralgcm_paper_residual.sbatch /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/source_train_v3 --phase train --resource-plan /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/resources.json --statistics /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json --output /home/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/train_k2_w256_d32_v1 --steps 2 --width 256 --d-inner 32 --updates 2000 --batch-size 2 --validate-every 100 --validation-origins 16"
+    }
+  ],
+  "status": "canceled; replaced after independent-process baseline mismatch",
+  "superseded_by_source": "source_train_v4"
+}

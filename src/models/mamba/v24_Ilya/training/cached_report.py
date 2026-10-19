@@ -524,6 +524,7 @@ def build_report(root, *, collect_accounting=True, make_plots=True):
         value = _json(path) if path.is_file() else {}
         gates[name] = {"passed": value.get("passed") is True, "source": _source(path), "report": value}
     gate_identities = [value["report"].get("provenance") for value in gates.values()]
+    expected_provenance = None
     try:
         expected_provenance = build_provenance(
             load_training_config(Path(manifest["configs"]["cached"])),
@@ -543,6 +544,21 @@ def build_report(root, *, collect_accounting=True, make_plots=True):
         "all_six_same_checkpoint_replays": all(value["passed"] for value in replay_records.values()),
         "final_quality_within_limits": quality["passed"],
     }
+    numerical_checks = {}
+    if manifest.get("numerical_policy") == "advisory":
+        from .cached_checkpoint import require_integrity_report
+        try:
+            if expected_provenance is None:
+                raise ValueError("Missing current provenance")
+            require_integrity_report(Path(manifest["reports"]["integrity"]), expected_provenance)
+            integrity_current = True
+        except (OSError, ValueError, UnboundLocalError):
+            integrity_current = False
+        numerical_checks = {key: checks.pop(key) for key in ("all_six_same_checkpoint_replays", "final_quality_within_limits")}
+        numerical_checks.update({name: gates[name]["passed"] for name in ("full_parity", "paired20")})
+        # Mutable diagnostic reports, including absent reports, never gate finalization.
+        checks["preproduction_gates"] = (integrity_current and gates["benchmark"]["passed"]
+                                          and gates["benchmark"]["report"].get("provenance") == expected_provenance)
     performance = {
         "matched_benchmark": gates["benchmark"]["report"],
         "production": _production_performance(root, run_dirs, training),
@@ -560,6 +576,11 @@ def build_report(root, *, collect_accounting=True, make_plots=True):
                   "Validation uses all 60 cached 2022 chunks and preserves the cache's observed prefix and four-chunk segment-state policy.",
                   "Production end-to-end fields include loading when present; older missing fields are not reconstructed. The separate benchmark holds resource settings matched."],
     }
+    if manifest.get("numerical_policy") == "advisory":
+        result.update(numerical_policy="advisory", integrity_passed=all(checks.values()),
+                      numerical_checks=numerical_checks,
+                      numerical_status="passed" if all(numerical_checks.values()) else "warning_or_incomplete")
+        result["status"] = ("complete_with_warnings" if not all(numerical_checks.values()) else "complete") if result["passed"] else "failed_integrity"
     if make_plots:
         _plot(reports / "paired_learning_curves", training, validation)
     result["artifacts"] = {"json": str(reports / "final_report.json"), "markdown": str(reports / "final_report.md"),

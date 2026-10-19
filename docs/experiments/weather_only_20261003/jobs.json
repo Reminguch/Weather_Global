@@ -1,0 +1,163 @@
+{
+  "batch_0001": {
+    "job_id": "14911575",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step20"
+    ]
+  },
+  "batch_0002": {
+    "job_id": "14911813",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step20"
+    ]
+  },
+  "batch_0003": {
+    "job_id": "14912044",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step220",
+      "H200_calibrated_step80"
+    ]
+  },
+  "batch_0004": {
+    "job_id": "14912372",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step220",
+      "H200_adaptive_step80"
+    ]
+  },
+  "batch_0005": {
+    "job_id": "14912559",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step420"
+    ]
+  },
+  "batch_0006": {
+    "job_id": "14912901",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step420"
+    ]
+  },
+  "batch_0007": {
+    "job_id": "14913052",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step620"
+    ]
+  },
+  "batch_0008": {
+    "job_id": "14913322",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step620"
+    ]
+  },
+  "batch_0009": {
+    "job_id": "14913492",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step820"
+    ]
+  },
+  "batch_0010": {
+    "job_id": "14913724",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step820"
+    ]
+  },
+  "batch_0011": {
+    "job_id": "14914295",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step1020"
+    ]
+  },
+  "batch_0012": {
+    "job_id": "14914661",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step1020",
+      "H200_adaptive_step1000"
+    ]
+  },
+  "batch_0013": {
+    "job_id": "14914853",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step1220",
+      "H200_calibrated_step1040"
+    ]
+  },
+  "batch_0014": {
+    "job_id": "14915062",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step1220"
+    ]
+  },
+  "batch_0015": {
+    "job_id": "14915335",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step1420"
+    ]
+  },
+  "batch_0016": {
+    "job_id": "14915678",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step1420"
+    ]
+  },
+  "batch_0017": {
+    "job_id": "14915833",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step1620",
+      "H200_calibrated_step1440"
+    ]
+  },
+  "batch_0018": {
+    "job_id": "14916259",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step1620",
+      "H200_adaptive_step1600"
+    ]
+  },
+  "batch_0019": {
+    "job_id": "14916838",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step1820"
+    ]
+  },
+  "batch_0020": {
+    "job_id": "14917060",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step1820"
+    ]
+  },
+  "batch_0021": {
+    "job_id": "14917411",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_calibrated_step2000"
+    ]
+  },
+  "batch_0022": {
+    "job_id": "14917641",
+    "observed_state": "COMPLETED",
+    "snapshots": [
+      "H200_adaptive_step2000",
+      "H200_adaptive_step1840"
+    ]
+  }
+}

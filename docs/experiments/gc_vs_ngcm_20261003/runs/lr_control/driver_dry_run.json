@@ -1,0 +1,29 @@
+{
+  "worker": [
+    "/usr/bin/python3",
+    "-u",
+    "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/source_v1/experimental/weather_only/train.py",
+    "--resources",
+    "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_pressure_20260929/resources.json",
+    "--statistics",
+    "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_aligned_20260924/shared_statistics_cpu_v1/statistics.json",
+    "--preflight",
+    "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_only_20261002_h200_2k/preflight_v1/report.json",
+    "--lifecycle-report",
+    "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/schedule_smoke/report.json",
+    "--mode",
+    "adaptive",
+    "--updates",
+    "2000",
+    "--max-seconds",
+    "3300",
+    "--output",
+    "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/logs/ngcm_weather_lr_control_20261003_h200_2k/trial_adaptive",
+    "--peak-lr",
+    "0.0001",
+    "--warmup",
+    "200"
+  ],
+  "slice_updates": 2000,
+  "requeue_current_job_only": true
+}

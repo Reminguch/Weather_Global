@@ -142,16 +142,55 @@ def build_spherical_transform(latitudes: np.ndarray, longitudes: np.ndarray,
     return _cached_transform(tuple(float(x) for x in latitudes), len(longitudes), int(lmax))
 
 
+def scheduled_amse_lambda(target: float, ramp_steps: int, optimizer_step,
+                          start: float = 0.0) -> jax.Array:
+    """Linear lambda ramp using zero-based completed optimizer updates.
+
+    Update index zero uses ``start``; index ``ramp_steps`` reaches ``target``.
+    A disabled ramp uses target immediately. The step is a runtime JAX scalar,
+    so training does not compile a fresh objective at every update. Resume must
+    pass its persisted completed-update count; initialization starts at zero.
+    """
+    if type(ramp_steps) is not int or ramp_steps < 0:
+        raise ValueError("ramp_steps must be a non-negative integer")
+    for name, value in (("target", target), ("start", start)):
+        if not np.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError(f"{name} lambda must be finite and in [0, 1]")
+    if ramp_steps == 0:
+        return jnp.asarray(target, dtype=jnp.float32)
+    if start > target:
+        raise ValueError("start lambda must not exceed target")
+    if optimizer_step is None:
+        raise ValueError("Ramped AMSE requires an explicit optimizer_step")
+    step = jnp.asarray(optimizer_step)
+    if step.ndim != 0 or not jnp.issubdtype(step.dtype, jnp.integer):
+        raise ValueError("optimizer_step must be a scalar integer completed-update count")
+    if not isinstance(step, jax.core.Tracer) and int(step) < 0:
+        raise ValueError("optimizer_step must be non-negative")
+    fraction = jnp.clip(step.astype(jnp.float32) / ramp_steps, 0.0, 1.0)
+    return jnp.asarray(start, jnp.float32) + (target - start) * fraction
+
+
 def amse_per_degree(prediction: jax.Array, truth: jax.Array,
-                    power_epsilon: float = 1e-12) -> tuple[jax.Array, dict[str, jax.Array]]:
+                    power_epsilon: float = 1e-12,
+                    amse_lambda: float | jax.Array = 1.0) -> tuple[jax.Array, dict[str, jax.Array]]:
     """Score (..., degree, nonnegative-order) complex coefficients.
 
     The omitted negative orders have identical power, hence multiplicity two
     except for m=0. The tiny shared regularization coefficient makes the
     normalized-vector distance a stable evaluation of 2*(1-coherence).
+    ``amse_excess`` evaluates AMSE minus spectral MSE directly as a product
+    of nonnegative factors, including the same power floor and lambda.
     """
     if power_epsilon <= 0 or not np.isfinite(power_epsilon):
         raise ValueError("power_epsilon must be finite and positive")
+    # Static/concrete callers get range checks. Dynamic traced values are bounded
+    # by the validated schedule and multipliers in build_full_field_loss.
+    if not isinstance(amse_lambda, jax.core.Tracer):
+        coefficient = np.asarray(amse_lambda)
+        if not np.all(np.isfinite(coefficient) & (coefficient >= 0) & (coefficient <= 1)):
+            raise ValueError("amse_lambda must be finite and in [0, 1]")
+    amse_lambda = jnp.asarray(amse_lambda, dtype=jnp.float32)
     prediction = jnp.asarray(prediction, dtype=jnp.complex64)
     truth = jnp.asarray(truth, dtype=jnp.complex64)
     if prediction.shape != truth.shape:
@@ -169,11 +208,23 @@ def amse_per_degree(prediction: jax.Array, truth: jax.Array,
     normalized_difference = prediction / a_prediction[..., None] - truth / a_truth[..., None]
     twice_decorrelation = power(normalized_difference) + power_epsilon * (
         1 / a_prediction - 1 / a_truth)**2
-    pattern = jnp.maximum(p_prediction + power_epsilon, p_truth + power_epsilon) * twice_decorrelation
+    p_pred_reg = p_prediction + power_epsilon
+    p_truth_reg = p_truth + power_epsilon
+    decorrelation_scale = ((1 - amse_lambda) * jnp.sqrt(p_pred_reg * p_truth_reg)
+                           + amse_lambda * jnp.maximum(p_pred_reg, p_truth_reg))
+    pattern = decorrelation_scale * twice_decorrelation
+    # AMSE - spectral MSE is nonnegative. Evaluate it directly instead of
+    # subtracting nearly equal full losses. For the shared-epsilon augmented
+    # coefficient vectors, max(Pf, Py) - sqrt(Pf*Py) = a_max*(a_max-a_min).
+    # max/min also retain the symmetric zero subgradient at equal powers.
+    a_max = jnp.maximum(a_prediction, a_truth)
+    a_min = jnp.minimum(a_prediction, a_truth)
+    amse_excess = amse_lambda * a_max * (a_max - a_min) * twice_decorrelation
     return amplitude + pattern, {
         "amplitude": amplitude,
         "pattern": pattern,
         "spectral_mse": power(prediction - truth),
+        "amse_excess": amse_excess,
     }
 
 
@@ -186,22 +237,51 @@ def _normalization_scales(stats: Mapping[str, xr.Dataset] | xr.Dataset) -> xr.Da
 def build_full_field_loss(stats: Mapping[str, xr.Dataset] | xr.Dataset,
                           loss_kind: str, *, lmax: int | None = None,
                           power_epsilon: float = 1e-12,
+                          amse_lambda: float = 1.0,
+                          amse_lambda_ramp_steps: int = 0,
+                          amse_lambda_start: float = 0.0,
+                          amse_variable_lambda_multipliers: Mapping[str, float] | None = None,
+                          amse_degree_lambda_multipliers: tuple[float, ...] = (),
                           per_variable_weights: Mapping[str, float] | None = None):
     """Return (full_prediction, truth) -> (FP32 batch loss, batch diagnostics).
 
     ``mse_fp32`` is GraphCast's grid MSE in FP32. ``amse`` directly computes the
-    spherical objective. Stats may be the core loader's dict or its difference
-    standard-deviation Dataset. Diagnostics also include the matched grid MSE.
+    spherical objective. Lambda multipliers alter only its adjustment strength:
+    zero selects spectral MSE, not exact grid MSE. They do not remove degrees or
+    change the original variable/level weights. Degree entries index total
+    spherical degree 0..lmax, not zonal wavenumber. A ramp requires the caller's
+    zero-based completed optimizer-update index. Validation should pass the ramp
+    endpoint explicitly when comparing the fixed target objective.
     """
     if loss_kind not in ("mse_fp32", "amse"):
         raise ValueError(f"Unknown full-field loss kind {loss_kind!r}")
     if power_epsilon <= 0 or not np.isfinite(power_epsilon):
         raise ValueError("power_epsilon must be finite and positive")
+    if not np.isfinite(amse_lambda) or not 0 <= amse_lambda <= 1:
+        raise ValueError("amse_lambda must be finite and in [0, 1]")
+    # Validate schedule metadata before any model compilation.
+    scheduled_amse_lambda(amse_lambda, amse_lambda_ramp_steps, 0, amse_lambda_start)
+    if amse_lambda_ramp_steps == 0 and amse_lambda_start != 0:
+        raise ValueError("amse_lambda_start requires a nonzero amse_lambda_ramp_steps")
+    variable_multipliers = dict(amse_variable_lambda_multipliers or {})
+    for name, value in variable_multipliers.items():
+        if not isinstance(name, str) or not name:
+            raise ValueError("AMSE variable multipliers require non-empty names")
+        if not np.isscalar(value) or not np.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError("AMSE variable lambda multipliers must be finite and in [0, 1]")
+    degree_multipliers = np.asarray(amse_degree_lambda_multipliers, dtype=np.float32)
+    if (degree_multipliers.ndim != 1
+            or not np.all(np.isfinite(degree_multipliers)
+                          & (degree_multipliers >= 0) & (degree_multipliers <= 1))):
+        raise ValueError("AMSE degree lambda multipliers must be a finite [0, 1] vector")
+    if loss_kind != "amse" and (amse_lambda_ramp_steps or variable_multipliers
+                               or degree_multipliers.size):
+        raise ValueError("AMSE schedules and multipliers require loss_kind='amse'")
     scales = _normalization_scales(stats)
     variable_weights = dict(ORIGINAL_GRAPHCAST_VARIABLE_WEIGHTS if per_variable_weights is None
                             else per_variable_weights)
 
-    def loss(predictions: xr.Dataset, targets: xr.Dataset):
+    def loss(predictions: xr.Dataset, targets: xr.Dataset, *, optimizer_step=None):
         if set(predictions.data_vars) != set(targets.data_vars):
             raise ValueError("Full prediction and truth variable sets must match")
         latitude = np.asarray(targets.lat)
@@ -212,6 +292,14 @@ def build_full_field_loss(stats: Mapping[str, xr.Dataset] | xr.Dataset,
         area = jnp.asarray(latitude_area_weights(latitude), dtype=jnp.float32)
         transform = (build_spherical_transform(latitude, longitude, lmax)
                      if loss_kind == "amse" else None)
+        if transform is not None:
+            unknown = set(variable_multipliers) - set(targets.data_vars)
+            if unknown:
+                raise ValueError(f"AMSE lambda multipliers name unknown output variables: {sorted(unknown)}")
+            if degree_multipliers.size and degree_multipliers.size != transform.lmax + 1:
+                raise ValueError("AMSE degree lambda multipliers must have lmax+1 entries")
+            current_lambda = scheduled_amse_lambda(
+                amse_lambda, amse_lambda_ramp_steps, optimizer_step, amse_lambda_start)
         packed_predictions, packed_truths = [], []
         variable_layout = []
         diagnostics = {}
@@ -273,7 +361,18 @@ def build_full_field_loss(stats: Mapping[str, xr.Dataset] | xr.Dataset,
         # GEMM per field, rather than a separate large constant for every variable.
         pred_coefficients = transform.analysis(jnp.concatenate(packed_predictions, axis=1))
         true_coefficients = transform.analysis(jnp.concatenate(packed_truths, axis=1))
-        per_degree, components = amse_per_degree(pred_coefficients, true_coefficients, power_epsilon)
+        effective_lambda = current_lambda
+        if variable_multipliers:
+            channel_multipliers = np.concatenate([
+                np.full(end - start, variable_multipliers.get(name, 1.0), dtype=np.float32)
+                for name, start, end, _weights, _variable_weight in variable_layout
+            ])
+            effective_lambda = effective_lambda * jnp.asarray(channel_multipliers)[None, :, None]
+        if degree_multipliers.size:
+            effective_lambda = effective_lambda * jnp.asarray(degree_multipliers)[None, None, :]
+        per_degree, components = amse_per_degree(
+            pred_coefficients, true_coefficients, power_epsilon, effective_lambda
+        )
         channels_loss = jnp.sum(per_degree, axis=-1)
         total = jnp.zeros_like(grid_total)
         component_totals = {key: jnp.zeros_like(grid_total) for key in components}
@@ -285,6 +384,7 @@ def build_full_field_loss(stats: Mapping[str, xr.Dataset] | xr.Dataset,
                 value = jnp.mean(jnp.sum(values[:, start:end], axis=-1) * channel_weights, axis=-1)
                 component_totals[key] = component_totals[key] + variable_weight * value
         diagnostics.update(component_totals)
+        diagnostics["amse_lambda"] = jnp.full_like(grid_total, current_lambda)
         return total, diagnostics
 
     return loss

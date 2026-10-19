@@ -21,9 +21,25 @@ python scripts/preprocessing/precompute_v24_baseline.py \
   --dry-run
 ```
 
-For the four-chunk pilot, submit `scripts/experiments/precompute_v24_baseline.slurm`
-with positional arguments `pilot CONFIG PILOT_ROOT`. The script uses one gpu80
-GPU, 8 CPUs, 32 GiB host RAM, and 1:02 walltime. It selects the first and last
+For a new cache, prepare the workflow **before submitting the pilot**:
+
+```bash
+python scripts/preprocessing/submit_v24_baseline.py prepare \
+  --config configs/experiments/v24_Ilya/res1_open_loop_mamba1_di64_bcg2_all24_10k.json \
+  --pilot-root data/graphcast/graphcast/dataset/precomputed_baselines/NEW_CACHE_pilot \
+  --output-root data/graphcast/graphcast/dataset/precomputed_baselines/NEW_CACHE \
+  --submit
+```
+
+Use new, empty cache roots. Omit `--submit` to prepare and inspect the frozen
+workflow without launching jobs. Repeating the same command reuses its original
+snapshot and recorded job IDs; it never refreshes source from the workspace.
+`PILOT_ROOT/workflow.json` binds the complete source snapshot (including vendored
+GraphCast), pinned configuration, workspace and output paths. Configuration data
+paths are made absolute. `workflow_submission.json` records pilot/release IDs.
+
+The four-chunk pilot uses one gpu80 GPU, 8 CPUs, 32 GiB host RAM, and 1:02
+walltime. It selects the first and last
 training and validation chunks. The pilot checks all 96 predictions against a
 separately initialized maintained training baseline transform, with independent
 observed-window loading and AR concatenation; no residual model is initialized.
@@ -34,13 +50,23 @@ matching the repository's GPU parity-test convention. This reduction policy is
 part of cache compatibility. The original online training job is unchanged;
 its default GPU reductions need not be bitwise reproducible across executions.
 
-Submit `scripts/experiments/submit_v24_baseline_after_pilot.slurm` with an
-`afterok:PILOT_ID` dependency and positional arguments
-`CONFIG PRODUCTION_ROOT PILOT_ROOT PILOT_ID`. It verifies the pilot, checks
-accounting, then submits eight unthrottled GPU shards sized from measured memory
-and throughput. It also submits CPU verification dependent on the whole array.
+The wrapper submits release with an `afterok:PILOT_ID` dependency. Release
+verifies the original frozen workflow and pilot, checks accounting, then submits
+eight unthrottled GPU shards sized from measured memory and throughput. It also
+submits CPU verification dependent on the whole array. Pilot, release, every
+production shard and final verification execute the same checked snapshot;
+subprocess imports use that snapshot and data/output paths use the workspace.
+All stages reject changed snapshot files or pinned configurations before work.
 The production submission IDs and sizing evidence are recorded in
 `PRODUCTION_ROOT/submission.json` and appended to `current_experiments.md`.
+
+Do not launch the Slurm scripts directly with the former short argument lists:
+they now require the original workflow's explicit workspace/source/pilot paths,
+which the wrapper supplies. Historical pilots without `workflow.json` cannot
+be rebound to today's source. They need an explicitly audited recovery or a new
+pilot in new cache roots; existing manifests and compatibility checks remain
+unchanged. In particular, a passed pilot does not authorize ignoring a later
+source mismatch.
 
 ## Layout, integrity, and reuse
 
@@ -65,8 +91,17 @@ new cache root. Production generation requires an allocated GPU.
 `--max-chunks N` creates a separately identified representative subset, balanced
 between splits where possible; it must not share a root with the full dataset.
 The default shard count is eight. The pilot uses `--num-shards 1 --max-chunks 4`.
-A full verification can also be invoked directly with the producer's `--verify`
-flag, the original config/root, and `--num-shards 8`.
+A full verification for a prepared workflow can also be invoked with the
+snapshot runtime (replace `PILOT_ROOT`, `WORKSPACE` and `PRODUCTION_ROOT` with
+the absolute paths from `workflow.json`):
+
+```bash
+python PILOT_ROOT/source/scripts/experiments/frozen_runtime.py exec \
+  --source PILOT_ROOT/source --workspace WORKSPACE \
+  --script scripts/preprocessing/submit_v24_baseline.py -- run \
+  --phase verify --pilot-root PILOT_ROOT --config PILOT_ROOT/frozen_config.json \
+  --output-root PRODUCTION_ROOT
+```
 
 Prepared source arrays are identified by metadata/coordinate hashes and per-file
 size/mtime, rather than rereading hundreds of GiB to hash weather fields.

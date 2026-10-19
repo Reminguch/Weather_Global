@@ -22,6 +22,22 @@ ORIGINAL_GRAPHCAST_VARIABLE_WEIGHTS = {
     "total_precipitation_6hr": 0.1,
 }
 
+# Original physical field units. Squared errors use the square of these units;
+# taking the square root after pooling gives the reported physical-unit RMSE.
+VARIABLE_PHYSICAL_UNITS = {
+    "2m_temperature": "K",
+    "10m_u_component_of_wind": "m s-1",
+    "10m_v_component_of_wind": "m s-1",
+    "mean_sea_level_pressure": "Pa",
+    "total_precipitation_6hr": "m",
+    "temperature": "K",
+    "geopotential": "m2 s-2",
+    "u_component_of_wind": "m s-1",
+    "v_component_of_wind": "m s-1",
+    "vertical_velocity": "Pa s-1",
+    "specific_humidity": "kg kg-1",
+}
+
 METRIC_MERGE_STATE_FORMAT = "v24_Ilya_metric_merge_state_v1"
 
 _MERGE_STATE_ARRAY_ATTRIBUTES = (
@@ -71,6 +87,10 @@ class V24IlyaMetricAccumulator:
         self._diffs_stddev_by_level = diffs_stddev_by_level
         self._has_original_graphcast_loss = diffs_stddev_by_level is not None
         self._store_spatial_bias = bool(store_spatial_bias)
+        # Only one call's scalar contributions are retained, never spatial
+        # fields. Manifest evaluators call update_step with one initialization.
+        self.last_step_variable_mse: dict[str, dict[str, float]] = {}
+        self.variable_mse_metadata: dict[str, dict[str, str]] = {}
 
         self._graphcast_loss_sum_baseline = np.zeros(
             target_steps,
@@ -138,8 +158,11 @@ class V24IlyaMetricAccumulator:
         Returned values are the same ones accumulated into the original
         GraphCast objective, enabling per-initialization exports without
         rescoring fields or subtracting cumulative floating-point sums.
+        ``last_step_variable_mse`` exposes this call's physical weighted MSE
+        contributions, retaining the legacy equal-level averaging convention.
         """
 
+        self.last_step_variable_mse = {}
         if step_index < 0 or step_index >= self.target_steps:
             raise ValueError(
                 f"step_index={step_index} is outside 0..{self.target_steps - 1}"
@@ -175,8 +198,26 @@ class V24IlyaMetricAccumulator:
             full_error = full - truth
             residual = full - baseline
             pre_error = -baseline_error
-            self.sum_sq_b[variable][step_index] += self._weighted_mean(baseline_error**2)
-            self.sum_sq_f[variable][step_index] += self._weighted_mean(full_error**2)
+            baseline_mse = self._weighted_mean(baseline_error**2)
+            full_mse = self._weighted_mean(full_error**2)
+            if not np.all(np.isfinite([baseline_mse, full_mse])) or min(baseline_mse, full_mse) < 0:
+                raise ValueError(f"Invalid physical variable MSE for {variable!r} at step {step_index}")
+            self.last_step_variable_mse[variable] = {
+                "baseline": baseline_mse,
+                "full": full_mse,
+            }
+            metadata = {
+                "units": str(truth_dataset[variable].attrs.get(
+                    "units", VARIABLE_PHYSICAL_UNITS.get(variable, "unknown"),
+                )),
+                "spatial_weighting": "normalized_cosine_latitude",
+                "pressure_pooling": "equal_levels" if "level" in truth.dims else "surface",
+            }
+            if variable in self.variable_mse_metadata and self.variable_mse_metadata[variable] != metadata:
+                raise ValueError(f"Physical variable MSE metadata changed for {variable!r}")
+            self.variable_mse_metadata[variable] = metadata
+            self.sum_sq_b[variable][step_index] += baseline_mse
+            self.sum_sq_f[variable][step_index] += full_mse
             self.sum_abs_b[variable][step_index] += self._weighted_mean(np.abs(baseline_error))
             self.sum_abs_f[variable][step_index] += self._weighted_mean(np.abs(full_error))
             self.sum_dot_re[variable][step_index] += self._weighted_mean(residual * pre_error)
@@ -623,7 +664,8 @@ class V24IlyaMetricAccumulator:
         }
 
     def _weighted_mean(self, value: xr.DataArray) -> float:
-        return float((value * self._cos_lat_da).mean().values)
+        # Missing grid cells must not silently disappear from an initialization.
+        return float((value * self._cos_lat_da).mean(skipna=False).values)
 
     @staticmethod
     def _lat_lon(value: xr.DataArray) -> np.ndarray:

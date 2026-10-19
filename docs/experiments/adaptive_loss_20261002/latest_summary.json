@@ -1,0 +1,1237 @@
+{
+  "failed_checkpoints": [],
+  "generated_at": 1790969528.4660208,
+  "rows": [
+    {
+      "band": "all_levels",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 6811.625949530664,
+          "improvement_percent": 2.571796279067856,
+          "level_counts": {
+            "improved": 35,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 1
+          },
+          "rmse": 6636.444806816614
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 3.868420169479628e-06,
+          "improvement_percent": -0.18150229302112406,
+          "level_counts": {
+            "improved": 12,
+            "unchanged": 11,
+            "undefined": 0,
+            "worse": 14
+          },
+          "rmse": 3.875441440790925e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 9.300801429778048e-06,
+          "improvement_percent": -0.03804261458689444,
+          "level_counts": {
+            "improved": 12,
+            "unchanged": 9,
+            "undefined": 0,
+            "worse": 16
+          },
+          "rmse": 9.30433969781947e-06
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00027920114886740974,
+          "improvement_percent": 0.2748183373599215,
+          "level_counts": {
+            "improved": 6,
+            "unchanged": 22,
+            "undefined": 0,
+            "worse": 9
+          },
+          "rmse": 0.00027843385291220253
+        },
+        "temperature": {
+          "baseline_rmse": 2.4623463053533783,
+          "improvement_percent": 4.545101056068064,
+          "level_counts": {
+            "improved": 21,
+            "unchanged": 8,
+            "undefined": 0,
+            "worse": 8
+          },
+          "rmse": 2.350430177424709
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 7.187717247997979,
+          "improvement_percent": -3.2553176027600776,
+          "level_counts": {
+            "improved": 3,
+            "unchanged": 14,
+            "undefined": 0,
+            "worse": 20
+          },
+          "rmse": 7.421700272808679
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 3.331987783530213,
+          "improvement_percent": -3.06296357474004,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 17,
+            "undefined": 0,
+            "worse": 20
+          },
+          "rmse": 3.4340453556545314
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 12,
+      "level_counts": {
+        "improved": 89,
+        "unchanged": 82,
+        "undefined": 0,
+        "worse": 88
+      },
+      "levels": 37,
+      "mode": "fixed",
+      "scope": "short",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6303.107365855947,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 3,
+        "unchanged": 1,
+        "undefined": 0,
+        "worse": 3
+      }
+    },
+    {
+      "band": "all_levels",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 6811.625949530664,
+          "improvement_percent": 1.2857530864255475,
+          "level_counts": {
+            "improved": 15,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 22
+          },
+          "rmse": 6724.04525864881
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 3.868420169479628e-06,
+          "improvement_percent": -0.6579892956531754,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 2,
+            "undefined": 0,
+            "worse": 33
+          },
+          "rmse": 3.8938739601056924e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 9.300801429778048e-06,
+          "improvement_percent": -0.2474835078032717,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 7,
+            "undefined": 0,
+            "worse": 26
+          },
+          "rmse": 9.32381937941028e-06
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00027920114886740974,
+          "improvement_percent": -0.3036807363078539,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 3,
+            "undefined": 0,
+            "worse": 34
+          },
+          "rmse": 0.0002800490289720703
+        },
+        "temperature": {
+          "baseline_rmse": 2.4623463053533783,
+          "improvement_percent": 2.0180042671947187,
+          "level_counts": {
+            "improved": 7,
+            "unchanged": 7,
+            "undefined": 0,
+            "worse": 23
+          },
+          "rmse": 2.4126560518382356
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 7.187717247997979,
+          "improvement_percent": 5.705535270475452,
+          "level_counts": {
+            "improved": 3,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 34
+          },
+          "rmse": 6.7776195052714066
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 3.331987783530213,
+          "improvement_percent": -1.4674922450937349,
+          "level_counts": {
+            "improved": 1,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 35
+          },
+          "rmse": 3.3808844458609895
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 12,
+      "level_counts": {
+        "improved": 32,
+        "unchanged": 20,
+        "undefined": 0,
+        "worse": 207
+      },
+      "levels": 37,
+      "mode": "calibrated",
+      "scope": "short",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6336.819221194601,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 3,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 4
+      }
+    },
+    {
+      "band": "all_levels",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 6811.625949530664,
+          "improvement_percent": 1.2867501085975326,
+          "level_counts": {
+            "improved": 19,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 18
+          },
+          "rmse": 6723.9773452278205
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 3.868420169479628e-06,
+          "improvement_percent": -0.4027966051033516,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 3,
+            "undefined": 0,
+            "worse": 32
+          },
+          "rmse": 3.884002034593425e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 9.300801429778048e-06,
+          "improvement_percent": -0.17058341954133252,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 9,
+            "undefined": 0,
+            "worse": 24
+          },
+          "rmse": 9.316667054901713e-06
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00027920114886740974,
+          "improvement_percent": 0.09163486815558243,
+          "level_counts": {
+            "improved": 13,
+            "unchanged": 6,
+            "undefined": 0,
+            "worse": 18
+          },
+          "rmse": 0.0002789453032627562
+        },
+        "temperature": {
+          "baseline_rmse": 2.4623463053533783,
+          "improvement_percent": 1.9539748887803827,
+          "level_counts": {
+            "improved": 7,
+            "unchanged": 16,
+            "undefined": 0,
+            "worse": 14
+          },
+          "rmse": 2.4142326768719617
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 7.187717247997979,
+          "improvement_percent": 5.199054219040726,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 5,
+            "undefined": 0,
+            "worse": 28
+          },
+          "rmse": 6.814023931163222
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 3.331987783530213,
+          "improvement_percent": 0.03328269807919743,
+          "level_counts": {
+            "improved": 3,
+            "unchanged": 4,
+            "undefined": 0,
+            "worse": 30
+          },
+          "rmse": 3.330878808096185
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 12,
+      "level_counts": {
+        "improved": 52,
+        "unchanged": 43,
+        "undefined": 0,
+        "worse": 164
+      },
+      "levels": 37,
+      "mode": "adaptive",
+      "scope": "short",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6684.976406770758,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 3,
+        "unchanged": 2,
+        "undefined": 0,
+        "worse": 2
+      }
+    },
+    {
+      "band": "weather_gt30hpa",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 39.01547533703469,
+          "improvement_percent": 2.7759747833985613,
+          "level_counts": {
+            "improved": 28,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 0
+          },
+          "rmse": 37.93241558005552
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 4.3235016675312205e-06,
+          "improvement_percent": -0.0993174466351945,
+          "level_counts": {
+            "improved": 11,
+            "unchanged": 11,
+            "undefined": 0,
+            "worse": 7
+          },
+          "rmse": 4.327795658992643e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.0437273005271459e-05,
+          "improvement_percent": -0.023380169534719282,
+          "level_counts": {
+            "improved": 11,
+            "unchanged": 9,
+            "undefined": 0,
+            "worse": 9
+          },
+          "rmse": 1.0439713257394893e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00031536893315907644,
+          "improvement_percent": 0.27481849988921375,
+          "level_counts": {
+            "improved": 6,
+            "unchanged": 15,
+            "undefined": 0,
+            "worse": 8
+          },
+          "rmse": 0.00031450224098785205
+        },
+        "temperature": {
+          "baseline_rmse": 0.48622136410498484,
+          "improvement_percent": -0.026671191838957393,
+          "level_counts": {
+            "improved": 15,
+            "unchanged": 8,
+            "undefined": 0,
+            "worse": 6
+          },
+          "rmse": 0.4863510451377673
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 1.2625267118997434,
+          "improvement_percent": -0.1270445539548992,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 14,
+            "undefined": 0,
+            "worse": 13
+          },
+          "rmse": 1.264130683329438
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 1.3091739156105446,
+          "improvement_percent": -0.12151190648966526,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 17,
+            "undefined": 0,
+            "worse": 12
+          },
+          "rmse": 1.3107647177946684
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 12,
+      "level_counts": {
+        "improved": 73,
+        "unchanged": 75,
+        "undefined": 0,
+        "worse": 55
+      },
+      "levels": 29,
+      "mode": "fixed",
+      "scope": "short",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6303.107365855947,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 2,
+        "unchanged": 3,
+        "undefined": 0,
+        "worse": 2
+      }
+    },
+    {
+      "band": "weather_gt30hpa",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 39.01547533703469,
+          "improvement_percent": -3.721833188590369,
+          "level_counts": {
+            "improved": 9,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 20
+          },
+          "rmse": 40.467566246814734
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 4.3235016675312205e-06,
+          "improvement_percent": -0.4498825846044232,
+          "level_counts": {
+            "improved": 1,
+            "unchanged": 2,
+            "undefined": 0,
+            "worse": 26
+          },
+          "rmse": 4.342952348578525e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.0437273005271459e-05,
+          "improvement_percent": -0.13672825592186863,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 7,
+            "undefined": 0,
+            "worse": 18
+          },
+          "rmse": 1.045154370661737e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00031536893315907644,
+          "improvement_percent": -0.3036807972562214,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 3,
+            "undefined": 0,
+            "worse": 26
+          },
+          "rmse": 0.00031632664804959236
+        },
+        "temperature": {
+          "baseline_rmse": 0.48622136410498484,
+          "improvement_percent": -0.7073334136306612,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 6,
+            "undefined": 0,
+            "worse": 21
+          },
+          "rmse": 0.4896605702775102
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 1.2625267118997434,
+          "improvement_percent": -0.5251778233067934,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 1.2691572222039653
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 1.3091739156105446,
+          "improvement_percent": -0.4639019029552575,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 28
+          },
+          "rmse": 1.3152471983180558
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 12,
+      "level_counts": {
+        "improved": 16,
+        "unchanged": 19,
+        "undefined": 0,
+        "worse": 168
+      },
+      "levels": 29,
+      "mode": "calibrated",
+      "scope": "short",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6336.819221194601,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 0,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 7
+      }
+    },
+    {
+      "band": "weather_gt30hpa",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 39.01547533703469,
+          "improvement_percent": -0.7523883112502091,
+          "level_counts": {
+            "improved": 13,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 16
+          },
+          "rmse": 39.309023213049244
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 4.3235016675312205e-06,
+          "improvement_percent": -0.3403052570617548,
+          "level_counts": {
+            "improved": 1,
+            "unchanged": 3,
+            "undefined": 0,
+            "worse": 25
+          },
+          "rmse": 4.338214770994982e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.0437273005271459e-05,
+          "improvement_percent": -0.10469307969305598,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 9,
+            "undefined": 0,
+            "worse": 16
+          },
+          "rmse": 1.044820010781665e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00031536893315907644,
+          "improvement_percent": 0.09163464904419925,
+          "level_counts": {
+            "improved": 5,
+            "unchanged": 6,
+            "undefined": 0,
+            "worse": 18
+          },
+          "rmse": 0.0003150799459439817
+        },
+        "temperature": {
+          "baseline_rmse": 0.48622136410498484,
+          "improvement_percent": -0.4047713605846898,
+          "level_counts": {
+            "improved": 1,
+            "unchanged": 16,
+            "undefined": 0,
+            "worse": 12
+          },
+          "rmse": 0.48818944893592603
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 1.2625267118997434,
+          "improvement_percent": -0.36733840253777406,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 4,
+            "undefined": 0,
+            "worse": 25
+          },
+          "rmse": 1.2671644573548486
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 1.3091739156105446,
+          "improvement_percent": -0.23439557416481907,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 4,
+            "undefined": 0,
+            "worse": 25
+          },
+          "rmse": 1.312242561326856
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 12,
+      "level_counts": {
+        "improved": 24,
+        "unchanged": 42,
+        "undefined": 0,
+        "worse": 137
+      },
+      "levels": 29,
+      "mode": "adaptive",
+      "scope": "short",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6684.976406770758,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 0,
+        "unchanged": 1,
+        "undefined": 0,
+        "worse": 6
+      }
+    },
+    {
+      "band": "all_levels",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 6905.725777872409,
+          "improvement_percent": 17.98656145974872,
+          "level_counts": {
+            "improved": 6,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 30
+          },
+          "rmse": 5663.6231665936775
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 6.406211703802494e-06,
+          "improvement_percent": -0.45936132552112946,
+          "level_counts": {
+            "improved": 7,
+            "unchanged": 5,
+            "undefined": 0,
+            "worse": 25
+          },
+          "rmse": 6.435639362800771e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.4226354902354504e-05,
+          "improvement_percent": -0.6211222244067073,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 33
+          },
+          "rmse": 1.4314717954376001e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00065668689225545,
+          "improvement_percent": -3.3352516613959353,
+          "level_counts": {
+            "improved": 6,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 31
+          },
+          "rmse": 0.0006785890527395693
+        },
+        "temperature": {
+          "baseline_rmse": 2.8945021229275496,
+          "improvement_percent": -14.736520523457084,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 35
+          },
+          "rmse": 3.321051022324669
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 8.17490689763383,
+          "improvement_percent": -38.17720856227474,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 36
+          },
+          "rmse": 11.295858153715281
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 5.173697321133602,
+          "improvement_percent": -1.5959622743917874,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 2,
+            "undefined": 0,
+            "worse": 35
+          },
+          "rmse": 5.256267578570113
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 120,
+      "level_counts": {
+        "improved": 25,
+        "unchanged": 9,
+        "undefined": 0,
+        "worse": 225
+      },
+      "levels": 37,
+      "mode": "fixed",
+      "scope": "long",
+      "snapshot_id": "H200_fixed_step2000",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6303.107365855947,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 1,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 6
+      }
+    },
+    {
+      "band": "all_levels",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 6905.725777872409,
+          "improvement_percent": 7.315912544837983,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 33
+          },
+          "rmse": 6400.508919376931
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 6.406211703802494e-06,
+          "improvement_percent": -3.7769874964206394,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 37
+          },
+          "rmse": 6.64817351884935e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.4226354902354504e-05,
+          "improvement_percent": -1.570204927709543,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 35
+          },
+          "rmse": 1.4449737828064723e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00065668689225545,
+          "improvement_percent": -7.4481655165742815,
+          "level_counts": {
+            "improved": 6,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 31
+          },
+          "rmse": 0.0007055980189162838
+        },
+        "temperature": {
+          "baseline_rmse": 2.8945021229275496,
+          "improvement_percent": -30.088399946481665,
+          "level_counts": {
+            "improved": 1,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 36
+          },
+          "rmse": 3.765411498133393
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 8.17490689763383,
+          "improvement_percent": -38.10009222777143,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 35
+          },
+          "rmse": 11.289553965166768
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 5.173697321133602,
+          "improvement_percent": -9.507055563979055,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 37
+          },
+          "rmse": 5.66556360016587
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 120,
+      "level_counts": {
+        "improved": 15,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 244
+      },
+      "levels": 37,
+      "mode": "calibrated",
+      "scope": "long",
+      "snapshot_id": "H200_calibrated_step2000",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6336.819221194601,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 1,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 6
+      }
+    },
+    {
+      "band": "all_levels",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 6905.725777872409,
+          "improvement_percent": 3.7527785354232606,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 33
+          },
+          "rmse": 6646.569183165222
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 6.406211703802494e-06,
+          "improvement_percent": -2.620251850537733,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 37
+          },
+          "rmse": 6.5740705845207435e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.4226354902354504e-05,
+          "improvement_percent": -1.6540604345898187,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 37
+          },
+          "rmse": 1.446166741007868e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00065668689225545,
+          "improvement_percent": -6.206569629741116,
+          "level_counts": {
+            "improved": 6,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 31
+          },
+          "rmse": 0.0006974446214726676
+        },
+        "temperature": {
+          "baseline_rmse": 2.8945021229275496,
+          "improvement_percent": -10.655961360039388,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 35
+          },
+          "rmse": 3.202939150712229
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 8.17490689763383,
+          "improvement_percent": -23.9146615155598,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 34
+          },
+          "rmse": 10.129908211415112
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 5.173697321133602,
+          "improvement_percent": -6.291849640614733,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 37
+          },
+          "rmse": 5.499218577439841
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 120,
+      "level_counts": {
+        "improved": 14,
+        "unchanged": 1,
+        "undefined": 0,
+        "worse": 244
+      },
+      "levels": 37,
+      "mode": "adaptive",
+      "scope": "long",
+      "snapshot_id": "H200_adaptive_step2000",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6684.976406770758,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 1,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 6
+      }
+    },
+    {
+      "band": "weather_gt30hpa",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 304.9955450131093,
+          "improvement_percent": -2.292793603640187,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 28
+          },
+          "rmse": 311.9884633605574
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 7.2062673140971705e-06,
+          "improvement_percent": -0.39805683595104396,
+          "level_counts": {
+            "improved": 7,
+            "unchanged": 5,
+            "undefined": 0,
+            "worse": 17
+          },
+          "rmse": 7.23495235375784e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.602302297819352e-05,
+          "improvement_percent": -0.5652355861643703,
+          "level_counts": {
+            "improved": 4,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 25
+          },
+          "rmse": 1.6113590806045565e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00074175448884145,
+          "improvement_percent": -3.33525223824891,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 0.0007664938720328463
+        },
+        "temperature": {
+          "baseline_rmse": 1.581170620310525,
+          "improvement_percent": -5.03499067112941,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 1.6607824135377989
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 4.200844065305578,
+          "improvement_percent": -1.6778771238529862,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 1,
+            "undefined": 0,
+            "worse": 28
+          },
+          "rmse": 4.271329066886076
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 4.5262816965495904,
+          "improvement_percent": -0.8586987192585308,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 2,
+            "undefined": 0,
+            "worse": 27
+          },
+          "rmse": 4.565148819507895
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 120,
+      "level_counts": {
+        "improved": 11,
+        "unchanged": 9,
+        "undefined": 0,
+        "worse": 183
+      },
+      "levels": 29,
+      "mode": "fixed",
+      "scope": "long",
+      "snapshot_id": "H200_fixed_step2000",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6303.107365855947,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 0,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 7
+      }
+    },
+    {
+      "band": "weather_gt30hpa",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 304.9955450131093,
+          "improvement_percent": -33.30279172844289,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 406.56757614985435
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 7.2062673140971705e-06,
+          "improvement_percent": -3.6852581585567394,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 7.471836868217344e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.602302297819352e-05,
+          "improvement_percent": -1.4470191721452759,
+          "level_counts": {
+            "improved": 2,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 27
+          },
+          "rmse": 1.6254879192645225e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00074175448884145,
+          "improvement_percent": -7.448167266510405,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 0.0007970016038772105
+        },
+        "temperature": {
+          "baseline_rmse": 1.581170620310525,
+          "improvement_percent": -28.569949375581167,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 2.0329102660748046
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 4.200844065305578,
+          "improvement_percent": -8.751360229383371,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 4.568475062135142
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 4.5262816965495904,
+          "improvement_percent": -6.597517287109293,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 4.8249039139427135
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 120,
+      "level_counts": {
+        "improved": 2,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 201
+      },
+      "levels": 29,
+      "mode": "calibrated",
+      "scope": "long",
+      "snapshot_id": "H200_calibrated_step2000",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6336.819221194601,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 0,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 7
+      }
+    },
+    {
+      "band": "weather_gt30hpa",
+      "fields": {
+        "geopotential": {
+          "baseline_rmse": 304.9955450131093,
+          "improvement_percent": -22.47753873467435,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 373.55103678246206
+        },
+        "specific_cloud_ice_water_content": {
+          "baseline_rmse": 7.2062673140971705e-06,
+          "improvement_percent": -2.5735345280355233,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 7.391723091607999e-06
+        },
+        "specific_cloud_liquid_water_content": {
+          "baseline_rmse": 1.602302297819352e-05,
+          "improvement_percent": -1.5862673042774686,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 1.627719095285347e-05
+        },
+        "specific_humidity": {
+          "baseline_rmse": 0.00074175448884145,
+          "improvement_percent": -6.206571354747302,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 0.0007877920104684357
+        },
+        "temperature": {
+          "baseline_rmse": 1.581170620310525,
+          "improvement_percent": -20.695840868551603,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 1.9084071757502814
+        },
+        "u_component_of_wind": {
+          "baseline_rmse": 4.200844065305578,
+          "improvement_percent": -7.350804258890921,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 4.509639889767427
+        },
+        "v_component_of_wind": {
+          "baseline_rmse": 4.5262816965495904,
+          "improvement_percent": -5.901979879384763,
+          "level_counts": {
+            "improved": 0,
+            "unchanged": 0,
+            "undefined": 0,
+            "worse": 29
+          },
+          "rmse": 4.793421931564223
+        }
+      },
+      "hardware": "H200",
+      "lead_hours": 120,
+      "level_counts": {
+        "improved": 0,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 203
+      },
+      "levels": 29,
+      "mode": "adaptive",
+      "scope": "long",
+      "snapshot_id": "H200_adaptive_step2000",
+      "threshold_percent": 0.1,
+      "training_compute_seconds": 6684.976406770758,
+      "update": 2000,
+      "variable_counts": {
+        "improved": 0,
+        "unchanged": 0,
+        "undefined": 0,
+        "worse": 7
+      }
+    }
+  ],
+  "threshold_percent": 0.1
+}

@@ -1,0 +1,37 @@
+{
+  "version": "representative_smoke_user_release_v1",
+  "recorded_utc": "2026-09-24T17:31:51.170137+00:00",
+  "authorization_text": "width128 K=2如果通过了，那width256的也应该通过吧，那你就可以解除正式任务的依赖了啊",
+  "decision": "Release all eight production jobs after width128/d16 K=1/K=2 detailed pass and K=1/K=2 production-CLI pass; continue other sizes smoke tests concurrently.",
+  "representative_test_job": 14374769,
+  "cli_test_job": 14374768,
+  "verified_evidence": {
+    "cli_smoke_v2/report.json": {
+      "passed": true,
+      "sha256": "a1af7aa8140f682a67842e2a9281a0671cb88bd6d7017b5538be38a332b8ff3a"
+    },
+    "detailed_w128_d16_v4/report.json": {
+      "passed": true,
+      "sha256": "302888a6e31fc89eebf659db7b64d53af07a6eaa3c5cf3e00fa0c39f4a54fc9d"
+    }
+  },
+  "jobs": [
+    14374862,
+    14374863,
+    14374864,
+    14374865,
+    14374866,
+    14374867,
+    14374868,
+    14374870
+  ],
+  "current_dependencies": [],
+  "slurm_dependencies_verified_null": true,
+  "remaining_smoke_jobs": [
+    14374770,
+    14374778,
+    14374779
+  ],
+  "model_optimizer_loss_source_unchanged": true,
+  "source_id": "f4346f67bf51ca59dcd0d85d67dbaaebd802f2fab77c6c5ce330c059d9c44423"
+}

@@ -72,14 +72,20 @@ def freeze_source(workspace: Path, destination: Path) -> dict:
 def prepare_experiment(experiment_root: Path, *, cache_root: Path, workspace: Path = ROOT,
                        training_config: Path | None = None, cached_only: bool = False,
                        smoke_time_minutes: int = 120, smoke_memory_gib: int = 128,
-                       job_name: str | None = None) -> dict:
+                       job_name: str | None = None, numerical_policy: str = "strict",
+                       recovery_of: Path | None = None) -> dict:
     experiment_root, cache_root, workspace = (Path(p).resolve() for p in (experiment_root, cache_root, workspace))
     cache_manifest = json.loads((cache_root / "manifest.json").read_text())
+    if numerical_policy not in ("strict", "advisory"):
+        raise ValueError("Unknown numerical policy")
     ready = json.loads((cache_root / "READY.json").read_text())
     if ready.get("partial") or ready.get("manifest_sha256") != cache_manifest.get("manifest_sha256"):
         raise ValueError("Experiment requires a complete verified GC cache")
     if smoke_time_minutes <= 0 or smoke_memory_gib <= 0:
         raise ValueError("Smoke time and memory must be positive")
+    if recovery_of is not None and training_config is None:
+        old_manifest = json.loads((Path(recovery_of) / "manifest.json").read_text())
+        training_config = Path(old_manifest["configs"]["online"])
     template_path = training_config or workspace / "configs/experiments/v24_Ilya/res1_open_loop_mamba1_di64_bcg2_all24_10k.json"
     template = json.loads(template_path.read_text())
     for key in ("prepared_root", "anchor_manifest_root", "baseline_checkpoint", "stats_dir"):
@@ -120,6 +126,19 @@ def prepare_experiment(experiment_root: Path, *, cache_root: Path, workspace: Pa
                 "reports": {name: str(experiment_root / "reports" / f"{name}.json")
                             for name in ("preflight", "full_parity", "paired20", "benchmark", "resource_check")},
                 "execution": execution}
+    if numerical_policy == "advisory":
+        manifest.update(numerical_policy="advisory", runtime={"XLA_FLAGS": "--xla_gpu_enable_triton_gemm=false"},
+                        production_backends=["cached"] if cached_only else ["online", "cached"],
+                        production_schedule={"max_steps": template["optimizer"]["max_steps"],
+                            "checkpoint_every": template["optimizer"]["checkpoint_every"],
+                            "validation_every": template["validation"]["every_steps"] if template["validation"]["enabled"] else None})
+        manifest["reports"]["integrity"] = str(experiment_root / "reports/integrity.json")
+        manifest["cache_producer_provenance"] = {"manifest_sha256": cache_manifest["manifest_sha256"],
+                                              "compatibility": cache_manifest.get("compatibility"),
+                                              "cache_manifest_file_sha256": file_sha256(cache_root / "manifest.json")}
+        if recovery_of is not None:
+            old = Path(recovery_of).resolve()
+            manifest["recovery_of"] = {"path": str(old), "manifest_sha256": file_sha256(old / "manifest.json")}
     if training_config is not None or cached_only:
         manifest["production_backends"] = ["cached"] if cached_only else ["online", "cached"]
         manifest["production_schedule"] = {
@@ -156,7 +175,9 @@ def experiment_provenance(manifest: dict) -> dict:
 
 def check_gates(manifest: dict) -> dict:
     return require_production_gates(Path(manifest["reports"]["full_parity"]),
-                                    Path(manifest["reports"]["paired20"]), experiment_provenance(manifest))
+                                    Path(manifest["reports"]["paired20"]), experiment_provenance(manifest),
+                                    numerical_policy=manifest.get("numerical_policy", "strict"),
+                                    integrity_report=Path(manifest["reports"]["integrity"]) if "integrity" in manifest["reports"] else None)
 
 
 def require_report(manifest: dict, name: str) -> dict:
@@ -171,10 +192,13 @@ def require_resource_check(manifest: dict, budget: dict) -> dict:
     if int(report.get("completed_steps", 0)) < 70:
         raise ValueError("Resource check must complete seventy updates and full validation")
     allocation = report.get("allocation", {})
-    if allocation.get("memory_gib") != budget["memory_gib"] or allocation.get("cpus") != 4:
+    advisory = manifest.get("numerical_policy") == "advisory"
+    if not advisory and (allocation.get("memory_gib") != budget["memory_gib"] or allocation.get("cpus") != 4):
         raise ValueError("Resource check did not use the proposed cached production allocation")
     if report.get("full_validation_completed") is not True:
         raise ValueError("Resource check did not finish full cached validation")
+    if advisory and (report.get("integrity_passed") is not True or allocation.get("cpus", 0) < 4):
+        raise ValueError("Resource check lacks integrity evidence or allocated CPUs")
     return report
 
 
@@ -188,6 +212,13 @@ def measured_budget(benchmark: dict, backend: str, schedule: dict | None = None)
         raise ValueError("Benchmark has invalid memory/timing observations")
     minimum_memory = 128 if backend == "online" else 32
     memory = max(minimum_memory, math.ceil(1.4 * peak / 16) * 16)
+    if benchmark.get("numerical_policy") == "advisory":
+        # Source memmaps persist across every update; a three-update RSS misses
+        # their eventual residency. Cached prediction maps are chunk-local.
+        resident = float(benchmark.get("prepared_working_set_gib", 0))
+        if not math.isfinite(resident) or resident <= 0:
+            raise ValueError("Advisory production requires the complete prepared-data working set")
+        memory = max(memory, math.ceil(1.25 * (resident + peak) / 16) * 16)
     schedule = schedule or {"max_steps": 4000, "checkpoint_every": 500, "validation_every": 500}
     updates = int(schedule["max_steps"])
     checkpoints = math.ceil(updates / int(schedule["checkpoint_every"]))
@@ -218,7 +249,7 @@ def job_qos(time_minutes: int) -> str:
     raise ValueError(f"Measured job budget {time_minutes} minutes exceeds the 144-hour Slurm limit")
 
 
-def cached_production_chunks(manifest: dict, benchmark: dict) -> list[tuple[int, dict]]:
+def cached_production_chunks(manifest: dict, benchmark: dict, backend="cached") -> list[tuple[int, dict]]:
     """Split a long constant-LR trajectory at native checkpoint boundaries."""
     schedule = manifest["production_schedule"]
     total, interval = int(schedule["max_steps"]), int(schedule["checkpoint_every"])
@@ -227,12 +258,12 @@ def cached_production_chunks(manifest: dict, benchmark: dict) -> list[tuple[int,
     completed, chunks = 0, []
     while completed < total:
         count = total - completed
-        budget = measured_budget(benchmark, "cached", {**schedule, "max_steps": count})
+        budget = measured_budget(benchmark, backend, {**schedule, "max_steps": count})
         while budget["time_minutes"] > 8640:
             count = ((count - 1) // interval) * interval
             if count <= 0:
                 raise ValueError("One checkpoint interval exceeds the Slurm walltime limit")
-            budget = measured_budget(benchmark, "cached", {**schedule, "max_steps": count})
+            budget = measured_budget(benchmark, backend, {**schedule, "max_steps": count})
         completed += count
         chunks.append((completed, budget))
     return chunks
@@ -244,8 +275,15 @@ def submit_stage(manifest: dict, stage: str, *, dry_run: bool = False, dependenc
     requests = {}
     launches = {}
     gates = None
+    advisory = manifest.get("numerical_policy") == "advisory"
     if stage == "smoke":
         requests["smoke"] = manifest.get("smoke_budget", {"memory_gib": 128, "time_minutes": 120, "cpus": 8, "gpu": "gpu40&nomig"})
+    elif stage == "resource-check" and advisory:
+        gates = check_gates(manifest)
+        requests["resource-check"] = require_report(manifest, "preflight")["resource_budget"]
+    elif stage == "diagnostics":
+        check_gates(manifest)
+        requests["diagnostics"] = {"memory_gib": 128, "time_minutes": 240, "cpus": 8, "gpu": "gpu40&nomig"}
     elif stage == "gates":
         report = require_report(manifest, "preflight")
         budget = report["gates_budget"]
@@ -264,7 +302,14 @@ def submit_stage(manifest: dict, stage: str, *, dry_run: bool = False, dependenc
             requests["resource-check"] = {**cached_budget, "time_minutes": max(120, math.ceil(seconds / 1800) * 30)}
         else:
             require_resource_check(manifest, cached_budget)
-            if manifest.get("production_backends") == ["cached"]:
+            if advisory:
+                for backend in manifest["production_backends"]:
+                    for index, (stop, budget) in enumerate(cached_production_chunks(manifest, benchmark, backend)):
+                        label = f"{backend}_step{stop:08d}"
+                        requests[label] = budget
+                        launches[label] = {"backend": backend, "stop_step": stop, "resume_latest": index > 0}
+                requests["finalize"] = {"memory_gib": 32, "time_minutes": 62, "cpus": 4, "gpu": "gpu40&nomig"}
+            elif manifest.get("production_backends") == ["cached"]:
                 chunks = cached_production_chunks(manifest, benchmark)
                 for index, (stop, budget) in enumerate(chunks):
                     label = "cached" if len(chunks) == 1 else f"cached_step{stop:08d}"
@@ -315,7 +360,8 @@ def submit_stage(manifest: dict, stage: str, *, dry_run: bool = False, dependenc
             if manifest.get("job_name"):
                 args.insert(0, f"--job-name={manifest['job_name']}-{backend}")
             if backend == "finalize":
-                args.insert(0, f"--dependency=afterok:{record['jobs']['online']}:{record['jobs']['cached']}")
+                terminal = [key for key in record["jobs"] if key != "finalize"]
+                args.insert(0, "--dependency=afterok:" + ":".join(record["jobs"][key] for key in terminal))
             elif launch.get("resume_latest"):
                 previous = list(requests)[list(requests).index(backend) - 1]
                 args.insert(0, f"--dependency=afterok:{record['jobs'][previous]}")
@@ -349,12 +395,22 @@ def advance_pipeline(manifest: dict, completed_stage: str) -> dict | None:
     if saved != expected:
         raise ValueError("Automatic pipeline identity changed; refusing to advance")
     next_stage = {"smoke": "gates", "gates": "resource-check", "resource-check": "production"}.get(completed_stage)
+    if manifest.get("numerical_policy") == "advisory" and completed_stage == "smoke":
+        next_stage = "resource-check"
     if next_stage is None:
         return None
     current_job = os.environ.get("SLURM_JOB_ID", "")
     if not current_job.isdigit():
         raise ValueError("Automatic advancement requires the current Slurm job ID")
     result = submit_stage(manifest, next_stage, dependency=current_job)
+    if manifest.get("numerical_policy") == "advisory" and completed_stage == "smoke":
+        # An independent diagnostics launch cannot roll back accepted production work.
+        try:
+            diagnostics = submit_stage(manifest, "diagnostics", dependency=current_job)
+            atomic_json_dump(diagnostics, Path(manifest["experiment_root"]) / "diagnostic_submission.json")
+        except Exception as error:
+            atomic_json_dump({"status": "submission_failed", "error": str(error)},
+                             Path(manifest["experiment_root"]) / "diagnostic_submission.json")
     atomic_json_dump({"completed_stage": completed_stage, "completed_job_id": current_job,
                       "submitted_stage": next_stage, "jobs": result["jobs"],
                       "source_digest": manifest["source_digest"]},
@@ -371,31 +427,34 @@ def execute_stage(manifest: dict, stage: str, *, resume: Path | None = None,
         raise ValueError("--resume applies only to online or cached production training")
     if stage == "smoke":
         subprocess.run([sys.executable, "scripts/training/train_v24_cached_open_loop.py", "prepare",
-                        "--config", manifest["configs"]["online"], "--output-dir", str(root / "shared")], check=True)
+                        "--config", manifest["configs"]["online"], "--output-dir", str(root / "shared"),
+                        "--numerical-policy", manifest.get("numerical_policy", "strict")], check=True)
         subprocess.run([sys.executable, "-m", "src.models.mamba.v24_Ilya.training.cached_parity",
                         "--experiment-root", str(root), "--preflight"], check=True)
         return advance_pipeline(manifest, "smoke")
-    if stage == "gates":
+    if stage in ("gates", "diagnostics"):
         require_report(manifest, "preflight")
         subprocess.run([sys.executable, "-m", "src.models.mamba.v24_Ilya.training.cached_parity",
                         "--experiment-root", str(root)], check=True)
-        return advance_pipeline(manifest, "gates")
+        return advance_pipeline(manifest, "gates") if stage == "gates" else None
     check_gates(manifest)
     if stage == "resource-check":
         subprocess.run([sys.executable, "-m", "src.models.mamba.v24_Ilya.training.cached_parity",
                         "--experiment-root", str(root), "--resource-check"], check=True)
         return advance_pipeline(manifest, "resource-check")
     if stage == "finalize":
+        if manifest.get("production_backends") == ["cached"]:
+            return finalize_cached_only(manifest)
         subprocess.run([sys.executable, "-m", "src.models.mamba.v24_Ilya.training.cached_report",
-                        "--experiment-root", str(root)], check=True)
+                        "--experiment-root", str(root), *(["--summarize-only"] if manifest.get("numerical_policy") == "advisory" else [])], check=True)
         return
     config_path = Path(manifest["configs"][stage])
     config = load_training_config(config_path)
-    if stop_step is not None and (stage != "cached" or not 1 <= stop_step <= config.max_steps):
-        raise ValueError("Explicit stopping step requires cached training and must be within its trajectory")
+    if stop_step is not None and (stage not in ("online", "cached") or not 1 <= stop_step <= config.max_steps):
+        raise ValueError("Explicit stopping step must be within the training trajectory")
     if resume_latest:
-        if stage != "cached" or resume is not None:
-            raise ValueError("--resume-latest requires cached training without --resume")
+        if stage not in ("online", "cached") or resume is not None:
+            raise ValueError("--resume-latest requires training without --resume")
         resume = latest_checkpoint_for_run(config)
         if resume is None:
             raise FileNotFoundError("A continuation requires the previous native checkpoint")
@@ -407,13 +466,15 @@ def execute_stage(manifest: dict, stage: str, *, resume: Path | None = None,
                                    expected_manifest_sha256=manifest["execution"]["expected_manifest_sha256"],
                                    prefetch_batches=manifest["execution"]["prefetch_batches"],
                                    parity_report=Path(manifest["reports"]["full_parity"]),
-                                   paired_report=Path(manifest["reports"]["paired20"]))
+                                   paired_report=Path(manifest["reports"]["paired20"]),
+                                   numerical_policy=manifest.get("numerical_policy", "strict"),
+                                   integrity_report=Path(manifest["reports"]["integrity"]) if "integrity" in manifest["reports"] else None)
         atomic_json_dump({"checkpoint": str(result), "completed_step": stop_step or config.max_steps,
                           "target_steps": config.max_steps, "complete": (stop_step or config.max_steps) == config.max_steps},
                          root / "reports/training_status.json")
         return result
     from src.models.mamba.v24_Ilya.training.cached_diagnostics import require_matched_gpu_environment
-    require_matched_gpu_environment()
+    require_matched_gpu_environment(manifest.get("numerical_policy", "strict"))
     from src.models.mamba.v24_Ilya.training.cached_config import load_cached_training_config
     from src.models.mamba.v24_Ilya.training.cached_data import open_cached_training_data
     from src.models.mamba.v24_Ilya.training.cached_validation import make_online_validation_callback
@@ -425,7 +486,7 @@ def execute_stage(manifest: dict, stage: str, *, resume: Path | None = None,
     resolved = load_cached_training_config(config_path, cache_root=Path(manifest["cache_root"]),
                                            expected_manifest_sha256=manifest["execution"]["expected_manifest_sha256"],
                                            prefetch_batches=0)
-    data = open_cached_training_data(resolved)
+    data = open_cached_training_data(resolved, numerical_policy=manifest.get("numerical_policy", "strict"))
     _, _, task, stats, _, baseline_model = data.context
     model = dataclasses.replace(baseline_model, latent_size=config.architecture.residual_width or config.architecture.width,
                                 gnn_msg_steps=config.architecture.residual_msg_steps)
@@ -459,16 +520,53 @@ def execute_stage(manifest: dict, stage: str, *, resume: Path | None = None,
                 checkpoint_for_step=lambda n: config.run_dir / "checkpoints" / f"checkpoint_step{n:08d}.pkl",
                 output_path=config.run_dir / "best_validation.json", subset_fingerprint=record["subset_fingerprint"])
         return resume
-    return run_training(V24IlyaTrainInvocation(config=config, config_path=config_path, resume=resume),
+    return run_training(V24IlyaTrainInvocation(config=config, config_path=config_path, resume=resume,
+                        stop_after_steps=stop_step),
                         validation_callback=make_online_validation_callback(train_step=evaluator, cached_data=data))
+
+
+def finalize_cached_only(manifest: dict) -> dict:
+    """Summarize every requested cached update and exact held-out metric."""
+    from src.models.mamba.v24_Ilya.checkpoint import load_v24_Ilya_training_checkpoint
+    from src.models.mamba.v24_Ilya.training.cached_parity import _validation_coverage
+    config = load_training_config(Path(manifest["configs"]["cached"]))
+    root = Path(manifest["experiment_root"])
+    training = [json.loads(line) for line in (config.run_dir / "train_metrics.jsonl").read_text().splitlines() if line.strip()]
+    validation = [json.loads(line) for line in (config.run_dir / "validation_metrics.jsonl").read_text().splitlines() if line.strip()]
+    fixed = {int(row["step"]): row for row in validation if row.get("role") == "fixed_checkpoint"}
+    expected = set(range(config.validation.every_steps, config.max_steps + 1, config.validation.every_steps)) | {config.max_steps}
+    checks = {"all_training_updates": len(training) == config.max_steps and {int(row["step"]) for row in training} == set(range(1, config.max_steps + 1)),
+              "finite_training": all(math.isfinite(float(row["loss"])) and math.isfinite(float(row["gradient_norm"])) for row in training),
+              "all_validation_steps": set(fixed) == expected,
+              "no_duplicate_validation": len(fixed) == sum(row.get("role") == "fixed_checkpoint" for row in validation)}
+    for step in sorted(expected):
+        row = fixed.get(step, {})
+        checks[f"coverage_{step}"] = _validation_coverage(root, row)["passed"]
+        values = row.get("original_graphcast_loss", {})
+        checks[f"finite_metrics_{step}"] = all(key in values and math.isfinite(float(values[key]))
+            for key in ("baseline_rollout", "full_rollout", "improvement_pct_rollout"))
+        checkpoint = config.run_dir / "checkpoints" / f"checkpoint_step{step:08d}.pkl"
+        checks[f"checkpoint_{step}"] = checkpoint.is_file() and load_v24_Ilya_training_checkpoint(checkpoint).completed_step == step
+    check_gates(manifest)
+    result = {"integrity_passed": all(checks.values()), "passed": all(checks.values()), "checks": checks,
+              "status": "complete_with_warnings" if all(checks.values()) else "failed_integrity",
+              "numerical_policy": manifest.get("numerical_policy", "strict"),
+              "numerical_status": "independent_diagnostics_separate", "validation": validation,
+              "provenance": experiment_provenance(manifest)}
+    atomic_json_dump(result, root / "reports/final_report.json")
+    if not result["passed"]:
+        raise RuntimeError("Cached-only final report found incomplete or invalid training/validation")
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("prepare", "submit-smoke", "submit-gates", "submit-resource-check", "submit-production", "execute"))
+    parser.add_argument("stage", choices=("prepare", "submit-smoke", "submit-gates", "submit-resource-check", "submit-production", "submit-diagnostics", "execute"))
     parser.add_argument("--experiment-root", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path)
-    parser.add_argument("--backend", choices=("smoke", "gates", "resource-check", "online", "cached", "finalize"))
+    parser.add_argument("--backend", choices=("smoke", "gates", "resource-check", "diagnostics", "online", "cached", "finalize"))
+    parser.add_argument("--numerical-policy", choices=("strict", "advisory"), default="strict")
+    parser.add_argument("--recovery-of", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--resume", type=Path)
     parser.add_argument("--stop-step", type=int)
@@ -482,7 +580,8 @@ def main():
     if args.stage == "prepare":
         if args.cache_root is None:
             parser.error("prepare requires --cache-root")
-        result = prepare_experiment(args.experiment_root, cache_root=args.cache_root)
+        result = prepare_experiment(args.experiment_root, cache_root=args.cache_root,
+                                    numerical_policy=args.numerical_policy, recovery_of=args.recovery_of)
     else:
         manifest = load_experiment(args.experiment_root)
         if args.stage == "execute":

@@ -11,9 +11,15 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-EXPERIMENT = ROOT / 'artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908'
-BASE_CONFIG = ROOT / 'configs/experiments/v24_Ilya/res1_optimizer_matrix_20260904/mamba1_di16_bcg1_lr1em4_b1p9_b2p98_cos10k.json'
-REFERENCE = ROOT / 'artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_20k_20260813/di16_bcg1_closed_sg_stateful_20k/eval/cold_full_zero_exact/swa_step02000-08000.json'
+from scripts.experiments.frozen_runtime import freeze_source, frozen_command, file_sha256, verify_source
+
+WORKSPACE = Path(os.environ.get('WEATHER_WORKSPACE', ROOT)).resolve()
+EXPERIMENT = WORKSPACE / 'artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908'
+BASE_CONFIG = WORKSPACE / 'configs/experiments/v24_Ilya/res1_optimizer_matrix_20260904/mamba1_di16_bcg1_lr1em4_b1p9_b2p98_cos10k.json'
+REFERENCE = WORKSPACE / 'artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_20k_20260813/di16_bcg1_closed_sg_stateful_20k/eval/cold_full_zero_exact/swa_step02000-08000.json'
+EVAL_DATA = '/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/wb2_res1_levels13_2015_2022.zarr'
+BRANCH_UPDATES = 2000
+SWA_STEPS = (500, 1000, 1500, 2000)
 ARMS = [('joint', 1., 1.), ('slow_mamba', 1., .3), ('frozen_spatial', 0., 1.)]
 
 
@@ -23,16 +29,39 @@ def write_json(path, value):
 
 
 def run(*args):
-    subprocess.run([sys.executable, *map(str, args)], cwd=ROOT, check=True)
+    command, options = frozen_command(ROOT, WORKSPACE, args[0], args[1:])
+    subprocess.run(command, check=True, **options)
+
+
+def require_runtime(manifest):
+    source = Path(manifest.get('source_root', EXPERIMENT / 'source')).resolve()
+    verify_source(source)
+    if ROOT != source:
+        raise RuntimeError('Execute stages from the prepared source snapshot')
+    if file_sha256(source / 'snapshot.json') != manifest.get('source_manifest_sha256'):
+        raise ValueError('Experiment source identity differs; use explicit recovery for legacy snapshots')
+    for path, expected in manifest['config_hashes'].items():
+        if file_sha256(path) != expected:
+            raise ValueError(f'Prepared configuration changed: {path}')
+    from src.data_operations.loaders.zarr_metadata import verify_frozen_zarr_metadata
+    verify_frozen_zarr_metadata(manifest['eval_data'], manifest['eval_data_metadata'])
+
+
+def evaluation_tags():
+    return f'step{BRANCH_UPDATES}', f'swa_step{SWA_STEPS[0]:05d}-{SWA_STEPS[-1]:05d}'
 
 
 def prepare():
     if (EXPERIMENT / 'manifest.json').exists():
         raise RuntimeError('Experiment already prepared; refusing to overwrite its manifest')
+    from src.data_operations.loaders.zarr_metadata import frozen_zarr_metadata
+    metadata = frozen_zarr_metadata(EVAL_DATA)
     cfg = json.loads(BASE_CONFIG.read_text())
+    for key in ('prepared_root', 'anchor_manifest_root', 'baseline_checkpoint', 'stats_dir'):
+        cfg['data'][key] = str((WORKSPACE / cfg['data'][key]).resolve())
     cfg['distributed'].update(mode='single', num_devices=1, per_device_batch_size=4)
     cfg['validation']['enabled'] = False
-    cfg['optimizer'].update(max_steps=2000, checkpoint_every=250, warmup_steps=50)
+    cfg['optimizer'].update(max_steps=BRANCH_UPDATES, checkpoint_every=250, warmup_steps=50)
     cfg['output']['output_root'] = str(EXPERIMENT / 'runs')
     entries = []
     for di in (16, 32):
@@ -53,12 +82,18 @@ def prepare():
             write_json(path, item)
             entries.append(dict(task=len(entries), name=name, di=di, condition=arm,
                                 config=str(path), init_from=str(start),
+                                warmup_config=str(EXPERIMENT / f'configs/seed_di{di}.json'),
                                 spatial_lr_multiplier=spatial, mamba_lr_multiplier=mamba))
-    for directory in ('logs', 'source', 'checks', 'results'):
+    for directory in ('logs', 'checks', 'results'):
         (EXPERIMENT / directory).mkdir(parents=True, exist_ok=True)
+    source = EXPERIMENT / 'source'
+    freeze_source(WORKSPACE, source)
     write_json(EXPERIMENT / 'manifest.json', dict(
-        experiment='res1_batch4_temporal_lr_20260908', batch_size=4,
-        seed_updates=500, branch_updates=2000, seed=22, entries=entries,
+        experiment=EXPERIMENT.name, workspace=str(WORKSPACE), source_root=str(source),
+        source_manifest_sha256=file_sha256(source / 'snapshot.json'),
+        config_hashes={str(p): file_sha256(p) for p in sorted((EXPERIMENT / 'configs').glob('*.json'))},
+        eval_data=EVAL_DATA, eval_data_metadata=metadata, batch_size=4,
+        seed_updates=500, branch_updates=BRANCH_UPDATES, swa_steps=list(SWA_STEPS), seed=22, entries=entries,
         evaluation_reference=str(REFERENCE),
         stage_order=['smoke (2 widths)', 'shared warm-up (2 widths)', 'train (6 arms)', 'exact evaluation (6 arms)'],
     ))
@@ -151,16 +186,17 @@ def smoke(di):
 def evaluate(entry):
     directory = EXPERIMENT / 'runs' / entry['name']
     cfg = json.loads(Path(entry['config']).read_text())
+    final_tag, swa_tag = evaluation_tags()
     for tag, checkpoint in [('shared_start', Path(entry['init_from'])),
-                            ('step2000', directory / 'checkpoints/checkpoint_step00002000.pkl'),
-                            ('swa_step00500-02000', directory / 'swa/swa_step00500-02000.pkl')]:
+                            (final_tag, directory / f'checkpoints/checkpoint_step{BRANCH_UPDATES:08d}.pkl'),
+                            (swa_tag, directory / 'swa' / f'{swa_tag}.pkl')]:
         output = directory / 'eval/cold_full_zero_exact_gc/matched32' / f'{tag}.json'
         output.parent.mkdir(parents=True, exist_ok=True)
         if output.exists():
             raise RuntimeError(f'Refusing to overwrite evaluation {output}')
         run('scripts/analyze_models/eval_v24_Ilya.py',
             '--ckpt', checkpoint, '--ckpt-in', cfg['data']['baseline_checkpoint'],
-            '--data-path', '/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/wb2_res1_levels13_2015_2022.zarr',
+            '--data-path', EVAL_DATA,
             '--stats-dir', cfg['data']['stats_dir'], '--resolution', '1.0', '--mesh-size', '5', '--width', '512',
             '--baseline-msg-steps', '16', '--residual-msg-steps', '2',
             '--val-year', '2022', '--train-start-year', '2015', '--train-end-year', '2021',
@@ -177,14 +213,29 @@ def evaluate(entry):
 
 
 def main():
+    global EXPERIMENT, WORKSPACE, BRANCH_UPDATES, SWA_STEPS, REFERENCE, EVAL_DATA
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('stage', choices=['prepare', 'smoke', 'seed', 'train', 'eval', 'summarize'])
     parser.add_argument('--task', type=int, default=0)
+    parser.add_argument('--experiment', type=Path, default=EXPERIMENT)
+    parser.add_argument('--updates', type=int, default=BRANCH_UPDATES,
+                        help='Branch update budget for a new experiment; must be divisible by 1000')
     args = parser.parse_args()
+    EXPERIMENT = args.experiment.resolve()
     if args.stage == 'prepare':
+        if args.updates <= 0 or args.updates % 1000:
+            parser.error('--updates must be positive and divisible by 1000')
+        BRANCH_UPDATES = args.updates
+        SWA_STEPS = tuple(args.updates * i // 4 for i in range(1, 5))
         prepare()
         return
     manifest = json.loads((EXPERIMENT / 'manifest.json').read_text())
+    require_runtime(manifest)
+    WORKSPACE = Path(manifest['workspace'])
+    REFERENCE = Path(manifest['evaluation_reference'])
+    EVAL_DATA = manifest['eval_data']
+    BRANCH_UPDATES = manifest['branch_updates']
+    SWA_STEPS = tuple(manifest['swa_steps'])
     if args.stage == 'summarize':
         summarize(manifest)
         return
@@ -198,13 +249,15 @@ def main():
     else:
         entry = manifest['entries'][args.task]
         if args.stage == 'train':
+            if not Path(entry['init_from']).is_file():
+                raise FileNotFoundError('Run the shared seed stage before its dependent training branches')
             prepare_branch_start(entry)
             train(entry['config'], entry['init_from'])
             directory = EXPERIMENT / 'runs' / entry['name']
-            steps = (500, 1000, 1500, 2000)
+            steps = SWA_STEPS
             run('scripts/training/build_v24_Ilya_swa.py', '--inputs',
                 *[directory / f'checkpoints/checkpoint_step{step:08d}.pkl' for step in steps],
-                '--source-steps', *steps, '--output', directory / 'swa/swa_step00500-02000.pkl')
+                '--source-steps', *steps, '--output', directory / 'swa' / f'{evaluation_tags()[1]}.pkl')
         else:
             evaluate(entry)
 
@@ -226,7 +279,7 @@ def summarize(manifest):
     for entry in manifest['entries']:
         directory = EXPERIMENT / 'runs' / entry['name'] / 'eval/cold_full_zero_exact_gc/matched32'
         initial = json.loads((directory / 'shared_start.json').read_text())['original_graphcast_loss']
-        for tag in ('step2000', 'swa_step00500-02000'):
+        for tag in evaluation_tags():
             path = directory / f'{tag}.json'
             result = json.loads(path.read_text())['original_graphcast_loss']
             rows.append(dict(name=entry['name'], artifact=tag, di=entry['di'],

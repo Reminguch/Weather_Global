@@ -12,11 +12,13 @@
 #SBATCH --output=logs/v24_spatial_8k_%A_%a.out
 #SBATCH --error=logs/v24_spatial_8k_%A_%a.err
 set -euo pipefail
-cd "${SLURM_SUBMIT_DIR}"
-export MPLCONFIGDIR="/tmp/mpl-v24-spatial-${SLURM_JOB_ID}"
-export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export XLA_PYTHON_CLIENT_ALLOCATOR=platform
-export XLA_FLAGS="${XLA_FLAGS:-} --xla_gpu_enable_triton_gemm=false"
-source scripts/graphcast_env.sh
-sha256sum --quiet -c artifacts/checkpoints/v24_Ilya/res1_batch4_slow_spatial_20260916_8k/source/SHA256SUMS
-python -u scripts/experiments/run_v24_res1_slow_spatial_8k.py "${1:?stage required}" --task "${SLURM_ARRAY_TASK_ID:-0}"
+WORKSPACE="${3:-${SLURM_SUBMIT_DIR:?workspace required}}"
+EXPERIMENT="${2:-${WORKSPACE}/artifacts/checkpoints/v24_Ilya/res1_batch4_slow_spatial_20260916_8k}"
+SOURCE_ROOT="${EXPERIMENT}/source"
+if [[ ! -f "${SOURCE_ROOT}/snapshot.json" ]]; then
+  echo "Prepare a complete source snapshot before submission; historical partial snapshots need explicit recovery: ${EXPERIMENT}" >&2
+  exit 1
+fi
+source "${SOURCE_ROOT}/scripts/experiments/run_frozen_experiment.sh"
+run_frozen_experiment "${WORKSPACE}" "${EXPERIMENT}" \
+  "scripts/experiments/run_v24_res1_slow_spatial_8k.py" "${1:?stage required}" "${SLURM_ARRAY_TASK_ID:-0}"

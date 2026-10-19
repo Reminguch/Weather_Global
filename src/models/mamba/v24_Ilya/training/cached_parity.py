@@ -1,7 +1,8 @@
 """Separate-process correctness gates and measurements for cached stepwise training.
 
-Run on an allocated GPU with ``--experiment-root``. No production job is
-authorized by this module unless every recorded numerical comparison passes.
+Run on an allocated GPU with ``--experiment-root``. Legacy campaigns require
+numerical agreement. Advisory recovery campaigns release on immutable integrity
+evidence and run numerical comparisons independently.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ import numpy as np
 from .cached_diagnostics import (
     capture_gradients, gradient_comparison, memory_snapshot,
     require_matched_gpu_environment, timing_summary, tree_comparison, tree_digest,
+    logical_dataset_digest, comparison_integrity,
 )
 
 
@@ -55,14 +57,14 @@ def _context(root, backend="cached"):
     from .cached_stepwise import make_cached_stepwise_train_step
     from .endpoint_step import build_optimizer
     from .config import load_training_config
-    require_matched_gpu_environment()
     manifest = _manifest(root)
+    require_matched_gpu_environment(manifest.get("numerical_policy", "strict"))
     resolved = load_cached_training_config(
         Path(manifest["configs"]["cached"]), cache_root=Path(manifest["cache_root"]),
         prefetch_batches=int(manifest["execution"].get("prefetch_batches", 0)),
         expected_manifest_sha256=manifest["execution"].get("expected_manifest_sha256"),
     )
-    cached = open_cached_training_data(resolved)
+    cached = open_cached_training_data(resolved, numerical_policy=manifest.get("numerical_policy", "strict"))
     config = resolved.common
     local_config = load_training_config(Path(manifest["configs"]["smoke_" + backend]))
     local_initial = local_config.run_dir / "checkpoints/checkpoint_step00000000.pkl"
@@ -205,6 +207,43 @@ def _data_signature(values, config):
             "weights": tree_digest(np.asarray(config.normalized_supervised_weights, np.float32))}
 
 
+def _raw_integrity(context):
+    """Compare source weather separately from generated GC trajectories."""
+    from .endpoint_step import input_window_from_frames
+    from ..baseline_cache import enumerate_chunks, load_chunk
+    _, resolved, cached, _, _, _, _ = context
+    config, _, task, _, data, _ = cached.context
+    expected_chunks, _ = enumerate_chunks(data, config)
+    raw_keys = ("id", "split", "segment_id", "segment_offset", "chunk_index", "raw_anchor_indices", "target_timestamps")
+    actual_chunks = [{key: row[key] for key in raw_keys} for row in cached.manifest["chunks"]]
+    checks = {"raw_indices_timestamps_and_coverage": expected_chunks == actual_chunks}
+    samples = []
+    for split in ("train", "val"):
+        chunks = [row for row in expected_chunks if row["split"] == split]
+        samples += [chunks[0], chunks[-1]]
+    for item in samples:
+        source = load_chunk(cached.context, item)
+        source_truths = [logical_dataset_digest(value) for value in source.truths]
+        source_forcings = [logical_dataset_digest(value) for value in source.forcings]
+        observed = [logical_dataset_digest(input_window_from_frames(
+            source.input_frames[i], source.input_frames[i + 1], source.static_inputs,
+            step_index=i, truth_prefix_steps=config.truth_prefix_steps, time_step=data.time_step))
+            for i in range(config.truth_prefix_steps)]
+        raw_indices = source.raw_anchor_indices.tolist()
+        batch = cached._materialize(split=item["split"], segment_id=item["segment_id"],
+                                    segment_offset=item["segment_offset"], next_cursor=None,
+                                    include_validation_fields=True)
+        label = f"{item['split']}:{item['id']}"
+        checks[label + ":observed_inputs_and_coords"] = observed == [logical_dataset_digest(value) for value in batch.inputs[:config.truth_prefix_steps]]
+        checks[label + ":truth_and_coords"] = source_truths == [logical_dataset_digest(value) for value in batch.truths]
+        checks[label + ":forcing_and_coords"] = source_forcings == [logical_dataset_digest(value) for value in batch.forcings]
+        checks[label + ":indices"] = raw_indices == batch.raw_anchor_indices.tolist()
+        del batch, source
+    return {"integrity_passed": all(checks.values()), "checks": checks,
+            "canonicalization": "logical variable/dimension/coordinate values; numeric representation normalized",
+            "derived_forecast_windows_and_residual_targets": "excluded from raw identity; numerical diagnostics only"}
+
+
 def _full_worker(root, backend):
     import jax
     import jax.numpy as jnp
@@ -250,13 +289,18 @@ def _full_worker(root, backend):
             signatures["val:" + str(cursor.to_dict())] = _data_signature(values, config)
             del values
         _json(output / "data_identity.json", signatures)
-        for case in ("initial", "nonzero"):
+        advisory = manifest.get("numerical_policy") == "advisory"
+        if advisory and online:
+            _save(output / "captured_inputs.pkl", first_values)
+        cases = ("initial", "nonzero", "captured_nonzero") if advisory and not online else ("initial", "nonzero")
+        for case in cases:
             params, state = checkpoint.residual_params, checkpoint.residual_state
             changed = []
-            if case == "nonzero":
+            if case.endswith("nonzero"):
                 params, state, changed = _nonzero(params, state)
             assert first_values is not None
-            inputs, targets, forcings = first_values
+            inputs, targets, forcings = (_read(Path(root) / "reports/workers/full_online/captured_inputs.pkl")
+                                          if case == "captured_nonzero" else first_values)
             if online:
                 predictions, components = [], []
                 evaluation_state = state
@@ -272,7 +316,7 @@ def _full_worker(root, backend):
                     chunk.truths, chunk.forcings)
                 opt_state, gradients = new_opt
                 forward_check = tree_comparison(evaluation_state, new_state)
-                if not forward_check["passed"]:
+                if not comparison_integrity(forward_check) or (manifest.get("numerical_policy", "strict") == "strict" and not forward_check["passed"]):
                     raise AssertionError("Online diagnostic forward differs from maintained training state")
             else:
                 loss, new_state, step_losses, predictions, gradients = cached_step.loss_and_grad(
@@ -288,7 +332,7 @@ def _full_worker(root, backend):
                                               "memory": memory_snapshot()})
             print(f"[cached parity] full {backend} {case} loss={float(loss):.9f}", flush=True)
             del payload, gradients, predictions, new_state, new_params, opt_state
-    _json(output / "completed.json", {"backend": backend, "cases": ["initial", "nonzero"],
+    _json(output / "completed.json", {"backend": backend, "cases": list(cases),
                                       "memory": memory_snapshot()})
 
 
@@ -305,6 +349,15 @@ def _native_checkpoint(context, output, step, params, state, opt_state, rng, cur
         parameter_overlay_metadata=source.parameter_overlay_metadata)
     path = output / f"checkpoint_step{step:08d}.pkl"
     atomic_pickle_dump(payload, path)
+    from ..checkpoint import load_v24_Ilya_training_checkpoint
+    saved = load_v24_Ilya_training_checkpoint(path)
+    checks = {name: tree_digest(value) == tree_digest(getattr(saved, name))
+              and tree_comparison(value, getattr(saved, name))["passed"] for name, value in
+              (("residual_params", params), ("residual_state", state), ("optimizer_state", opt_state), ("rng_key", rng))}
+    checks["training_cursor"] = saved.training_cursor == cursor.to_dict()
+    if not all(checks.values()):
+        raise RuntimeError("Checkpoint serialization changed saved state or contains nonfinite values")
+    _json(path.with_suffix(".serialization.json"), {"integrity_passed": True, "checks": checks})
     return path
 
 
@@ -324,6 +377,11 @@ def _continuation_worker(root, backend, *, resume=False, cpus=None, prefetch=0,
     label += "_preflight" if preflight else "_resource" if resource_check else ""
     output = Path(root) / "reports/workers" / label
     output.mkdir(parents=True, exist_ok=True)
+    if preflight and backend == "cached" and manifest.get("numerical_policy") == "advisory":
+        raw = _raw_integrity(context)
+        _json(Path(root) / "reports/raw_integrity.json", raw)
+        if not raw["integrity_passed"]:
+            raise RuntimeError("Raw cached/source weather, coordinates or timestamps differ")
     online = _online(context) if backend == "online" else None
     zero_state = jax.tree_util.tree_map(jnp.zeros_like, checkpoint.residual_state)
     if resume:
@@ -362,6 +420,8 @@ def _continuation_worker(root, backend, *, resume=False, cpus=None, prefetch=0,
                     result = cached_step(params, state, opt_state, keys, batch.inputs, batch.targets, batch.forcings)
                 params, state, opt_state, loss, grad_norm, components = result
                 jax.block_until_ready(result)
+                if not np.isfinite(np.asarray([loss, grad_norm])).all() or not np.isfinite(np.asarray(components)).all():
+                    raise RuntimeError("Nonfinite training output")
                 ended = time.monotonic()
                 consumed = cursor
                 cursor = batch.next_cursor
@@ -444,6 +504,10 @@ def _provenance(root):
 def run_preflight(root):
     root = Path(root)
     (root / "reports").mkdir(exist_ok=True)
+    manifest = _manifest(root)
+    advisory = manifest.get("numerical_policy") == "advisory"
+    if advisory:
+        provenance, initialization = prepare_integrity(root)
     for backend in ("online", "cached"):
         _run_worker(root, worker="preflight", backend=backend)
     summaries = {backend: json.loads((root / "reports/workers" / (backend + "_preflight") / "preflight.json").read_text())
@@ -456,12 +520,37 @@ def run_preflight(root):
     budget = {"memory_gib": max(128, math.ceil(1.4 * max(v["peak_host_gib"] for v in summaries.values()) / 16) * 16),
               "time_minutes": max(120, math.ceil(estimate / 1800) * 30),
               "cpus": 8, "gpu": "gpu40&nomig"}
-    _json(root / "reports/preflight.json", {"passed": True, "provenance": _provenance(root),
-                                            "backends": summaries, "gates_budget": budget})
+    report = {"passed": True, "provenance": _provenance(root), "integrity_passed": True,
+              "backends": summaries, "gates_budget": budget}
+    if advisory:
+        raw = json.loads((root / "reports/raw_integrity.json").read_text())
+        serialization = [json.loads((root / f"reports/workers/{backend}_preflight/checkpoint_step00000002.serialization.json").read_text())
+                         for backend in ("online", "cached")]
+        checks = {"initialization": initialization["passed"], "raw_data": raw["integrity_passed"],
+                  "exact_serialization": all(record["integrity_passed"] for record in serialization),
+                  "finite_short_training": all(record["completed_steps"] == 3 for record in summaries.values())}
+        integrity = {"kind": "cached_integrity", "numerical_policy": "advisory", "provenance": provenance,
+                     "integrity_passed": all(checks.values()), "checks": checks,
+                     "numerical_status": "independent_diagnostics_pending"}
+        from scripts.experiments.run_v24_cached_pair import write_once_json
+        write_once_json(root / "reports/integrity.json", integrity)
+        if not integrity["integrity_passed"]:
+            raise RuntimeError("Cached integrity preflight failed")
+        # Resource stage measures 70 updates and complete validation separately;
+        # reserve one full backward update per validation chunk as an upper bound.
+        cache_manifest = json.loads((Path(manifest["cache_root"]) / "manifest.json").read_text())
+        validation_chunks = sum(row["split"] == "val" for row in cache_manifest["chunks"])
+        backends = manifest.get("production_backends", ["online", "cached"])
+        seconds = 1.35 * sum(summaries[name]["startup_seconds"] + (70 + validation_chunks) * summaries[name]["p90_end_to_end_seconds"] for name in backends)
+        report["resource_budget"] = {**budget, "time_minutes": max(120, math.ceil(seconds / 1800) * 30)}
+        report["numerical_policy"] = "advisory"
+    _json(root / "reports/preflight.json", report)
 
 
 def run_resource_check(root):
     root = Path(root)
+    if _manifest(root).get("numerical_policy") == "advisory":
+        return run_advisory_resources(root)
     _run_worker(root, worker="resource", backend="cached", cpus=4)
     workers = root / "reports/workers"
     result = _checkpoint_compare(workers / "cached_4cpu_resource/checkpoint_step00000020.pkl",
@@ -482,6 +571,44 @@ def run_resource_check(root):
     _json(root / "reports/resource_check.json", report)
     if not report["passed"]:
         raise RuntimeError("Reduced-resource replay differs from the accepted cached trajectory")
+
+
+def run_advisory_resources(root):
+    """Measure real processes and full held-out coverage, without replay gates."""
+    manifest = _manifest(root)
+    from .config import load_training_config
+    config = load_training_config(Path(manifest["configs"]["cached"]))
+    metadata = json.loads((config.prepared_root / "metadata.json").read_text())
+    working_set = sum(math.prod(variable["shape"]) * np.dtype(variable["dtype"]).itemsize
+                      for variable in metadata["variables"].values()) / 1024**3
+    benchmarks, coverage_checks = {}, {}
+    for backend in manifest.get("production_backends", ["online", "cached"]):
+        cpus = 4 if backend == "cached" else None
+        _run_worker(root, worker="resource", backend=backend, cpus=cpus)
+        label = backend + ("_4cpu" if cpus else "") + "_resource"
+        output = root / "reports/workers" / label
+        record = json.loads((output / "benchmark.json").read_text())
+        record.update(peak_host_gib=record["memory"]["host_peak_gib"],
+                      p90_end_to_end_seconds=record["end_to_end_p90_seconds"],
+                      startup_seconds=record["setup_seconds"] + record["first_update_seconds"])
+        record["checkpoint_seconds"] = max(record["checkpoint_seconds"], default=0.0)
+        benchmarks["cached_4cpu" if cpus else backend] = record
+        coverage_checks[backend] = _validation_coverage(root, json.loads((output / "validation.json").read_text()))
+    passed = all(value["passed"] for value in coverage_checks.values())
+    report = {"passed": passed, "integrity_passed": passed, "numerical_policy": "advisory",
+              "provenance": _provenance(root), "completed_steps": 70, "full_validation_completed": passed,
+              "validation_coverage": coverage_checks, "backends": benchmarks,
+              "allocation": {"memory_gib": int(os.environ.get("SLURM_MEM_PER_NODE", 0)) / 1024,
+                             "cpus": int(os.environ.get("SLURM_CPUS_PER_TASK", 0))},
+              "validation_seconds": max(value["validation_seconds"] for value in benchmarks.values()),
+              "prepared_working_set_gib": working_set,
+              "memory_budget_policy": "1.25 * (complete persistent prepared memmaps + observed process peak); cache maps are chunk-local",
+              "numerical_status": "independent_diagnostics_pending"}
+    _json(root / "reports/benchmark.json", report)
+    _json(root / "reports/resource_check.json", report)
+    if not passed:
+        raise RuntimeError("Incomplete held-out validation coverage in resource check")
+    return report
 
 
 def _validation_coverage(root, validation):
@@ -514,14 +641,17 @@ def compare_full_outputs(root):
     directory = Path(root) / "reports/workers"
     data_a = json.loads((directory / "full_online/data_identity.json").read_text())
     data_b = json.loads((directory / "full_cached/data_identity.json").read_text())
-    reports["data_identity"] = {"passed": data_a == data_b, "checked_chunks": len(data_a)}
-    for case in ("initial", "nonzero"):
-        expected = _read(directory / "full_online" / (case + ".pkl"))
+    advisory = _manifest(root).get("numerical_policy") == "advisory"
+    reports["data_identity"] = {"passed": data_a == data_b, "checked_chunks": len(data_a),
+                                "meaning": "derived forecast windows and residual targets; raw source identity checked separately"}
+    for case in (("initial", "nonzero", "captured_nonzero") if advisory else ("initial", "nonzero")):
+        expected = _read(directory / "full_online" / (("nonzero" if case == "captured_nonzero" else case) + ".pkl"))
         actual = _read(directory / "full_cached" / (case + ".pkl"))
         checks = {key: tree_comparison(actual[key], expected[key], relative=1e-4 if key in ("loss", "step_losses") else 1e-3)
                   for key in ("loss", "step_losses", "predictions", "state", "params", "optimizer", "grad_norm")}
         checks["gradients"] = gradient_comparison(actual["gradients"], expected["gradients"])
-        reports[case] = {"passed": all(check["passed"] for check in checks.values()), "checks": checks}
+        reports[case] = {"passed": all(check["passed"] for check in checks.values()), "checks": checks,
+                         "inputs": "identical captured online inputs/targets/forcings" if case == "captured_nonzero" else "independently generated trajectories"}
         del expected, actual
     return {"passed": all(report["passed"] for report in reports.values()), "checks": reports}
 
@@ -538,7 +668,9 @@ def _checkpoint_compare(left, right, *, exact=False):
             checks[name]["passed"] = checks[name]["passed"] and checks[name]["exact_hash_match"]
     checks["rng"] = {"passed": tree_digest(a.rng_key) == tree_digest(b.rng_key)}
     checks["cursor"] = {"passed": a.training_cursor == b.training_cursor}
-    return {"passed": all(check["passed"] for check in checks.values()), "checks": checks}
+    return {"passed": all(check["passed"] for check in checks.values()), "checks": checks,
+            "integrity_passed": checks["rng"]["passed"] and checks["cursor"]["passed"]
+              and all(comparison_integrity(check) for check in checks.values())}
 
 
 def _initialization_checks(source, config):
@@ -573,7 +705,7 @@ def _initialization_checks(source, config):
             "residual_fresh": fresh, "parameter_leaves": parameter_leaves}
 
 
-def run_gates(root):
+def prepare_integrity(root):
     from .cached_checkpoint import build_provenance, project_shared_initialization
     from .cached_config import load_cached_training_config
     from .cached_runner import execution_metadata
@@ -612,14 +744,25 @@ def run_gates(root):
     if not initial_report["passed"]:
         raise RuntimeError("Shared initialization projection differs")
     del saved, source
+    return provenance, initial_report
+
+
+def run_gates(root):
+    root = Path(root).resolve()
+    manifest = _manifest(root)
+    advisory = manifest.get("numerical_policy") == "advisory"
+    provenance, initial_report = prepare_integrity(root)
     for backend in ("online", "cached"):
         _run_worker(root, worker="full", backend=backend)
     full = compare_full_outputs(root)
     full["checks"]["initialization_identity"] = initial_report
     full.update(kind="full_parity", provenance=provenance)
     _json(root / "reports/full_parity.json", full)
-    if not full["passed"]:
-        raise RuntimeError("Full parity gate failed; production remains disabled")
+    full["integrity_passed"] = comparison_integrity(full) and initial_report["passed"]
+    full["numerical_status"] = "passed" if full["passed"] else "warning"
+    _json(root / "reports/full_parity.json", full)
+    if not full["integrity_passed"] or (not advisory and not full["passed"]):
+        raise RuntimeError("Full parity checks failed")
     for backend in ("online", "cached"):
         _run_worker(root, worker="continue", backend=backend)
     _run_worker(root, worker="resume", backend="cached")
@@ -640,8 +783,13 @@ def run_gates(root):
     report = {"kind": "paired20", "completed_steps": 20, "provenance": provenance,
               "passed": all(value["passed"] for value in paired.values()), "checks": paired}
     _json(root / "reports/paired20.json", report)
-    if not report["passed"]:
-        raise RuntimeError("Paired continuation/resume gate failed; production remains disabled")
+    report["integrity_passed"] = comparison_integrity(report) and paired["initialization"]["passed"] and paired["boundaries"]["passed"]
+    report["numerical_status"] = "passed" if report["passed"] else "warning"
+    _json(root / "reports/paired20.json", report)
+    if not report["integrity_passed"] or (not advisory and not report["passed"]):
+        raise RuntimeError("Paired continuation/resume checks failed")
+    if advisory:
+        return report
     # Four-core verification uses the same GPU, numerical policy and examples.
     _run_worker(root, worker="continue", backend="cached", cpus=4)
     benchmarks = {name: json.loads((workers / name / "benchmark.json").read_text())

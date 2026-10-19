@@ -192,3 +192,25 @@ def test_nonfinite_prediction_closes_stream_without_mutating_state(validation_ca
     with pytest.raises(ValueError, match="Non-finite original GraphCast"):
         _run(case)
     assert case.closed == [(0, 0)]
+
+
+def test_batch4_training_state_is_sliced_for_single_segment_validation(validation_case):
+    case = validation_case
+    config = dataclasses.replace(case.config, distributed=dataclasses.replace(
+        case.config.distributed, per_device_batch_size=4))
+    train_state = {"memory": jnp.arange(8, dtype=jnp.float32).reshape(4, 2)}
+    before = np.array(train_state["memory"])
+    incoming = []
+    original = case.trainer.evaluate_step
+
+    def evaluate(params, state, key, *fields):
+        assert state["memory"].shape == (1, 2)
+        incoming.append(float(state["memory"][0, 0]))
+        loss, _, prediction = original(params, case.state, key, *fields)
+        return loss, {"memory": state["memory"] + 1}, prediction
+
+    case.trainer.evaluate_step = evaluate
+    result = _run(case, config=config, zero_state=train_state)
+    assert result["selected_segments"] == 2
+    assert incoming == list(range(8)) * 2
+    np.testing.assert_array_equal(train_state["memory"], before)

@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import resource
 import shlex
-import shutil
 import subprocess
 import sys
 import time
@@ -19,9 +18,11 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scripts.experiments.frozen_runtime import freeze_source, verify_source
 ARMS = ('mse_fp32', 'amse')
 REFERENCE = 'artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908'
 DEFAULT_EXPERIMENT = 'artifacts/checkpoints/v24_Ilya/res1_amse_pair_20260919'
+AMSE_LAMBDA = 0.1
 
 
 def read(path):
@@ -51,24 +52,23 @@ def call(args):
 
 
 def freeze(workspace, destination):
-    destination.mkdir(parents=True, exist_ok=False)
-    files = {}
-    for folder in ('src', 'third_party/graphcast', 'scripts', 'tests/v24_Ilya'):
-        for source in sorted((workspace / folder).rglob('*')):
-            if not source.is_file() or source.suffix not in ('.py', '.sh', '.slurm'):
-                continue
-            relative = source.relative_to(workspace)
-            target = destination / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
-            files[str(relative)] = sha(target)
-    write(destination / 'snapshot.json', {'files': files})
+    freeze_source(workspace, destination)
     return sha(destination / 'snapshot.json')
 
 
 def prepare(experiment, workspace):
     if (experiment / 'manifest.json').exists():
         raise FileExistsError('Experiment already frozen')
+    from scripts.analyze_models.evaluate_v24_amse_pair import (
+        EXACT_DATA, PILOT, check_file, protocol_digest,
+    )
+    from src.data_operations.loaders.zarr_metadata import frozen_zarr_metadata, verify_frozen_zarr_metadata
+    pilot = read(workspace / PILOT)
+    if protocol_digest(pilot) != pilot['protocol_hash']:
+        raise ValueError('Saved spectral protocol hash mismatch')
+    evaluation_metadata = {'exact': frozen_zarr_metadata(EXACT_DATA),
+                           'spectral': verify_frozen_zarr_metadata(pilot['data_path'], pilot['data_metadata'])}
+    check_file(pilot['initialization_manifest'])
     from src.models.mamba.v24_Ilya.training.config import load_training_config
     template = read(workspace / REFERENCE / 'configs/di16_fast_mamba.json')
     start = workspace / REFERENCE / 'seeds/di16_fast_mamba_warmup/checkpoints/checkpoint_step00000500.pkl'
@@ -81,6 +81,9 @@ def prepare(experiment, workspace):
     for name in ARMS:
         config = copy.deepcopy(template)
         config['objective']['loss_kind'] = name
+        if name == 'amse':
+            config['objective'].update(amse_lmax=179, amse_lambda=AMSE_LAMBDA,
+                                       amse_power_epsilon=1e-12)
         config['output'] = {'output_root': str(experiment / 'runs'), 'run_name': name}
         config_path = experiment / 'configs' / f'{name}.json'
         write(config_path, config)
@@ -98,15 +101,18 @@ def prepare(experiment, workspace):
     baseline_sha256 = sha(baseline)
     source_digest = freeze(workspace, experiment / 'source')
     manifest = {
-        'format': 'v24_res1_amse_pair_v1', 'created_utc': datetime.now(timezone.utc).isoformat(),
+        'format': 'v24_res1_amse_blend_v1', 'created_utc': datetime.now(timezone.utc).isoformat(),
         'workspace': str(workspace), 'experiment': str(experiment), 'source_root': str(experiment / 'source'),
         'source_digest': source_digest, 'entries': entries,
+        'evaluation_data_metadata': evaluation_metadata,
         'init_from': str(start), 'init_sha256': sha(start), 'baseline_path': str(baseline),
         'baseline_sha256': baseline_sha256, 'reference_warmup': start_record,
         'primary_swa_steps': [500, 1000, 1500, 2000],
         'evaluation_reference': str(workspace / REFERENCE / 'runs/di16_fast_mamba/eval/cold_full_zero_exact_gc/matched32/swa_step00500-02000.json'),
         'spectral_protocol': str(workspace / 'plots/analyze_models/data/resolution_eval/res1_spectral_pilot_2023_20260917/protocol.json'),
-        'comparison': 'Same starting residual weights, data, state policy, seed, optimizer and 2000-update budget. Full-field FP32 scoring in both arms; original legacy MSE ran inside BF16.',
+        'amse_lambda': AMSE_LAMBDA,
+        'comparison': f'Same starting residual weights, data, state policy, seed, optimizer and 2000-update budget. Full-field FP32 scoring in both arms; compare exact grid MSE with AMSE interpolation lambda={AMSE_LAMBDA}.',
+        'spectral_definition': 'Global spherical-harmonic T179 using area-weighted QR latitude analysis on 181x360, FP32/complex64. Mean degree retained; longitude Nyquist/unresolved components excluded. Continuous spherical norm of the projected field differs from exact discrete GC area norm.',
         'preflight': {'updates': 64, 'memory_gib': 320, 'time_minutes': 120,
                       'schedule_note': 'Independent short measurement run; same warmup50, shortened cosine. Production restarts from the common500-update checkpoint.'},
         'historical_resources': {'training': ['13740084_6', '13807466_0', '13807466_1', '13807466_2'],
@@ -125,9 +131,10 @@ def verify(experiment, *, require_snapshot=False):
         raise ValueError('Source manifest changed')
     if require_snapshot and ROOT != source:
         raise ValueError('Execute from frozen source')
-    for relative, expected in read(source / 'snapshot.json')['files'].items():
-        if sha(source / relative) != expected:
-            raise ValueError(f'Frozen source changed: {relative}')
+    verify_source(source)
+    if 'evaluation_data_metadata' in m:
+        from scripts.analyze_models.evaluate_v24_amse_pair import validate_evaluation_data
+        validate_evaluation_data(experiment)
     for path, expected in ((m['init_from'], m['init_sha256']), (m['baseline_path'], m['baseline_sha256'])):
         if sha(path) != expected:
             raise ValueError(f'Frozen input changed: {path}')
@@ -166,6 +173,8 @@ def validate_training(directory, config_path, steps, manifest):
 
 def preflight(experiment, task):
     m = verify(experiment, require_snapshot=True)
+    from scripts.analyze_models.evaluate_v24_amse_pair import validate_evaluation_data
+    validate_evaluation_data(experiment)
     entry = m['entries'][task]
     # Fail on CPU fallback before a costly model build.
     call([sys.executable, '-c', 'import jax; assert any(d.platform == "gpu" for d in jax.devices()), "GPU required"'])
@@ -181,8 +190,8 @@ def preflight(experiment, task):
     call([sys.executable, '-u', ROOT / 'scripts/analyze_models/evaluate_v24_amse_pair.py',
           'smoke', '--experiment', experiment, '--task', task, '--checkpoint', checkpoint])
     roundtrip = experiment / 'checks' / f"{entry['name']}_roundtrip.json"
-    if not roundtrip.is_file():
-        raise ValueError('Checkpoint roundtrip report missing')
+    if not roundtrip.is_file() or read(roundtrip).get('passed') is not True:
+        raise ValueError('Checkpoint roundtrip did not pass')
     import numpy as np
     seconds = [r.get('end_to_end_seconds', r['step_seconds']) for r in records[4:]]
     write(experiment / 'checks' / f"{entry['name']}_preflight.json", {
@@ -257,6 +266,7 @@ def submit_preflight(experiment):
 def release(experiment):
     m = verify(experiment, require_snapshot=True)
     evaluations = []
+    requests = []
     for task, entry in enumerate(m['entries']):
         report = read(experiment / 'checks' / f"{entry['name']}_preflight.json")
         if any(report[key] != expected for key, expected in (
@@ -267,6 +277,9 @@ def release(experiment):
             raise ValueError('Roundtrip validation changed')
         resources = budget(report, m['historical_resources'])
         write(experiment / 'checks' / f"{entry['name']}_budget.json", resources)
+        requests.append((task, entry, resources))
+    # Validate both arms fully before submitting either production trajectory.
+    for task, entry, resources in requests:
         train = submit_job(experiment, f"train_{entry['name']}", sbatch(experiment, m, 'train',
                            memory=resources['memory_gib'], minutes=resources['time_minutes'], task=task))
         evaluation = submit_job(experiment, f"eval_{entry['name']}", sbatch(experiment, m, 'evaluate',
