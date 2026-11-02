@@ -136,7 +136,7 @@ def main():
             outputs += make_plot(images, name, variables, saved["diagnostics"], days, rmse, full)
         metadata = {"status": "plots_regenerated_from_saved_qc_analysis", "summary_at_render": identity(summary_path),
                     "plotter": identity(__file__), "outputs": outputs,
-                    "display": "Physical-unit RMSE; no shading; detailed eligibility remains in analysis metadata."}
+                    "display": "Physical-unit RMSE; detailed eligibility remains in analysis metadata."}
         (images / "plot_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         print(json.dumps({"images": str(images), "plotter": metadata["plotter"], "outputs": outputs}, indent=2))
         return
@@ -218,7 +218,7 @@ def main():
                         "This preview does not repair native-grid losses or other experiments using the affected source."],
         "checks": {"paired_protocol_checkpoint_truth_hashes": "passed by frozen gather()",
                    "original_summary_reproduction": "passed at rtol 2e-14",
-                   "unaffected_pooled_rmse": "bitwise unchanged", "shading": False},
+                   "unaffected_pooled_rmse": "bitwise unchanged"},
         "source_files": sources + [identity(workflow / "protocol.json"), identity(gather_path),
                                     identity(audit_path), identity(old_summary_path), identity(__file__),
                                     identity(ROOT / "scripts/analyze_models/common_grid_metrics.py")],

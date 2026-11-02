@@ -376,6 +376,114 @@ def qualify(config_path, init_path, cache_root, report_path):
     return result
 
 
+def reusable_evidence_checks(evidence, previous_config, config, previous_init_sha256, provenance):
+    """Reuse scientific execution evidence only with identical arithmetic/settings."""
+    from src.models.mamba.v24_Ilya.training.cached_checkpoint import digest_json, scientific_config
+    prior = evidence["provenance"]
+    # The frozen training implementation is the original control's implementation.
+    # Prepared storage and campaign orchestration may change independently.
+    prefixes = ("src/models/mamba/v24_Ilya/training/", "src/models/mamba/modules/",
+                "src/models/mamba/training/", "third_party/graphcast/")
+    arithmetic = {k: v for k, v in prior["code_sha256"].items()
+                  if k.startswith(prefixes) or k == "src/models/mamba/v24_Ilya/model.py"}
+    checks = {
+        "prior_execution_integrity": evidence.get("kind") == "cached_integrity"
+            and evidence.get("numerical_policy") == "advisory"
+            and evidence.get("integrity_passed") is True
+            and bool(evidence.get("checks")) and all(v is True for v in evidence["checks"].values()),
+        "prior_config_identity": prior["scientific_config_sha256"] == digest_json(scientific_config(previous_config)),
+        "same_scientific_protocol": initialization_config_identity(previous_config)
+            == initialization_config_identity(config),
+        "prior_initialization_identity": prior["shared_init_sha256"] == previous_init_sha256,
+        "same_training_arithmetic": bool(arithmetic)
+            and all(provenance["code_sha256"].get(k) == v for k, v in arithmetic.items()),
+        "same_environment": prior["environment"] == provenance["environment"],
+    }
+    if not all(checks.values()):
+        raise ValueError(f"Scientific qualification evidence cannot be reused: {checks}")
+    return checks
+
+
+def startup(config_path, init_path, cache_root, report_path, *, evidence_path,
+            previous_config_path, previous_init_path, benchmark_path=None):
+    """Bind existing execution evidence to new inputs without optimizer probes.
+
+    The completed cache verifier checks all prediction files; alignment checks
+    every overlapping weather value. This stage verifies identities and bounded
+    samples at the beginning, middle and end of the new cache on CPU.
+    """
+    import numpy as np
+    from src.models.mamba.v24_Ilya import baseline_cache
+    from src.models.mamba.v24_Ilya.checkpoint import file_sha256, load_v24_Ilya_training_checkpoint
+    from src.models.mamba.v24_Ilya.training.cached_checkpoint import build_provenance, require_integrity_report
+    from src.models.mamba.v24_Ilya.training.cached_config import load_cached_training_config
+    from src.models.mamba.v24_Ilya.training.cached_runner import execution_metadata
+    _bounded_environment()
+    config_path, init_path, cache_root = map(Path, (config_path, init_path, cache_root))
+    resolved = load_cached_training_config(config_path, **cache_execution(cache_root))
+    provenance = build_provenance(resolved.common, init_path, cache_root,
+                                  execution=execution_metadata(resolved.execution))
+    evidence = read(evidence_path)
+    previous = _clean(read(previous_config_path))
+    checks = reusable_evidence_checks(evidence, previous, resolved.common.to_dict(),
+                                      file_sha256(Path(previous_init_path)), provenance)
+    initialization = check_fresh_initialization(load_v24_Ilya_training_checkpoint(init_path), resolved.common)
+    checks.update(initialization["checks"])
+    alignment = read(cache_root / "alignment.json")
+    manifest = read(cache_root / "manifest.json")
+    ready = read(cache_root / "READY.json")
+    if (alignment.get("passed") is not True or not alignment.get("overlap", {}).get("bitwise_equal")
+            or alignment.get("manifest_sha256") != manifest["manifest_sha256"]
+            or ready.get("chunks") != len(manifest["chunks"])
+            or ready.get("shards") != manifest["num_shards"]):
+        raise ValueError("New cache lacks complete matching alignment/verification evidence")
+    context = baseline_cache.load_context(config_path)
+    if baseline_cache.build_manifest(context, manifest["num_shards"]) != manifest:
+        raise ValueError("New cache inputs differ from its completed manifest")
+    selected = sorted({0, len(manifest["chunks"]) // 2, len(manifest["chunks"]) - 1})
+    samples = []
+    for index in selected:
+        item = manifest["chunks"][index]
+        baseline_cache.verify_shard(cache_root, manifest, item["shard"], checksums=False)
+        for name, schema in manifest["variables"].items():
+            path = cache_root / f'shard_{item["shard"]:03d}/chunk_{item["id"]:06d}/{name}.npy'
+            array = np.load(path, mmap_mode="r", allow_pickle=False)
+            if (list(array.shape) != [manifest["compatibility"]["bptt_steps"], *schema["shape"]]
+                    or str(array.dtype) != schema["dtype"] or not np.isfinite(array[[0, -1]]).all()):
+                raise ValueError(f"Invalid bounded cache sample: {path}")
+        # Load only a single prepared frame per selected window.
+        data = context[4]
+        raw = item["raw_anchor_indices"][0]
+        for name, value in data.store.data_vars.items():
+            values = (value.data.take(np.asarray([raw]), axis=value.dims.index("time"))
+                      if "time" in value.dims else np.asarray(value.data))
+            if not np.isfinite(values).all():
+                raise ValueError(f"Nonfinite bounded prepared sample: {name}")
+        samples.append(dict(chunk_id=item["id"], first_target=item["target_timestamps"][0]))
+    checks.update(new_cache_identity=True, bounded_first_middle_last_finite=True,
+                  full_prepared_overlap_verified=True)
+    if not all(checks.values()):
+        raise ValueError(f"New cache startup integrity failed: {checks}")
+    benchmark = evidence.get("benchmark")
+    if benchmark_path is not None:
+        historical = read(benchmark_path)
+        benchmark = historical.get("backends", {}).get("cached_4cpu", historical)
+    if not benchmark:
+        raise ValueError("Missing reusable training resource evidence")
+    paths = [evidence_path, previous_config_path, previous_init_path,
+             cache_root / "READY.json", cache_root / "alignment.json"]
+    if benchmark_path is not None:
+        paths.append(benchmark_path)
+    result = dict(kind="cached_integrity", numerical_policy="advisory", passed=True,
+                  integrity_passed=True, checks=checks, provenance=provenance, benchmark=benchmark,
+                  qualification_reused=True, optimizer_probe_updates=0, samples=samples,
+                  numerical_warnings=evidence.get("numerical_warnings", []),
+                  reused_evidence=[dict(path=str(Path(p).resolve()), sha256=file_sha256(Path(p))) for p in paths])
+    write_once(report_path, result)
+    require_integrity_report(Path(report_path), provenance)
+    return result
+
+
 def train_open(config_path, init_path, cache_root, report_path, *, stop_step, integrity_report):
     import jax
     import numpy as np
@@ -510,7 +618,7 @@ def train_closed(config_path, parent, report_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("init", "qualify", "qualify-worker", "replay-worker",
+    parser.add_argument("stage", choices=("init", "qualify", "startup", "qualify-worker", "replay-worker",
                                           "train-open", "select", "train-closed"))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path)
@@ -520,12 +628,20 @@ def main():
     parser.add_argument("--report", type=Path)
     parser.add_argument("--parent", type=Path)
     parser.add_argument("--integrity-report", type=Path)
+    parser.add_argument("--evidence", type=Path)
+    parser.add_argument("--previous-config", type=Path)
+    parser.add_argument("--previous-init", type=Path)
+    parser.add_argument("--benchmark", type=Path)
     parser.add_argument("--stop-step", type=int)
     args = parser.parse_args()
     if args.stage == "init":
         result = {"checkpoint": str(prepare_init(args.config, args.output_dir, args.source_init))}
     elif args.stage == "qualify":
         result = qualify(args.config, args.init, args.cache_root, args.report)
+    elif args.stage == "startup":
+        result = startup(args.config, args.init, args.cache_root, args.report,
+                         evidence_path=args.evidence, previous_config_path=args.previous_config,
+                         previous_init_path=args.previous_init, benchmark_path=args.benchmark)
     elif args.stage in ("qualify-worker", "replay-worker"):
         result = _qualify_worker(args.config, args.init, args.cache_root, args.report,
                                  replay=args.stage == "replay-worker")

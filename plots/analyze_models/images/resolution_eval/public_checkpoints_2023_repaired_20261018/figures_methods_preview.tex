@@ -1,0 +1,80 @@
+% PROPOSED TEXT ONLY -- no manuscript files have been changed.
+% Both reruns and the merged 122-start report are complete. Independent
+% coverage, truth-hash, retained-field rescoring and pooled-RMSE validation
+% passed on 2026-10-19 at 01:19:07 UTC; numerical rerun differences were reviewed.
+% Validated summary SHA256:
+% dcda10d74149a270ffc244941c0b8440bd60fbd7596dd763b05898003e4d5e81
+% Bootstrap intervals were not independently recomputed by that validator.
+% Intended figures: fig5_public_checkpoints_2023_repaired.{pdf,png} and
+% fig9_public_checkpoints_2023_repaired.{pdf,png}; physical RMSE, lines only.
+% Repair protocol: a0e67b8a329c32f0d8c60880136beb17126f8130ee339eda3f3662c5a91dda76
+% Captions remain descriptive; no comparative claim has been added.
+
+% Proposed Figure 5 caption:
+Forecast RMSE of the principal GraphCast--Mamba correction M1 ($1^\circ$)
+and the public DeepMind GraphCast\_small ($1^\circ$) and GraphCast
+($0.25^\circ$) checkpoints for Z500, T2m and U850.
+All models share 122 initializations at 00 UTC every third day from
+January 1 to December 30, 2023, and 40 six-hourly forecast leads through
+ten days. Lines show physical-unit RMSE after conservative remapping to
+a common $1.5^\circ$ verification grid and pooling squared errors across
+all 122 initializations at every lead.
+
+% Proposed Figure 9 caption:
+The comparison in Figure 5 extended to twelve diagnostics, using the same
+checkpoints, initialization dates, verification fields and aggregation.
+Geopotential is measured in $\mathrm{m^2\,s^{-2}}$, temperature in K,
+pressure in Pa, specific humidity in $\mathrm{kg\,kg^{-1}}$, and wind
+components in $\mathrm{m\,s^{-1}}$. Each plotted point uses all 122
+initializations.
+
+% Proposed Appendix C methods:
+We generate forecasts locally from the fixed principal M1 checkpoint and
+the public DeepMind GraphCast checkpoints~\citep{lam2023graphcast}.
+The $1^\circ$ reference is GraphCast\_small, with 13 pressure levels and
+mesh refinement level 5, trained on ERA5 for 1979--2015; the $0.25^\circ$
+reference uses 37 pressure levels and mesh refinement level 6, trained for
+1979--2017. Both public checkpoints include precipitation as an input and
+output. M1 uses the same selected correction checkpoint as the principal
+evaluation. Each forecast begins with two observed states six hours apart
+and subsequently feeds back its own predictions. M1's recurrent state is
+initialized to zero at each forecast start, with no observational warmup.
+Network calculations use bfloat16, with float32 physical fields and state
+boundaries. The comparison reflects differences in spatial resolution,
+pressure levels, architecture and training coverage.
+
+Verification uses ERA5~\citep{hersbach2020era5} from
+\href{https://github.com/google-research/arco-era5}{ARCO ERA5}, with
+documented source-data repairs from the independently curated
+\href{https://doi.org/10.5065/BH6N-5N20}{NSF NCAR ERA5 archive} validated
+against unaffected times and fields. The same verification fields are
+used for all three models. Predictions at their native resolution and
+verification fields at $0.25^\circ$ are mapped to a $121\times240$
+latitude--longitude grid ($-90^\circ$ to $90^\circ$, $0^\circ$ to
+$358.5^\circ$) using first-order conservative spherical-cell overlap,
+midpoint cell boundaries clipped at the poles, and periodic longitude.
+For each diagnostic and lead, squared errors receive normalized
+cosine-latitude weights and are averaged across all 122 initializations
+before taking the square root. Verification extends through January 9,
+2024. Checkpoint checksums, initialization dates, frozen evaluator code,
+normalization files and source-data repair identities accompany the results.
+
+Pointwise uncertainty estimates reported separately use 10,000 paired,
+non-wrapping moving-block bootstrap draws with five consecutive
+initialization dates per block; three- and seven-start blocks provide
+sensitivity checks. These intervals condition on the fixed checkpoints
+and evaluation dates and do not quantify training-seed variation.
+
+% Provenance notes for editorial review (not proposed caption text):
+% Public checkpoint identities are established by the frozen files/checksums:
+% GC1: e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29
+% GC025: 4e8cf600f3f402ebb430483e782b94648cef57bb757dec24dd7b11760d3fbacc
+% M1: b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0
+% M1 file: di16_fast_mamba/swa/swa_step00500-02000.pkl.
+% Equivalence to a separate internal WeatherBench2 GraphCast checkpoint or
+% archived WeatherBench2 forecast product has not been established.
+% The parent protocol records prior numerical-pilot exposure for three sampled
+% initialization dates; do not describe every case as previously unseen.
+% This repair concerns common-grid physical RMSE. Native original-GraphCast
+% loss produced during reruns still uses the original native truth and is
+% retained only as a numerical comparison, not a corrected native-loss result.

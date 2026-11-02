@@ -721,12 +721,19 @@ def write_cadence_outputs(protocol, result, baseline, full, output_dir, image_di
     lines.extend(f"- {limitation}" for limitation in result["limitations"])
     lines.extend(numerical_summary_lines(result))
     (output_dir / "report.md").write_text("\n".join(lines) + "\n")
+    plot_cadence_figures(protocol, result, image_dir)
+
+
+def plot_cadence_figures(protocol, result, image_dir):
+    """Render an existing cadence analysis without repeating its statistics."""
     if image_dir is None:
         return
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    image_dir = Path(image_dir)
     image_dir.mkdir(parents=True, exist_ok=True)
+    primary = result["primary"]
 
     def save(figure, stem):
         figure.tight_layout()
@@ -737,12 +744,10 @@ def write_cadence_outputs(protocol, result, baseline, full, output_dir, image_di
     days = np.asarray(protocol["lead_hours"]) / 24
     figure, axis = plt.subplots(figsize=(9, 5))
     for m, model_id in enumerate(result["model_ids"]):
-        line, = axis.plot(days, primary["improvement_pct"][m][1:], label=model_id)
-        axis.fill_between(days, primary["pointwise_ci95_lower"][m][1:], primary["pointwise_ci95_upper"][m][1:],
-                          alpha=0.10, color=line.get_color())
+        axis.plot(days, primary["improvement_pct"][m][1:], label=model_id)
     axis.axhline(0, color="black", linewidth=.8)
     axis.set(xlabel="Forecast lead (days)", ylabel="Exact GraphCast loss reduction (%)",
-             title="2023 · 122 starts · pointwise 95% paired block intervals")
+             title="2023 · 122 starts")
     axis.legend(ncol=2)
     save(figure, "exact_loss_reduction_2023")
     figure, axis = plt.subplots(figsize=(8, 3.8))
@@ -826,10 +831,9 @@ def write_outputs(
         figure, axes = plt.subplots(figsize=(8, 4.5))
         days = np.asarray(result["lead_hours"]) / 24.0
         for m, model_id in enumerate(result["model_ids"]):
-            line, = axes.plot(days, primary["improvement_pct"][m][1:], label=model_id)
-            axes.fill_between(days, primary["pointwise_ci95_lower"][m][1:], primary["pointwise_ci95_upper"][m][1:], alpha=0.18, color=line.get_color())
+            axes.plot(days, primary["improvement_pct"][m][1:], label=model_id)
         axes.axhline(0, color="black", linewidth=0.8)
-        axes.set(xlabel="Forecast lead (days)", ylabel="Exact GraphCast loss reduction (%)", title="2023 daily starts · pointwise 95% paired block intervals")
+        axes.set(xlabel="Forecast lead (days)", ylabel="Exact GraphCast loss reduction (%)", title="2023 daily starts")
         axes.grid(alpha=0.2)
         axes.legend()
         figure.tight_layout()

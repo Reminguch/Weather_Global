@@ -1,13 +1,18 @@
 """Finite-step safeguards on deterministic, noisy and rounded toy objectives."""
 from dataclasses import FrozenInstanceError
+from functools import partial
 import json
 
 import numpy as np
 import pytest
 
 from src.models.mamba.v24_Ilya.training.mgda_acceptance import (
-    LossTolerances, backtrack_losses, calibrate_loss_tolerances,
+    LossTolerances, backtrack_losses as _backtrack_losses, calibrate_loss_tolerances,
 )
+
+# Historical strict behavior remains covered explicitly; production defaults
+# to advisory scheduled updates.
+backtrack_losses = partial(_backtrack_losses, decrease_policy="error")
 
 
 def tolerances(losses=(1., 2.), **kwargs):
@@ -54,11 +59,36 @@ def test_fixed_sum_rejects_sum_increase_even_when_mse_improves():
     assert not result.accepted
 
 
+@pytest.mark.parametrize("mode", ["mgda", "mse_control", "fixed_sum"])
+@pytest.mark.parametrize("candidate", [(1.01, 2.01), (1., 2.)])
+def test_advisory_default_commits_finite_increase_or_tie_at_scheduled_lr(mode, candidate):
+    calls = []
+    def evaluate(lr):
+        calls.append(lr)
+        return candidate
+    with pytest.warns(RuntimeWarning, match="committing finite scheduled update"):
+        result = _backtrack_losses((1., 2.), evaluate, mode=mode, tolerances=tolerances())
+    assert calls == [1e-6]
+    assert result.accepted and not result.measured_decrease
+    assert result.reason == "advisory_no_decrease" and result.decrease_policy == "warn"
+    assert result.losses == candidate and result.learning_rate == 1e-6
+    assert not result.trials[0].measured_decrease
+    json.dumps(result.to_dict(), allow_nan=False)
+
+
+@pytest.mark.parametrize("candidate", [(np.nan, 2.), (1., np.inf)])
+def test_advisory_default_never_commits_nonfinite_candidate(candidate):
+    result = _backtrack_losses((1., 2.), lambda lr: candidate, mode="mgda", tolerances=tolerances())
+    assert not result.accepted and result.reason == "nonfinite_loss"
+    assert len(result.trials) == 1 and result.losses is None
+    json.dumps(result.to_dict(), allow_nan=False)
+
+
 def test_identical_replay_noise_sets_strict_decrease_floor():
     # Powers of two make exact equality at the acceptance boundary testable.
     noise = 2. ** -20
     qualified = calibrate_loss_tolerances([(1., 2.), (1. + noise, 2. + noise), (1., 2.)],
-                                         absolute_floor=0, relative_floor=0)
+                                         absolute_floor=0, relative_floor=0, repeatability_policy="error")
     assert qualified.repeatability_span == (noise, noise)
     assert qualified.thresholds((1., 2.)) == (4 * noise, 4 * noise)
     calls = []
@@ -74,12 +104,44 @@ def test_identical_replay_noise_sets_strict_decrease_floor():
     json.dumps(qualified.to_dict(), allow_nan=False)
 
 
-def test_repeatability_qualification_rejects_noise_instead_of_relaxing_threshold_unboundedly():
+def test_explicit_legacy_strict_policy_rejects_noise():
     with pytest.raises(ValueError, match="configured bound"):
-        calibrate_loss_tolerances([(1., 2.), (1.01, 2.), (1., 2.)], max_relative_noise=1e-3)
+        calibrate_loss_tolerances([(1., 2.), (1.01, 2.), (1., 2.)],
+                                 max_relative_noise=1e-3, repeatability_policy="error")
     # At zero, the explicit absolute floor bounds the permissible variation.
     with pytest.raises(ValueError, match="configured bound"):
-        calibrate_loss_tolerances([(0., 0.), (1e-7, 0.), (0., 0.)], absolute_floor=1e-8)
+        calibrate_loss_tolerances([(0., 0.), (1e-7, 0.), (0., 0.)],
+                                 absolute_floor=1e-8, repeatability_policy="error")
+
+
+@pytest.mark.parametrize("mode", ["mgda", "mse_control", "fixed_sum"])
+def test_actual_failed_pilot_variance_warns_and_does_not_indirectly_reject_decrease(mode):
+    repeated = [[3.5118603706359863, .9506522417068481],
+                [3.504420042037964, .9496756792068481],
+                [3.510044813156128, .9508850574493408]]
+    with pytest.warns(RuntimeWarning, match="advisory only"):
+        qualified = calibrate_loss_tolerances(repeated)
+    before = np.mean(repeated, axis=0)
+    assert qualified.noise_exceeded == (True, True)
+    assert qualified.repeatability_policy == "warn"
+    np.testing.assert_allclose(qualified.thresholds(before), before * 1e-7)
+    # A measured decrease smaller than repeatability noise is allowed, with
+    # the larger noise-aware margin retained for interpretation.
+    result = backtrack_losses(before, lambda lr: before - 1e-4, mode=mode, tolerances=qualified)
+    assert result.accepted
+    assert all(floor > 1e-4 for floor in qualified.noise_thresholds(before))
+    json.dumps(qualified.to_dict(), allow_nan=False)
+    worse = backtrack_losses(before, lambda lr: before + 1e-4, mode=mode,
+                            tolerances=qualified, max_halvings=0)
+    assert not worse.accepted
+
+
+def test_warning_policy_still_records_near_zero_noise_and_rejects_invalid_policy():
+    with pytest.warns(RuntimeWarning):
+        qualified = calibrate_loss_tolerances([(0., 0.), (1e-7, 0.), (0., 0.)])
+    assert qualified.noise_exceeded == (True, False)
+    with pytest.raises(ValueError, match="repeatability_policy"):
+        tolerances(repeatability_policy="ignore")
 
 
 def test_zero_objectives_and_stationary_direction_stall_without_accepting_ties():

@@ -1,4 +1,4 @@
-"""Immutable fresh residual 7/40-year campaign with an existing seven-year control."""
+"""Immutable fresh residual data-scale campaigns with reusable seven-year controls."""
 from __future__ import annotations
 
 import argparse
@@ -26,6 +26,7 @@ CONTROL = 'artifacts/checkpoints/v24_Ilya/res1_cached_w128_di_sweep_recovery_202
 CONTROL_CL = 'artifacts/checkpoints/v24_Ilya/res1_cached_w128_closed_loop_k20_20261013'
 PRODUCER = 'artifacts/checkpoints/v24_Ilya/res1_cached_40yr_w512_di64_20261014_v5'
 NEW_ARMS = ('w512_7y', 'w128_40y', 'w512_40y')
+REUSED_CAMPAIGN = 'artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2'
 
 
 def pinned(path):
@@ -67,7 +68,13 @@ def freeze_runtime(workspace, destination, control_source):
                 purpose='Historical batch1 training arithmetic; bounded reads and year shards are I/O changes')
 
 
-def prepare(root, workspace):
+def prepare(root, workspace, *, large_training_years=40, producer_root=None, reused_campaign=None):
+    if large_training_years == 20:
+        if producer_root is None:
+            raise ValueError('The twenty-year campaign requires its dedicated producer root')
+        return prepare_twenty(root, workspace, producer_root, reused_campaign or Path(workspace) / REUSED_CAMPAIGN)
+    if large_training_years != 40 or producer_root is not None or reused_campaign is not None:
+        raise ValueError('Custom producer/reused controls are supported by the new twenty-year campaign')
     from scripts.experiments.fresh_data_scale_training import open_config, closed_config
     from src.data_operations.loaders.zarr_metadata import frozen_zarr_metadata
     root, workspace = Path(root).resolve(), Path(workspace).resolve()
@@ -141,6 +148,117 @@ def prepare(root, workspace):
              common_closed_training_years=[2015, 2021], numerical_policy='advisory',
              sampling='historical chronological segments; record selected-parent cursor',
              created_at=now())
+    m['workflow_id'] = digest(m)
+    write(root / 'manifest.json', m)
+    write(root / 'state.json', dict(workflow_id=m['workflow_id'], automation_enabled=False, jobs={}))
+    return verify(root)
+
+
+def prepare_twenty(root, workspace, producer_root, reused_campaign):
+    """Two new twenty-year lineages, preserving both completed seven-year arms."""
+    from scripts.experiments.fresh_data_scale_training import open_config, closed_config
+    from src.data_operations.loaders.zarr_metadata import frozen_zarr_metadata
+    root, workspace, producer_root, reused_campaign = map(
+        lambda p: Path(p).resolve(), (root, workspace, producer_root, reused_campaign))
+    if root.exists():
+        raise FileExistsError(f'Use an empty new campaign root: {root}')
+    old = verify(reused_campaign)
+    producer = read(producer_root / 'campaign.json')
+    if (producer.get('years') != list(range(2002, 2023))
+            or producer.get('training_years') != [2002, 2021]
+            or producer.get('validation_year') != 2022
+            or producer.get('stop_after') != 'cache_verify'):
+        raise ValueError('Producer must prepare 2002–2021 training plus 2022 validation and stop after its cache')
+    control, closed_control = workspace / CONTROL, workspace / CONTROL_CL
+    template = read(control / 'runs/cached/run_config.json')
+    closed_template = read(closed_control / 'runs/di64/run_config.json')
+    paths = dict(large_prepared=producer['paths']['prepared_root'],
+                 producer_cache=producer['paths']['cache_root'],
+                 large_anchor=str(root / 'data/aligned_anchors'),
+                 large_cache=str(root / 'data/aligned_cache'),
+                 small_cache=old['paths']['small_cache'], producer_root=str(producer_root),
+                 download_status=producer['paths']['download_status'])
+    for name in ('configs', 'reports', 'logs', 'intents', 'data', 'results'):
+        (root / name).mkdir(parents=True, exist_ok=True)
+    arms, inputs = {}, [pinned(reused_campaign / 'manifest.json'), pinned(producer_root / 'campaign.json')]
+    # Fixed checkpoints and completed development evaluations are reused as evidence.
+    for name in ('w128_7y', 'w512_7y'):
+        prior = old['arms'][name]
+        if name == 'w128_7y':
+            parent, final = prior['parent'], prior['final']
+            evidence = control / 'reports/integrity.json'
+            benchmark = control / 'reports/benchmark.json'
+            init = control / 'shared/checkpoint_step00000000.pkl'
+            evaluations = {f'2022_{label}': str(closed_control / f'evaluation/di64_step{step:05d}.json')
+                           for label, step in (('parent', 0), ('final', 2000))}
+        else:
+            selection = require_result(old, f'select_{name}')
+            trained = require_result(old, f'closed_{name}')
+            if selection.get('step') != 8000 or trained.get('completed_step') != 2000:
+                raise ValueError('Completed width512 control endpoint/parent changed')
+            parent, final = selection['checkpoint'], trained['checkpoint']
+            if sha(parent) != selection['checkpoint_sha256'] or sha(final) != trained['checkpoint_sha256']:
+                raise ValueError('Completed seven-year checkpoint changed')
+            evidence = Path(prior['root']) / 'qualification.json'
+            benchmark = None
+            init = Path(prior['init_dir']) / 'checkpoint_step00000000.pkl'
+            evaluations = {}
+            for index, label in enumerate(('parent', 'final')):
+                output = require_result(old, f'eval2022_{name}_{index:03d}')['output']
+                if pinned(output['path']) != output:
+                    raise ValueError('Completed seven-year evaluation changed')
+                evaluations[f'2022_{label}'] = output['path']
+        inputs += [pinned(p) for p in (prior['open_config'], prior['closed_config'], parent, final, init, evidence,
+                                      *evaluations.values())]
+        if benchmark is not None:
+            inputs.append(pinned(benchmark))
+        arms[name] = dict(name=name, width=prior['width'], years=7, reused=True,
+                         root=str(root / 'arms' / name), open_config=prior['open_config'],
+                         closed_config=prior['closed_config'], parent=parent, final=final,
+                         initial_checkpoint=str(init), scientific_evidence=str(evidence),
+                         benchmark_evidence=str(benchmark) if benchmark is not None else None,
+                         reused_evaluations=evaluations, reused_from=str(reused_campaign))
+        merged = Path(prior['root']) / 'evaluation/merged2023.json'
+        if merged.exists():
+            # Saved complete results can be imported after strict identity checking.
+            arms[name]['reused_merged2023'] = str(merged)
+            inputs.append(pinned(merged))
+    for width in (128, 512):
+        name = f'w{width}_20y'
+        prior = arms[f'w{width}_7y']
+        ar = root / 'arms' / name
+        op, cp = root / 'configs' / f'{name}_open.json', root / 'configs' / f'{name}_closed.json'
+        write(op, open_config(template, ar / 'open', 'cached', width,
+                 paths=dict(prepared_root=paths['large_prepared'], anchor_manifest_root=paths['large_anchor'])))
+        write(cp, closed_config(closed_template, ar / 'closed/runs', 'closed', width))
+        arms[name] = dict(name=name, width=width, years=20, root=str(ar), open_config=str(op),
+                         closed_config=str(cp), init_dir=str(ar / 'init'),
+                         init_source=prior['initial_checkpoint'], cache_root=paths['large_cache'],
+                         scientific_evidence=prior['scientific_evidence'],
+                         benchmark_evidence=prior['benchmark_evidence'],
+                         evidence_config=prior['open_config'])
+    cache_config = root / 'configs/cache.json'
+    write(cache_config, read(arms['w128_20y']['open_config']))
+    inputs += [pinned(p) for p in (old['init2023'], template['data']['baseline_checkpoint'])]
+    inputs += [pinned(p) for p in Path(template['data']['stats_dir']).glob('*.nc')]
+    inputs += [pinned(Path(paths['small_cache']) / name) for name in ('manifest.json', 'READY.json')]
+    inputs += [pinned(Path(template['data']['prepared_root']) / 'metadata.json')]
+    inputs += [pinned(p) for p in Path(template['data']['anchor_manifest_root']).rglob('*') if p.is_file()]
+    runtime = freeze_runtime(workspace, root / 'source', control / 'source')
+    write(root / 'source_provenance.json', runtime)
+    m = dict(format=FORMAT, root=str(root), workspace=str(workspace), source=str(root / 'source'),
+             source_digest=runtime['source_digest'], paths=paths, arms=arms,
+             configs=[pinned(p) for p in sorted((root / 'configs').glob('*.json'))], inputs=inputs,
+             cache_config=str(cache_config), cache_shards=20, wait_hours=143,
+             large_training_years=20, prepared_years=list(range(2002, 2023)),
+             training_years=[2002, 2021], validation_year=2022, new_arms=['w128_20y', 'w512_20y'],
+             reuse_qualification=True, producer_scheduler_bridge=False,
+             eval_data2022=old['eval_data2022'], eval_data2023=old['eval_data2023'], init2023=old['init2023'],
+             eval_metadata2022=frozen_zarr_metadata(old['eval_data2022']),
+             eval_metadata2023=frozen_zarr_metadata(old['eval_data2023']), chosen_idx=old['chosen_idx'],
+             open_steps=20000, closed_steps=2000, warmup_steps=200, seed=22,
+             common_closed_training_years=[2015, 2021], numerical_policy='advisory',
+             sampling='historical chronological segments; record selected-parent cursor', created_at=now())
     m['workflow_id'] = digest(m)
     write(root / 'manifest.json', m)
     write(root / 'state.json', dict(workflow_id=m['workflow_id'], automation_enabled=False, jobs={}))
@@ -228,6 +346,16 @@ def submit_job(m, key, spec, dependencies=()):
 
 def initial_jobs(m):
     # Distinct aligned-cache producer; shared prepared data has one existing owner.
+    if m.get('reuse_qualification'):
+        return [
+            ('prepared_wait', job('prepared_wait', memory=2, cpus=1, minutes=m['wait_hours'] * 60 + 5), []),
+            ('aligned_prepare', job('aligned_prepare', memory=64, cpus=8, minutes=240), ['prepared_wait']),
+            ('cache_generate', job('cache_generate', memory=8, cpus=2, minutes=240,
+                                   array=m['cache_shards']), ['aligned_prepare']),
+            ('cache_verify', job('cache_verify', memory=16, cpus=4, minutes=240), ['cache_generate']),
+            *[(f'qualify_{arm}', job('startup', arm=arm, memory=64, cpus=4, minutes=60), ['cache_verify'])
+              for arm in m['new_arms']],
+        ]
     return [
         ('producer_scheduler_bridge', job('producer_scheduler_bridge', memory=2, cpus=1, minutes=m['wait_hours'] * 60 + 5), []),
         ('prepared_wait', job('prepared_wait', memory=2, cpus=1, minutes=m['wait_hours'] * 60 + 5), []),
@@ -240,16 +368,22 @@ def initial_jobs(m):
     ]
 
 
-def submit(m, *, dry=False):
+def submit(m, *, dry=False, producer_dependency=None):
+    jobs = initial_jobs(m)
+    if producer_dependency is not None:
+        if not str(producer_dependency).isdigit() or not m.get('reuse_qualification'):
+            raise ValueError('A producer dependency is a numeric job ID for the new twenty-year campaign')
+        jobs = [(key, spec, [str(producer_dependency)] if key == 'prepared_wait' else deps)
+                for key, spec, deps in jobs]
     if dry:
-        return {'submitted': False, 'initial_jobs': initial_jobs(m),
-                'automatic': 'qualify → 5×4000 open updates → select → closed2k → matched32; all finals frozen → 2023 eight shards/model → comparison'}
+        return {'submitted': False, 'initial_jobs': jobs,
+                'automatic': 'startup/reused qualification → 5×4000 open updates → select → closed2k → matched32; all finals frozen → 2023 eight shards/model or valid saved results → comparison'}
     with locked(m['root']):
         p = Path(m['root']) / 'state.json'
         state = read(p); state['automation_enabled'] = True; write(p, state)
     ids = {}
-    for key, spec, deps in initial_jobs(m):
-        ids[key] = submit_job(m, key, spec, [ids[d] for d in deps])
+    for key, spec, deps in jobs:
+        ids[key] = submit_job(m, key, spec, [ids.get(d, d) for d in deps])
     return ids
 
 
@@ -286,7 +420,7 @@ def advance(m, key, spec, result):
         return
     jid = state['jobs'][key]['job_id']
     arm = spec['arm']
-    if spec['stage'] == 'qualify':
+    if spec['stage'] in ('qualify', 'startup'):
         budget = training_budget(result, m['arms'][arm]['width'])
         previous = jid
         for stop in range(4000, 20001, 4000):
@@ -301,6 +435,9 @@ def advance(m, key, spec, result):
     elif spec['stage'] == 'freeze_finals':
         merges = []
         for name in m['arms']:
+            if m['arms'][name].get('reused_merged2023'):
+                merges.append(submit_job(m, f'merge_{name}', job('reuse2023', arm=name, memory=8), [jid]))
+                continue
             ev = submit_job(m, f'eval2023_{name}', job('eval2023', arm=name, memory=20, cpus=4,
                            minutes=90, gpu='gpu80&nomig', array=8), [jid])
             merges.append(submit_job(m, f'merge_{name}', job('merge', arm=name, memory=8), [ev]))
@@ -309,7 +446,7 @@ def advance(m, key, spec, result):
 
 def maybe_freeze_finals(m):
     jobs = read(Path(m['root']) / 'state.json')['jobs']
-    required = [f'eval2022_{arm}' for arm in NEW_ARMS]
+    required = [f'eval2022_{arm}' for arm in m.get('new_arms', NEW_ARMS)]
     if all(k in jobs for k in required):
         submit_job(m, 'freeze_finals', job('freeze_finals', memory=16), [jobs[k]['job_id'] for k in required])
 
@@ -342,7 +479,7 @@ def execute_stage(m, key, spec, index):
             print(json.dumps({'waiting_for': str(cache_ready), 'download': status.get('current_year'), 'at': now()}), flush=True)
             time.sleep(60)
         record = read(ready)
-        if record.get('status') != 'complete' or record.get('years') != list(range(1982, 2023)):
+        if record.get('status') != 'complete' or record.get('years') != m.get('prepared_years', list(range(1982, 2023))):
             raise ValueError('Incomplete full prepared-data marker')
         if record.get('metadata_sha256') != sha(ready.parent / 'metadata.json') or (ready.parent / '.incomplete').exists():
             raise ValueError('Invalid prepared-data identity')
@@ -357,22 +494,28 @@ def execute_stage(m, key, spec, index):
         if stage == 'aligned_prepare':
             require_result(m, 'prepared_wait')
             return cache.prepare_aligned_cache(Path(m['cache_config']), Path(paths['small_cache']), Path(paths['large_cache']),
-                                               num_shards=40, historical_cache_root=Path(paths['producer_cache']))
+                                               num_shards=m.get('cache_shards', 40), historical_cache_root=Path(paths['producer_cache']))
         require_result(m, 'aligned_prepare')
         if stage == 'cache_generate':
             return cache.generate_aligned_shard(Path(m['cache_config']), Path(paths['small_cache']), Path(paths['large_cache']), index,
                                                historical_cache_root=Path(paths['producer_cache']))
         return cache.verify_aligned_cache(Path(paths['large_cache']))
-    if stage == 'qualify':
-        if arm['years'] == 40:
+    if stage in ('qualify', 'startup'):
+        if arm['years'] > 7:
             require_result(m, 'cache_verify')
         args = ['init', '--config', arm['open_config'], '--output-dir', arm['init_dir']]
         if arm['init_source']:
             args += ['--source-init', arm['init_source']]
         run_helper('training', args)
         report = Path(arm['root']) / 'qualification.json'
-        run_helper('training', ['qualify', '--config', arm['open_config'], '--init', str(Path(arm['init_dir']) / 'checkpoint_step00000000.pkl'),
-                   '--cache-root', arm['cache_root'], '--report', report])
+        args = [stage, '--config', arm['open_config'], '--init', str(Path(arm['init_dir']) / 'checkpoint_step00000000.pkl'),
+                '--cache-root', arm['cache_root'], '--report', report]
+        if stage == 'startup':
+            args += ['--evidence', arm['scientific_evidence'], '--previous-config', arm['evidence_config'],
+                     '--previous-init', arm['init_source']]
+            if arm.get('benchmark_evidence'):
+                args += ['--benchmark', arm['benchmark_evidence']]
+        run_helper('training', args)
         return read(report)
     if stage == 'open':
         require_result(m, f'qualify_{arm["name"]}')
@@ -435,10 +578,24 @@ def execute_stage(m, key, spec, index):
         result = merge(files, Path(m['init2023']), Path(arm['root']) / 'evaluation/merged2023.json',
                        expected_checkpoint=checkpoint['path'])
         return dict(passed=True, **result)
+    if stage == 'reuse2023':
+        from scripts.experiments.fresh_data_scale_evaluation import manifest_times, loss_arrays
+        result = read(arm['reused_merged2023'])
+        checkpoint = require_result(m, 'freeze_finals')['finals'][arm['name']]['checkpoint']
+        if (result.get('status') != 'complete' or result['identity']['checkpoint'] != checkpoint
+                or pinned(checkpoint['path']) != checkpoint
+                or result['identity']['initializations'] != pinned(m['init2023'])
+                or result['initialization_times'] != manifest_times(m['init2023'])):
+            raise ValueError('Saved seven-year 2023 evaluation is incompatible')
+        loss_arrays(result['baseline_loss_matrix'], result['full_loss_matrix'], (122, 40))
+        write(Path(arm['root']) / 'evaluation/merged2023.json', result)
+        return dict(passed=True, **result)
     if stage == 'comparison':
         from scripts.experiments.fresh_data_scale_evaluation import comparison_report
         reports = {name: str(Path(a['root']) / 'evaluation/merged2023.json') for name, a in m['arms'].items()}
-        result = comparison_report(reports, root / 'results')
+        large = m.get('large_training_years', 40)
+        result = comparison_report(reports, root / 'results',
+                                   arm_keys={(w, y): f'w{w}_{y}y' for w in (128, 512) for y in (7, large)})
         return dict(passed=True, **result)
     raise ValueError(stage)
 
@@ -490,12 +647,17 @@ def main():
     p.add_argument('--stage')
     p.add_argument('--index', type=int)
     p.add_argument('--dry-run', action='store_true')
+    p.add_argument('--large-training-years', type=int, choices=(20, 40), default=40)
+    p.add_argument('--producer-root', type=Path)
+    p.add_argument('--reuse-campaign', type=Path)
+    p.add_argument('--producer-dependency')
     a = p.parse_args()
-    m = prepare(a.campaign_root, a.workspace) if a.action == 'prepare' else verify(a.campaign_root, runtime=a.action == 'execute')
+    m = prepare(a.campaign_root, a.workspace, large_training_years=a.large_training_years,
+                producer_root=a.producer_root, reused_campaign=a.reuse_campaign) if a.action == 'prepare' else verify(a.campaign_root, runtime=a.action == 'execute')
     if a.action in ('prepare', 'verify'):
         result = {'passed': True, 'root': m['root'], 'workflow_id': m['workflow_id']}
     elif a.action == 'submit':
-        result = submit(m, dry=a.dry_run)
+        result = submit(m, dry=a.dry_run, producer_dependency=a.producer_dependency)
     elif a.action == 'execute':
         result = execute(m, a.stage, a.index)
     elif a.action == 'advance':

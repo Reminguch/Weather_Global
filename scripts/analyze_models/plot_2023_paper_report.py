@@ -90,7 +90,6 @@ def main():
             ax.plot(days, full, color=BLUE, lw=1.6, label="GraphCast–Mamba (M1)")
             ax.set_ylim(bottom=0)
         axes[0, 1].plot(days, m1.improvement_pct, color=BLUE, lw=1.6)
-        axes[0, 1].fill_between(days, m1.pointwise_ci95_lower, m1.pointwise_ci95_upper, color=BLUE, alpha=.16)
         axes[1, 1].plot(days, temp.rmse_reduction_pct, color=BLUE, lw=1.6)
         axes[0, 1].set_ylim(-2, 26)
         axes[1, 1].set_ylim(-1, 12)
@@ -105,7 +104,7 @@ def main():
         fig.legend(*axes[0, 0].get_legend_handles_labels(), loc="lower center", bbox_to_anchor=(.5, .08), ncol=2, frameon=False)
         aggregate = loss.query("model_id == 'M1' and endpoint == 'rollout'").iloc[0].improvement_pct
         fig.text(.5, .052, f"Exact loss reduction: rollout {aggregate:.2f}% · day 10 {m1.improvement_pct.iloc[-1]:.2f}%", ha="center", fontsize=9)
-        fig.text(.5, .022, "Shading: pointwise 95% loss intervals; numerical-repeatability warning retained.", ha="center", fontsize=8)
+        fig.text(.5, .022, "Numerical-repeatability warning retained.", ha="center", fontsize=8)
         save(fig, "forecast_skill_2023")
 
         selected = rmse.query("endpoint == 'lead' and lead_hours in [120,144,168,192,216,240]")
@@ -195,7 +194,7 @@ def main():
         "sources": [{"path": str(p.relative_to(ROOT)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in inputs],
         "figures": exports, "accuracy_starts": 122, "spectral_starts": 8,
         "model": "M1 (prespecified, same checkpoint as paper's 2022 primary figure)",
-        "loss_intervals": "pointwise 95%, paired block bootstrap; not simultaneous bands",
+        "loss_intervals": "pointwise 95%, paired block bootstrap; not simultaneous intervals",
         "numerical_warnings": "Saved repeatability warnings retained; no new inference performed.",
         "coverage": "No 83-channel coverage figure: this report exports variable-group RMSE, not per-channel MSE.",
         "metric_checks": "Saved loss and RMSE reductions recomputed and verified; spectral and accuracy checkpoint identities match.",

@@ -610,20 +610,20 @@ selected-M1 superiority claim. The archive-versus-public-checkpoint numerical
 question from e006 remains distinct and unresolved. Manuscript source figures
 have not been replaced by this regeneration.
 
-### October18 — Remove uncertainty shading from Figure5/9 previews
+### October18 — Point-estimate Figure5/9 previews
 
 At the user's request, regenerated both matched68-date PDF/PNG figures with
 point-estimate curves only. The working report script now has a `plots` phase
 that reads the completed summary without rescoring or recomputing intervals.
 Saved uncertainty estimates, scores, dates and frozen source are unchanged;
 `plot_metadata.json` alongside the figures records the summary and plotter
-hashes and the absence of uncertainty shading. Manuscript files remain pending
+hashes and point-estimate display. Manuscript files remain pending
 the user's review of these previews.
 
 ### October18 — Incorporate approved Figure5/9 replacements into the arXiv draft
 
 The user approved replacing Figures5/9 and explaining their construction.
-`Overleaf/arxiv_versoin.tex` now uses the exact unshaded PDF previews, copied
+`Overleaf/arxiv_versoin.tex` now uses the exact PDF previews, copied
 with their PNGs into `Overleaf/Graphs/common_grid_2022_matched68/`.
 The accompanying `figure_sources.json` records hashes, the checkpoint and
 archive identities, all68 dates, the recovered exclusion origins, scoring
@@ -730,7 +730,7 @@ block-length and pilot sensitivities, was independently checked; every day10
 interval remains bitwise identical to the original report.
 
 The figures show physical-unit RMSE on the common1.5degree grid without ENS
-normalization or shading. Day10 M1 RMSE reductions versus publicGC025 remain
+normalization. Day10 M1 RMSE reductions versus publicGC025 remain
 7.6785--11.3892% across12 diagnostics: Z5008.4640%, T2m10.2420%, U85010.0657%.
 All day10 lower confidence bounds remain positive across the prescribed
 sensitivities. This compares fixed public models with different training,
@@ -750,3 +750,457 @@ M1 reduction14.42401956% becomes14.43160406%, matched reset9.16266207% becomes
 9.16818853%, and their advantage5.26135748pp becomes5.26341553pp. Day10 is
 unchanged. These remain sensitivity estimates, not replacements for native
 manuscript values; saved aggregate losses cannot isolate affected levels.
+
+### e009 — October18: Recover independent truth and rerun the three affected starts
+
+Execution: completed. Outcome: supported for the specified fixed-model,
+common-grid comparison; independent truth recovery and rescoring passed.
+
+The user explicitly authorized recovering valid ERA5 truth and rerunning
+November 3, 6 and 9, 2023 after asking why rerunning against the original archive
+would not resolve the anomaly. This supersedes e008's masked analysis as the
+intended final comparison, while preserving that sensitivity and all originals.
+No manuscript assets are changed during preparation or execution.
+
+`scripts/preprocessing/repair_common_grid_2023_truth_ncar.py` downloaded bounded
+hourly HDF5 chunks from the public NSF NCAR ERA5 AWS archive: geopotential,
+temperature and specific humidity at all 37 levels for November 10 00/06/12/18 UTC.
+The 00 UTC control agrees with original common-grid truth to RMSE 0.008284/0.005670
+m2 s-2 for Z500/Z850, 3.308e-5 K for T500 and 8.743e-9/1.120e-8 kg kg-1 for
+Q700/Q850. Same-time unaffected Z50/T850/Q500 controls also passed. Coordinates,
+units, timestamps, finite values and downloaded-array hashes were independently
+checked. Only the five defective common-grid diagnostics at06/12/18 were
+replaced; the other seven diagnostics are bitwise unchanged. This establishes
+a valid independent replacement, not the exact upstream cause of ARCO's defect.
+
+Campaign: `artifacts/evaluations/graphcast_common_grid_2023_truth_repair_20261018`.
+Recovery evidence: `recovery_report.json` and `independent_recovery_validation.json`.
+Frozen protocol hash: `a0e67b8a329c32f0d8c60880136beb17126f8130ee339eda3f3662c5a91dda76`.
+The protocol binds the original campaign, new truth, recovery report, wrapper,
+three-start manifest and immutable source copies. CPU preflight and observer
+known-answer/rejection checks passed. The wrapper reuses original frozen
+inference and checkpoints; the observer scores identical forecasts against
+both truth versions and retains common-grid predictions at every lead.
+
+Jobs 15802505 (M1+GC1, 16G/20min) and 15802506 (GC025, 40G/45min) each process
+all three starts, avoiding repeated graph compilation. Resources follow the
+original pilot/production accounting recorded in the protocol. A sandboxed
+submission timed out; a successful queue check confirmed no repair job before
+the accepted retry. Submission commands and IDs are in `submissions/`.
+Both jobs started 20:32:47 EDT on October18.
+
+CPU job15802647 was initially queued with `afterok:15802505:15802506` and
+`kill-on-invalid-dep=yes`. It automatically merges the scores, generates
+point-estimate previews and runs an independent validator. Analysis sources and
+hashes are archived in `report_source/manifest.json`; the job rejects changed
+working or archived source. Its 2G/10min allocation allows extra field I/O
+beyond original report15642245 (24s,435580K).
+
+The merger's live provenance checks and eight negative checks passed. The
+independent validator's known-answer weighted-MSE and invalid-input checks
+passed; actual scientific validation remains pending complete GPU outputs.
+It will verify all175680 CSV cells, every original truth hash, all360 saved
+common-grid forecasts and8640 independently recomputed old/new-truth scores.
+It publishes `report/independent_validation.json` only after every check
+succeeds. The report separately records numerical variation and the effect
+of changing truth. A proposed caption/methods snippet is in
+`report/figures_methods_preview.tex`, explicitly pending completed results.
+
+Merge policy is 119 untouched original starts plus three complete rerun starts
+for each model, with all 40 leads and 12 diagnostics. The old-truth bridge will
+quantify numerical rerun variation separately from the repaired-truth effect.
+Full paired bootstrap and physical-RMSE Figure5/9 previews follow
+coverage/provenance validation. Native forecast/truth fields at affected times
+are retained for separate exact-loss repair; the current rerun native-loss
+scalars are explicitly an old-truth bridge, not corrected native results.
+
+#### Completed reruns and CPU report recovery
+
+Both GPU jobs succeeded:15802505 took10m51s with7994296K maximum RSS;
+15802506 took32m07s with32043568K. The report job15802647 failed after2s
+because its source guard detected a working plotter edit after submission.
+The edit removed two descriptive metadata items in the old plotter's CLI;
+the entire module AST excluding that CLI, including `make_plot`, was
+unchanged. The original snapshot and failed attempt remain preserved.
+`report_source_recovery/manifest.json` freezes the reviewed analysis source;
+its `execution.json` records successful local GraphCast-environment report
+and validator runs in27.95s and18.22s on October18 at21:19 EDT.
+
+The final merge retains119 original starts bitwise and replaces all40 leads
+for the three declared starts, for every model. All175680 CSV cells are
+present, with122 samples at every diagnostic/lead. Independent validation
+checked1492 original truth files, three corrected truth files, all360 saved
+common-grid forecasts and27 native field files. It independently recomputed
+8640 old/new-truth MSE cells; maximum relative discrepancy was4.292e-16.
+Evidence is `report/independent_validation.json`, with summary SHA256
+`dcda10d74149a270ffc244941c0b8440bd60fbd7596dd763b05898003e4d5e81`.
+The independent validator checks pooling and analysis point estimates;
+bootstrap intervals use the previously validated frozen bootstrap code.
+
+On unchanged truth, per-start RMSE drift is at most1.976% for GC1,1.981%
+for M1 and1.161% for GC025. Pooling all122 starts reduces the maxima to
+0.02565%,0.01620% and0.01650%, respectively. The separate truth repair removes
+the November9 Z500 spike: at42h, errors are69.08/65.28/70.21 m2 s-2 for
+GC1/M1/GC025, versus approximately502–508 on the old truth. No bitwise
+forecast equivalence or exact cause of numerical variation is claimed.
+
+Final day10 M1 physical-RMSE reductions versus publicGC025 span
+7.6795–11.3843% across twelve diagnostics on the common1.5-degree grid.
+Z500:8.4446% [6.8478,9.7616]; T2m:10.2386% [8.7402,11.1339];
+U850:10.0592% [9.0238,10.9551], with primary paired95% bootstrap intervals.
+Day10 truth was unaffected, so its small changes reflect rerun numerics.
+These compare fixed checkpoints with different training, mesh and levels;
+they do not isolate resolution or establish the unidentified WB2 model's skill.
+
+Figure5/9 previews and tables are under
+`plots/analyze_models/{images,data}/resolution_eval/public_checkpoints_2023_repaired_20261018/`.
+They retain all122 dates and show physical RMSE as lines. Manuscript changes
+remain pending preview review. Native-loss scalars remain explicitly
+uncorrected numerical checks; no primary native-loss manuscript value changed.
+Both final PNGs passed visual review, and the caption/methods preview was
+checked against the completed summary and copied beside the figures. Final
+source/output hash review passed. Day10 lower confidence bounds remain
+positive in the primary, 3/7-block and pilot-exclusion analyses.
+
+### e010 — October18: Add matched ENS in the historical Figure5/9 style
+
+Execution: completed. Outcome: supported for the specified matched,
+ENS-available subsets; manuscript incorporation remains pending review.
+
+The user requested an ENS baseline, then clarified that the new comparison
+should use the same style as earlier Figures5/9. The resulting previews use
+the historical1x3/3x4 layouts, canvas sizes, colors and line styles, with
+RMSE as a percentage of the matched ENS mean and a horizontal100 reference.
+No uncertainty bands are plotted. Labels identify principal M1 and the two
+public checkpoints, replacing the historical K22/archive labels.
+
+The existing ENS table is from WeatherBench2's public
+`ifs_ens/2016-2024-240x121_equiangular_with_poles_conservative_mean.zarr`.
+Its missing metadata were reconstructed from the complete2018–2022 sibling;
+the earlier71-overlapping-chunk layout check is preserved (e003). It contains
+46930 of58560 diagnostic/lead/start cells, with91–108 starts per point and
+no initialization complete across all480 diagnostic/lead combinations.
+Current public metadata checks confirm that the mean archive is still
+incomplete. Nine sampled missing mean chunks have corresponding member
+chunks, but recovering complete means would require a separate, larger
+download and validation task; no complete alternative was used here.
+
+`scripts/analyze_models/repair_ens_common_grid_2023.py` downloaded only eight
+needed forecast chunks (about15.7MB compressed), preserving raw bytes, URLs
+and checksums. It reproduced all42 available affected scores exactly against
+old truth before rescoring against the same corrected truth used for the
+three GraphCast models. Three unavailable November9 T500 cells remain null;
+all58518 other entries are float-bitwise unchanged, including availability.
+The corrected ENS table, repair audit and frozen source are under
+`artifacts/evaluations/graphcast_common_grid_2023_truth_repair_20261018/ens/`.
+ENS table SHA256:`cc649493dc654fef463e9c58faf1715a063ce011ff8fc04f1133e43def82baf5`.
+
+`scripts/analyze_models/plot_repaired_common_grid_with_ens.py` uses the
+validated repaired model CSV and corrected ENS table. For each diagnostic
+and lead, all four models are pooled over exactly the same ENS-available
+initializations: average spatial MSE, take its square root, then divide
+model RMSE by ENS RMSE and multiply by100. No averaging of per-start ratios,
+interpolation or selection based on errors is used. Figure5 has91–103 dates
+per point; Figure9 has91–108. The figures explicitly display these ranges.
+
+Tables and previews are under
+`plots/analyze_models/{data,images}/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/`.
+Independent validation checked all187720 matched CSV rows (46930 per model),
+identical date sets, original repaired-model values, all42 ENS repairs,
+unchanged ENS entries, and source/output/raw-chunk/truth hashes. Independent
+`math.fsum` pooling reproduces RMSE within5.77e-16 relative and ENS ratios
+within7.11e-14 percentage points. Evidence is `independent_validation.json`
+in the tables directory. Both plots passed visual review; proposed captions
+and methods describe the variable paired sample sets and ENS provenance.
+
+At day10, M1 RMSE is107.3579%,107.2630% and106.3374% of matched ENS for
+Z500,T2m,U850. All twelve day10 point estimates exceed100%, so these plots
+do not support superiority to ENS at day10. They do not alter the full122
+model-only results, and those bootstrap intervals are not transferred to
+the smaller ENS-matched subsets. No GPU jobs or manuscript edits were needed.
+
+#### October 18: approved manuscript incorporation and model-scale audit
+
+The user approved these ENS-relative versions and asked how to describe
+the advantage over the higher-resolution model. Section 4.4, Figure 5,
+Figure 9 and Appendix C in `Overleaf/arxiv_versoin.tex` were replaced with
+the selected M1/public-checkpoint 2023 comparison. Historical assets remain
+preserved. The approved files were copied byte-for-byte into
+`Overleaf/Graphs/common_grid_2023_public_checkpoints_ens/`, accompanied by
+`figure_sources.json` linking checkpoint, source-data, result, validation
+and figure hashes. The previous manuscript and PDF are backed up under
+`Overleaf/build/arxiv_common_grid2023_ens_20261018/`.
+
+The new `ens/model_scale_audit.json` independently counts NPZ parameters and
+links the ENS-matched results to their summary hash. Public GC025 contains
+36,464,582 stored weights (including 116,451 auxiliary decoder weights not
+requested by this evaluator); GC1 has 35,979,347. M1 adds 10,348,879 for a
+total 46,328,226. Therefore “much larger model” is not supported by parameter
+count. GC025 instead has 1,038,240 vs 65,160 native horizontal grid points,
+40,962 vs 10,242 mesh vertices, and 37 vs 13 pressure levels. No speedup claim
+follows from these size ratios without controlled timing measurements.
+
+ENS-matched day-10 RMSE reductions versus public GC025 are 8.475179% Z500,
+10.578194% T2m and 9.827283% U850, spanning 7.703546–11.419036% across all 12.
+All 12 M1 curves stay below GC025 from 84h through 240h. The three selected
+diagnostics remain below from 36h, 84h and 66h respectively. All 12 M1 day-10
+RMSEs remain above ENS. The manuscript uses the rounded ENS-matched values,
+not the different full-122 model-only estimates or confidence intervals.
+
+Independent manuscript review verified the numbers, identities, availability,
+pilot exposure and interpretation against the final artifacts. Changes are
+confined to Section 4.4 and Appendix C/captions; surrounding manuscript and
+collaborator comments are preserved. The user's “much larger” suggestion is
+retained as a Suozhi comment under the existing hidden-comment convention;
+the scientific prose uses “higher-resolution.” Review also clarified that
+only time-varying ERA5 inputs are subsampled for the 1° models; their static
+fields come from the existing training/evaluation store. The separate
+AI-use statement still understates the assistance and was flagged to the
+user for author review rather than silently rewritten in this figure task.
+
+Compilation and visual inspection passed: the rebuilt manuscript has 27
+pages, Figure 5 on page 9 and Figure 9 on page 24, with Appendix C continuing
+on page 25. References and citations resolve. A local footnote layout fix
+removed the new underfull boxes; only the pre-existing 1.59732pt bibliography
+overfull warning remains. All four copied figure files match the approved
+original hashes, and source regions outside the intended sections are
+byte-identical to the backup. Evidence is the build directory's
+`validation.json` and `manuscript.diff`. The compiled PDF was installed at
+`Overleaf/arxiv_versoin.pdf`, SHA256
+`c8bf2ef9b4cda8d86e0ab14a0594a62736c40076dce94ad5cb1c40fc7a4ba669`.
+
+#### October 18: computational-cost clarification and publication
+
+The user clarified that “larger” refers to memory and FLOPs, then requested
+a push to Overleaf. The manuscript now emphasizes the larger spatial
+computational workload of GC025 (approximately 16× grid points and 4× mesh
+vertices, with 37 vs 13 pressure levels); the distracting parameter-count
+digression was removed. No exact FLOP, peak-memory or speedup ratio is
+claimed. Two newer Overleaf formatting edits from commit 582c9d6 were
+merged and preserved. Recompilation and visual inspection passed. Seven
+files (manuscript, compiled PDF, four figure assets, source manifest) were
+pushed normally to Non-Markovian-Weather/main as commit
+`098e94826e407c4949f3fe390f99408adc462c32`. The isolated checkout is clean;
+no parent Weather_Global commit or push occurred. Publication checks and
+current file hashes are in `Overleaf/build/arxiv_push_ens_20261018/publication.json`.
+
+#### October 19: replace Figure 5 Z500 panel with Q700
+
+At the user's explicit request, Figure 5 now shows Q700, T2m and U850.
+The same validated ENS-matched scores were replotted in
+`public_checkpoints_2023_repaired_ens_q700_20261019`; all score CSV bytes,
+RMSE arrays and matching arrays equal the prior version. Figure 9 PDF/PNG
+are byte-identical. The new three-panel sample range is 92–105 starts per
+point. Q700 day-10 M1 RMSE reduction versus public GC025 is 7.70354577931%
+(94 starts), rounded to 7.70% in the selected-result sentence. Caption and
+Appendix C counts were updated. No forecast reruns or other result changes.
+Independent numerical/source/visual review and final PDF compilation passed.
+An early build read a backup source sharing the main filename in the output
+directory; the caption check caught it, the backup was renamed, and the
+correct source was rebuilt and visually verified before publication.
+Five manuscript/figure/provenance files were pushed to the designated
+repository main branch as `1b32b6c489fe10b30cc29727138f7112875da9ac`.
+Evidence: `Overleaf/build/fig5_q700_20261019/validation.json` and the new
+plot-data directory's `presentation_validation.json`.
+
+<a id="e011"></a>
+### e011 — October 19: Verify current GC025 against the GraphCast paper
+
+Execution: completed (CPU inspection, public metadata retrieval, saved-score
+reaggregation; no new forecasts or Slurm changes)
+Outcome: supported for official release identity; paper-score reproduction
+remains unverified and the previously observed archive gap is confirmed.
+
+The user requested verification that our GC res025 matches DeepMind's paper.
+Scope is the public GC025 baseline used in the current common-grid figures.
+Fresh local SHA256/MD5/size checks against live `dm_graphcast` metadata pass
+for the checkpoint and all three statistics files. Checkpoint SHA256 remains
+`4e8cf600f3f402ebb430483e782b94648cef57bb757dec24dd7b11760d3fbacc`;
+official object generation is `1690799158668499`, size 145,990,258 bytes.
+Embedded metadata gives resolution 0.25°, mesh size 6, latent width 512,
+16 message-passing steps, one hidden layer, 37 pressure levels, 227 output
+channels, two input frames six hours apart and ERA5 training over 1979–2017.
+Direct NPZ counting gives 36,464,582 stored parameters; the paper describes
+36.7M. This literal count difference does not indicate an altered local
+checkpoint, whose bytes match the official release.
+
+Compared the frozen production evaluator and predictor/overlay code with
+the saved direct-upstream audit. Production uses GraphCast with official
+normalization, bf16 internal prediction, float32 physical fields and strict
+loading of every required parameter. The previously completed January 1,
+2023 upstream rollout has a maximum absolute relative RMSE difference of
+1.843063% across 12 diagnostics × 40 leads. This is saved single-start
+evidence, not a fresh rollout or proof of bitwise/full-year parity.
+
+Independently re-pooled all 122 saved local and DeepMind archive 2022 starts,
+checking identical timestamp sets, 40 lead coordinates, protocol IDs,
+local checkpoint hashes and finite per-start MSE arrays. RMSE is the square
+root after pooling MSE. Local-minus-archive RMSE percentages are:
+
+| Diagnostic | Day 1 | Day 3 | Day 10 |
+| --- | ---: | ---: | ---: |
+| Z500 | +13.776% | +11.758% | +1.362% |
+| T2m | +13.206% | +11.991% | +3.251% |
+| U850 | +5.613% | +7.166% | −0.335% |
+| Q700 | +5.139% | +6.744% | −0.186% |
+
+These are common-1.5° physical-RMSE comparisons against the 2022 WB2 archive,
+whose exact weights and numerical configuration remain unidentified. They
+are not comparisons with the paper's 2018 test scores. The paper's main
+HRES evaluation uses 2018 and native 0.25° scoring, with GraphCast 06/18 UTC
+initializations and lookahead matching; our current figures use 2023
+every-third-day 00 UTC starts, twelve diagnostics, 1.5° scoring and ENS mean.
+Therefore the defensible label is the official released GraphCast model
+evaluated under our protocol. Reproducing the paper requires its evaluation
+protocol; a small matched FP32/bf16 experiment could separately test numerics
+as a contributor to the archive gap, but was not launched by this question.
+
+Evidence: [fresh machine-readable audit](../../../artifacts/evaluations/graphcast_common_grid_2023_20261015/audits/paper_verification_20261019.json),
+including live official checksums, checkpoint configuration, source hashes
+and independently computed paired scores. Host: della; project HEAD
+`089f60db62315c4644067811bc1939bd30c550fe` with pre-existing working-tree edits;
+the audit reads the frozen campaign source rather than treating HEAD as an
+exact experiment snapshot. Public references:
+[DeepMind model documentation](https://github.com/google-deepmind/weathernext/blob/main/docs/weathernext1_graph/README.md),
+[paper and supplement](https://arxiv.org/html/2212.12794v2), especially
+Sections 3, 3.7 and 5.2.4. Model/results/manuscript files were not changed.
+
+#### October 19 follow-up: select a small paper reproduction
+
+The user asked about a reproducibility statement and a simpler graph.
+The paper's **Data and Materials Availability** section links public code,
+trained weights and ECMWF data sources. It does not specify a numerical
+reproduction tolerance. The official demonstration provides inference and
+loss examples; a checksum match alone does not validate inference skill.
+
+The simplest useful numerical curve is the blue GraphCast Z500 RMSE curve
+in Figure 2a. A proposed pilot stages native 0.25°/37-level ERA5 inputs for
+12 preselected dates spread over 2018, at both 06 and 18 UTC (24 starts),
+and scores 12, 24 and 48 h forecasts at native resolution. It requires the
+full state evolution but only Z500 verification, with no HRES or ENS data
+and no ACC climatology. Comparison against the published curve would first
+be approximate (digitized plot plus sampling uncertainty); full replication
+requires the paper's full 2018 initialization set and matching aggregation.
+This is a proposed diagnostic, not a submitted or executed experiment.
+
+**New methodological finding:** Supplement Eq. 20 defines RMSE as the mean
+across initialization dates of each forecast's area-weighted spatial RMSE.
+Our common-grid metric instead takes the square root after averaging MSE
+across initializations (the paper's Eq. 21). A reproduction must implement
+Eq. 20, exact latitude-cell area weights and native geopotential units
+(m²/s²). This distinction does not invalidate the paired 2022 archive
+comparison, which applied the same pooled-MSE convention to both sources,
+and is not established as the cause of that archive gap.
+
+The cheapest qualitative check is supplement Figure 50: Z500 initialized
+2018-11-23 12:00 UTC, shown at days 2, 6 and 10. The first panel needs eight
+six-hour model steps and inputs at 06 and 12 UTC. We inspected the actual
+published image; it contains forecast maps and a color scale, with no RMSE
+annotations. Visual resemblance alone cannot establish numerical skill.
+The source images were inspected at
+[Figure 2](https://arxiv.org/html/2212.12794v2/fig2.png) and
+[Figure 50](https://arxiv.org/html/2212.12794v2/forecast_vertical_z500_2018-11-23T12_00_00.png).
+
+### e012 — 2026-10-19: native Figure 2a reproduction using existing 2018 ERA5
+
+Execution: running. Outcome: pending.
+
+The user authorized reproducing Figure 2a using the publicly released 0.25°
+checkpoint. The checkpoint and all three normalization files were checked
+again against live DeepMind object sizes and MD5 hashes; the checkpoint SHA256
+remains `4e8cf600f3f402ebb430483e782b94648cef57bb757dec24dd7b11760d3fbacc`.
+Inference uses a checksummed copy of unmodified upstream GraphCast commit
+`08cf73625c9d12bd9aaa038868bcb2fe488f2a22`, direct released parameters,
+bfloat16 internal prediction and float32 physical fields.
+
+Correction to the initial data plan: the existing
+`data/graphcast/graphcast/dataset/prepared_stream_graphcast37/res0p25`
+already contains all 1,460 six-hourly 2018 frames at native 721×1440 resolution,
+37 pressure levels and physical float32 units. All variable validity masks
+are complete, and 2019 is present for forecasts crossing New Year. The user
+pointed out this overlooked store. The redundant ARCO staging process on
+della-vis1 was terminated after 273/276 files (about 49.57 GB transferred).
+The partial attempt remains under `graphcast_fig2a_2018_20261019`; it is not
+used as the evaluation source. A direct comparison of the January 15 06 UTC
+two-frame input found every one of the 13 weather/static fields and all
+coordinates exactly equal after latitude reversal. Two native Z500 truth
+fields also match exactly; January 10, 2019 truth is readable and finite.
+See [local data audit](../../../artifacts/evaluations/graphcast_fig2a_2018_20261019/references/local_data_audit.json).
+
+The revised [pilot protocol](../../../artifacts/evaluations/graphcast_fig2a_2018_local_pilot_20261019/protocol.json)
+reads the local arrays directly without copying the full state. It uses
+the 15th of each month at 06/18 UTC (24 starts), 40 six-hour steps, and native
+Z500 verification at 12-hour intervals through day 10. The scorer implements
+Eq.20: mean across starts of each area-weighted spatial RMSE, in m²/s²,
+including finite polar cells. Saved Z500 predictions and per-field truth
+hashes permit an independent float64 recomputation before reporting.
+Published GC/HRES curves are explicitly labeled approximate raster
+digitizations; HRES is not rerun. Pilot bootstrap uncertainty uses the 12
+paired-hour date clusters and does not reproduce the paper's AR(2) intervals.
+
+Five metric/hash checks pass. Source is frozen in the pilot's `eval_source`.
+Slurm pilot `15868012_0` runs four seasonal starts on one A100, requesting
+16 GiB and 30 minutes. Budget evidence: direct-upstream audit `15657532`
+completed one 40-step forecast in 4m08s with 7.33 GiB peak host RAM.
+The first shard completed in 5m47s. Slurm reported 15.97 GiB peak (Python's
+own RSS statistic was 9.89 GiB); three subsequent shards completed in
+5m22s–5m39s with 16.98–17.15 GiB Slurm peaks. Remaining pilot array
+`15869182` therefore requests 24 GiB and 10 minutes. Its report job
+`15870045` checks all 480 scores independently before producing the pilot
+plot. The initial report submission referencing both arrays failed because
+the completed first array was no longer a valid scheduler dependency;
+the accepted submission depends on the still-active array and the report
+itself requires all 24 results, including the first shard.
+
+The full-year [protocol](../../../artifacts/evaluations/graphcast_fig2a_2018_full_local_20261019/protocol.json)
+covers all 730 initializations at 06/18 UTC, including January 2019 truth for
+late-December forecasts. Array `15870083` depends on successful pilot report
+`15870045`; report `15870088` depends on the entire annual array. Native
+predictions are retained and all 14,600 scores will be independently checked.
+The full-year source digest is
+`50afe6776ee7c097c7bc0764a6a110eadb6e8fc8912df3caa653acbc1c5cee89`.
+
+Scheduler policy routes short GPU jobs to `gpu-test`, which allows three
+running and 25 submitted jobs per user. Accordingly the annual work is packed
+into 20 unthrottled array elements with 36–37 starts each, 24 GiB RAM and a
+35-minute limit. After compilation the pilot took approximately 32 seconds
+per additional 10-day forecast. Annual validation has 2 CPUs, 4 GiB and
+45 minutes. Expected GPU completion is roughly 2–3 hours plus queueing;
+do not infer completion from these submissions. An earlier 46-shard full-year
+preparation (`graphcast_fig2a_2018_full_20261019`) was superseded before
+submission to fit the queue's submission limit and remains preserved.
+Annual bootstrap bands use 14-day circular blocks, not paper AR(2) intervals.
+No annual agreement conclusion yet.
+
+#### Pilot result and annual handoff
+
+All 24 pilot forecasts and all 480 independent native-field score checks
+completed successfully. Report job `15870045` took 52 seconds and 1.23 GiB
+peak RAM. Mean spatial RMSE (m²/s²), compared with the digitized annual paper
+curve, is:
+
+| Lead | Pilot | Paper, approximate | Relative difference |
+| --- | ---: | ---: | ---: |
+| 1 day | 44.467 | 44.814 | −0.77% |
+| 2 days | 84.128 | 84.150 | −0.03% |
+| 3 days | 137.950 | 137.370 | +0.42% |
+| 5 days | 291.323 | 292.403 | −0.37% |
+| 10 days | 714.939 | 748.245 | −4.45% |
+
+This supports plausible skill of the released model under the paper protocol,
+but the 24-date sampling and raster reference prevent an annual parity claim.
+The paper reference has about 2.314 m²/s² per vertical pixel, so the printed
+percentage precision must not be interpreted as precise reference accuracy.
+See [pilot summary](../../../artifacts/evaluations/graphcast_fig2a_2018_local_pilot_20261019/report/summary.json)
+and [pilot figure](../../../plots/analyze_models/images/resolution_eval/graphcast_fig2a_2018_local_pilot_20261019/figure2a_reproduction.png).
+
+The original constrained-layout rectangle clipped the title. A separate
+frozen `plot_source` corrects layout without altering scores, source snapshots,
+or protocols. Its digest is
+`7cbac35f2bc00d1b6daed0a4a48ef06901004f8e17aae8c752597ec170445ac0`;
+each plot has a `report/plot_receipt.json` recording summary/script/output
+hashes. Annual plot job `15870456` depends on report `15870088` and applies
+the same correction. The annual array has started and produced initial
+forecasts; final annual validation is still pending. Resume via
+`graphcast_fig2a_2018_full_local_20261019/control/state.json`, Slurm jobs
+`15870083`, `15870088`, `15870456`, and the campaign's `report/summary.json`.

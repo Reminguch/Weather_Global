@@ -23,6 +23,7 @@ def excess_setup(mode="mgda", learning_rate=1e-4, **policy):
     cfg.mgda_direction = mode
     cfg.mgda_backtracking = {
         "repeatability_repeats": 3, "absolute_floor": 1e-10, "relative_floor": 0.,
+        "decrease_policy": "error",
         "max_relative_noise": 1e-3, "max_halvings": 8, "shrink": .5, **policy,
     }
     # Positive proportional toy objectives isolate the acceptance machinery
@@ -86,6 +87,62 @@ def test_rejected_batch_retains_params_rms_count_memory_and_rng_exactly():
     assert_tree_identical((params, state, optimizer_state, args[0]), before)
 
 
+@pytest.mark.parametrize("mode", ["mgda", "mse_control", "fixed_sum"])
+def test_advisory_step_commits_full_finite_overshoot_and_correct_memory(mode):
+    _, _, optimizer, params, state, args, step = excess_setup(
+        mode, learning_rate=4., decrease_policy="warn")
+    optimizer_state = optimizer.init(params)
+    first, second = step.objective_gradients(params, state, args)
+    updates, proposed_state, _ = optimizer.update_pair(first, second, optimizer_state, params)
+    expected_params = jax.tree_util.tree_map(lambda p, u: p + u, params, updates)
+    expected_losses, expected_memory, _, _ = step.forward_only(expected_params, state, *args)
+    with pytest.warns(RuntimeWarning, match="committing finite scheduled update"):
+        result = step(params, state, optimizer_state, *args)
+    assert_tree_close(result.params, expected_params)
+    assert_tree_close(result.state, expected_memory)
+    assert_tree_close(result.optimizer_state, proposed_state)
+    assert int(result.optimizer_state.count) == 1
+    assert result.diagnostics['decrease_warning']
+    assert not result.diagnostics['measured_decrease']
+    assert result.diagnostics['learning_rate'] == 4.
+    assert result.diagnostics['backtracking_trials'] == 1
+    record = step.last_acceptance_record['acceptance']
+    assert record['reason'] == 'advisory_no_decrease'
+    np.testing.assert_allclose(record['losses'], expected_losses)
+
+
+def test_advisory_step_keeps_nonfinite_optimizer_state_blocking():
+    _, _, optimizer, params, state, args, step = excess_setup(decrease_policy="warn")
+    opt_state = optimizer.init(params)
+    bad_state = opt_state._replace(second_moment=jax.tree_util.tree_map(
+        lambda x: jnp.full_like(x, jnp.nan), opt_state.second_moment))
+    with pytest.raises(FloatingPointError, match="Nonfinite"):
+        step(params, state, bad_state, *args)
+
+
+@pytest.mark.parametrize("mode", ["mgda", "mse_control", "fixed_sum"])
+def test_noisy_step_retains_warning_and_raw_repeats_with_committed_update(monkeypatch, mode):
+    from src.models.mamba.v24_Ilya.training import mgda_acceptance
+    calibrate = mgda_acceptance.calibrate_loss_tolerances
+    def noisy_calibration(repeated, **kwargs):
+        repeated[1] = repeated[0] * 1.1
+        repeated[2] = repeated[0] * .9
+        return calibrate(repeated, **kwargs)
+    monkeypatch.setattr(mgda_acceptance, "calibrate_loss_tolerances", noisy_calibration)
+    _, _, optimizer, params, state, args, step = excess_setup(mode)
+    with pytest.warns(RuntimeWarning, match="advisory only"):
+        result = step(params, state, optimizer.init(params), *args)
+    assert result.diagnostics["backtracking_accepted"]
+    assert result.diagnostics["repeatability_warning"]
+    assert not result.diagnostics["accepted_decrease_above_noise"]
+    record = step.last_acceptance_record["repeatability"]
+    assert record["warning"] and record["noise_exceeded"] == [True, True]
+    assert record["repeatability_policy"] == "warn"
+    assert len(record["repeated_losses"]) == 3
+    assert record["noise_thresholds"][0] > result.diagnostics["acceptance_threshold_1"]
+    json.dumps(step.last_acceptance_record, allow_nan=False)
+
+
 def test_backtracked_candidates_use_original_params_and_fixed_rms_direction(monkeypatch):
     from src.models.mamba.v24_Ilya.training import mgda_acceptance
     base_learning_rate = 4.
@@ -146,13 +203,15 @@ def test_all_direction_controls_use_same_pair_rms_moments_for_same_gradients():
     assert not np.array_equal(np.asarray(directions[0]["spatial"]), np.asarray(directions[1]["spatial"]))
 
 
-def qualification_harness(monkeypatch, failing_mode=None):
+def qualification_harness(monkeypatch, failing_mode=None, feedback_mode="closed_loop_sg"):
     """Expose conspicuously different candidate and unchanged-parent memory."""
     from src.models.mamba.v24_Ilya.training import mgda_step, runner
     from src.models.mamba.v24_Ilya.training.data import TrainingCursor
     from test_mse_amse_excess_loss import excess_config
 
     config = excess_config(mgda_direction="mse_control")
+    if feedback_mode != config.feedback_mode:
+        config = replace(config, feedback_mode=feedback_mode)
     params, initial_state = {"w": np.array([.3], np.float32)}, {"s": np.array([5.], np.float32)}
     key = jax.random.PRNGKey(19)
     observed = {"attempts": [], "forwards": [], "cursors": [], "optimizer_states": []}
@@ -214,8 +273,9 @@ def qualification_harness(monkeypatch, failing_mode=None):
     return runner, arguments, observed
 
 
-def test_four_batch_qualification_discards_both_trials_and_carries_unchanged_parent_memory(monkeypatch):
-    runner, arguments, observed = qualification_harness(monkeypatch)
+@pytest.mark.parametrize("feedback_mode", ["closed_loop_sg", "closed_loop"])
+def test_four_batch_qualification_discards_both_trials_and_carries_unchanged_parent_memory(monkeypatch, feedback_mode):
+    runner, arguments, observed = qualification_harness(monkeypatch, feedback_mode=feedback_mode)
     originals = snapshot((arguments["params"], arguments["zero_state"], arguments["rng_key"]))
     external_cursor = arguments["training_data"].cursor
     result = runner._calibrate_initialized_training(**arguments)
@@ -237,11 +297,11 @@ def test_four_batch_qualification_discards_both_trials_and_carries_unchanged_par
             assert int(rms_state["count"]) == 0
             np.testing.assert_array_equal(keys, expected_keys)
         mode, params, state, keys = observed["forwards"][index]
-        assert mode == "closed_loop_sg"
+        assert mode == feedback_mode
         np.testing.assert_array_equal(state["s"], [parent_state])
         np.testing.assert_array_equal(keys, expected_keys)
         record = result["records"][index]
-        for mode in ("baseline", "closed_loop_sg"):
+        for mode in ("baseline", feedback_mode):
             assert record[mode]["diagnostics"]["finite"] is True
             assert record[mode]["acceptance_record"]["acceptance"]["accepted"]
     assert_tree_identical((arguments["params"], arguments["zero_state"], arguments["rng_key"]), originals)

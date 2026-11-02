@@ -213,8 +213,12 @@ def comparison_report(arm_reports, outdir, *, canonical_arm='w128_7y', arm_keys=
                       bootstrap_samples=10000, block_starts=5, seed=20260916):
     """Paired fixed-checkpoint inference; two primary width-specific data gains."""
     keys = DEFAULT_ARMS if arm_keys is None else arm_keys
-    if len(keys) != 4 or set(keys) != set(DEFAULT_ARMS) or len(set(keys.values())) != 4:
+    years = sorted({y for _, y in keys})
+    if (len(keys) != 4 or len(years) != 2 or years[0] != 7 or years[1] <= 7
+            or set(keys) != {(w, y) for w in (128, 512) for y in years}
+            or len(set(keys.values())) != 4):
         raise ValueError('Exactly four width-by-data arms are required')
+    large_years = years[1]
     reports = {key: read(v) if isinstance(v, (str, Path)) else v for key, v in arm_reports.items()}
     if set(reports) != set(keys.values()) or canonical_arm != keys[128, 7]:
         raise ValueError('Canonical baseline must be the evaluated width128 seven-year control')
@@ -241,7 +245,7 @@ def comparison_report(arm_reports, outdir, *, canonical_arm='w128_7y', arm_keys=
             'outside_rtol_0p001_count': int(np.count_nonzero(np.abs(own - baseline) > 1e-6 + .001 * np.abs(baseline)))}
     if bootstrap_samples < 100 or not 1 <= block_starts <= n:
         raise ValueError('Invalid bootstrap specification')
-    differences = np.stack([models[keys[w, 7]] - models[keys[w, 40]] for w in (128, 512)])
+    differences = np.stack([models[keys[w, 7]] - models[keys[w, large_years]] for w in (128, 512)])
     point = 100 * differences.sum(axis=(1, 2)) / baseline.sum()
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, n - block_starts + 1, (bootstrap_samples, math.ceil(n / block_starts)))
@@ -261,15 +265,16 @@ def comparison_report(arm_reports, outdir, *, canonical_arm='w128_7y', arm_keys=
         'bootstrap': {'samples': bootstrap_samples, 'block_starts': block_starts, 'seed': seed,
             'scheme': 'paired non-wrapping moving blocks; truncated final block',
             'primary_family': 'simultaneous 95% maximum absolute centered deviation; two within-width gains'},
-        'interpretation': 'Fixed checkpoint/seed, weather-sample uncertainty only. 2023 has prior project exposure. Positive gain is lower loss with 40 training years. Day10 and width interaction are descriptive.',
+        'training_year_counts': years,
+        'interpretation': f'Fixed checkpoint/seed, weather-sample uncertainty only. 2023 has prior project exposure. Positive gain is lower loss with {large_years} training years. Day10 and width interaction are descriptive.',
         'initialization_times': reference['initialization_times']}
     outdir = Path(outdir)
     write(outdir / 'comparison.json', result)
     lines = ['# Fresh residual data-scale comparison', '',
-        'Exact original GraphCast loss, pooled over 122 starts and 40 leads. Canonical baseline: new evaluation of the width128 seven-year control.', '',
+        'Exact original GraphCast loss, pooled over 122 starts and 40 leads. Canonical baseline: matched evaluation of the width128 seven-year control.', '',
         '| Arm | Rollout loss reduction (%) | Day10 reduction (%) |', '| --- | ---: | ---: |']
     lines += [f"| {key} | {r['loss_reduction_pct']:.4f} | {r['day10_loss_reduction_pct']:.4f} |" for key, r in rows.items()]
-    lines += ['', 'Primary gains from 40 versus seven years (percentage points; simultaneous 95% intervals):', '']
+    lines += ['', f'Primary gains from {large_years} versus seven years (percentage points; simultaneous 95% intervals):', '']
     for width, row in primary.items():
         low, high = row['simultaneous_95_interval']
         lines.append(f"- Width{width}: {row['gain_percentage_points']:.4f} [{low:.4f}, {high:.4f}].")

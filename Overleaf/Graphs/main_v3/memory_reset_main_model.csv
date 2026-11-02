@@ -1,0 +1,121 @@
+policy,metric,lead_days,loss_reduction_pct
+Carry / carry (main model),exact,0.25,0.4887760122521456
+Carry / carry (main model),exact,0.5,0.25006897468833333
+Carry / carry (main model),exact,0.75,-0.16983776395940176
+Carry / carry (main model),exact,1.0,-0.13107879365454878
+Carry / carry (main model),exact,1.25,-0.17966303636354208
+Carry / carry (main model),exact,1.5,-0.27025950268502186
+Carry / carry (main model),exact,1.75,-0.2727353939346866
+Carry / carry (main model),exact,2.0,-0.30831587838524577
+Carry / carry (main model),exact,2.25,-0.22205061568194573
+Carry / carry (main model),exact,2.5,-0.15520271785720574
+Carry / carry (main model),exact,2.75,0.07084324405203235
+Carry / carry (main model),exact,3.0,0.443845613145899
+Carry / carry (main model),exact,3.25,1.0713133407982078
+Carry / carry (main model),exact,3.5,1.6829147103839759
+Carry / carry (main model),exact,3.75,2.5212565253521446
+Carry / carry (main model),exact,4.0,3.4472783195107493
+Carry / carry (main model),exact,4.25,4.550033190948599
+Carry / carry (main model),exact,4.5,5.523485366752345
+Carry / carry (main model),exact,4.75,6.495701695893697
+Carry / carry (main model),exact,5.0,7.452470668981803
+Carry / carry (main model),exact,5.25,8.341408951133388
+Carry / carry (main model),exact,5.5,9.288340879690404
+Carry / carry (main model),exact,5.75,10.427815360434733
+Carry / carry (main model),exact,6.0,11.60012843529319
+Carry / carry (main model),exact,6.25,12.80683306181638
+Carry / carry (main model),exact,6.5,13.961472771762196
+Carry / carry (main model),exact,6.75,15.154555301796613
+Carry / carry (main model),exact,7.0,16.252827016374706
+Carry / carry (main model),exact,7.25,17.21646168434974
+Carry / carry (main model),exact,7.5,17.907805146293054
+Carry / carry (main model),exact,7.75,18.583526633412095
+Carry / carry (main model),exact,8.0,19.31629054267544
+Carry / carry (main model),exact,8.25,20.05915075293784
+Carry / carry (main model),exact,8.5,20.69671120159119
+Carry / carry (main model),exact,8.75,21.18278264002602
+Carry / carry (main model),exact,9.0,21.69006615623742
+Carry / carry (main model),exact,9.25,22.17676462600061
+Carry / carry (main model),exact,9.5,22.638215248713202
+Carry / carry (main model),exact,9.75,23.177226906216642
+Carry / carry (main model),exact,10.0,23.683071295749947
+Carry / reset,approximate,0.25,0.439890022685796
+Carry / reset,approximate,0.5,0.11547685128373564
+Carry / reset,approximate,0.75,-1.7055437441388044
+Carry / reset,approximate,1.0,-4.137348407127361
+Carry / reset,approximate,1.25,-6.311099903978534
+Carry / reset,approximate,1.5,-8.357736903282852
+Carry / reset,approximate,1.75,-10.174688535247057
+Carry / reset,approximate,2.0,-11.984679538112175
+Carry / reset,approximate,2.25,-13.46507007383293
+Carry / reset,approximate,2.5,-14.876024570059275
+Carry / reset,approximate,2.75,-15.815711738337868
+Carry / reset,approximate,3.0,-16.460623871223824
+Carry / reset,approximate,3.25,-16.626023179021466
+Carry / reset,approximate,3.5,-16.740658116043882
+Carry / reset,approximate,3.75,-16.43723573155478
+Carry / reset,approximate,4.0,-15.908745249173162
+Carry / reset,approximate,4.25,-14.879646984031725
+Carry / reset,approximate,4.5,-14.045545155065442
+Carry / reset,approximate,4.75,-13.289764156381278
+Carry / reset,approximate,5.0,-12.728877990818432
+Carry / reset,approximate,5.25,-12.143574295707449
+Carry / reset,approximate,5.5,-11.216970216353971
+Carry / reset,approximate,5.75,-9.81858379068461
+Carry / reset,approximate,6.0,-8.18452518351438
+Carry / reset,approximate,6.25,-6.235238121225128
+Carry / reset,approximate,6.5,-4.449504989074504
+Carry / reset,approximate,6.75,-2.746725696862229
+Carry / reset,approximate,7.0,-1.2908470199296973
+Carry / reset,approximate,7.25,-0.07781505310600068
+Carry / reset,approximate,7.5,0.7349542533362063
+Carry / reset,approximate,7.75,1.5658309437396767
+Carry / reset,approximate,8.0,2.5070815090082244
+Carry / reset,approximate,8.25,3.6253068534227384
+Carry / reset,approximate,8.5,4.594333990329902
+Carry / reset,approximate,8.75,5.479591516993643
+Carry / reset,approximate,9.0,6.393001162402667
+Carry / reset,approximate,9.25,7.2072454737905804
+Carry / reset,approximate,9.5,7.866843360280029
+Carry / reset,approximate,9.75,8.544265206669188
+Carry / reset,approximate,10.0,9.241861932900896
+Reset / reset,approximate,0.25,0.7316870041536805
+Reset / reset,approximate,0.5,0.5636794214839091
+Reset / reset,approximate,0.75,0.4288089450297017
+Reset / reset,approximate,1.0,0.20848903766147453
+Reset / reset,approximate,1.25,0.02267487362915821
+Reset / reset,approximate,1.5,-0.17287570369770577
+Reset / reset,approximate,1.75,-0.3858233227979957
+Reset / reset,approximate,2.0,-0.6510624093420736
+Reset / reset,approximate,2.25,-0.7450358728098294
+Reset / reset,approximate,2.5,-0.7987202923314785
+Reset / reset,approximate,2.75,-0.7071661661783413
+Reset / reset,approximate,3.0,-0.5002757449835249
+Reset / reset,approximate,3.25,-0.009402647446510315
+Reset / reset,approximate,3.5,0.45026634766250906
+Reset / reset,approximate,3.75,1.0490880539176684
+Reset / reset,approximate,4.0,1.7234891555663157
+Reset / reset,approximate,4.25,2.6298927873161237
+Reset / reset,approximate,4.5,3.3325371822157446
+Reset / reset,approximate,4.75,3.9815280929813346
+Reset / reset,approximate,5.0,4.612400802285189
+Reset / reset,approximate,5.25,5.130294674018677
+Reset / reset,approximate,5.5,5.684713232577499
+Reset / reset,approximate,5.75,6.468559296350918
+Reset / reset,approximate,6.0,7.3213756635969185
+Reset / reset,approximate,6.25,8.168125425279326
+Reset / reset,approximate,6.5,8.865085731867728
+Reset / reset,approximate,6.75,9.638560257974316
+Reset / reset,approximate,7.0,10.313115101430427
+Reset / reset,approximate,7.25,10.81824225321235
+Reset / reset,approximate,7.5,11.050542741688707
+Reset / reset,approximate,7.75,11.316466982423757
+Reset / reset,approximate,8.0,11.655686509903894
+Reset / reset,approximate,8.25,12.09159713099357
+Reset / reset,approximate,8.5,12.353880805396876
+Reset / reset,approximate,8.75,12.442789416381972
+Reset / reset,approximate,9.0,12.53653501640123
+Reset / reset,approximate,9.25,12.627669070447755
+Reset / reset,approximate,9.5,12.706755234153777
+Reset / reset,approximate,9.75,12.83966854152051
+Reset / reset,approximate,10.0,12.90723381442076

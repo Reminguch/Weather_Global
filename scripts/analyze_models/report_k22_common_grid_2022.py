@@ -101,7 +101,7 @@ def bootstrap_counts(starts, length, draws, seed):
 
 
 def plot_figures(summary, out):
-    """Render point estimates from saved results without uncertainty shading."""
+    """Render point estimates from saved results."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -202,7 +202,7 @@ def report(workflow, p):
             f'{count} daily00UTC starts,40 six-hour leads. All four predictors use identical dates and '
             'hash-matched native-0.25° ERA5 truth conservatively mapped to1.5°. Errors pool MSE before square root. '
             'Saved uncertainty estimates are pointwise paired five-day block intervals within each of five date windows; '
-            'ten-day blocks are a sensitivity. Figures show point estimates without shading. '
+            'ten-day blocks are a sensitivity. '
             'These are physical-unit RMSE diagnostics.\n\n'
             '|Diagnostic|Day10 RMSE reduction vs archived GC025 (%)|\n|---|---:|\n'+
             '\n'.join(f'|{d}|{v:.3f}|' for d,v in zip(diagnostics,reductions))+'\n')
@@ -226,7 +226,6 @@ if __name__ == '__main__':
         (Path(p['plot_directory']) / 'plot_metadata.json').write_text(json.dumps({
             'protocol_hash': p['protocol_hash'], 'summary_sha256': sha256(summary_path),
             'plotter': str(Path(__file__).resolve()), 'plotter_sha256': sha256(__file__),
-            'uncertainty_shading': False,
         }, indent=2)+'\n')
     else:
         (references if args.phase=='references' else report)(args.workflow, p)

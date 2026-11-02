@@ -5,8 +5,8 @@
 
 Event date: 2026-10-15
 Recorded: 2026-10-15 (America/New_York)
-Execution: running (submitted; initial jobs queued)
-Outcome: pending
+Execution: interrupted (forty-year arms superseded on2026-10-28 before training)
+Outcome: inconclusive (seven-year controls completed; larger-data comparison unavailable)
 
 **User clarification:** The hypothesis is the benefit of larger data, not a
 width comparison restricted to the ready seven-year cache. This supersedes
@@ -195,3 +195,234 @@ Evidence: live `squeue`/`sacct`,
 [validation records](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/open/cached/validation_metrics.jsonl),
 [best-validation marker](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/open/cached/best_validation.json),
 and [download status](../../../artifacts/data_staging/res1_1982_2022_recovery_20261014/download_status.json).
+
+
+### 2026-10-23 — Both seven-year finals available; forty-year arms blocked by storage
+
+Read-only reconstruction on October23 from saved stage proofs, exact evaluation
+JSONs and live Slurm accounting. No jobs, executable sources or configurations
+were changed. Events below occurred October18–20 (EDT), rather than today.
+
+**All four arms:** width128/7y reuses completed open20k, selected14k and closed2k;
+width512/7y has now completed open20k, selected8k and closed2k. Width128/40y
+qualification15656210 and width512/40y qualification15656211 have not started.
+The forty-year prepared-data, producer-cache and aligned-cache roots are absent.
+The campaign has no2023 evaluation outputs or submitted2023 stages; its automatic
+all-four-final freeze has not been reached. No data-size effect can be estimated.
+
+**Matched2022 forecasts:** verified identical32 chosen starts,40 six-hour leads,
+cold zero memory, full corrected feedback, baseline checkpoint and evaluation
+metadata. To compare widths, use the existing width128 campaign's canonical
+baseline (`evaluation/di32_step00000.json`, exact pooled loss10.824076081370004)
+for every row. Positive reduction is better; these are exact original GraphCast
+weighted losses, pooled before taking a ratio.
+
+| Arm / checkpoint | Model loss | Rollout reduction | Day10 reduction |
+| --- | --- | --- | --- |
+| width128/7y selected14k open parent |14.271972605 |-31.853957% |-31.400884% |
+| width128/7y closed2k final |9.656741653 |10.784610% |16.848425% |
+| width512/7y selected8k open parent |14.236091947 |-31.522468% |-28.421492% |
+| width512/7y closed2k final |10.126636726 |6.443408% |7.875807% |
+
+Width512's own saved baseline gives6.469032% rollout and7.955506% day10
+reduction; the table consistently uses the common baseline. Repeated-baseline
+pooled differences from that reference are+0.041278/+0.020342/-0.032182/+0.027396%
+for the four rows; maximum absolute lead differences are0.166698/0.282257/
+0.229865/0.090902%. These finite discrepancies are warnings, not exclusions.
+Width128's final leads width512 by4.341203pp on this development cohort and
+single training seed. No paired confidence interval or training-seed replication
+was computed here. Both cached parents perform poorly with corrected feedback;
+closed-loop fine-tuning improves them. Cached-validation gains must not be
+confused with these continuous ten-day forecasts.
+
+**Width512 training:** all five4k jobs15659892–15659896 completed; open20k
+finished October18 at18:25:56EDT. Selection15659897 chose8k (exact validation
+loss3.693784196,1.390329% reduction). Closed15659898 completed2k October19 at
+00:48:24EDT; evaluations15659899_0/1 completed by01:52:50EDT and each records
+complete32-sample metrics and passing integrity. Open-stage elapsed sums to
+58h17m55s, closed to6h18m48s (64h36m43s training, excluding qualification,
+evaluation and queueing). Qualification peak host memory was13.6007GiB.
+
+The fixed cached-validation grid at2k/4k/6k/8k/10k/12k/14k/16k/18k/20k gives
+0.610064/0.907689/0.939875/1.390329/0.711772/0.606815/1.158203/0.212021/
+-2.724082/-1.135567% reduction over15 common validation segments. Final20k
+loss is3.788400835. Continuing beyond8k did not improve the selected validation
+score; the completed search budget and fixed20k endpoint are both retained.
+
+**Numerical warning:** width512 qualification passed all integrity checks with
+`numerical_policy=advisory`. Independent GPU restart/replay state relative-L2
+drift0.004281471 exceeded the diagnostic reference0.001 (max absolute0.03125,
+reference state magnitude3.40625, cosine0.9999908345). Parameter relative-L2
+was5.6268e-9 and optimizer3.0268e-6; exact serialization, cursor and RNG passed.
+The diagnostic replay `passed=false` is advisory; overall qualification passed.
+No hard finite-variance or restart-drift gate was applied.
+
+**Forty-year blocker:** download gate15575578 completed October20 at16:11:45EDT.
+Producer prepare pilot15905675 then failed after39s: `Insufficient storage:
+2.314 TiB free; 2.680 TiB needed including 256 GiB reserve`. The shortfall at
+that check was0.366TiB (about375GiB); current `df -h` still rounds available
+space to2.3T. No data was prepared. Wait15656205 and bridge15656204 failed
+at16:13EDT after detecting that failure. Alignment15656206 is pending
+`DependencyNeverSatisfied`; cache import15656207_[0–39], verify15656208 and
+both40y qualifications remain dependency-pending. They will not recover merely
+by waiting for GPU priority. The bridge correctly refuses to retry a failed
+producer stage. The separate warm-start40y experiment shares this blocker and
+is not a substitute for either fresh arm.
+
+**Next action:** resolve storage capacity or prepare an explicitly inspected
+storage-efficient recovery, then recover the producer and dependent cache chain
+while preserving source/data identity and matched initializations. Do not blindly
+resubmit the blocked jobs or modify frozen snapshots. Once both40y finals exist,
+release the prescribed common2023 comparison. This report authorizes no new jobs.
+
+**Evidence:** [campaign ledger](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/state.json),
+[selection](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/selection.json),
+[closed proof](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/closed.json),
+[parent evaluation](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/evaluation/2022_parent.json),
+[final evaluation](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/evaluation/2022_final.json),
+[qualification / replay warning](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/arms/w512_7y/qualification.json),
+[width128 canonical summary](../../../artifacts/checkpoints/v24_Ilya/res1_cached_w128_closed_loop_k20_20261013/results/summary.csv),
+[producer failure ledger](../../../artifacts/checkpoints/v24_Ilya/res1_cached_40yr_w512_di64_20261014_v5/state.json).
+
+<a id="e002"></a>
+## e002 — Seven versus twenty years after the forty-year storage failure
+
+Event date: 2026-10-28
+Recorded: 2026-10-28 (America/New_York)
+Execution: running (replacement pipeline submitted; initial jobs queued)
+Outcome: pending
+
+**Authorization and change:** The user requested “let's use 20 years instead”.
+Use2002–2021 for twenty training years and2022 for validation, preserving the
+completed seven-year controls and all existing forty-year artifacts. This
+supersedes the unstarted forty-year arms from e001. The scientific question
+remains added-data benefit at each width, with a smaller historical extension.
+
+**Controls and fixed protocol:** Reuse width128/7y selected open14k and final
+closed2k, plus width512/7y selected open8k and final closed2k. Both have completed
+20k open-loop search budgets. Only width128/20y and width512/20y are new training
+lineages. Within each width use the exact saved fresh step-zero weights from
+its seven-year control; retain di64/BCG1/rank32/MP2, batch1, seed22, K20/BPTT24/
+segment96, chronological segments, open20k with200-step warmup to1e-4 and
+selection on the same ten-point2022 exact-loss grid. Follow with common2015–2021
+closed2k,200-step warmup to1e-5, fresh optimizer/RNG/cursor and zero memory.
+Bounded training continues through finite weak metrics; numerical drift is
+advisory. Nonfinite values, corrupt/mismatched data/checkpoints and unusable
+execution remain errors.
+
+**Data and storage:** Reuse the complete1982–2022 downloaded Zarr without
+redownloading or copying it. Prepare only2002–2022 (30,680 six-hour frames),
+using dedicated new roots. The provisional conservative payload scales the old
+1.23TiB prepared plus1.20TiB cache estimate by30,680/59,900, then adds the
+unchanged256GiB reserve: **1.494614TiB** total. Available space at design check
+is2.212723TiB. This is an estimate, refined after cache manifest construction;
+existing resource checks remain active. No deletion is needed. Preserve all
+original seven-year train/validation windows and shared weather identity in
+the aligned cache; final segment/chunk counts must come from its manifest.
+
+**Evaluation:** Preserve common32-start2022 parent/final diagnostics and the
+four-final freeze before122-start2023 evaluation,40 six-hour leads and cold
+zero memory with corrected feedback. The primary comparisons become twenty-
+minus-seven-year exact pooled original GraphCast loss reduction at each width,
+against one common baseline, with simultaneous paired start-block intervals.
+One training seed and previously inspected2023 data limit generality.
+
+**Implementation / release:** Reuse valid seven-year qualification and resource
+evidence; bind new cache/source/initialization identities in startup checks
+without repeating70-update scientific qualification jobs. Build a new frozen
+producer ending at verified cache, and a separate new consumer campaign for
+the two missing lineages. Preserve old snapshots. Scheduler commands omit the
+rejected explicit GPU partition. Submission IDs and validation evidence will
+be recorded below after confirmation; no new jobs are claimed by this entry.
+
+
+### 2026-10-28 — Twenty-year replacement submitted; old pending chain superseded
+
+Confirmed in both Slurm queue and accounting after submission. Event time is
+October28 at16:53EDT. The new first stage is queued; no new weather
+arrays, cache predictions or twenty-year training updates are claimed yet.
+
+| Stage | Job ID | Confirmed status |
+| --- | --- | --- |
+| Existing-download verification; then automatic annual preparation/cache producer | **16392462** | Pending |
+| Prepared/cache wait, afterok16392462 | **16392463** | Pending dependency |
+| Aligned weather/cache construction | **16392464** | Pending dependency |
+| Hardlink import array,20 CPU shards, unthrottled | **16392465_[0–19]** | Pending dependency |
+| Aligned cache verification | **16392466** | Pending dependency |
+| Width128/20y CPU startup using reused qualification | **16392467** | Pending dependency |
+| Width512/20y CPU startup using reused qualification | **16392468** | Pending dependency |
+
+The jobs named `qualify_*` are CPU `startup` stages with zero optimizer probe
+updates, not new70-update GPU qualification. Each successful startup releases
+five4k exact-resume GPU training stages, selection, common seven-year closed2k
+and matched32 parent/final2022 evaluation. Then all four finals are pinned before
+2023 evaluation and the paired seven-versus-twenty-year comparison. Training IDs
+will be added automatically to the new consumer ledger after startup.
+
+**Provenance:** New producer
+[`res1_cached_20yr_precompute_20261028`](../../../artifacts/checkpoints/v24_Ilya/res1_cached_20yr_precompute_20261028/campaign.json)
+workflow `41bb961a7ed9749854fd2795fee9ffea716fab3835842b90bb24e667166dd891`,
+source digest `ee3d2ab3bef164c9eb47c4d1451237e7fb27e18357b072066a07d53ec16751e4`.
+It stops after verified cache, uses a single full40GB cache pilot, selects the GPU
+partition automatically and requests valid QoS. It rechecks the already complete
+source download; it launches no new download process. New consumer
+[`res1_fresh_data_scale_20yr_20261028`](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/manifest.json)
+workflow `a35967f36990b13382bccd6eb6487352d4163bbbaecd31e6f0f5758018b358eb`,
+source digest `cbacdde2453c695749581bef06b97844889f11eb9c8c6bf8c2137d9397f880cf`.
+Both manifests pin a snapshot of the dirty checkout; the consumer restores
+historical control training arithmetic and pins both completed controls.
+
+**Validation:**52 producer campaign/anchor/resume tests,77 consumer/cache/
+training/evaluation tests,34 distinct baseline-cache/qualification tests and8
+annual preparation tests passed (171 distinct targeted tests). Nine Slurm
+`--test-only` requests passed. Real saved-config/checkpoint/environment reuse
+checks pass for both widths using the new frozen arithmetic. Completed-download
+verification and the full conservative initial storage check pass. New cache
+startup still awaits the actual new prepared/cache artifacts; it was not
+replaced by a synthetic readiness claim. Zarr asynchronous I/O stalled under
+local sandbox socket restrictions; the same annual tests passed outside that
+sandbox in14s. No production stage failed from that local tooling issue.
+
+**Data accounting:** A calendar alignment against the actual saved seven-year
+anchors projects197 additional historical segments plus106 retained train
+segments:1,212 complete training chunks, with60 original validation chunks.
+It omits78 transition anchors to retain old restart boundaries. These are
+calendar-derived projections; final counts and bitwise overlap must be verified
+by the generated manifest.20k updates correspond to approximately16.5 versus
+47.2 passes over complete twenty-/seven-year chunks. Chronological year exposure
+will be recorded by production. Initial disk estimate is692,681,312,027 prepared
+bytes plus675,786,645,880 cache bytes plus274,877,906,944 reserve bytes; the
+verified check found2,427,696,709,632 bytes free. Source data was not copied or
+deleted. The two widths share the same cache.
+
+**Supersession:** After confirming all five old submissions were still pending,
+cancelled15656206,15656207_[0–39],15656208,15656210 and15656211; accounting
+confirms cancellation without execution. Disabled automatic release in the old
+fresh-consumer mutable ledger and linked the replacement. All old source
+snapshots, logs, checkpoints and completed seven-year controls remain preserved.
+No unrelated live jobs or separate warm-start experiment settings were changed.
+The prior forty-year source/storage failure remains part of e001 history.
+
+**Evidence:** [Submission IDs and commands](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/initial_submissions.json),
+[new consumer ledger](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/state.json),
+[new producer ledger](../../../artifacts/checkpoints/v24_Ilya/res1_cached_20yr_precompute_20261028/state.json),
+[storage/download verification](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/checks/preparation.json),
+[real protocol reuse](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/checks/reusable_protocol.json),
+[scheduler preflight](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/checks/scheduler_preflight.json),
+[confirmed queue/accounting](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/checks/post_submission.json),
+[old job cancellation record](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/superseded_40yr_jobs.json).
+
+**Interpretation / next action:** Implementation and submission completed;
+scientific outcome pending. Inspect the first producer stage and then its
+measured preparation/cache progression. Successful execution should continue
+to final evaluation even with finite loss increases or numerical warnings.
+
+
+### 2026-10-28,16:54 EDT — New producer advances successfully
+
+New download verification16392462 completed and published a passing signed
+report at16:54:09EDT, then automatically submitted preparation pilot
+**16392486** (4CPUs,32GiB,4h). Live queue confirms that pilot pending and
+consumer wait16392463 running. Thus the replacement has progressed beyond
+submission and passed the prerequisite that leads to preparation; annual data
+construction and training remain unfinished. No new source download occurred.

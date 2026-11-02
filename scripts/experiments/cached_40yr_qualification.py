@@ -101,6 +101,9 @@ def execute_cache_pilot(campaign: dict, gpu_kind: str) -> dict:
 def _cache_worker(campaign, gpu_kind):
     from src.models.mamba.v24_Ilya.baseline_cache import build_manifest, generate_shard, load_context
     from src.models.mamba.v24_Ilya.training.cached_diagnostics import require_matched_gpu_environment, memory_snapshot
+    # Cache generation retains the pinned deterministic flags used by existing
+    # cache shards. Finite replay differences follow the campaign policy below;
+    # the environment validator's strict argument only validates these flags.
     runtime = require_matched_gpu_environment('strict')
     runtime['allocation'] = validate_allocated_gpu(gpu_kind)
     pilot = Path(campaign['root']) / 'qualification' / f'cache_{gpu_kind}'
@@ -109,7 +112,8 @@ def _cache_worker(campaign, gpu_kind):
         raise RuntimeError('GPU memory measurements unavailable in existing cache pilot; use a fresh measured pilot')
     context = load_context(Path(campaign['paths']['cache_config']))
     manifest = build_manifest(context, 1, 4)
-    generate_shard(context, manifest, pilot, 0, resume=True, parity=True)
+    generate_shard(context, manifest, pilot, 0, resume=True, parity=True,
+                   numerical_policy=campaign.get('numerical_policy', 'strict'))
     snapshot = memory_snapshot()
     report = _read(pilot / 'pilot_report.json')
     report.update(peak_gpu_gib=max(_gpu_peak(snapshot), float(prior['peak_gpu_gib']) if prior else 0),

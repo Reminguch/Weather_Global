@@ -515,6 +515,7 @@ def memory_contract(
     target_tape_bytes = sum(tree_nbytes(value) for value in truths)
     target_staging_bytes = max((tree_nbytes(value) for value in truths), default=0)
     differentiable_weather = config.feedback_mode == "closed_loop"
+    reverse_sweeps = 2 if getattr(config, "objective_pair", None) == "mse_amse_excess" else 1
     return {
         "bptt_backend": "explicit_weather_reverse_vjp" if differentiable_weather else BPTT_BACKEND,
         "teacher_input_windows": config.truth_prefix_steps,
@@ -536,8 +537,13 @@ def memory_contract(
         "truth_target_staging_frames": 1,
         "truth_target_staging_bytes": target_staging_bytes,
         "static_input_bytes": tree_nbytes(static_inputs),
-        "graphcast_backward_calls": config.bptt_steps if differentiable_weather else 0,
+        "graphcast_backward_calls": config.bptt_steps * reverse_sweeps if differentiable_weather else 0,
         **({"weather_cotangent_tape_bytes": tree_nbytes(sample_frame) * (config.bptt_steps + 1),
+            "objective_reverse_sweeps": reverse_sweeps,
+            "concurrent_weather_cotangent_tapes": 1,
+            "gradient_window_steps": config.bptt_steps,
+            "weather_restart_every_steps": config.bptt_steps,
+            "recurrent_gradient_truncation_steps": config.bptt_steps,
             "graphcast_parameters_trainable": False,
             "graphcast_input_gradients": True}
            if differentiable_weather else {}),

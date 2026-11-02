@@ -1,0 +1,42 @@
+{
+  "source": "presentation/02_correction_branch.pptx",
+  "updated_at": "2026-09-26T05:13:34.134663+00:00",
+  "backup": "artifacts/figure-edits/20260926T051006Z_notation_fix",
+  "renderer": "LibreOffice 25.8.7.3",
+  "changes": [
+    "Two Mamba modules labeled as two layers each; existing 14 pt font retained",
+    "Preserved X_{0:1} -> Yhat_1 and c_1; initial memory m_0 = 0, then m_1, m_2, m_3",
+    "Matched main_v3 caption/method initialization and clarified forecast-call indexing"
+  ],
+  "validation": [
+    "All PPTX package entries except the two slide XML files unchanged",
+    "All slide XML outside two module labels and four memory labels unchanged",
+    "Existing PDF artwork exactly matches the before-edit master render",
+    "All PDF pixel differences confined to the requested labels"
+  ],
+  "pdfs": [
+    {
+      "path": "Overleaf/Pics/gc_mamba_architecture/presentation/02_correction_branch.pdf",
+      "crop": [
+        42,
+        5,
+        1103.5,
+        230.5
+      ],
+      "sha256": "cc901b0c2ebb05b2104a927052c7e6f286494d917ed160ca9b71483fec349629",
+      "changed_pixels_at_72dpi": 2798
+    },
+    {
+      "path": "Overleaf/Pics/gc_mamba_architecture/presentation/03_temporal_rollout.pdf",
+      "crop": [
+        309.5,
+        11,
+        838,
+        238
+      ],
+      "sha256": "dbf37b63d778f7b38fd416a3d89af2c926c7543fadc3c0a30df67452a6127d70",
+      "changed_pixels_at_72dpi": 128
+    }
+  ],
+  "pptx_sha256": "de5a91ce48522bc8b79497cc417e2ef4fe540a5a5ae3253fa3dae8c654f0ce5c"
+}

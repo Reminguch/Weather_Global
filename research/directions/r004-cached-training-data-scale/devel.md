@@ -1,8 +1,41 @@
 # Development — Fresh cached data scaling
 
-Updated: 2026-10-15 (America/New_York)
+Updated: 2026-10-28 (America/New_York)
 
-## Implementation
+## Current twenty-year replacement
+
+The user replaced both unstarted40y arms with20y arms onOctober28. Current
+producer: [res1_cached_20yr_precompute_20261028](../../../artifacts/checkpoints/v24_Ilya/res1_cached_20yr_precompute_20261028/campaign.json).
+Current consumer: [res1_fresh_data_scale_20yr_20261028](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20yr_20261028/manifest.json).
+Use their `state.json` and `initial_submissions.json` rather than the old40y IDs.
+The [e002 record](experiments.md#e002) records confirmed submissions and limits.
+
+The producer prepares2002–2022 from the completed1982–2022 downloaded Zarr,
+then builds and verifies baseline predictions. It stops at `cache_verify`;
+it submits no warm-start or batch4 model training. The total initial disk
+estimate is1.494614TiB including256GiB reserve; no files were deleted. Only
+one full40GB cache GPU pilot measures the new production I/O and throughput.
+GPU scheduling uses the automatic partition and valid QoS.
+
+The consumer reuses BOTH7y controls and exact fresh initial states. New arms
+`w128_20y`/`w512_20y` use the original frozen training arithmetic, open20k,
+selection on the same ten-point grid and common7y closed2k. Reused qualification
+is checked on CPU against config, initializer, model/training code and package
+environment identities; startup binds verified new cache/provenance and bounded
+first/middle/last samples without70 repeated optimizer updates. All scheduled
+finite optimization proceeds to its endpoint; numerical warnings remain advisory.
+Only new final checkpoints require new2022 diagnostics before the four-final
+freeze and common122-start2023 benchmark. No data-size result exists at launch.
+
+`checks/preparation.json`, `checks/reusable_protocol.json` and scheduler
+preflight records in the new roots contain inspected evidence. Annual preparation
+Zarr tests need local socket support; the sandbox stalled Zarr's event loop,
+while the same8 tests passed outside it in14s. Slurm workers run normally outside
+that sandbox. This was a local tooling issue, not a failed production stage.
+
+The sections below preserve the original40y implementation and failure history.
+
+## Original forty-year implementation
 
 The [controller](../../../scripts/experiments/run_v24_fresh_data_scale.py)
 registers the completed fresh width128/7-year control and schedules three new
@@ -63,8 +96,25 @@ Tests cover fresh-state transfer, cache provenance and corruption, exact-resume
 boundaries, selection, evaluation coverage and merging, submission identity,
 final-model gates and scheduler repair. Real CPU startup has also exercised
 the historical runtime, actual saved width128 initial state and existing cache:
-424 training chunks and15 validation segments. GPU measurements and scientific
-results remain pending until the queued jobs execute.
+424 training chunks and15 validation segments. The original submission checks are historical; current GPU measurements and
+scientific results are summarized below.
+
+## Verified state on October23
+
+Width512/7y open20k, selected8k, closed2k and both2022 evaluations are complete.
+The ledger retains evaluation status `submitted`; Slurm and both complete32-start
+JSONs verify completion. Seven-year width128 is the completed reused control.
+See the [October23 evidence](experiments.md#2026-10-23--both-seven-year-finals-available-forty-year-arms-blocked-by-storage)
+for common-baseline scores, full validation trajectory and advisory replay drift.
+
+The40y chain is stopped: prepare pilot15905675 failed October20 with2.314TiB
+free versus2.680TiB required (including256GiB reserve). Wait15656205 and
+bridge15656204 failed; alignment15656206 is `DependencyNeverSatisfied`;
+15656207/08/10/11 remain pending dependencies. None of the40y prepared/cache
+roots exists. Resolve storage and prepare a reconciled recovery; the old bridge
+will not retry this failed producer stage. Preserve successful seven-year work,
+all recorded IDs, frozen sources and shared initial weights. No recovery was
+submitted during the October23 inspection; no2023 evaluation has been released.
 
 ## Resume
 

@@ -1,0 +1,45 @@
+[
+  {
+    "file": "02_correction_branch.pptx",
+    "slides": [
+      {
+        "source": "02_correction_branch.svg",
+        "sha256": "221c9d229c1bce318b374ef399b6b2cb849f9644e4b924173ca603d24c43244b",
+        "vector_shapes": 31,
+        "text_boxes": 39,
+        "pictures": 0
+      }
+    ]
+  },
+  {
+    "file": "03_temporal_rollout.pptx",
+    "slides": [
+      {
+        "source": "03_temporal_rollout.svg",
+        "sha256": "48a937ead4caec207b8e761bcc9e9c1d6540ffaa0f3b6ac350ffd1cf275903d3",
+        "vector_shapes": 75,
+        "text_boxes": 60,
+        "pictures": 12
+      }
+    ]
+  },
+  {
+    "file": "gc_mamba_editable_figures.pptx",
+    "slides": [
+      {
+        "source": "02_correction_branch.svg",
+        "sha256": "221c9d229c1bce318b374ef399b6b2cb849f9644e4b924173ca603d24c43244b",
+        "vector_shapes": 31,
+        "text_boxes": 39,
+        "pictures": 0
+      },
+      {
+        "source": "03_temporal_rollout.svg",
+        "sha256": "48a937ead4caec207b8e761bcc9e9c1d6540ffaa0f3b6ac350ffd1cf275903d3",
+        "vector_shapes": 75,
+        "text_boxes": 60,
+        "pictures": 12
+      }
+    ]
+  }
+]

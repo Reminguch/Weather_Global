@@ -1,0 +1,24 @@
+% Compile from Overleaf/ with:
+% pdflatex -output-directory=Graphs/main_v2 Graphs/main_v2/add_mamba_legend.tex
+% The archived figure has no plotting source in this repository. Embed the
+% original PNG at its native 2520 x 1540 pixel dimensions, crop the top 60
+% pixels to remove the overall title, and cover the three parenthetical
+% legend qualifiers. Coordinates are in the original image pixels.
+\documentclass{article}
+\usepackage[paperwidth=2520bp,paperheight=1480bp,margin=0bp]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\unitlength}{1bp}
+\begin{document}
+\noindent\begin{picture}(2520,1480)
+    \put(0,0){\includegraphics[width=2520bp,height=1540bp]{Graphs/add_mamba.png}}
+    % (WB2): image x=355..407, y=108..130.
+    \put(355,1410){\color{white}\rule{52bp}{22bp}}
+    % First (ours 1.0 degrees): image x=334..422, y=132..152.
+    \put(334,1388){\color{white}\rule{88bp}{20bp}}
+    % Second (ours 1.0 degrees): image x=300..386, y=155..176.
+    \put(300,1364){\color{white}\rule{86bp}{21bp}}
+\end{picture}
+\end{document}

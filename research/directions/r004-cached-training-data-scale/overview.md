@@ -2,26 +2,29 @@
 
 Category: data
 Status: active
-Updated: 2026-10-17 (America/New_York)
+Updated: 2026-10-28 (America/New_York)
 Related: [superseded width-only proposal](../r003-fresh-residual-width/overview.md)
 
 ## Hypothesis and four-arm design
 
-Does adding 1982–2014 to cached open-loop K20 training improve subsequent
+Does adding 2002–2014 to cached open-loop K20 training improve subsequent
 closed-loop forecast skill? Does width512 benefit more than width128?
 
 | Residual width | Open-loop training years | Closed-loop training years | Training needed |
 | --- | --- | --- | --- |
 | 128 | 2015–2021: 7 years | 2015–2021 | Reuse completed fresh di64 control |
-| 128 | 1982–2021: 40 years | 2015–2021 | New |
-| 512 | 2015–2021: 7 years | 2015–2021 | New fresh control |
-| 512 | 1982–2021: 40 years | 2015–2021 | New |
+| 128 | 2002–2021: 20 years | 2015–2021 | New |
+| 512 | 2015–2021: 7 years | 2015–2021 | Reuse completed fresh control |
+| 512 | 2002–2021: 20 years | 2015–2021 | New |
 
-This requires three new training lineages, not four. The existing width128
-di64 arm completed20k cached updates, selected its14k checkpoint and completed
-2k closed-loop updates. Its2022 evaluation is complete; the common2023
-evaluation must be checked/run as needed. Preserve its protocol for the new
-arms rather than introducing a sampler change that forces a rerun.
+The user changed the larger-data arm from forty to twenty years on2026-10-28
+after the forty-year preparation failed for insufficient storage. The original
+[e001](experiments.md#e001) history and snapshots remain preserved; follow
+[e002](experiments.md#e002) for the replacement. Only two new lineages are needed.
+Reuse width128/7y (20k open search, selected14k, closed2k) and width512/7y
+(20k open search, selected8k, closed2k), including their exact saved fresh
+initial weights. Reuse valid resource and qualification evidence and bind new
+cache/data identities during startup instead of repeating scientific pilots.
 
 Common downstream fine-tuning isolates the benefit of larger open-loop
 pretraining. Expanding closed-loop data too would be a separate follow-up
@@ -54,16 +57,14 @@ frozen. No new arm initializes from trained residual weights.
   partially completed epochs overweight the earlier dates. Use the control's
   frozen training implementation, checking any necessary compatibility changes.
 
-The seven-year cache has424 training chunks; the aligned forty-year construction
-expects2,432 training chunks (502 added historical segments plus106 original
-seven-year segments). It omits18 transition anchors to preserve the original
-restart boundaries. At batch1,20k updates is
-about47 versus8 passes. Equal updates give equal sampled-window budgets:
-the larger arm trades repetition for diversity. Selected-parent updates may
-differ under the common checkpoint-search rule. A null result means no gain
-demonstrated at this budget, not that larger data can never help. Matching
-passes would need about115k large-data updates and adds a compute difference;
-any such convergence study must be reported separately.
+The seven-year cache has424 training chunks. The twenty-year aligned cache
+will add complete2002–2014 historical segments while retaining all original
+seven-year windows. Record exact counts and excluded boundary anchors from
+its generated manifest. Equal20k update budgets trade repetition for data
+diversity; selected parents may have different updates under the same fixed
+selection rule. Report actual year exposure from the chronological sampler.
+A null result applies to this budget, rather than all possible larger-data
+training. A study that also matches epoch counts would change compute budget.
 
 ## Data controls and readiness
 
@@ -71,18 +72,17 @@ Use2022 for validation/selection and the existing122-start2023 benchmark for
 evaluation. Preserve the original2015–2021 training chunks and2022 validation
 chunks exactly inside the large-data construction. Add earlier complete
 segments without shifting the shared weather restart boundaries. If the
-current forty-year builder does not preserve those boundaries, implement an
+twenty-year builder does not preserve those boundaries, implement an
 explicit compatible cache/index construction. Verify shared timestamps,
 inputs, stats and baseline predictions before treating it as a matched superset.
 
-The [seven-year cache](../../../data/graphcast/graphcast/dataset/precomputed_baselines/v24_res1_gcsmall_bptt24_k20/manifest.json)
-is complete. At submission on2026-10-15 at21:15EDT, the forty-year cache is
-pending; source downloading has completed1982–2002 and is processing2003.
-Cache readiness is a prerequisite
-for the actual hypothesis, not a reason to replace it with a width-only test.
-Keep normalization and the frozen baseline common. Adding older years also
-changes the historical distribution and overlap with baseline pretraining;
-the interpretation is specifically the benefit of adding these years.
+The seven-year cache is complete. Reuse the completed1982–2022 download,
+preparing only2002–2022 in new dedicated roots. The conservative payload
+estimate is1.494614TiB including the unchanged256GiB reserve; the design check
+found2.212723TiB available. Cache manifest construction refines the estimate.
+No source redownload or data deletion is needed. Both widths share one aligned
+cache. Preserve source weather, normalization, baseline and shared prediction
+identities before releasing training.
 
 ## Evaluation and decision
 
@@ -92,7 +92,7 @@ before evaluating the same122 starts in2023,40 six-hour leads, zero initial
 memory and corrected feedback.2023 is outside residual training but has prior
 project exposure; it is not an untouched test set.
 
-For each width, the primary quantity is the forty-year minus seven-year gain
+For each width, the primary quantity is the twenty-year minus seven-year gain
 in exact pooled GraphCast loss reduction against one common baseline. Positive
 is better. The difference of those gains across widths is a secondary
 interaction; also report day10 and compute/storage cost. Use paired start-block
@@ -103,36 +103,28 @@ This initial probe uses one training seed. Repeat promising effects with
 additional seeds before claiming generality; forecast-start intervals do not
 measure seed or year variability.
 
-## Submitted campaign and next action
+## Current evidence and next action
 
-The already authorized [forty-year width512 campaign](../../../artifacts/checkpoints/v24_Ilya/res1_cached_40yr_w512_di64_20261014_v5/campaign.json)
-uses trained parent weights, B/C groups2, batch4 and5k updates. It is a separate
-warm-start adaptation experiment and cannot replace a fresh arm here. It has
-not been cancelled. Its frozen scientific source and settings are unchanged;
-a separate CPU compatibility bridge handles Della's rejection of an explicit
-GPU partition when releasing its next jobs.
+The seven-year finals remain the only completed data-size controls: on32 matched
+2022 starts and40 six-hour leads, exact loss reduction against one common saved
+baseline is10.784610% for width128 and6.443408% for width512; day10 is16.848425%
+and7.875807%. Width512's own saved baseline gives6.469032%/7.955506%. Finite
+baseline and restart drift remain advisory. This is one seed and a development
+cohort; no larger-data result or common four-arm2023 result exists.
 
-The user authorized all three missing lineages on2026-10-15. Qualification
-jobs **15656209** (width512/7y), **15656210** (width128/40y), and **15656211**
-(width512/40y) are submitted. As of2026-10-17 at17:25EDT, the seven-year
-width512 arm has passed qualification and completed12,000/20,000 open-loop
-updates. Its next4k stage15659895 is pending priority. Closed-loop training
-and forecast evaluation have not started. Both forty-year arms still await
-the prepared data and cache. The source download reports complete at04:16EDT
-today, but producer gate15575578 and wait/bridge jobs remain pending a
-maintenance reservation. The prepared-data and cache roots do not yet exist.
+The old forty-year producer failed before preparing arrays onOctober20 at
+2.314TiB free versus2.680TiB required. Its fresh-consumer alignment and cache/
+qualification jobs were left pending behind that failure. The October28
+replacement preserves completed controls and old immutable snapshots and uses
+new producer/consumer roots; old unstarted forty-year descendants are superseded.
+The separate warm-start forty-year adaptation experiment remains historical
+context and is outside the two fresh twenty-year lineages.
 
-Best width512 cached validation so far is step8,000 (exact full-rollout loss3.693784,
-1.390% reduction); step12,000 has worsened to0.607% reduction. These are
-15-segment open-loop validation scores, not the final closed-loop forecast
-benchmark. No data-size comparison is available. The existing automatic
-pipeline continues through20k, selection, closed2k and evaluation.
-
-The [campaign manifest](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/manifest.json)
-pins all three configurations, the reused control and immutable runtime.
-The [state ledger](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_data_scale_20261015_v2/state.json)
-will accumulate later job IDs. Scientific evidence for the data-size hypothesis
-is still pending. Next inspect qualification and cache proofs, then compare the
-prespecified within-width gains after all four finals complete evaluation.
-See [e001](experiments.md#e001) for job IDs, dated corrections and validation,
-and [development handoff](devel.md) for resources and recovery commands.
+The replacement is submitted: source verification16392462 completed and
+automatically released preparation16392486 (queued). Cache chain16392463–66
+and CPU startup16392467/68 are active or pending their required data. The five obsolete unstarted40y
+submissions were cancelled and their old release disabled. Complete the
+twenty-year preparation, verified cache and two fresh lineages,
+then evaluate the prescribed within-width data gains after freezing all four
+finals. See [e002](experiments.md#e002) for current submission evidence and
+[development handoff](devel.md) for resource and recovery details.

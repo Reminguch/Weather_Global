@@ -1,5 +1,75 @@
 # Current experiments
 
+## Fresh residual data scaling changed to twenty years — 2026-10-28
+
+- User replaces the unstarted forty-year arms with **2002–2021 training /2022 validation**. Reuse both completed seven-year controls and their saved fresh initial states; only width128/20y and width512/20y need training.
+- New producer `res1_cached_20yr_precompute_20261028` reuses the complete downloaded1982–2022 Zarr and prepares only2002–2022. Planned prepared/cache payload plus unchanged256GiB reserve is **1.494614TiB**, below approximately2.21TiB available; no source redownload or deletion is needed.
+- New consumer `res1_fresh_data_scale_20yr_20261028` retains di64/BCG1/rank32/MP2, batch1, seed22, open20k and common seven-year closed2k. It reuses valid scientific qualification evidence through CPU identity/startup checks with zero optimizer probe updates. Finite numerical drift and weak metrics remain advisory.
+- **Submitted:** verification **16392462** already completed; preparation **16392486** is queued and wait **16392463** running. Alignment **16392464**, import **16392465_[0–19]**, verify **16392466**, CPU startup **16392467/68** await dependencies. Training releases automatically after the new cache/startup. Cancelled only obsolete pending15656206/07/08/10/11 and disabled the old fresh-consumer release.171 targeted tests and nine scheduler test-only requests passed. [r004/e002](research/directions/r004-cached-training-data-scale/experiments.md#e002) contains snapshots, job IDs and evidence. No twenty-year scientific result yet.
+
+## MGDA completion with advisory diagnostics — 2026-10-28
+
+- User requested letting the finite experiment reach evaluation and keeping
+  checks proportionate. The general recommendation is saved in [AGENTS.md](AGENTS.md).
+- New `decrease_policy=warn` commits one finite scheduled update per batch,
+  logging increases/ties, variance, stalls and direction warnings. There is no
+  repeated loss-decrease search. Nonfinite computation and integrity failures
+  remain errors. The terminal report retains warning counts separately from skill.
+- Submitted `res1_mse_amse_excess_advisory_20261028`: same parent/model/data,
+  three200-step arms and eight2022 starts ×40 leads. Previous runs stopped before
+  their first checkpoint, so training restarts from the parent. Successful
+  qualification15877833 supplies resource evidence; no new GPU gate is needed.
+- CPU release **16391359** completed after submission October28 at16:11EDT.
+  MGDA **16391367_0** is running; controls **16391367_1/2** await priority. Exact evaluation
+  **16391368**, spectral evaluation **16391369** and report **16391370** await
+  dependencies.
+- [Current attempt and provenance](research/directions/r005-mgda-accuracy-spectral-adjustment/experiments.md#e003).
+- [Detailed failure diagnosis](research/directions/r005-mgda-accuracy-spectral-adjustment/experiments.md#diagnosis-20261028):
+  observed MSE repeat variation is typically63× the local predicted decrement;
+  recorded MGDA coefficients are consistent, while stopped-feedback gradients
+  differ from regenerated-rollout derivatives. BF16 graph sums are a plausible
+  numerical contributor. Current training continues with advisory diagnostics.
+
+## MGDA recovery stopped before evaluation — inspected 2026-10-23
+
+- Qualification15877833 and release15877834 completed October19. Training
+  array15884371 stopped after **46/200 MGDA**, **1/200 MSE-control**, and
+  **31/200 fixed-sum** updates. All three exhausted nine trial step sizes
+  without satisfying their measured-loss-decrease condition.
+- Finite variance remained warning-only. MGDA/fixed-sum accepted33/25 updates
+  with variance warnings. Blocking thresholds were the absolute/relative
+  measured-decrease floors; the noise margins stayed advisory. Only0/0/1
+  accepted updates exceeded those noise margins, so scientific interpretation
+  remains inconclusive.
+- Exact15884372, spectral15884373 and report15884374 were cancelled by
+  dependencies. No final evaluation results exist. Logs and failure records
+  are preserved; this status check submitted no jobs and changed no code.
+- [Full outcome and evidence](research/directions/r005-mgda-accuracy-spectral-adjustment/experiments.md#2026-10-23--recovery-outcome-inspected).
+
+## MGDA variance warnings and authorized rerun — 2026-10-19
+
+- The user reaffirmed that large finite variance must be saved as a warning,
+  not fail qualification or release. This standing instruction is saved in
+  [AGENTS.md](AGENTS.md). The new default and all recovery configs use
+  `repeatability_policy=warn`; noise-derived margins are advisory as well.
+  Actual measured objective decreases retain absolute/relative floors.
+- Original qualification15787947 failed October18 after6m41s on0.212%/0.127%
+  repeatability spans versus a0.1% hard limit; release15787948 was cancelled.
+  No training/evaluation results came from that attempt. The older submission
+  status below is historical and superseded by this entry.
+- Recovery submitted: `res1_mse_amse_excess_pilot_recovery_20261019` preserves
+  the old snapshot and patches only four declared runtime files. Same parent,
+  three200-update arms and eight2022 evaluation starts.104 regression tests
+  pass. All repeated losses, warning bounds, candidate trials and whether a
+  decrease exceeds measured noise are retained in the new output records.
+- Qualification **15877833** and afterok release **15877834** submitted
+  October19 at20:00EDT; both confirmed pending. Qualification requests
+  oneA10080/8CPUs/320GiB/4h. Source digest
+  `8d9cc13cf98856ea84b4bbc651c287b69badcfb88943a084f9dbf76879c5db93`.
+  Frozen inputs/configs and scheduler test-only preflight pass. Release will
+  submit three200-update training arms and their evaluations/report.
+- [Recovery protocol and evidence](research/directions/r005-mgda-accuracy-spectral-adjustment/experiments.md#e002).
+
 ## Exact GC MSE / AMSE-adjustment MGDA pilot submitted — 2026-10-18
 
 - Submitted qualification **15787947** and dependent release **15787948** at12:28EDT. Scheduler confirms qualification pending and release pending dependency; GPU qualification and scientific results are not yet available. Passing qualification conditionally submits all three200-update arms and their evaluations/report; the training array does not yet have a job ID.
@@ -10,6 +80,8 @@
 - [Research protocol and attempt](research/directions/r005-mgda-accuracy-spectral-adjustment/experiments.md#e001), [implementation/resumption](research/directions/r005-mgda-accuracy-spectral-adjustment/devel.md), [campaign manifest](artifacts/checkpoints/v24_Ilya/res1_mse_amse_excess_pilot_20261018/manifest.json), [qualification submission](artifacts/checkpoints/v24_Ilya/res1_mse_amse_excess_pilot_20261018/submissions/qualify.json), [release submission](artifacts/checkpoints/v24_Ilya/res1_mse_amse_excess_pilot_20261018/submissions/release.json).
 
 ## Fresh residual data scaling: three new lineages submitted — 2026-10-15
+
+- **Current status inspected2026-10-23 (supersedes October17 below):** both7y arms have completed open20k/closed2k. Width512 selected8k; final common-baseline matched2022 reduction **6.443408%**, day10 **7.875807%**, versus reused width128/di64 **10.784610%/16.848425%**. Width512's own saved baseline gives6.469032%/7.955506%; finite baseline/replay drift remains advisory. Both40y arms have not started: producer prepare15905675 failed October20 with2.314TiB free versus2.680TiB needed including256GiB reserve. Wait/bridge15656205/04 failed; alignment15656206 has `DependencyNeverSatisfied`; import/cache/qualifications remain pending. No common2023 evaluation or data-size result exists. Storage and dependency recovery are needed; no jobs changed in this inspection. [Full updated evidence](research/directions/r004-cached-training-data-scale/experiments.md#2026-10-23--both-seven-year-finals-available-forty-year-arms-blocked-by-storage).
 
 - **Status2026-10-17,17:25EDT:** width512/7y passed qualification and completed **12,000/20,000** open-loop updates; next stage **15659895** is pending priority. Best cached-validation gain **1.390% at8k**, latest **0.607% at12k**; these are intermediate15-segment validation scores. Closed-loop training and forecast evaluations remain pending. Full source download completed at04:16EDT, but producer gate **15575578** and wait/bridge jobs remain maintenance-blocked; forty-year prepared data/cache and both forty-year training runs have not started. No scheduling changes during this check. Details in the dated research record below.
 - Submitted qualification jobs **15656209** (width512/7y), **15656210** (width128/40y), and **15656211** (width512/40y). Reuse completed fresh width128/7y di64 control: selected open step14k, final closed+2k. At submission on October15, all new jobs were queued; see the October17 update above for current progress.
@@ -114,7 +186,7 @@ Source report: [2023 frozen-model verification](artifacts/evaluations/v24_res1_2
   exact loss 11.40449 → 9.75951 over all starts/leads (14.424% reduction; paired
   95% CI 13.430–15.240%) and 29.73771 → 23.29699 at day 10 (21.658%; simultaneous
   secondary-family 95% CI 19.624–23.693%). Preserve 2022 results with explicit
-  development-set labels; identify figure shading as pointwise intervals.
+  development-set labels.
 - [ ] Add the physical-unit RMSE table and optional all-variable curves. Explain
   pooling squared errors before square root and equal pressure-level pooling;
   keep RMSE reductions distinct from exact GraphCast loss reductions. Do not

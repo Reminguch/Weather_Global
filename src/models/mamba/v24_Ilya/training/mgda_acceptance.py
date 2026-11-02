@@ -8,13 +8,15 @@ parameters, recurrent memory, RNG or optimizer state. This module deliberately
 owns none of those objects; the caller commits them only after acceptance.
 
 Directional derivatives are useful diagnostics, but do not establish the
-finite-step acceptance condition checked here. Ties and improvements below the
-measured repeatability floor are stalls, including at a Pareto stationary point.
+finite-step acceptance condition checked here. Finite repeatability noise is
+advisory by default; it must not prevent an otherwise accepted measured decrease.
+Such a decrease is not evidence of improvement above the measured noise floor.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+import warnings
 from typing import Callable, Literal, Sequence
 
 import numpy as np
@@ -54,6 +56,7 @@ class LossTolerances:
     repeats: int
     noise_multiplier: float = 4.0
     max_relative_noise: float = 1e-3
+    repeatability_policy: Literal["warn", "error"] = "warn"
 
     def __post_init__(self):
         for name in ("absolute_floor", "relative_floor", "repeatability_span"):
@@ -65,19 +68,36 @@ class LossTolerances:
             raise ValueError("noise_multiplier must be finite and at least one")
         if not math.isfinite(self.max_relative_noise) or not 0 <= self.max_relative_noise < 1:
             raise ValueError("max_relative_noise must be finite and in [0, 1)")
-        # Never silently enlarge the acceptance tolerance to hide unstable
-        # reevaluations. The absolute floor bounds near-zero repeatability too.
-        ceiling = np.maximum(self.absolute_floor,
-                             np.abs(self.reference_losses) * self.max_relative_noise)
-        if np.any(np.asarray(self.repeatability_span) > ceiling):
-            raise ValueError("Identical-forward repeatability noise exceeds its configured bound")
+        if self.repeatability_policy not in ("warn", "error"):
+            raise ValueError("repeatability_policy must be 'warn' or 'error'")
+        if any(self.noise_exceeded):
+            message = ("Identical-forward repeatability noise exceeds its configured bound: "
+                       f"span={self.repeatability_span}, bound={self.noise_bounds}")
+            if self.repeatability_policy == "error":
+                raise ValueError(message)
+            warnings.warn(message + "; advisory only, continuing", RuntimeWarning, stacklevel=2)
+
+    @property
+    def noise_bounds(self) -> LossPair:
+        return tuple(float(x) for x in np.maximum(
+            self.absolute_floor, np.abs(self.reference_losses) * self.max_relative_noise))
+
+    @property
+    def noise_exceeded(self) -> tuple[bool, bool]:
+        return tuple(span > bound for span, bound in zip(
+            self.repeatability_span, self.noise_bounds, strict=True))
 
     def thresholds(self, before_losses: Sequence[float]) -> LossPair:
         before = np.asarray(_pair(before_losses, name="before_losses"))
-        values = np.maximum.reduce((np.asarray(self.absolute_floor),
-                                    np.asarray(self.relative_floor) * np.abs(before),
-                                    self.noise_multiplier * np.asarray(self.repeatability_span)))
+        values = np.maximum(self.absolute_floor, np.asarray(self.relative_floor) * np.abs(before))
+        if self.repeatability_policy == "error":
+            values = np.maximum(values, self.noise_multiplier * np.asarray(self.repeatability_span))
         return float(values[0]), float(values[1])
+
+    def noise_thresholds(self, before_losses: Sequence[float]) -> LossPair:
+        """Retain the original noise-aware margin as an interpretation diagnostic."""
+        return tuple(float(x) for x in np.maximum(
+            self.thresholds(before_losses), self.noise_multiplier * np.asarray(self.repeatability_span)))
 
     def to_dict(self) -> dict:
         return {"absolute_floor": list(self.absolute_floor),
@@ -86,13 +106,15 @@ class LossTolerances:
                 "reference_losses": list(self.reference_losses),
                 "repeats": int(self.repeats),
                 "noise_multiplier": float(self.noise_multiplier),
-                "max_relative_noise": float(self.max_relative_noise)}
+                "max_relative_noise": float(self.max_relative_noise),
+                "repeatability_policy": self.repeatability_policy}
 
 
 def calibrate_loss_tolerances(
     repeated_losses: Sequence[Sequence[float]], *, absolute_floor=1e-8,
     relative_floor=1e-7, noise_multiplier: float = 4.0,
     max_relative_noise: float = 1e-3,
+    repeatability_policy: Literal["warn", "error"] = "warn",
 ) -> LossTolerances:
     """Qualify >=3 forward evaluations of one unchanged batch/state/RNG.
 
@@ -111,6 +133,7 @@ def calibrate_loss_tolerances(
         reference_losses=_pair(np.mean(values, axis=0), name="reference_losses"),
         repeats=len(values), noise_multiplier=noise_multiplier,
         max_relative_noise=max_relative_noise,
+        repeatability_policy=repeatability_policy,
     )
 
 
@@ -122,13 +145,15 @@ class BacktrackingTrial:
     decreases: LossPair
     accepted: bool
     reason: str
+    measured_decrease: bool = False
 
     def to_dict(self) -> dict:
         # Failed nonfinite forwards are recorded as JSON null, never NaN JSON.
         finite_list = lambda values: [float(x) if math.isfinite(x) else None for x in values]
         return {"index": self.index, "learning_rate": self.learning_rate,
                 "losses": finite_list(self.losses), "decreases": finite_list(self.decreases),
-                "accepted": self.accepted, "reason": self.reason}
+                "accepted": self.accepted, "reason": self.reason,
+                "measured_decrease": self.measured_decrease}
 
 
 @dataclass(frozen=True)
@@ -141,13 +166,17 @@ class AcceptanceResult:
     trials: tuple[BacktrackingTrial, ...]
     reason: str
     mode: AcceptanceMode
+    measured_decrease: bool = False
+    decrease_policy: str = "error"
 
     def to_dict(self) -> dict:
         return {"accepted": self.accepted, "learning_rate": self.learning_rate,
                 "losses": list(self.losses) if self.losses is not None else None,
                 "before_losses": list(self.before_losses), "thresholds": list(self.thresholds),
                 "trials": [trial.to_dict() for trial in self.trials],
-                "reason": self.reason, "mode": self.mode}
+                "reason": self.reason, "mode": self.mode,
+                "measured_decrease": self.measured_decrease,
+                "decrease_policy": self.decrease_policy}
 
 
 def backtrack_losses(
@@ -156,23 +185,31 @@ def backtrack_losses(
     mode: AcceptanceMode, tolerances: LossTolerances,
     initial_learning_rate: float = 1e-6, max_halvings: int = 8,
     shrink: float = 0.5,
+    decrease_policy: Literal["warn", "error"] = "warn",
 ) -> AcceptanceResult:
-    """Accept measured decrease using at most ``max_halvings + 1`` candidates.
+    """Commit a finite scheduled step, recording loss changes as diagnostics.
+
+    Under the default warning policy, evaluate the scheduled step once and
+    retain it even when measured losses increase or tie. Do not select among
+    repeated noisy forecasts. Explicit ``error`` policy retains the historical
+    loss-decrease search with at most ``max_halvings + 1`` candidates.
 
     All candidates are displacements from the same original parameters along a
     single fixed optimizer direction. Rejected candidates must not become the
     starting point for subsequent trials. The caller supplies that pure replay
     through ``evaluate_candidate(learning_rate)`` and caches any accepted state.
 
-    MGDA requires a strict, above-floor decrease in each loss. The matched MSE
-    control requires it only in the first loss; fixed-sum requires it in their
-    sum, using the sum of component noise thresholds as a conservative bound.
+    The measured-decrease diagnostic requires both losses for MGDA, the first
+    for MSE control, and their sum for fixed-sum. Only explicit error policy
+    makes that diagnostic blocking. Nonfinite losses never commit.
     Callback exceptions propagate so that model/IO failures cannot masquerade
     as ordinary optimizer stalls.
     """
     before = _pair(before_losses, name="before_losses")
     if mode not in ("mgda", "mse_control", "fixed_sum"):
         raise ValueError(f"Unsupported acceptance mode: {mode}")
+    if decrease_policy not in ("warn", "error"):
+        raise ValueError("decrease_policy must be 'warn' or 'error'")
     if not math.isfinite(initial_learning_rate) or initial_learning_rate <= 0:
         raise ValueError("initial_learning_rate must be finite and positive")
     if not isinstance(max_halvings, (int, np.integer)) or not 0 <= max_halvings <= 8:
@@ -181,24 +218,30 @@ def backtrack_losses(
         raise ValueError("The qualified backtracking policy halves each candidate step")
     thresholds = tolerances.thresholds(before)
     trials = []
-    for index in range(max_halvings + 1):
+    for index in range(1 if decrease_policy == "warn" else max_halvings + 1):
         learning_rate = float(initial_learning_rate * shrink ** index)
         candidate = _pair(evaluate_candidate(learning_rate), name="candidate_losses", finite=False)
         decreases = before[0] - candidate[0], before[1] - candidate[1]
         finite = all(math.isfinite(value) for value in (*candidate, *decreases))
         if not finite:
-            accepted, reason = False, "nonfinite_loss"
+            measured, accepted, reason = False, False, "nonfinite_loss"
         else:
             if mode == "mgda":
-                accepted = all(delta > floor for delta, floor in zip(decreases, thresholds, strict=True))
+                measured = all(delta > floor for delta, floor in zip(decreases, thresholds, strict=True))
             elif mode == "mse_control":
-                accepted = decreases[0] > thresholds[0]
+                measured = decreases[0] > thresholds[0]
             else:
-                accepted = math.fsum(decreases) > math.fsum(thresholds)
-            reason = "accepted" if accepted else "insufficient_measured_decrease"
-        trials.append(BacktrackingTrial(index, learning_rate, candidate, decreases, accepted, reason))
+                measured = math.fsum(decreases) > math.fsum(thresholds)
+            accepted = measured or decrease_policy == "warn"
+            reason = ("accepted" if measured else "advisory_no_decrease" if accepted
+                      else "insufficient_measured_decrease")
+            if accepted and not measured:
+                warnings.warn(f"{mode}: no measured decrease; committing finite scheduled update "
+                              f"with losses {before} -> {candidate}", RuntimeWarning, stacklevel=2)
+        trials.append(BacktrackingTrial(index, learning_rate, candidate, decreases, accepted, reason, measured))
         if accepted:
             return AcceptanceResult(True, learning_rate, candidate, before, thresholds,
-                                    tuple(trials), reason, mode)
+                                    tuple(trials), reason, mode, measured, decrease_policy)
     return AcceptanceResult(False, None, None, before, thresholds, tuple(trials),
-                            "backtracking_exhausted", mode)
+                            "nonfinite_loss" if decrease_policy == "warn" else "backtracking_exhausted",
+                            mode, False, decrease_policy)

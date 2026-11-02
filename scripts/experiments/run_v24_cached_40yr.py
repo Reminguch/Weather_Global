@@ -92,8 +92,29 @@ def training_config(template, paths, root, width, *, batch=4):
     return config
 
 
+def campaign_years(campaign):
+    return campaign.get("years", YEARS)
+
+
+def campaign_training_years(campaign):
+    start, end = campaign.get("training_years", [1982, 2021])
+    return list(range(start, end + 1))
+
+
+def preparation_storage_bytes(campaign):
+    """Scale the original full-payload estimate by exact six-hour coverage."""
+    import calendar
+    frames = lambda years: sum((366 if calendar.isleap(year) else 365) * 4 for year in years)
+    fraction = frames(campaign_years(campaign)) / frames(YEARS)
+    return dict(prepared_bytes=math.ceil(1.23 * 1024**4 * fraction),
+                cache_bytes=math.ceil(1.20 * 1024**4 * fraction))
+
+
 def prepare(root, *, workspace=ROOT, download_status=DEFAULT_DOWNLOAD, stop_after="report",
-            widths=(128, 512), init_from=None, download_wait_hours=72):
+            widths=(128, 512), init_from=None, download_wait_hours=72,
+            training_start_year=1982, training_end_year=2021, validation_year=2022,
+            prepared_root=None, anchor_root=None, cache_root=None,
+            gpu_kinds=None, gpu_partition=None):
     if not 1 <= download_wait_hours <= 336:
         raise ValueError('Download wait must be between one hour and fourteen days')
     widths = list(widths)
@@ -102,6 +123,16 @@ def prepare(root, *, workspace=ROOT, download_status=DEFAULT_DOWNLOAD, stop_afte
     init_from = str(Path(init_from).resolve()) if init_from is not None else None
     if stop_after not in ("cache_verify", "report"):
         raise ValueError("stop_after must be cache_verify or report")
+    if not (1982 <= training_start_year <= training_end_year < validation_year <= 2022
+            and validation_year == training_end_year + 1):
+        raise ValueError("Training years must be contiguous within 1982–2021 and immediately precede validation")
+    years = list(range(training_start_year, validation_year + 1))
+    gpu_kinds = list(gpu_kinds) if gpu_kinds is not None else list(GPU_TYPES) if years == YEARS else ["full"]
+    if not gpu_kinds or len(set(gpu_kinds)) != len(gpu_kinds) or any(kind not in GPU_TYPES for kind in gpu_kinds):
+        raise ValueError("Choose distinct supported GPU kinds")
+    gpu_partition = gpu_partition or ("gpu" if years == YEARS else "auto")
+    if gpu_partition not in ("gpu", "auto"):
+        raise ValueError("GPU partition must be gpu or auto")
     root, workspace, download_status = (Path(p).resolve() for p in (root, workspace, download_status))
     if (root / "campaign.json").exists():
         campaign = load_campaign(root)
@@ -113,6 +144,15 @@ def prepare(root, *, workspace=ROOT, download_status=DEFAULT_DOWNLOAD, stop_afte
             raise ValueError('Existing campaign has a different model or initialization')
         if campaign.get('download_wait_hours', 72) != download_wait_hours:
             raise ValueError('Existing campaign has a different download wait budget')
+        if (campaign_years(campaign) != years
+                or campaign.get("training_years", [1982, 2021]) != [training_start_year, training_end_year]
+                or campaign.get("validation_year", 2022) != validation_year):
+            raise ValueError("Existing campaign has different selected years")
+        if campaign.get("gpu_kinds", list(GPU_TYPES)) != gpu_kinds or campaign.get("gpu_partition", "gpu") != gpu_partition:
+            raise ValueError("Existing campaign has different GPU scheduling settings")
+        for key, supplied in (("prepared_root", prepared_root), ("anchor_root", anchor_root), ("cache_root", cache_root)):
+            if supplied is not None and str(Path(supplied).resolve()) != campaign["paths"][key]:
+                raise ValueError(f"Existing campaign has a different {key}")
         return campaign
     if root.exists() and any(root.iterdir()):
         raise FileExistsError("Use an empty campaign root; incomplete preparation is not overwritten")
@@ -132,12 +172,13 @@ def prepare(root, *, workspace=ROOT, download_status=DEFAULT_DOWNLOAD, stop_afte
         if not all(np.isfinite(v).all() for module in parent.residual_params.values() for v in module.values()):
             raise ValueError('Nonfinite parent checkpoint')
     dataset = workspace / "data/graphcast/graphcast/dataset"
+    year_tag = f"{training_start_year}_{validation_year}"
     resolve = lambda p: str((workspace / p).resolve())
     paths = dict(source_zarr=str(Path(status["output"]).resolve()), download_status=str(download_status),
         download_report=str(Path(status["output"]).with_name(Path(status["output"]).name + ".stage_report.json")),
-        prepared_root=str(dataset / "prepared_stream_1982_2022/res1"),
-        anchor_root=str(dataset / "anchor_manifests/v24_Ilya_res1_1982_2022"),
-        cache_root=str(dataset / "precomputed_baselines/v24_res1_gcsmall_1982_2022_bptt24_k20"),
+        prepared_root=str(Path(prepared_root).resolve() if prepared_root is not None else dataset / f"prepared_stream_{year_tag}/res1"),
+        anchor_root=str(Path(anchor_root).resolve() if anchor_root is not None else dataset / f"anchor_manifests/v24_Ilya_res1_{year_tag}"),
+        cache_root=str(Path(cache_root).resolve() if cache_root is not None else dataset / f"precomputed_baselines/v24_res1_gcsmall_{year_tag}_bptt24_k20"),
         baseline_checkpoint=resolve(template["data"]["baseline_checkpoint"]),
         stats_dir=resolve(template["data"]["stats_dir"]), reports=str(root / "reports"),
         cache_config=str(root / "configs/cache.json"))
@@ -170,12 +211,17 @@ def prepare(root, *, workspace=ROOT, download_status=DEFAULT_DOWNLOAD, stop_afte
     campaign = dict(format=FORMAT, root=str(root), workspace=str(workspace), source=str(root / "source"),
         source_digest=snapshot["source_digest"], paths=paths, configs=configs, assets=assets,
         config_sha256={p: sha(p) for p in [*configs.values(), paths["cache_config"]]},
-        download_source_sha256=status["source_sha256"], years=YEARS, training_years=[1982, 2021],
-        validation_year=2022, numerical_policy="advisory", batch_size=4, max_steps=5000,
+        download_source_sha256=status["source_sha256"], years=years,
+        training_years=[training_start_year, training_end_year], validation_year=validation_year,
+        train_years=list(range(training_start_year, training_end_year + 1)), val_years=[validation_year],
+        prepared_years=years, gpu_kinds=gpu_kinds, gpu_partition=gpu_partition,
+        numerical_policy="advisory", batch_size=4, max_steps=5000,
         runtime={"XLA_FLAGS": "--xla_gpu_enable_triton_gemm=false", "WEATHER_PREPARED_BOUNDED_READS": "1"},
         storage_reserve_bytes=RESERVE, stop_after=stop_after, created_at=now(),
         widths=widths, init_from=init_from, download_wait_hours=download_wait_hours,
+        download_gate_minutes=5 if status.get("status") == "complete" else download_wait_hours * 60 + 5,
         initialization='parent weights; fresh optimizer/RNG/cursor and zero memory' if parent else 'fresh zero-head residual')
+    campaign["storage_estimate"] = preparation_storage_bytes(campaign)
     campaign["workflow_id"] = digest(campaign)
     write(root / "campaign.json", campaign)
     write(root / "state.json", dict(workflow_id=campaign["workflow_id"], automation_enabled=False, jobs={}))
@@ -325,16 +371,22 @@ def sbatch_args(campaign, key, job, dependencies=(), condition="afterok", attemp
         raise ValueError("Invalid Slurm dependency")
     root = Path(campaign["root"])
     token = digest([campaign["workflow_id"], key, attempt])[:24]
-    args = ["sbatch", "--parsable", f"--job-name=c40-{key}", "--account=dabanin",
+    label = f"c{len(campaign_training_years(campaign))}"
+    args = ["sbatch", "--parsable", f"--job-name={label}-{key}", "--account=dabanin",
         f"--cpus-per-task={job['cpus']}", f"--mem={job['memory_gib']}G", f"--time={job['time_minutes']}",
-        f"--chdir={campaign['workspace']}", f"--comment=c40:{token}",
+        f"--chdir={campaign['workspace']}", f"--comment={label}:{token}",
         f"--output={root}/logs/{key}_%A_%a.out", f"--error={root}/logs/{key}_%A_%a.err"]
     if dependencies:
         args.append(f"--dependency={condition}:" + ":".join(map(str, dependencies)))
     if job["array"] is not None:
         args.append(f"--array=0-{job['array']-1}")
     if job["constraint"]:
-        args += ["--partition=gpu", "--gres=gpu:1", f"--constraint={job['constraint']}"]
+        if campaign.get("gpu_partition", "gpu") != "auto":
+            args.append("--partition=gpu")
+        else:
+            qos = "gpu-short" if job["time_minutes"] <= 1440 else "gpu-medium" if job["time_minutes"] <= 4320 else "gpu-long"
+            args.append(f"--qos={qos}")
+        args += ["--gres=gpu:1", f"--constraint={job['constraint']}"]
     else:
         args.append("--partition=cpu")
         if job['time_minutes'] > 4320:
@@ -402,7 +454,8 @@ def mark_job(campaign, key, *, expected_job_id=None, **fields):
 def launch_pilots(campaign, *, family, dependency, width=None):
     collectors = []
     prefix = family if width is None else f"{family}_w{width}"
-    for kind, constraint in GPU_TYPES.items():
+    for kind in campaign.get("gpu_kinds", list(GPU_TYPES)):
+        constraint = GPU_TYPES[kind]
         key = f"{prefix}_{kind}"
         pilot = spec(f"{family}_pilot", width=width, gpu_kind=kind, memory=64 if family=="cache" else 128,
                      cpus=4, minutes=(240 if kind=="full" else 360) if family=="cache" else 360, constraint=constraint)
@@ -426,7 +479,7 @@ def advance(campaign, key, job, result):
     elif stage == "prepare_pilot":
         memory = max(16, math.ceil(1.4*result["peak_host_gib"]/16)*16)
         minutes = max(62, math.ceil(1.35*result["slowest_year_seconds"]/1800)*30)
-        array = submit_job(campaign, "prepare_years", spec("prepare_year", array=41, memory=memory, cpus=4, minutes=minutes), dependencies=[jid])
+        array = submit_job(campaign, "prepare_years", spec("prepare_year", array=len(campaign_years(campaign)), memory=memory, cpus=4, minutes=minutes), dependencies=[jid])
         submit_job(campaign, "prepare_verify", spec("prepare_verify", memory=16, cpus=4, minutes=240), dependencies=[array])
     elif stage == "prepare_verify":
         launch_pilots(campaign, family="cache", dependency=jid)
@@ -500,7 +553,10 @@ def _validate_campaign_anchors(campaign, target):
     prepared_metadata = read(prepared/"metadata.json")
     prepared_sha = sha(prepared/"metadata.json")
     checkpoint_sha = sha(checkpoint_path)
-    if (ready.get("metadata_sha256") != prepared_sha or ready.get("years") != YEARS
+    years = campaign_years(campaign)
+    training_years = campaign_training_years(campaign)
+    validation_year = campaign.get("validation_year", 2022)
+    if (ready.get("metadata_sha256") != prepared_sha or ready.get("years") != years
             or ready.get("status") != "complete"
             or ready.get("identity", {}).get("checkpoint_sha256") != checkpoint_sha
             or prepared_metadata.get("checkpoint_sha256") != checkpoint_sha
@@ -512,23 +568,24 @@ def _validate_campaign_anchors(campaign, target):
     if ready.get("root_file_sha256", {}).get("coords/time.npy") != sha(time_path):
         raise ValueError("Prepared time coordinate fingerprint changed")
     times = np.load(time_path, allow_pickle=False)
-    expected_times = pd.date_range("1982-01-01", "2022-12-31 18:00", freq="6h").values
+    expected_times = pd.date_range(f"{years[0]}-01-01", f"{years[-1]}-12-31 18:00", freq="6h").values
     if not np.issubdtype(times.dtype, np.datetime64) or not np.array_equal(times, expected_times):
-        raise ValueError("Prepared anchor clock must cover the exact 1982–2022 six-hour grid")
+        raise ValueError(f"Prepared anchor clock must cover the exact {years[0]}–{years[-1]} six-hour grid")
     checkpoint = load_graphcast_checkpoint(checkpoint_path)
     task = checkpoint.task_config
     input_steps = input_steps_from_duration(task.input_duration, pd.Timedelta(hours=6))
     anchors = np.arange(input_steps, len(times)-2, dtype=np.int64)
     years = pd.DatetimeIndex(times[anchors]).year.to_numpy()
     expected = {"anchor_indices.npy": anchors, "anchor_times.npy": times[anchors],
-                "split_train.npy": np.flatnonzero(years <= 2021), "split_val.npy": np.flatnonzero(years == 2022)}
+                "split_train.npy": np.flatnonzero(np.isin(years, training_years)),
+                "split_val.npy": np.flatnonzero(years == validation_year)}
     for name, values in expected.items():
         actual = np.load(target/"anchors"/name, allow_pickle=False)
         kind = np.datetime64 if name == "anchor_times.npy" else np.integer
         if actual.ndim != 1 or not np.issubdtype(actual.dtype, kind) or not np.array_equal(actual, values):
             raise ValueError(f"Anchor indices/timestamps/split differ from prepared data: {name}")
     metadata = read(target/"metadata.json")
-    required = {"train_end_year": 2021, "validation_year": 2022, "input_steps": input_steps,
+    required = {"train_end_year": training_years[-1], "validation_year": validation_year, "input_steps": input_steps,
                 "target_steps": 1, "input_duration": str(task.input_duration),
                 "pressure_levels": list(task.pressure_levels), "target_variables": list(task.target_variables),
                 "n_anchors_total": len(anchors), "n_anchors_train": len(expected["split_train.npy"]),
@@ -556,7 +613,9 @@ def prepare_anchors(campaign):
     if staging.exists():
         archived=staging.with_name(staging.name+f".interrupted-{time.time_ns()}")
         staging.rename(archived)
-    build_anchor_manifest(prepared_root=Path(paths["prepared_root"]),baseline_checkpoint=Path(paths["baseline_checkpoint"]),output_root=staging)
+    build_anchor_manifest(prepared_root=Path(paths["prepared_root"]),baseline_checkpoint=Path(paths["baseline_checkpoint"]),
+                          output_root=staging, train_end_year=campaign_training_years(campaign)[-1],
+                          validation_year=campaign.get("validation_year", 2022))
     if (staging/".incomplete").exists():
         raise ValueError("Anchor builder did not finish")
     metadata=read(staging/"metadata.json")
@@ -568,17 +627,19 @@ def prepare_anchors(campaign):
     staging.rename(target)
 
 
-def verify_target_split(manifest):
+def verify_target_split(manifest, campaign=None):
+    training_years = campaign_training_years(campaign or {})
+    validation_year = (campaign or {}).get("validation_year", 2022)
     train=val=0
     for chunk in manifest["chunks"]:
         years={int(timestamp[:4]) for timestamp in chunk["target_timestamps"]}
         if chunk["split"]=="train":
-            if not years or not years.issubset(set(range(1982,2022))):
-                raise ValueError("Training target timestamps leak outside 1982–2021")
+            if not years or not years.issubset(set(training_years)):
+                raise ValueError(f"Training target timestamps leak outside {training_years[0]}–{training_years[-1]}")
             train+=1
         elif chunk["split"]=="val":
-            if years!={2022}:
-                raise ValueError("Validation targets must be in 2022")
+            if years!={validation_year}:
+                raise ValueError(f"Validation targets must be in {validation_year}")
             val+=1
         else:
             raise ValueError("Unexpected cache split")
@@ -596,16 +657,26 @@ def execute_stage(campaign, key, job, *, index=None):
         if not require_download(campaign):
             raise RuntimeError("Preprocessing requires completed download")
         if stage == "prepare_verify":
-            result = finalize_prepared(Path(paths["source_zarr"]), Path(paths["prepared_root"]), YEARS, Path(paths["baseline_checkpoint"]))
+            result = finalize_prepared(Path(paths["source_zarr"]), Path(paths["prepared_root"]), campaign_years(campaign), Path(paths["baseline_checkpoint"]))
             prepare_anchors(campaign)
             from src.models.mamba.v24_Ilya.baseline_cache import build_manifest,load_context
-            split=verify_target_split(build_manifest(load_context(Path(paths["cache_config"])),40))
+            split=verify_target_split(build_manifest(load_context(Path(paths["cache_config"])),40), campaign)
             return dict(passed=True, preparation=result, anchors=paths["anchor_root"], split=split)
         if stage == "prepare_year":
             require_report(campaign, "prepare_pilot")
         # Conservative remaining prepared/cache payloads; refined after generation.
-        storage_check(campaign, max(0, int(1.23*1024**4)-allocated_bytes(paths["prepared_root"])) + int(1.20*1024**4))
-        years = [1982, 1984] if stage == "prepare_pilot" else [YEARS[index]]
+        estimate = campaign.get("storage_estimate") or preparation_storage_bytes(campaign)
+        storage_check(campaign, max(0, estimate["prepared_bytes"]-allocated_bytes(paths["prepared_root"]))
+                      + max(0, estimate["cache_bytes"]-allocated_bytes(paths["cache_root"])))
+        selected = campaign_years(campaign)
+        # Include an ordinary and a leap year when both are present.
+        import calendar
+        ordinary = next((year for year in selected if not calendar.isleap(year)), selected[0])
+        pilot = [ordinary]
+        leap = next((year for year in selected if calendar.isleap(year)), None)
+        if leap is not None and leap not in pilot:
+            pilot.append(leap)
+        years = pilot if stage == "prepare_pilot" else [selected[index]]
         import resource
         results, elapsed = [], []
         for year in years:
@@ -621,7 +692,7 @@ def execute_stage(campaign, key, job, *, index=None):
         return execute_cache_pilot(campaign, job["gpu_kind"])
     if stage == "cache_release":
         from src.models.mamba.v24_Ilya.baseline_cache import build_manifest, load_context, ensure_manifest
-        reports = {k:require_report(campaign, f"cache_{k}_collect") for k in GPU_TYPES}
+        reports = {k:require_report(campaign, f"cache_{k}_collect") for k in campaign.get("gpu_kinds", list(GPU_TYPES))}
         constraint, passing = gpu_selection(reports)
         for report in passing.values():
             if report.get("gpu_memory_passed") is not True or not 0 < report.get("peak_gpu_gib", float("inf")) < 32:
@@ -653,7 +724,8 @@ def execute_stage(campaign, key, job, *, index=None):
         if manifest["manifest_sha256"] != release["manifest_sha256"]:
             raise ValueError("Cache producer inputs changed after release")
         storage_check(campaign,max(0,manifest["prediction_bytes"]-allocated_bytes(paths["cache_root"])))
-        return generate_shard(context,manifest,Path(paths["cache_root"]),index,resume=True)
+        return generate_shard(context,manifest,Path(paths["cache_root"]),index,resume=True,
+                              numerical_policy=campaign.get("numerical_policy", "advisory"))
     if stage == "cache_verify":
         from src.models.mamba.v24_Ilya.baseline_cache import verify_cache
         require_report(campaign,"cache_release")
@@ -665,7 +737,7 @@ def execute_stage(campaign, key, job, *, index=None):
     if stage == "training_release":
         require_cache(campaign)
         width = job["width"]
-        reports = {k: require_report(campaign,f"training_w{width}_{k}_collect") for k in GPU_TYPES}
+        reports = {k: require_report(campaign,f"training_w{width}_{k}_collect") for k in campaign.get("gpu_kinds", list(GPU_TYPES))}
         budget = training_budget(reports)
         chosen = next(reports[k] for k in budget["gpu_types"])
         proof = {k: chosen[k] for k in ("shared_init", "integrity_report")}
@@ -713,7 +785,9 @@ def execute_stage(campaign, key, job, *, index=None):
             jobs=read(Path(campaign["root"])/"state.json")["jobs"],
             qualification={str(w):require_report(campaign,f"training_w{w}_release") for w in campaign.get('widths', [128,512])})
         write(Path(campaign["root"])/"results.json",result)
-        lines = ["# Cached 40-year training comparison", "", "Training: 1982–2021; validation/evaluation: 2022.",
+        training_years = campaign_training_years(campaign)
+        lines = [f"# Cached {len(training_years)}-year training comparison", "",
+            f"Training: {training_years[0]}–{training_years[-1]}; validation/evaluation: {campaign.get('validation_year', 2022)}.",
             f"Initialization: {campaign.get('initialization', 'fresh')}; open-loop K20; batch 4; 5,000 updates / 20,000 sequence chunks per width.", "",
             f"Workflow: `{campaign['workflow_id']}`", f"Cache: `{result['cache_manifest_sha256']}`", "",
             "| Width | Selected update | Exact validation loss | Open-loop improvement | Closed-loop improvement |",
@@ -764,11 +838,13 @@ def execute(campaign, key, *, index=None):
 
 
 def dry_run(campaign):
-    first=spec("download_gate",memory=1,cpus=1,minutes=campaign.get('download_wait_hours',72)*60+5)
+    first=spec("download_gate",memory=1,cpus=1,
+               minutes=campaign.get("download_gate_minutes", campaign.get('download_wait_hours',72)*60+5))
     result = dict(submitted=False,workflow_id=campaign["workflow_id"],first_command=sbatch_args(campaign,"download_gate",first),
-        stages=["download_gate", "prepare_pilot", "prepare_years[41]", "prepare_verify",
-                "cache_full+cache_mig", "cache_collectors", "cache_release", "cache_generate[>=40]", "cache_verify",
-                '+'.join(f'training_w{w}_{kind}' for w in campaign.get('widths', [128,512]) for kind in GPU_TYPES),
+        stages=["download_gate", "prepare_pilot", f"prepare_years[{len(campaign_years(campaign))}]", "prepare_verify",
+                '+'.join(f'cache_{kind}' for kind in campaign.get('gpu_kinds', list(GPU_TYPES))),
+                "cache_collectors", "cache_release", "cache_generate[>=40]", "cache_verify",
+                '+'.join(f'training_w{w}_{kind}' for w in campaign.get('widths', [128,512]) for kind in campaign.get('gpu_kinds', list(GPU_TYPES))),
                 "training_collectors", "per_width_release", "per_width_training_<=24h", "per_width_evaluation", "report"],
         training={"batch_size":4,"updates_per_width":5000,"sequence_chunks_per_width":20000},
         note="Later submission commands are resolved automatically from successful measured pilots. No jobs submitted.")
@@ -785,7 +861,8 @@ def submit(campaign, *, dry=False):
     with locked(campaign["root"]):
         path=Path(campaign["root"])/"state.json"
         state=read(path);state["automation_enabled"]=True;write(path,state)
-    return {"download_gate":submit_job(campaign,"download_gate",spec("download_gate",memory=1,cpus=1,minutes=campaign.get('download_wait_hours',72)*60+5))}
+    return {"download_gate":submit_job(campaign,"download_gate",spec("download_gate",memory=1,cpus=1,
+        minutes=campaign.get("download_gate_minutes", campaign.get('download_wait_hours',72)*60+5)))}
 
 
 def status(campaign):
@@ -911,6 +988,16 @@ def main():
     parser.add_argument('--widths', type=int, nargs='+', choices=(128,512), default=[128,512])
     parser.add_argument('--init-from', type=Path)
     parser.add_argument('--download-wait-hours', type=int, default=72)
+    parser.add_argument('--training-start-year', type=int, default=1982)
+    parser.add_argument('--training-end-year', type=int, default=2021)
+    parser.add_argument('--validation-year', type=int, default=2022)
+    parser.add_argument('--prepared-root', type=Path)
+    parser.add_argument('--anchor-root', type=Path)
+    parser.add_argument('--cache-root', type=Path)
+    parser.add_argument('--gpu-kinds', nargs='+', choices=tuple(GPU_TYPES),
+                        help='Measured GPU shapes; a selected-year subset defaults to one full GPU pilot')
+    parser.add_argument('--gpu-partition', choices=('auto', 'gpu'),
+                        help='auto lets the cluster choose GPU partitions and QoS')
     parser.add_argument("--stage")
     parser.add_argument("--index",type=int)
     parser.add_argument("--stop-after",choices=("cache_verify", "report"),default="report",
@@ -918,7 +1005,11 @@ def main():
     args=parser.parse_args()
     if args.command=="prepare":
         result=prepare(args.campaign_root,download_status=args.download_status,stop_after=args.stop_after,
-                       widths=args.widths,init_from=args.init_from,download_wait_hours=args.download_wait_hours)
+                       widths=args.widths,init_from=args.init_from,download_wait_hours=args.download_wait_hours,
+                       training_start_year=args.training_start_year, training_end_year=args.training_end_year,
+                       validation_year=args.validation_year, prepared_root=args.prepared_root,
+                       anchor_root=args.anchor_root, cache_root=args.cache_root,
+                       gpu_kinds=args.gpu_kinds, gpu_partition=args.gpu_partition)
     else:
         campaign=load_campaign(args.campaign_root)
         if args.command=="submit":result=submit(campaign,dry=args.dry_run)

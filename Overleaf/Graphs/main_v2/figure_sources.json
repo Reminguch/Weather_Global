@@ -1,6 +1,6 @@
 {
   "generator": "Overleaf/Graphs/main_v2/generate_figures.py",
-  "generator_sha256": "1cf36b54ae198797371b74d9d904d38b3b0a12c77687bc1658273df987265cc5",
+  "generator_sha256": "eba17d127cc6de94ba71a6a6018618b963f0e80cf9c321b9fcd1cfabbce0b1aa",
   "sources": [
     {
       "path": "artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_20k_20260813/di16_bcg1_closed_sg_stateful_20k/eval/cold_full_reset_every_step_zero/swa_step02000-08000.json",

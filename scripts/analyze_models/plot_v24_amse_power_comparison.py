@@ -127,7 +127,6 @@ def overview(campaigns):
         by_k = table.groupby("wavenumber").power_error_decrease_pp.mean()
         ax.axhline(0, color="#75808C", lw=1)
         ax.plot(by_k.index, by_k, color=color, lw=1.6)
-        ax.fill_between(by_k.index, 0, by_k, color=color, alpha=.13)
         ax.set_xscale("log")
         ax.set_xticks([1, 3, 10, 30, 90, 180])
         ax.xaxis.set_major_formatter(ScalarFormatter())

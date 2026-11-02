@@ -1,5 +1,5 @@
 """Actual runner exact resume, operational stop and active-log boundaries."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,7 +19,7 @@ from src.models.mamba.v24_Ilya.training.mgda_step import MultiObjectiveResult
 from src.models.mamba.v24_Ilya.training.power_loss import make_power_calibration
 
 
-def mock_run(tmp_path, monkeypatch):
+def mock_run(tmp_path, monkeypatch, *, full_feedback=False, seen_states=None):
     config = V24IlyaTrainConfig(prepared_root=tmp_path / "prepared", anchor_manifest_root=tmp_path / "anchors",
         baseline_checkpoint=tmp_path / "baseline.npz", output_root=tmp_path / "runs", run_name="mgda",
         architecture=V24IlyaArchitectureConfig(residual_initialization="fresh"), input_duration=None,
@@ -28,6 +28,10 @@ def mock_run(tmp_path, monkeypatch):
         learning_rate_schedule="warmup_cosine_constant", learning_rate=1e-5, end_learning_rate=3e-6,
         warmup_steps=2, decay_end_step=4, weight_decay=0,
         power_calibration=make_power_calibration(np.ones((9, 2)), 1., 1.))
+    if full_feedback:
+        config = replace(config, segment_steps=96, bptt_steps=24, ar_tail_k=20,
+                         feedback_mode="closed_loop", objective_pair="mse_amse_excess",
+                         loss_kind="amse", power_calibration=None, mgda_backtracking={})
     config.baseline_checkpoint.write_bytes(b"baseline fixture")
     params = {"module": {"w": jnp.array([.2, .4], jnp.float32)}}
     state = {"s": jnp.zeros((1, 2), jnp.float32)}
@@ -39,8 +43,10 @@ def mock_run(tmp_path, monkeypatch):
         frames: int = 1
 
     def chunk(cursor, *args):
-        next_cursor = (TrainingCursor(segment_index=cursor.segment_index + 1) if cursor.segment_offset else
-                       TrainingCursor(segment_index=cursor.segment_index, segment_offset=2))
+        offset = cursor.segment_offset + config.bptt_steps
+        next_cursor = (TrainingCursor(segment_index=cursor.segment_index + 1)
+                       if offset == config.segment_steps else
+                       TrainingCursor(segment_index=cursor.segment_index, segment_offset=offset))
         return SimpleNamespace(input_frames=(), static_inputs=None, truths=(), forcings=(),
                                data_report=DataReport(), next_cursor=next_cursor)
     data = SimpleNamespace(anchor_indices=np.array([0]), train_split=np.array([0]), val_split=np.array([1]),
@@ -60,6 +66,8 @@ def mock_run(tmp_path, monkeypatch):
 
     def make_step(optimizer, **kw):
         def step(p, s, opt_state, keys, *args):
+            if seen_states is not None:
+                seen_states.append(np.asarray(s["s"]).copy())
             g = jax.tree_util.tree_map(lambda value: 2 * value + jnp.mean(s["s"]) +
                                       .01 * jax.random.normal(keys[0], value.shape), p)
             g2 = jax.tree_util.tree_map(lambda value: .5 * value, g)
@@ -74,11 +82,25 @@ def mock_run(tmp_path, monkeypatch):
     return config
 
 
-def test_runner_resume_matches_uninterrupted_and_archives_tail(tmp_path, monkeypatch):
-    config = mock_run(tmp_path, monkeypatch)
+@pytest.mark.parametrize("full_feedback", [False, True])
+def test_runner_resume_matches_uninterrupted_and_archives_tail(tmp_path, monkeypatch, full_feedback):
+    seen_states = []
+    config = mock_run(tmp_path, monkeypatch, full_feedback=full_feedback, seen_states=seen_states)
     invocation = V24IlyaTrainInvocation(config, tmp_path / "config.json")
     final = runner.run_training(invocation)
     expected = load_v24_Ilya_training_checkpoint(final)
+    windows_per_segment = config.segment_steps // config.bptt_steps
+    for index, state in enumerate(seen_states):
+        assert bool(np.any(state)) == bool(index % windows_per_segment)
+    expected_rng = jax.random.PRNGKey(config.seed)
+    for _ in range(2):  # Residual and frozen-baseline initialization keys.
+        expected_rng = jax.random.split(expected_rng)[0]
+    for _ in range(config.max_steps):
+        expected_rng = jax.random.split(expected_rng, config.bptt_steps + 1)[0]
+    np.testing.assert_array_equal(expected.rng_key, expected_rng)
+    assert expected.training_cursor == TrainingCursor(
+        segment_index=6 // windows_per_segment,
+        segment_offset=(6 % windows_per_segment) * config.bptt_steps).to_dict()
     early = config.run_dir / "checkpoints/checkpoint_step00000002.pkl"
     final = runner.run_training(V24IlyaTrainInvocation(config, invocation.config_path, resume=early))
     actual = load_v24_Ilya_training_checkpoint(final)
@@ -87,6 +109,7 @@ def test_runner_resume_matches_uninterrupted_and_archives_tail(tmp_path, monkeyp
                         jax.tree_util.tree_leaves(getattr(actual, field)), strict=True):
             np.testing.assert_array_equal(a, b)
     assert actual.training_cursor == expected.training_cursor
+    assert int(actual.optimizer_state.count) == 6
     metrics = [json.loads(line) for line in (config.run_dir / "train_metrics.jsonl").read_text().splitlines()]
     assert [item["step"] for item in metrics] == list(range(1, 7))
     assert all("gc_loss" in item and "power_loss" in item for item in metrics)
@@ -95,8 +118,9 @@ def test_runner_resume_matches_uninterrupted_and_archives_tail(tmp_path, monkeyp
     assert len(archives[0].read_text().splitlines()) == 6
 
 
-def test_operational_stop_saves_without_changing_schedule_or_budget(tmp_path, monkeypatch):
-    config = mock_run(tmp_path, monkeypatch)
+@pytest.mark.parametrize("full_feedback", [False, True])
+def test_operational_stop_saves_without_changing_schedule_or_budget(tmp_path, monkeypatch, full_feedback):
+    config = mock_run(tmp_path, monkeypatch, full_feedback=full_feedback)
     path = runner.run_training(V24IlyaTrainInvocation(config, tmp_path / "config.json", stop_after_steps=3))
     saved = load_v24_Ilya_training_checkpoint(path)
     assert saved.completed_step == 3

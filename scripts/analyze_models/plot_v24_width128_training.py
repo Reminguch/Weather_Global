@@ -160,7 +160,6 @@ def main():
 
     ax = axes[1, 0]
     ax.plot(steps, lr / 1e-4, color=BLUE, lw=2)
-    ax.axvspan(2000, 8000, color=INK, alpha=.055)
     ax.text(5000, .13, "SWA members: 2k, 3k, …, 8k", ha="center", fontsize=9)
     ax.annotate("Ends at 1e−5", xy=(10000, lr[-1] / 1e-4), xytext=(6200, .37),
                 arrowprops={"arrowstyle": "->", "color": INK}, fontsize=9)

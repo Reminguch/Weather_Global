@@ -151,7 +151,13 @@ def test_reject_corrected_feedback_before_loading_data(tmp_path):
         cache.load_context(path)
 
 
-def test_pilot_online_parity_and_recovery(setup, monkeypatch):
+@pytest.mark.parametrize('numerical_policy,drift,error', [
+    ('strict', 0., None),
+    ('strict', .001, 'normalized error exceeds'),
+    ('advisory', .001, None),
+    ('advisory', float('nan'), 'Nonfinite parity'),
+])
+def test_pilot_online_parity_and_recovery(setup, monkeypatch, numerical_policy, drift, error):
     from graphcast import xarray_jax
     from src.models.mamba.v24_Ilya.training import endpoint_step
     root, context, full_manifest, load, predict = setup
@@ -175,7 +181,7 @@ def test_pilot_online_parity_and_recovery(setup, monkeypatch):
             return {}, {}
 
         def apply(self, params, state, key, inputs, truth, forcing):
-            values = xarray_jax.unwrap_data(inputs.u)[:, -1:, :, :] + 10
+            values = xarray_jax.unwrap_data(inputs.u)[:, -1:, :, :] + 10 + drift
             ds = xr.Dataset({'u': xarray_jax.DataArray(values, dims=truth.u.dims, coords=truth.u.coords)})
             return ds, {}
     monkeypatch.setattr(endpoint_step, 'build_training_transforms',
@@ -183,19 +189,54 @@ def test_pilot_online_parity_and_recovery(setup, monkeypatch):
     stats = {'stddev_by_level': xr.Dataset({'u': 1., 'f': 1., 'land': 1.}),
              'diffs_stddev_by_level': xr.Dataset({'u': 1.})}
     context = (config, SimpleNamespace(params={}), None, stats, data, None)
-    cache.generate_shard(context, manifest, root, 0, parity=True)
+    if error:
+        with pytest.raises(AssertionError, match=error):
+            cache.generate_shard(context, manifest, root, 0, parity=True, numerical_policy=numerical_policy)
+        assert not (root / 'pilot_report.json').exists()
+        return
+    cache.generate_shard(context, manifest, root, 0, parity=True, numerical_policy=numerical_policy)
     report = json.loads((root / 'pilot_report.json').read_text())
     assert report['passed']
+    assert report['integrity_passed']
+    assert report['numerical_policy'] == numerical_policy
     assert report['chunks'] == 4
-    assert all(v == 0 for v in report['max_normalized_errors'].values())
+    assert report['reference_bound'] == 1e-5
+    assert report['numerical_within_reference'] is (drift == 0)
+    assert bool(report['numerical_warnings']) is (drift != 0)
+    if drift:
+        assert max(report['max_normalized_errors'].values()) > report['reference_bound']
+    else:
+        assert all(v == 0 for v in report['max_normalized_errors'].values())
+    marker_path = root / 'shard_000/COMPLETE.json'
+    assert json.loads(marker_path.read_text())['exact_roundtrip_verified']
+    if drift:
+        # Advisory repeat evidence cannot silently satisfy a strict re-request.
+        with pytest.raises(AssertionError, match='normalized error exceeds'):
+            cache.generate_shard(context, manifest, root, 0, resume=True, parity=True)
+        cache.generate_shard(context, manifest, root, 0, resume=True, parity=True, numerical_policy=numerical_policy)
     with pytest.raises(ValueError, match='partial|subset'):
         cache.verify_cache(root)
     with pytest.raises(FileNotFoundError):
         cache.BaselineCacheReader(root, manifest['compatibility_sha256'])
     # Crash after shard publication but before parity-report publication.
     (root / 'pilot_report.json').unlink()
-    cache.generate_shard(context, manifest, root, 0, resume=True, parity=True)
+    cache.generate_shard(context, manifest, root, 0, resume=True, parity=True, numerical_policy=numerical_policy)
     assert json.loads((root / 'pilot_report.json').read_text())['passed']
+    marker = json.loads(marker_path.read_text())
+    marker['exact_roundtrip_verified'] = False
+    cache.atomic_json(marker_path, marker)
+    with pytest.raises(ValueError, match='disk round trips'):
+        cache.generate_shard(context, manifest, root, 0, resume=True, parity=True, numerical_policy=numerical_policy)
+
+
+@pytest.mark.parametrize('value', [float('nan'), float('inf')])
+def test_normalized_error_rejects_partial_nonfinite_values_and_scales(value):
+    actual, expected = frame(1), frame(1)
+    actual['u'].values[..., 0] = value
+    with pytest.raises(AssertionError, match='Nonfinite parity'):
+        cache.normalized_error(actual, expected, xr.Dataset({'u': 1.}))
+    with pytest.raises(ValueError, match='Invalid normalization scale'):
+        cache.normalized_error(expected, expected, xr.Dataset({'u': value}))
 
 
 def test_production_budget_and_slurm_submission():

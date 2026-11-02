@@ -1,7 +1,7 @@
 """Bounded, resumable annual preparation for the 1982--2022 cached campaign.
 
 Annual workers never publish a trainable root. Only ``finalize_prepared`` can
-publish complete format-v2 metadata and READY after all 41 years verify.
+publish complete format-v2 metadata and READY after every selected year verifies.
 """
 from __future__ import annotations
 
@@ -267,32 +267,34 @@ def prepare_year(source: Path, output: Path, year: int, baseline_checkpoint: Pat
 def finalize_prepared(source: Path, output: Path, years: Iterable[int], baseline_checkpoint: Path) -> dict:
     """Verify the exact campaign coverage and publish a trainable format-v2 root."""
     source, output, baseline_checkpoint = map(Path, (source, output, baseline_checkpoint))
-    if tuple(years) != YEARS:
-        raise ValueError("Finalization requires every year 1982..2022 in order")
+    years = tuple(years)
+    if (not years or any(year not in YEARS for year in years)
+            or years != tuple(range(years[0], years[-1] + 1))):
+        raise ValueError("Finalization requires every year in the selected contiguous 1982..2022 interval in order")
     identity = _identity(source, baseline_checkpoint)
     with _lock(output / ".metadata.lock"):
         ready_path = output / "READY.json"
         if ready_path.exists():
             ready = json.loads(ready_path.read_text())
-            if (ready.get("identity") != identity or ready.get("years") != list(YEARS)
+            if (ready.get("identity") != identity or ready.get("years") != list(years)
                     or ready.get("metadata_sha256") != _sha(output / "metadata.json")
                     or (output / ".incomplete").exists()):
                 raise ValueError("Finalized prepared identity changed")
             for relative, expected in ready["root_file_sha256"].items():
                 if _sha(output / relative) != expected:
                     raise ValueError(f"Finalized prepared file changed: {relative}")
-            for year in YEARS:
+            for year in years:
                 with _lock(output / f".year_{year}.lock"):
                     _verify_year(output / "years" / str(year), identity, year)
             return ready
         (output / "READY.json").unlink(missing_ok=True)
         (output / ".incomplete").touch()
         records = []
-        for year in YEARS:
+        for year in years:
             with _lock(output / f".year_{year}.lock"):
                 records.append(_verify_year(output / "years" / str(year), identity, year))
         checkpoint = load_graphcast_checkpoint(baseline_checkpoint)
-        times = pd.DatetimeIndex(np.concatenate([_times(year).values for year in YEARS]))
+        times = pd.DatetimeIndex(np.concatenate([_times(year).values for year in years]))
         variables = json.loads(json.dumps(records[0]["variables"]))
         for name, info in variables.items():
             if "time" in info["dims"]:
@@ -310,15 +312,15 @@ def finalize_prepared(source: Path, output: Path, years: Iterable[int], baseline
                 relative = f"vars/{name}.npy"
                 if len({r["files"][relative]["sha256"] for r in records}) != 1:
                     raise ValueError(f"Static field changes across years: {name}")
-                _npy(output / relative, np.load(output / "years" / "1982" / relative))
+                _npy(output / relative, np.load(output / "years" / str(years[0]) / relative))
         _npy(output / "coords/time.npy", times.values)
         for name in ("lat", "lon", "level"):
             relative = f"coords/{name}.npy"
             if len({r["files"][relative]["sha256"] for r in records}) != 1:
                 raise ValueError(f"Coordinate changes across years: {name}")
-            _npy(output / relative, np.load(output / "years" / "1982" / relative))
+            _npy(output / relative, np.load(output / "years" / str(years[0]) / relative))
         shards, cursor = [], 0
-        for year in YEARS:
+        for year in years:
             year_times = _times(year)
             shards.append({"year": year, "path": f"years/{year}", "start": cursor,
                            "stop": cursor + len(year_times), "time_start": str(year_times[0].to_datetime64()),
@@ -346,7 +348,7 @@ def finalize_prepared(source: Path, output: Path, years: Iterable[int], baseline
         for shard in shards[1:]:
             store.build_batch_from_indices(indices=[shard["start"]], input_steps=2, target_steps=1,
                                            task_cfg=task, dt=pd.Timedelta(hours=6))
-        ready = {"format": FORMAT, "identity": identity, "years": list(YEARS), "time_steps": len(times),
+        ready = {"format": FORMAT, "identity": identity, "years": list(years), "time_steps": len(times),
                  "metadata_sha256": _sha(output / "metadata.json"), "status": "complete",
                  "root_file_sha256": {str(path.relative_to(output)): _sha(path)
                                       for directory in (output / "coords", output / "vars")

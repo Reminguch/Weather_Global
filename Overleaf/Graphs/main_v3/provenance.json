@@ -1,0 +1,262 @@
+{
+  "generator_sha256": "de100dc22125dfafe609a28cd8558e07c3eb51702519f2e17d1f363397174916",
+  "formula": "100*(1-rmse_full/rmse_baseline)",
+  "metric": "cosine-latitude-weighted RMSE reduction; not GraphCast loss",
+  "group_aggregation": "mean of physical-unit squared errors over starts and equally over pressure levels, then square root",
+  "n_samples": 32,
+  "chosen_idx": [
+    117,
+    119,
+    120,
+    121,
+    122,
+    123,
+    136,
+    138,
+    141,
+    159,
+    162,
+    166,
+    582,
+    588,
+    592,
+    598,
+    600,
+    605,
+    615,
+    624,
+    627,
+    630,
+    1048,
+    1056,
+    1058,
+    1060,
+    1076,
+    1093,
+    1094,
+    1095,
+    1096,
+    1098
+  ],
+  "target_steps": 40,
+  "sources": {
+    "S128": {
+      "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-08-10-ablation-swa-select32/sel32_S128_SWA6k-11k.json",
+      "sha256": "8a3ba3fa17867e37330600df07333eac2560531f15556c76bf13bc1aa317cd1d",
+      "ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/v13_residual_SWA_step6k-11k.pkl",
+      "ablation_mode": "none",
+      "anchor_manifest": "/home/lm8598/Weather_Global_experiments/results/anchor_manifests_r1/select32.json"
+    },
+    "M0": {
+      "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-08-10-ablation-swa-select32/sel32_M0_lr1e-4_SWA6k-11k.json",
+      "sha256": "e3ab6e0004deda00e39707f72fac123698f6aa52ff263dc2f25f2959ba9312a4",
+      "ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+      "ablation_mode": "reset_all_every_step",
+      "anchor_manifest": "/home/lm8598/Weather_Global_experiments/results/anchor_manifests_r1/select32.json"
+    },
+    "S0": {
+      "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-08-10-ablation-swa-select32/sel32_S0_lr1e-4_SWA6k-11k.json",
+      "sha256": "a60db52f3de9d73d3fbf8aafb8cf991d39e522d6af9144be70328ce0abca4126",
+      "ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+      "ablation_mode": "none",
+      "anchor_manifest": "/home/lm8598/Weather_Global_experiments/results/anchor_manifests_r1/select32.json"
+    },
+    "M20": {
+      "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-08-10-ablation-swa-select32/sel32_M20_lr1e-4_SWA6k-11k.json",
+      "sha256": "93270c63cfe05435fd0913edbaa377728603cba123f50ac4c5309af379ddfc5b",
+      "ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+      "ablation_mode": "reset_all_every_step",
+      "anchor_manifest": "/home/lm8598/Weather_Global_experiments/results/anchor_manifests_r1/select32.json"
+    },
+    "S20": {
+      "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-08-10-ablation-swa-select32/sel32_S20_lr1e-4_SWA6k-11k.json",
+      "sha256": "df28f02fe6da455f3b966db73832ec7efb2c78a2189dba222adac69d50991445",
+      "ckpt": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+      "ablation_mode": "none",
+      "anchor_manifest": "/home/lm8598/Weather_Global_experiments/results/anchor_manifests_r1/select32.json"
+    }
+  },
+  "findings": {
+    "breadth": {
+      "all_groups_improve_from_120h": true,
+      "all_channels_improve_from_hours": 186,
+      "channel_counts": [
+        79,
+        71,
+        64,
+        56,
+        50,
+        45,
+        33,
+        33,
+        34,
+        35,
+        40,
+        44,
+        50,
+        65,
+        68,
+        69,
+        71,
+        71,
+        72,
+        75,
+        77,
+        78,
+        79,
+        79,
+        80,
+        81,
+        81,
+        81,
+        82,
+        82,
+        83,
+        83,
+        83,
+        83,
+        83,
+        83,
+        83,
+        83,
+        83,
+        83
+      ],
+      "day10_group_reduction_min_pct": 10.573910517150754,
+      "day10_group_reduction_max_pct": 15.480615801619457
+    },
+    "memory": {
+      "day10_results": [
+        {
+          "variable": "geopotential",
+          "label": "Geopotential",
+          "M0": -0.003930273026786502,
+          "S0": -1.5793283849258932,
+          "M20": 5.48415415196517,
+          "S20": 10.470100093979195,
+          "memory_effect_K0_pp": -1.5753981118991067,
+          "memory_effect_K20_pp": 4.985945942014024
+        },
+        {
+          "variable": "temperature",
+          "label": "Temperature",
+          "M0": -2.1722322239013936,
+          "S0": -2.6567218116046565,
+          "M20": 6.341016951069256,
+          "S20": 11.176882789511177,
+          "memory_effect_K0_pp": -0.4844895877032629,
+          "memory_effect_K20_pp": 4.835865838441921
+        },
+        {
+          "variable": "specific_humidity",
+          "label": "Specific humidity",
+          "M0": -5.710357279680078,
+          "S0": -4.790034268122412,
+          "M20": 7.8055340086808815,
+          "S20": 11.139556056084931,
+          "memory_effect_K0_pp": 0.9203230115576666,
+          "memory_effect_K20_pp": 3.3340220474040496
+        },
+        {
+          "variable": "u_component_of_wind",
+          "label": "Zonal wind",
+          "M0": -1.6173264239150331,
+          "S0": -1.891411907324403,
+          "M20": 8.151581336054214,
+          "S20": 12.125694803413511,
+          "memory_effect_K0_pp": -0.2740854834093698,
+          "memory_effect_K20_pp": 3.974113467359297
+        },
+        {
+          "variable": "v_component_of_wind",
+          "label": "Meridional wind",
+          "M0": -0.013732804941657406,
+          "S0": 0.029946297403382616,
+          "M20": 7.89951498842647,
+          "S20": 13.984563729998634,
+          "memory_effect_K0_pp": 0.04367910234504002,
+          "memory_effect_K20_pp": 6.085048741572163
+        },
+        {
+          "variable": "vertical_velocity",
+          "label": "Vertical velocity",
+          "M0": -1.5037082659120626,
+          "S0": -1.282335703136983,
+          "M20": 8.735597344693325,
+          "S20": 11.882157932974714,
+          "memory_effect_K0_pp": 0.22137256277507955,
+          "memory_effect_K20_pp": 3.146560588281389
+        },
+        {
+          "variable": "10m_u_component_of_wind",
+          "label": "10 m zonal wind",
+          "M0": -1.0982129702657328,
+          "S0": -1.9123562203513966,
+          "M20": 9.635558175096337,
+          "S20": 14.148758227549807,
+          "memory_effect_K0_pp": -0.8141432500856638,
+          "memory_effect_K20_pp": 4.51320005245347
+        },
+        {
+          "variable": "10m_v_component_of_wind",
+          "label": "10 m meridional wind",
+          "M0": -0.03631591770634213,
+          "S0": -1.147037678355134,
+          "M20": 6.793129802307818,
+          "S20": 13.443812052347138,
+          "memory_effect_K0_pp": -1.1107217606487918,
+          "memory_effect_K20_pp": 6.65068225003932
+        },
+        {
+          "variable": "2m_temperature",
+          "label": "2 m temperature",
+          "M0": -3.842911453739273,
+          "S0": -4.489217066125972,
+          "M20": 5.004605267722118,
+          "S20": 10.145622037861802,
+          "memory_effect_K0_pp": -0.6463056123866995,
+          "memory_effect_K20_pp": 5.141016770139684
+        },
+        {
+          "variable": "mean_sea_level_pressure",
+          "label": "Mean sea-level pressure",
+          "M0": -0.31452410445074186,
+          "S0": -1.157423863509166,
+          "M20": 7.474972972325866,
+          "S20": 12.470368616436478,
+          "memory_effect_K0_pp": -0.8428997590584242,
+          "memory_effect_K20_pp": 4.995395644110611
+        },
+        {
+          "variable": "total_precipitation_6hr",
+          "label": "6 h precipitation",
+          "M0": -3.1926799587022714,
+          "S0": -2.7971097965449276,
+          "M20": 8.802113679667512,
+          "S20": 12.18282368498741,
+          "memory_effect_K0_pp": 0.39557016215734375,
+          "memory_effect_K20_pp": 3.380710005319898
+        },
+        {
+          "variable": "geopotential_level500",
+          "label": "500 hPa geopotential",
+          "M0": -1.741088945647884,
+          "S0": -2.5892005262401874,
+          "M20": 6.998565814107705,
+          "S20": 12.160456694335586,
+          "memory_effect_K0_pp": -0.8481115805923034,
+          "memory_effect_K20_pp": 5.161890880227881
+        }
+      ],
+      "max_relative_baseline_rmse_deviation_from_M0_pct": {
+        "M0": 0.0,
+        "S0": 0.4032312466908272,
+        "M20": 0.3788412857765988,
+        "S20": 0.2926242531601009
+      },
+      "day10_K20_memory_benefits_all_11_groups": true
+    }
+  },
+  "baseline_caveat": "Evaluation runs have slightly different baseline RMSEs despite matching start indices. Each curve retains its own paired baseline. The cause is not established by these artifacts.",
+  "uncertainty": "No confidence intervals or significance claims. One selected training run per ablation arm; starts are clustered and used in model selection."
+}

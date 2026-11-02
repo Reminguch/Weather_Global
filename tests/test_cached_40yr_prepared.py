@@ -112,8 +112,7 @@ def test_grid_and_finite_checks_reject_incompatible_source(tmp_path):
 def test_finalization_validates_cross_year_batches(source, tmp_path, monkeypatch):
     root, checkpoint, task = source
     output = tmp_path / "prepared"
-    # Exercise publication on three tiny synthetic years without weakening the
-    # production requirement (the separate test above checks the real YEARS).
+    # Exercise complete contiguous coverage with three tiny synthetic years.
     monkeypatch.setattr(preparation, "YEARS", (1982, 1983, 1984))
     for year in preparation.YEARS:
         preparation.prepare_year(root, output, year, checkpoint)
@@ -127,6 +126,27 @@ def test_finalization_validates_cross_year_batches(source, tmp_path, monkeypatch
     before = {path: path.stat().st_mtime_ns for path in output.rglob("*.npy")}
     assert preparation.finalize_prepared(root, output, preparation.YEARS, checkpoint) == ready
     assert before == {path: path.stat().st_mtime_ns for path in output.rglob("*.npy")}
+
+
+def test_selected_subset_finalization_uses_first_selected_annual_shard(source, tmp_path):
+    root, checkpoint, task = source
+    output = tmp_path / "subset"
+    years = [1983, 1984]
+    for year in years:
+        preparation.prepare_year(root, output, year, checkpoint)
+    ready = preparation.finalize_prepared(root, output, years, checkpoint)
+    assert ready["years"] == years and ready["time_steps"] == (365 + 366) * 4
+    metadata = json.loads((output / "metadata.json").read_text())
+    assert metadata["time_start"].startswith("1983-01-01")
+    assert [shard["year"] for shard in metadata["time_shards"]] == years
+    assert not (output / "years/1982").exists()
+    store = prepared_array.PreparedArrayStore(output, bounded_reads=True)
+    inputs, truth, _ = store.build_batch_from_indices(indices=[365 * 4], input_steps=2, target_steps=1,
+                                                      task_cfg=task, dt=pd.Timedelta(hours=6))
+    assert inputs.sizes["time"] == 2 and truth.sizes["time"] == 1
+    assert preparation.finalize_prepared(root, output, years, checkpoint) == ready
+    with pytest.raises(ValueError, match="identity changed"):
+        preparation.finalize_prepared(root, output, [1982, 1983, 1984], checkpoint)
 
 
 def test_owned_reads_release_every_mapping_and_cross_shards(tmp_path, monkeypatch):

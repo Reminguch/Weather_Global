@@ -1,0 +1,2578 @@
+{
+  "description": "Data from the two supplied archived plots; later monitoring entries are excluded.",
+  "metric": "Approximate reconstructed GraphCast loss reduction at 240 h (%)",
+  "metric_formula": "100*(1-weighted_MSE_full/weighted_MSE_baseline)",
+  "weighting": "Latitude-weighted channel RMSE squared, divided by per-level difference variance; pressure/mean-pressure weighting averaged across levels; GraphCast variable weights.",
+  "metric_limitation": "Exact GraphCast pole weighting cannot be recovered from saved channel RMSEs.",
+  "metric_source": {
+    "path": "/home/lm8598/Weather_Global_experiments/results/2026-07-20-r1-K20-mem-ablate/plot_ckpt_sweep.py",
+    "sha256": "9e48b90f94ac1367cf805ac6c2b81d319e1f6597d81468e9680c749332c660fd"
+  },
+  "normalization_source": {
+    "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/stats/diffs_stddev_by_level.nc",
+    "sha256": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce"
+  },
+  "monitoring_n_initializations": 4,
+  "swa_n_initializations": 32,
+  "swa_initializations": [
+    117,
+    119,
+    120,
+    121,
+    122,
+    123,
+    136,
+    138,
+    141,
+    159,
+    162,
+    166,
+    582,
+    588,
+    592,
+    598,
+    600,
+    605,
+    615,
+    624,
+    627,
+    630,
+    1048,
+    1056,
+    1058,
+    1060,
+    1076,
+    1093,
+    1094,
+    1095,
+    1096,
+    1098
+  ],
+  "same_initializations_as_principal_paper": false,
+  "training_years": [
+    2007,
+    2021
+  ],
+  "evaluation_year": 2022,
+  "label_note": "The archived ar_tail_K=0 runs are labelled K=1 (teacher forcing), matching main_v3; K=20 retains its feedback-tail meaning.",
+  "marker_note": "SWA markers are positioned at the averaging-window midpoint; x does not identify a single checkpoint.",
+  "original_assets": [
+    {
+      "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-10-spatial-depth-240h/spatial_depth_240h_vs_step.png",
+      "sha256": "b06509c0e7ac8ae90b4663bf3ca9c2f4efece494065b954948cbf3f587b29b91"
+    },
+    {
+      "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-10-spatial-depth-240h/spatial_depth_240h_vs_step.pdf",
+      "sha256": "037e3d3fc05b7e84b29ef8e967ac4c12883cc14eac360b192e50cacee285115b"
+    },
+    {
+      "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-240h/ablation_240h_vs_step.png",
+      "sha256": "1bfcfbc2d7b959e33b193efd667e6710c3e86f635db5cc66034b72453d0e3651"
+    },
+    {
+      "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-240h/ablation_240h_vs_step.pdf",
+      "sha256": "f3353961d517b0d0c934fab47e654dc97c58c5572a021412cda374daf21133de"
+    }
+  ],
+  "source_plot_scripts": [
+    {
+      "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-10-spatial-depth-240h/plot_spatial_240h_vs_step.py",
+      "sha256": "1e12b6dced1a83ec177a604d70fa946defcdd5d9b6e40c2979a5a5c4af9c0cf1"
+    },
+    {
+      "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-240h/plot_240h_vs_step.py",
+      "sha256": "cc6ed6c158013d39f1bf9e8e20281f5297e59f336c6f9289f150e4e5d345c750"
+    }
+  ],
+  "pdf_curve_verification": {
+    "spatial": {
+      "n_points": 44,
+      "pdf_axis_transforms": [
+        {
+          "scale": 0.03846193546965607,
+          "offset": 63.99638719016613,
+          "max_error_pt": 2.2416788738155446e-05
+        },
+        {
+          "scale": -12.461920522588848,
+          "offset": 343.4530966277567,
+          "max_error_pt": 1.539523450588831e-05
+        }
+      ]
+    },
+    "memory": {
+      "n_points": 228,
+      "pdf_axis_transforms": [
+        {
+          "scale": 0.016162467717890202,
+          "offset": 86.67520731699544,
+          "max_error_pt": 1.4954796938582149e-05
+        },
+        {
+          "scale": -4.85054880455919,
+          "offset": 225.86138489809437,
+          "max_error_pt": 2.1969087868001225e-05
+        }
+      ]
+    },
+    "size": {
+      "n_points": 189,
+      "pdf_axis_transforms": [
+        {
+          "scale": 0.013132004787043194,
+          "offset": 636.7486351419249,
+          "max_error_pt": 3.851884571304254e-05
+        },
+        {
+          "scale": -9.671449331110338,
+          "offset": 362.37679175477905,
+          "max_error_pt": 2.029396677016848e-05
+        }
+      ]
+    }
+  },
+  "groups": {
+    "spatial": [
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000
+        ],
+        "values": [
+          0.0,
+          16.641521395487846,
+          18.650660564861276,
+          20.89289136378619,
+          21.677886585472006,
+          21.305857457385102,
+          16.487775892080137,
+          23.15240941140766,
+          22.663822946128608,
+          19.248122261721267,
+          21.679174723360884,
+          23.744475715891756,
+          22.896494758667153,
+          16.176117200401098,
+          21.783727313238455,
+          19.975487085012677
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/val_log.json",
+          "sha256": "91b715838c129c77077a589f5a67a451c99b5f9d84b6b72f9b2502424d71aab2"
+        },
+        "id": "msg2",
+        "label": "2 graph steps",
+        "color": "#2a78d6",
+        "linestyle": "solid",
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 24.707120437364882,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S128_SWA6k-11k.json",
+              "sha256": "8a3ba3fa17867e37330600df07333eac2560531f15556c76bf13bc1aa317cd1d"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/run_config.json",
+              "sha256": "0d737a04563c4053f8cae3886392809111b714f36d63a1d7ed33945b179a8daa"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          },
+          {
+            "window": [
+              2000,
+              8000
+            ],
+            "x": 5000.0,
+            "value": 22.860145678262413,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-09-spatial-depth-loss/sel32_S128_msg2_SWA2k-8k.json",
+              "sha256": "99266ebd4663909f4148cae5fd2e1a1b58a321eee0bb92b14ba528e22e71106c"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/v13_residual_SWA_step2k-8k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/run_config.json",
+              "sha256": "0d737a04563c4053f8cae3886392809111b714f36d63a1d7ed33945b179a8daa"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000
+        ],
+        "values": [
+          0.0,
+          18.564422344432497,
+          18.43003606330842,
+          18.935429795176706,
+          22.60761984795363,
+          20.42951138404846,
+          13.331941901885413,
+          19.179604319804966,
+          20.32756838612385,
+          19.17672238445103,
+          21.16458245952102,
+          18.72513975870649,
+          16.44108649722148,
+          18.342557817864446,
+          14.701336849601432
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg4/val_log.json",
+          "sha256": "00154ae92404f933caaf3f5da26e98fd869c7e38d406e5090c4e8339aa3f2e49"
+        },
+        "id": "msg4",
+        "label": "4 graph steps",
+        "color": "#c9731a",
+        "linestyle": [
+          0,
+          [
+            5,
+            2
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 23.632507874834417,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-08-spatial-depth-select32/sel32_S128_msg4_SWA6k-11k.json",
+              "sha256": "7028dea029c88e89ccdeb959a600ff612017b03cc38c70e925feb373f71abb8b"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg4/run_config.json",
+              "sha256": "bfff572c95b17b3be5aebe330ffe31d858d2a8f7dc5d570a178cbf6641b120a6"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 4,
+              "temporal_insert_steps": "1,3",
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 14768527,
+            "evaluation_memory_policy": "none"
+          },
+          {
+            "window": [
+              2000,
+              8000
+            ],
+            "x": 5000.0,
+            "value": 23.765022346578302,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-09-spatial-depth-loss/sel32_S128_msg4_SWA2k-8k.json",
+              "sha256": "21e5d6a9075ab209784d65b033d0f0ffaf56c62dc4fb2658baa10ed62c02adc4"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg4/v13_residual_SWA_step2k-8k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg4/run_config.json",
+              "sha256": "bfff572c95b17b3be5aebe330ffe31d858d2a8f7dc5d570a178cbf6641b120a6"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 4,
+              "temporal_insert_steps": "1,3",
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 14768527,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000
+        ],
+        "values": [
+          0.0,
+          18.845266467811584,
+          20.84882058744896,
+          21.051553847800676,
+          20.706353876463734,
+          17.965630972743263,
+          16.981823020796394,
+          18.792240556505735,
+          20.965693748345316,
+          7.516755934732688,
+          20.955135330193443,
+          19.877431308169303,
+          14.10086818064309
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg8/val_log.json",
+          "sha256": "36493559486705fb45a58fe841c42226cd95cadf7c9f4c4292fd183c23cbcd5d"
+        },
+        "id": "msg8",
+        "label": "8 graph steps",
+        "color": "#1f9e6a",
+        "linestyle": [
+          0,
+          [
+            1.5,
+            1.5
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 23.876772779368004,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-08-spatial-depth-select32/sel32_S128_msg8_SWA6k-11k.json",
+              "sha256": "8452247baaf9f4d375a52e4de1db00a8434dfb7e6deb3a5ca15e7fc0cb81c40f"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg8/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg8/run_config.json",
+              "sha256": "bdceb704d2dc1ac2f8ddbf3075f3c5fd9b1399e0ca3e7ac193172080dc688d58"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 8,
+              "temporal_insert_steps": "3,7",
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 22124943,
+            "evaluation_memory_policy": "none"
+          },
+          {
+            "window": [
+              2000,
+              8000
+            ],
+            "x": 5000.0,
+            "value": 24.615654064043635,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-09-spatial-depth-loss/sel32_S128_msg8_SWA2k-8k.json",
+              "sha256": "2a430ebbb796727359ab912ddf92e6f4fa9ec155b563056a427873140e78164f"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg8/v13_residual_SWA_step2k-8k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_msg8/run_config.json",
+              "sha256": "bdceb704d2dc1ac2f8ddbf3075f3c5fd9b1399e0ca3e7ac193172080dc688d58"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 8,
+              "temporal_insert_steps": "3,7",
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 22124943,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      }
+    ],
+    "memory": [
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000
+        ],
+        "values": [
+          0.0,
+          -6.482218463380884,
+          -11.63319812771826,
+          -11.890298316810188,
+          -10.217105129656478,
+          -14.545215296644676,
+          -9.925390135824008,
+          -9.405579842795442,
+          -12.371230161431113,
+          -17.51686077266623,
+          -20.10839413568073,
+          -10.264178588186468,
+          -11.97786140970798,
+          -14.174730048952998,
+          -8.21943001645764,
+          -17.44447850792772,
+          -20.40146538082186,
+          -15.25306775726305,
+          -15.977628186691394,
+          -14.060625942781835,
+          -21.349597495600126,
+          -10.526196584613334,
+          -12.722105207855172,
+          -6.662397869288239,
+          -12.450103477945174,
+          -14.024471530409732
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr3e-5/val_log.json",
+          "sha256": "21ee71bed8a368cede894e5c5089db3d75d333ab8cdf6ab45f23381519b454e8"
+        },
+        "id": "M0_lr3e-5",
+        "arm": "M0",
+        "label": "Reset/reset, K=1",
+        "lr": "3e-5",
+        "color": "#e34948",
+        "linestyle": [
+          0,
+          [
+            1,
+            1.4
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": -4.924519415098838,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_M0_lr3e-5_SWA6k-11k.json",
+              "sha256": "bd30e6403cd9ceb9340bcbe43ea87e5ff47045f0228e8437502a771a0a744797"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr3e-5/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr3e-5/run_config.json",
+              "sha256": "12878c5d7b0f35dc815c107e59444e5a9d3d3e8ddf4dd0430f16cf30a804535a"
+            },
+            "config": {
+              "ar_tail_K": 0,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "reset_all_every_step",
+              "lr": 3e-05,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "reset_all_every_step"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000
+        ],
+        "values": [
+          0.0,
+          -10.85296410477181,
+          -19.231227076480106,
+          -12.475501898695661,
+          -17.601960707410356,
+          -19.839599576655043,
+          -16.803889708646413,
+          -13.83228801446399,
+          -13.355801802959322,
+          -11.520784589432754,
+          -31.578445239861928,
+          -17.04443372879547,
+          -11.707446865350812,
+          -19.97584556371532,
+          -13.780107256467321,
+          -17.95286577290578,
+          -12.75999237598835,
+          -18.656099816141914,
+          -13.538240245890588,
+          -14.430385621995633,
+          -19.63943263226817,
+          -12.3358025072553,
+          -17.887398785188925,
+          -13.65543539206091,
+          -18.299743037715245,
+          -19.06617315765764,
+          -20.104359252882077
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr1e-4/val_log.json",
+          "sha256": "fc34fad712e99a88998fe60758bfe19a7be5f820309d0af08aa1b8fa96d5cabb"
+        },
+        "id": "M0_lr1e-4",
+        "arm": "M0",
+        "label": "Reset/reset, K=1",
+        "lr": "1e-4",
+        "color": "#e34948",
+        "linestyle": "solid",
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": -3.218537084508988,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_M0_lr1e-4_SWA6k-11k.json",
+              "sha256": "e3ab6e0004deda00e39707f72fac123698f6aa52ff263dc2f25f2959ba9312a4"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr1e-4/run_config.json",
+              "sha256": "a5609633793f6ffec11db3a0972778e281255d5786db6ef00d799d1d9f770414"
+            },
+            "config": {
+              "ar_tail_K": 0,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "reset_all_every_step",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "reset_all_every_step"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000
+        ],
+        "values": [
+          0.0,
+          -12.813455846573586,
+          -13.973138741922252,
+          -10.863373610681549,
+          -15.62279857105171,
+          -11.456491801966283,
+          -10.944931682820558,
+          -10.105975515084697,
+          -6.696032652429307,
+          -9.65419954712059,
+          -12.193059993232414,
+          -15.489766061573684,
+          -5.454893799296889,
+          -14.135938795874225,
+          -6.814308923098533,
+          -18.024598845663476,
+          -14.402271592035731,
+          -9.49830655112287,
+          -14.058495739494248,
+          -17.2551395172891,
+          -15.916470818875617,
+          -13.118402741203393,
+          -12.224103422613597,
+          -6.991594593408279,
+          -13.735349017716514
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr3e-4/val_log.json",
+          "sha256": "6a10b5f605e08a969a259a64ad74cd35e5abf411db099b76ddca7e968583cc3e"
+        },
+        "id": "M0_lr3e-4",
+        "arm": "M0",
+        "label": "Reset/reset, K=1",
+        "lr": "3e-4",
+        "color": "#e34948",
+        "linestyle": [
+          0,
+          [
+            5,
+            2
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": -2.9056586093009207,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_M0_lr3e-4_SWA6k-11k.json",
+              "sha256": "9303e8d24ac894223c8911f8018d6b790082ccec785a14ede433efc610507a46"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr3e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M0_K0_reset_all_every_step_lr3e-4/run_config.json",
+              "sha256": "57f8b4d32828e47c57c649f02cf481e913b1aca09545f6aa8dc770d1422ce302"
+            },
+            "config": {
+              "ar_tail_K": 0,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "reset_all_every_step",
+              "lr": 0.0003,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "reset_all_every_step"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000
+        ],
+        "values": [
+          0.0,
+          6.005708971017965,
+          10.5462608117728,
+          8.179442962932326,
+          14.794903860853903,
+          9.45108590821635,
+          11.147429029324208,
+          12.782719324708957,
+          16.18547408676966,
+          10.315489853777848,
+          14.22013548455492,
+          14.274456615013875,
+          9.201922532953299,
+          4.906733853127765,
+          8.880424426612866,
+          12.571407872389596
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr3e-5/val_log.json",
+          "sha256": "64ff7f992c15fcf9ec67331c89f7de6417efa688641160a65cc8b2b0c3244181"
+        },
+        "id": "M20_lr3e-5",
+        "arm": "M20",
+        "label": "Reset/reset, K=20",
+        "lr": "3e-5",
+        "color": "#eb6834",
+        "linestyle": [
+          0,
+          [
+            1,
+            1.4
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 15.540903914232217,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_M20_lr3e-5_SWA6k-11k.json",
+              "sha256": "c9cbaf4e63b8f941d9a415b2504913e5dd3e808fae7c9479f724b762c1c4b57c"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr3e-5/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr3e-5/run_config.json",
+              "sha256": "46ba0d78c50979d2f8f7fe97cb93e3d5198d9ce05f8235766404680dae7c2c8d"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "reset_all_every_step",
+              "lr": 3e-05,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "reset_all_every_step"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000
+        ],
+        "values": [
+          0.0,
+          8.872022451760309,
+          7.592901364166105,
+          9.249510780387894,
+          11.075731261417609,
+          5.571451514814363,
+          10.623394889993875,
+          8.794009763638988,
+          11.245953856033486,
+          7.0772155609440945,
+          11.99540378107653,
+          9.66819148359177,
+          9.639461582515485,
+          7.521826475688198,
+          9.080154500411297,
+          9.706836561510467
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr1e-4/val_log.json",
+          "sha256": "ac34d95b110c408e22aa0fffadf4f15373cda99cd50633cff7f45dfa31396df0"
+        },
+        "id": "M20_lr1e-4",
+        "arm": "M20",
+        "label": "Reset/reset, K=20",
+        "lr": "1e-4",
+        "color": "#eb6834",
+        "linestyle": "solid",
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 14.123860216545314,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_M20_lr1e-4_SWA6k-11k.json",
+              "sha256": "93270c63cfe05435fd0913edbaa377728603cba123f50ac4c5309af379ddfc5b"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr1e-4/run_config.json",
+              "sha256": "46f49a538f32a9b56463116e11574440e72a464cbda0e5c8f30da75b63bfd8f0"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "reset_all_every_step",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "reset_all_every_step"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000
+        ],
+        "values": [
+          0.0,
+          5.5909994588886125,
+          -2.7447876570309226,
+          1.3189249783373436,
+          3.2209739047533437,
+          1.9332546794872951,
+          5.78540854414038,
+          3.9233096307655257,
+          8.164885101192176,
+          9.432645528328909,
+          13.946120596864208,
+          7.5169365117266125,
+          5.801175360499267,
+          5.883027428877918,
+          9.5151581337235,
+          12.093517065487426
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr3e-4/val_log.json",
+          "sha256": "ec59daa5389b07fa5803b49e619d4651ba3d0c9b542306608825fe22a0d1e92d"
+        },
+        "id": "M20_lr3e-4",
+        "arm": "M20",
+        "label": "Reset/reset, K=20",
+        "lr": "3e-4",
+        "color": "#eb6834",
+        "linestyle": [
+          0,
+          [
+            5,
+            2
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 9.611413086114084,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_M20_lr3e-4_SWA6k-11k.json",
+              "sha256": "2fe88f51422267fe043b17f73e80982455dec41416706e10dde8fddea354ad2c"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr3e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_M20_K20_reset_all_every_step_lr3e-4/run_config.json",
+              "sha256": "498d6ea43542cee9bb41d18c088502900113521d72a594438723e4ef7897df6c"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "reset_all_every_step",
+              "lr": 0.0003,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "reset_all_every_step"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000
+        ],
+        "values": [
+          0.0,
+          -7.915330467417192,
+          -11.03147061100367,
+          -12.892781115463592,
+          -14.012973246355532,
+          -15.957139015481058,
+          -14.240283116051211,
+          -7.344589990570816,
+          -11.733984571193412,
+          -13.842550176556955,
+          -15.678900944495332,
+          -12.417074076578904,
+          -11.069988748116643,
+          -11.92572186415135,
+          -6.722122863830893,
+          -10.711377322464678
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr3e-5/val_log.json",
+          "sha256": "f40baa1138f7a92736abafcc1537a5c90b5d8b6627163b8fc64792204c532e47"
+        },
+        "id": "S0_lr3e-5",
+        "arm": "S0",
+        "label": "Carry/carry, K=1",
+        "lr": "3e-5",
+        "color": "#4a3aa7",
+        "linestyle": [
+          0,
+          [
+            1,
+            1.4
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": -4.666872711120473,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S0_lr3e-5_SWA6k-11k.json",
+              "sha256": "467c747d480cc7be9da043ed4f96f6b07d4741f696b8dd910322deb9ea0776aa"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr3e-5/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr3e-5/run_config.json",
+              "sha256": "dc48e396f5ef2f2090f2ab79e0f98398d3faa897e3323c14e4317ad0aaea5416"
+            },
+            "config": {
+              "ar_tail_K": 0,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 3e-05,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000
+        ],
+        "values": [
+          0.0,
+          -7.09758971650849,
+          -15.3518527474243,
+          -11.925780798124585,
+          -13.758114406474187,
+          -15.204732849887614,
+          -12.43192409158218,
+          -12.49005638340972,
+          -6.499283815728107,
+          -9.041227496264238,
+          -12.330374125619127,
+          -7.485321032708936,
+          -5.632344627795005,
+          -10.547307638279424,
+          -5.0472567422585435,
+          -8.526389864116158,
+          -10.86768973351704
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr1e-4/val_log.json",
+          "sha256": "46e4dce07bd7b6162f98f1028d0948ec7140e123caae2f50a0c081abc571629b"
+        },
+        "id": "S0_lr1e-4",
+        "arm": "S0",
+        "label": "Carry/carry, K=1",
+        "lr": "1e-4",
+        "color": "#4a3aa7",
+        "linestyle": "solid",
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": -4.375177491087778,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S0_lr1e-4_SWA6k-11k.json",
+              "sha256": "a60db52f3de9d73d3fbf8aafb8cf991d39e522d6af9144be70328ce0abca4126"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr1e-4/run_config.json",
+              "sha256": "e1b73defb7f12912d40a3e0d6bd173794985c20a0679923ee02322a53cd73e9b"
+            },
+            "config": {
+              "ar_tail_K": 0,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000
+        ],
+        "values": [
+          0.0,
+          -6.8065897928094365,
+          -14.714571277168066,
+          -17.871317408952358,
+          -19.041979621702044,
+          -19.18867449036099,
+          -13.388111943999048,
+          -17.855843536245853,
+          -8.268323755592855,
+          -9.201005481829426,
+          -9.590621012238598,
+          -10.56711851335188,
+          -11.417088744893778,
+          -16.25484996233122,
+          -14.405502526473102,
+          -15.431705019396457,
+          -10.135877089866408
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr3e-4/val_log.json",
+          "sha256": "fef82d7c64717f78898298bb551018f65743feb7f1c3c1a6a556ae48b9f64254"
+        },
+        "id": "S0_lr3e-4",
+        "arm": "S0",
+        "label": "Carry/carry, K=1",
+        "lr": "3e-4",
+        "color": "#4a3aa7",
+        "linestyle": [
+          0,
+          [
+            5,
+            2
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": -5.318476838428254,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S0_lr3e-4_SWA6k-11k.json",
+              "sha256": "45262ed102727f86c2eee0ff452624b9e73849b7745c43302632c3c59556d0e0"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr3e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr3e-4/run_config.json",
+              "sha256": "eb9290bc002a8222b3205093f97ceba6d17683ad6d9ec303303650632df6a4c9"
+            },
+            "config": {
+              "ar_tail_K": 0,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0003,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000
+        ],
+        "values": [
+          0.0,
+          13.81913990970155,
+          14.584790970262473,
+          15.713160180028652,
+          19.957266076401126,
+          19.860749583206605,
+          19.039833156352337,
+          19.28032109092466,
+          21.753838940264902,
+          22.161694667257702,
+          20.16320946300101,
+          22.297644827884877,
+          11.090790353540235,
+          17.11766584101295,
+          15.896875864234762,
+          8.70101300497833,
+          15.99038902774037
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr3e-5/val_log.json",
+          "sha256": "3c888359ea1f2b7adfc6c78b18f9a4359dedde460d16ee5bbdbf16b2d7263652"
+        },
+        "id": "S20_lr3e-5",
+        "arm": "S20",
+        "label": "Carry/carry, K=20",
+        "lr": "3e-5",
+        "color": "#2a78d6",
+        "linestyle": [
+          0,
+          [
+            1,
+            1.4
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 25.313336004830013,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S20_lr3e-5_SWA6k-11k.json",
+              "sha256": "2b58f54eb0618a764e70b61a13bfa98ac87e3c591d9840767451bc66749e86e1"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr3e-5/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr3e-5/run_config.json",
+              "sha256": "1b7c58c303226fd635bdbe4e9f8890df49c191805df9e5c67f1b94db1dd8594a"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 3e-05,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000
+        ],
+        "values": [
+          0.0,
+          13.080967231974505,
+          18.76116896074067,
+          20.59151579447972,
+          20.032438131153143,
+          23.330331929113246,
+          20.559296872998857,
+          18.53041795794471,
+          20.9682830451836,
+          19.03627144691654,
+          21.153966250677136,
+          20.840292961392958,
+          15.584024731099866,
+          17.166836550344122,
+          15.883211141187259,
+          21.925365194743428,
+          16.698299077012223
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr1e-4/val_log.json",
+          "sha256": "26e577497f2887a4fd1a0997ffcf51d391f136d0433b48cd47e05207d6eb6f47"
+        },
+        "id": "S20_lr1e-4",
+        "arm": "S20",
+        "label": "Carry/carry, K=20",
+        "lr": "1e-4",
+        "color": "#2a78d6",
+        "linestyle": "solid",
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 22.76691092319243,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S20_lr1e-4_SWA6k-11k.json",
+              "sha256": "df28f02fe6da455f3b966db73832ec7efb2c78a2189dba222adac69d50991445"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr1e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr1e-4/run_config.json",
+              "sha256": "71fb445661688a1fe032559aab419f3dc12823089543e3e840791e6b12841d78"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000
+        ],
+        "values": [
+          0.0,
+          2.80750541798076,
+          3.381905742392055,
+          1.9900475208813329,
+          4.7814987079615285,
+          -3.9127959005611723,
+          5.847878590377942,
+          -0.03287363657367148,
+          5.059530858871264,
+          5.723720110523267,
+          -0.2980847420595456,
+          7.718801064167591,
+          6.30646773154091,
+          6.687690397210955,
+          2.702195703925081,
+          5.640984497052659,
+          5.991905435419609,
+          5.624991591125883
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr3e-4/val_log.json",
+          "sha256": "affac01e197d9d642b19e99ff5848a7423a7cccdbda6c892c72b9b82f4c08836"
+        },
+        "id": "S20_lr3e-4",
+        "arm": "S20",
+        "label": "Carry/carry, K=20",
+        "lr": "3e-4",
+        "color": "#2a78d6",
+        "linestyle": [
+          0,
+          [
+            5,
+            2
+          ]
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 5.508111680277095,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S20_lr3e-4_SWA6k-11k.json",
+              "sha256": "53293b9b90b48a68ff2be3312b8a9ac84a7acc18817d40bdf38a64d8cfef462c"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr3e-4/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S20_K20_none_lr3e-4/run_config.json",
+              "sha256": "311b92d0bd1ce7f41ca840c656ef2eb6988f4b545b220e875f3a01e19991c763"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0003,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      }
+    ],
+    "size": [
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000,
+          27000,
+          28000,
+          29000,
+          30000
+        ],
+        "values": [
+          0.0,
+          15.397954415246918,
+          21.301360845416294,
+          21.979957096828084,
+          20.174862838552,
+          22.3879492093651,
+          19.681134195917714,
+          18.842971627398153,
+          24.72166429008632,
+          23.60531838004487,
+          26.81076745228237,
+          22.38156572232701,
+          18.413690556469277,
+          20.61470147432005,
+          19.20951038533826,
+          17.748139038822565,
+          12.13634309869035,
+          20.51388563572901,
+          10.869190441908916,
+          21.215597947066033,
+          16.52419065679136,
+          14.951469714779964,
+          11.859828206345568,
+          11.247966513081685,
+          14.322101074043225,
+          14.883231235185757,
+          10.952411825117192,
+          8.822756851521607,
+          10.927037252857696,
+          3.0298252423175853,
+          -1.7223254460060344
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S16_h128_di16_ds16/val_log.json",
+          "sha256": "ca9065ec0040de6b501c935bee5b6d5975951ad7f88beec64a76a96b7b368c0c"
+        },
+        "id": "S16",
+        "label": "S16",
+        "color": "#eb6834",
+        "marker": "s",
+        "dimensions": [
+          16,
+          16
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 23.25386924782996,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S16_SWA6k-11k.json",
+              "sha256": "0b1a8c065e55d3083c0c0359d0b6dda11efcf101755ddaddaf488b92457fcbc0"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S16_h128_di16_ds16/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S16_h128_di16_ds16/run_config.json",
+              "sha256": "649e1f15a38d9a0218cd4ff664654ea50eff624fdf76e301553d222aaa83853a"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 16,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 10348879,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000,
+          27000,
+          28000,
+          29000,
+          30000,
+          31000
+        ],
+        "values": [
+          0.0,
+          16.641521395487846,
+          18.650660564861276,
+          20.89289136378619,
+          21.677886585472006,
+          21.305857457385102,
+          16.487775892080137,
+          23.15240941140766,
+          22.663822946128608,
+          19.248122261721267,
+          21.679174723360884,
+          23.744475715891756,
+          22.896494758667153,
+          16.176117200401098,
+          21.783727313238455,
+          19.975487085012677,
+          18.290691122311387,
+          14.609783049752977,
+          17.019428992157458,
+          23.048537313256055,
+          13.619748227853368,
+          8.994824231718779,
+          8.159466253632875,
+          17.069616940137667,
+          12.129523442747626,
+          15.511545160942608,
+          9.035820752957758,
+          15.451765454915678,
+          18.601422322532045,
+          9.507759043358643,
+          16.355956029975182,
+          9.614455075316686
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/val_log.json",
+          "sha256": "91b715838c129c77077a589f5a67a451c99b5f9d84b6b72f9b2502424d71aab2"
+        },
+        "id": "S128",
+        "label": "S128",
+        "color": "#2a78d6",
+        "marker": "o",
+        "dimensions": [
+          128,
+          16
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 24.707120437364882,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_S128_SWA6k-11k.json",
+              "sha256": "8a3ba3fa17867e37330600df07333eac2560531f15556c76bf13bc1aa317cd1d"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/run_config.json",
+              "sha256": "0d737a04563c4053f8cae3886392809111b714f36d63a1d7ed33945b179a8daa"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000,
+          27000,
+          28000,
+          29000,
+          30000
+        ],
+        "values": [
+          0.0,
+          15.08606492805773,
+          21.294605887294548,
+          19.081362394705547,
+          21.105885407145976,
+          21.514001919221137,
+          19.504744634573633,
+          17.556835929146274,
+          23.837560306917815,
+          21.97522706936148,
+          21.69462584485823,
+          22.255748467315286,
+          19.731625622864424,
+          17.038950012978262,
+          18.358423768003828,
+          18.72081466679052,
+          18.251148751309344,
+          20.95721235452841,
+          19.864956904555097,
+          20.516499704164282,
+          19.40998356007041,
+          14.579289718019261,
+          2.119187441954029,
+          17.710325219602307,
+          21.101039082147853,
+          15.342302513428274,
+          8.666755833873886,
+          14.208038041612802,
+          14.122420027610971,
+          11.927957153824353,
+          18.423007921226244
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_I256_h128_di256_ds16/val_log.json",
+          "sha256": "580ab4e423aca0da8e7a4adfb93c7366c848c7c1285767c007e89365e1370a23"
+        },
+        "id": "I256",
+        "label": "I256",
+        "color": "#1baf7a",
+        "marker": "^",
+        "dimensions": [
+          256,
+          16
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 24.0735807466121,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_I256_SWA6k-11k.json",
+              "sha256": "4849134b11daa6202c25df604ae98683f9a62c53abb381114b552b4e35033bd0"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_I256_h128_di256_ds16/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_I256_h128_di256_ds16/run_config.json",
+              "sha256": "0f871c42704ab725fbf3c9869eacc363c2ebcc159f38d8e935db2ae483d4e2d4"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 256,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11937679,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000,
+          27000,
+          28000,
+          29000,
+          30000
+        ],
+        "values": [
+          0.0,
+          16.83123666158286,
+          20.2388956815301,
+          19.479774210471078,
+          19.76708447797946,
+          21.635812720523628,
+          20.17966021116645,
+          21.146808488805448,
+          26.231617394888318,
+          19.05391128475502,
+          21.91439353785437,
+          24.649796471235106,
+          20.453503413783835,
+          15.093069680133874,
+          20.400096962826108,
+          22.400046926673866,
+          8.849489253241238,
+          18.676463818511134,
+          7.824161816014685,
+          16.860908699231057,
+          19.164575155858,
+          10.423248957139098,
+          9.774305280186923,
+          14.697975290133602,
+          15.886255220203848,
+          14.618548056636527,
+          8.304068668656118,
+          17.286815436972848,
+          12.985221842557626,
+          8.995961621562177,
+          7.947734977140519
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_H256i128_h256_di128_ds16/val_log.json",
+          "sha256": "a001b7f658aae8900fb3ccb0602dc326b2b56b5fc3773ba431c076ebfa4d2226"
+        },
+        "id": "H256i128",
+        "label": "H256i128",
+        "color": "#eda100",
+        "marker": "D",
+        "dimensions": [
+          128,
+          16
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 24.377409785279134,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_H256i128_SWA6k-11k.json",
+              "sha256": "4cfae1b231540b59628b533b0180a9353c769284ab9d02f907667928afffcffa"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_H256i128_h256_di128_ds16/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_H256i128_h256_di128_ds16/run_config.json",
+              "sha256": "6c1a08667429d1fb2672ba1be3f6ebf68371e97c308317dab5d93021665adff9"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 256,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11090319,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000,
+          27000,
+          28000,
+          29000,
+          30000,
+          31000,
+          32000
+        ],
+        "values": [
+          0.0,
+          13.59046888769424,
+          20.54289939211339,
+          20.675733974663903,
+          22.99902114804545,
+          20.04235483848211,
+          17.635225828616164,
+          21.200615201379534,
+          20.41796245144515,
+          18.84764722943475,
+          20.544202738673633,
+          20.215308851798852,
+          16.650462775606233,
+          21.27108133711516,
+          21.116768064429316,
+          15.303431044184745,
+          16.815788386175058,
+          21.53646444570243,
+          8.30009063592545,
+          13.582787522599515,
+          11.546016468513464,
+          17.26187244155677,
+          5.377194141608122,
+          12.810651334191558,
+          18.511315051834497,
+          11.35769567970758,
+          11.293411331289205,
+          10.016844414925895,
+          19.576354071023005,
+          1.13040658341641,
+          12.758042117294288,
+          14.086667979994317,
+          8.120409002127582
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_H256_h256_di256_ds16/val_log.json",
+          "sha256": "9992322723c5b01b822c4e7ddc375d7d58ce8ec0b0b585dc6d9cad1f7dda5c32"
+        },
+        "id": "H256",
+        "label": "H256",
+        "color": "#e87ba4",
+        "marker": "v",
+        "dimensions": [
+          256,
+          16
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 24.101301503517035,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_H256_SWA6k-11k.json",
+              "sha256": "ea67aae955bdd54bbc8c1f86bb6de49b292f044343e3c8873d3b8648a6bffbd2"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_H256_h256_di256_ds16/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_H256_h256_di256_ds16/run_config.json",
+              "sha256": "3505705e66c24b8fc05999f55baaa327211427eb273c8573fcefc908486f9f7b"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 256,
+              "temporal_d_inner": 256,
+              "temporal_d_state": 16,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11937679,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      },
+      {
+        "steps": [
+          0,
+          1000,
+          2000,
+          3000,
+          4000,
+          5000,
+          6000,
+          7000,
+          8000,
+          9000,
+          10000,
+          11000,
+          12000,
+          13000,
+          14000,
+          15000,
+          16000,
+          17000,
+          18000,
+          19000,
+          20000,
+          21000,
+          22000,
+          23000,
+          24000,
+          25000,
+          26000,
+          27000,
+          28000,
+          29000,
+          30000
+        ],
+        "values": [
+          0.0,
+          15.211768148424309,
+          19.975456674477275,
+          21.572715996223167,
+          20.57961114818756,
+          20.693925151573843,
+          19.01864572909735,
+          21.886178762769816,
+          21.336231459752963,
+          23.057386662376146,
+          23.610278173346167,
+          24.628699072569926,
+          22.308017033326422,
+          21.842192498055212,
+          22.233531552469465,
+          21.930809136098382,
+          18.61870184970771,
+          23.213415824488592,
+          18.027597762669046,
+          14.677669652237736,
+          17.151487509796283,
+          10.774966837121191,
+          13.113005419103818,
+          4.772052557783213,
+          17.731241102482652,
+          15.065053209170054,
+          14.123366925911075,
+          14.448102606867586,
+          19.813797801409493,
+          13.432182667180204,
+          13.67530429768198
+        ],
+        "monitoring_source": {
+          "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_N64_h128_di128_ds64/val_log.json",
+          "sha256": "ce2fe07941db08b39f1bbb73d5d70ef003deffb8db2cbcdddc48056598c1379f"
+        },
+        "id": "N64",
+        "label": "N64",
+        "color": "#4a3aa7",
+        "marker": "P",
+        "dimensions": [
+          128,
+          64
+        ],
+        "swa": [
+          {
+            "window": [
+              6000,
+              11000
+            ],
+            "x": 8500.0,
+            "value": 24.92111425698361,
+            "source": {
+              "path": "/home/lm8598/Weather_Global_experiments/results/2026-08-10-ablation-swa-select32/sel32_N64_SWA6k-11k.json",
+              "sha256": "4e3e14ea83be56140ce520e14c83a41b6fc13a48cdf3abf13e70f4c046316a1e"
+            },
+            "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_N64_h128_di128_ds64/v13_residual_SWA_step6k-11k.pkl",
+            "config_source": {
+              "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_N64_h128_di128_ds64/run_config.json",
+              "sha256": "76ee8e701653f8f7bfb92ed74ed958141912cc34502bd2fb4d0057ad84e1a09a"
+            },
+            "config": {
+              "ar_tail_K": 20,
+              "bptt_steps": 24,
+              "sequential_segment_steps": 96,
+              "carry_inputs_across_chunks": false,
+              "feedback_mode": "closed_loop_sg",
+              "train_state_ablation": "none",
+              "lr": 0.0001,
+              "seed": 22,
+              "residual_msg_steps": 2,
+              "temporal_insert_steps": null,
+              "temporal_hidden_size": 128,
+              "temporal_d_inner": 128,
+              "temporal_d_state": 64,
+              "temporal_d_conv": 4,
+              "temporal_layers": 2,
+              "width": 512,
+              "batch_size": 1,
+              "val_anchors": 4,
+              "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+              "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+            },
+            "n_parameters": 11164047,
+            "evaluation_memory_policy": "none"
+          }
+        ]
+      }
+    ]
+  },
+  "spatial_additional_seeds": [
+    {
+      "window": [
+        6000,
+        11000
+      ],
+      "x": 8500.0,
+      "value": 24.13271770892369,
+      "source": {
+        "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-08-seed-select32/sel32_S128_s23_SWA6k-11k.json",
+        "sha256": "1c079264112b7bb44aedde54bdf43afa1b44732385fe27eaba7051d5689034eb"
+      },
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_s23/v13_residual_SWA_step6k-11k.pkl",
+      "config_source": {
+        "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_s23/run_config.json",
+        "sha256": "1e6add58aedc73443e709b12c10a79837770592002a687f4a71db8f0575fd8fc"
+      },
+      "config": {
+        "ar_tail_K": 20,
+        "bptt_steps": 24,
+        "sequential_segment_steps": 96,
+        "carry_inputs_across_chunks": false,
+        "feedback_mode": "closed_loop_sg",
+        "train_state_ablation": "none",
+        "lr": 0.0001,
+        "seed": 23,
+        "residual_msg_steps": 2,
+        "temporal_insert_steps": null,
+        "temporal_hidden_size": 128,
+        "temporal_d_inner": 128,
+        "temporal_d_state": 16,
+        "temporal_d_conv": 4,
+        "temporal_layers": 2,
+        "width": 512,
+        "batch_size": 1,
+        "val_anchors": 4,
+        "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+        "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+      },
+      "n_parameters": 11090319,
+      "evaluation_memory_policy": "none",
+      "id": "seed23"
+    },
+    {
+      "window": [
+        6000,
+        11000
+      ],
+      "x": 8500.0,
+      "value": 24.6831370569343,
+      "source": {
+        "path": "/home/lm8598/Weather_Global_experiments/results/2026-09-08-seed-select32/sel32_S128_s24_SWA6k-11k.json",
+        "sha256": "c6311b20fc02cbfad147d65d424e2ba346bda7c181e3fbfb7e7032f2769edea7"
+      },
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_s24/v13_residual_SWA_step6k-11k.pkl",
+      "config_source": {
+        "path": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_s24/run_config.json",
+        "sha256": "05c0fdc02bc6d0f27f22ac2c967bd2c5551737d7b40bc6111e2ac5904c36b220"
+      },
+      "config": {
+        "ar_tail_K": 20,
+        "bptt_steps": 24,
+        "sequential_segment_steps": 96,
+        "carry_inputs_across_chunks": false,
+        "feedback_mode": "closed_loop_sg",
+        "train_state_ablation": "none",
+        "lr": 0.0001,
+        "seed": 24,
+        "residual_msg_steps": 2,
+        "temporal_insert_steps": null,
+        "temporal_hidden_size": 128,
+        "temporal_d_inner": 128,
+        "temporal_d_state": 16,
+        "temporal_d_conv": 4,
+        "temporal_layers": 2,
+        "width": 512,
+        "batch_size": 1,
+        "val_anchors": 4,
+        "prepared_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream_2007_2022/res1",
+        "residual_root": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/dataset/precomputed_residuals/v15_setup_res1_15yr"
+      },
+      "n_parameters": 11090319,
+      "evaluation_memory_policy": "none",
+      "id": "seed24"
+    }
+  ]
+}

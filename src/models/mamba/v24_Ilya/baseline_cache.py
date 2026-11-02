@@ -397,9 +397,11 @@ def normalized_error(actual, expected, scales):
         delta = np.abs(a.astype(np.float64) - b.astype(np.float64))
         if name in scales:
             scale = np.abs(scales[name])
-            if bool((scale <= 0).any()):
+            if not bool(np.isfinite(scale).all()) or bool((scale <= 0).any()):
                 raise ValueError(f"Invalid normalization scale: {name}")
             delta = delta / scale
+        if not bool(np.isfinite(delta).all()):
+            raise AssertionError(f"Nonfinite parity result: {name}")
         error = float(delta.max())
         if not np.isfinite(error):
             raise AssertionError(f"Nonfinite parity result: {name}")
@@ -407,7 +409,23 @@ def normalized_error(actual, expected, scales):
     return maximum
 
 
-def verify_pilot_parity(context, manifest, root):
+def _parity_result(max_errors, chunks, numerical_policy):
+    if numerical_policy not in ("strict", "advisory"):
+        raise ValueError(f"Unknown cache numerical policy: {numerical_policy}")
+    if not max_errors or any(not np.isfinite(value) or value < 0 for value in max_errors.values()):
+        raise AssertionError(f"Nonfinite or invalid pilot normalized errors: {max_errors}")
+    bound = 1e-5
+    within_reference = max(max_errors.values()) <= bound
+    warnings = [] if within_reference else [f"Pilot normalized error exceeds {bound}: {max_errors}"]
+    if warnings and numerical_policy == "strict":
+        raise AssertionError(warnings[0])
+    return {"passed": True, "integrity_passed": True, "numerical_policy": numerical_policy,
+            "tolerance": bound, "reference_bound": bound,
+            "numerical_within_reference": within_reference, "numerical_warnings": warnings,
+            "max_normalized_errors": max_errors, "chunks": chunks}
+
+
+def verify_pilot_parity(context, manifest, root, *, numerical_policy="strict"):
     """Independent online windows use the prepared batch builder and xr.concat.
 
     The prediction call is the maintained training baseline transform. No Mamba
@@ -458,15 +476,13 @@ def verify_pilot_parity(context, manifest, root):
                 static = current.drop_vars(names)
                 current = xr.merge([dynamic, static.drop_dims("time", errors="ignore")])
         print(f"parity chunk={item['id']} max_normalized_errors={max_errors}", flush=True)
-    if max(max_errors.values()) > 1e-5:
-        raise AssertionError(f"Pilot normalized error exceeds 1e-5: {max_errors}")
-    return {"passed": True, "tolerance": 1e-5, "max_normalized_errors": max_errors, "chunks": len(manifest["chunks"])}
+    return _parity_result(max_errors, len(manifest["chunks"]), numerical_policy)
 
 
-def finish_pilot(context, manifest, root, marker, started):
+def finish_pilot(context, manifest, root, marker, started, *, numerical_policy="strict"):
     if not marker.get("exact_roundtrip_verified", False):
         raise ValueError("Pilot lacks verified original-prediction disk round trips")
-    result = verify_pilot_parity(context, manifest, root)
+    result = verify_pilot_parity(context, manifest, root, numerical_policy=numerical_policy)
     timings = marker["timings"]
     steady = max(t["seconds"] for t in timings[1:]) if len(timings) > 1 else timings[0]["seconds"]
     report = {**result, "compatibility_sha256": manifest["compatibility_sha256"],
@@ -481,7 +497,10 @@ def finish_pilot(context, manifest, root, marker, started):
     print(json.dumps(report), flush=True)
 
 
-def generate_shard(context, manifest, root: Path, shard: int, *, resume=False, parity=False):
+def generate_shard(context, manifest, root: Path, shard: int, *, resume=False, parity=False,
+                   numerical_policy="strict"):
+    if numerical_policy not in ("strict", "advisory"):
+        raise ValueError(f"Unknown cache numerical policy: {numerical_policy}")
     if not 0 <= shard < manifest["num_shards"]:
         raise ValueError("shard-index outside num-shards")
     if parity and (manifest["num_shards"] != 1 or not manifest["partial"]):
@@ -500,10 +519,15 @@ def generate_shard(context, manifest, root: Path, shard: int, *, resume=False, p
                 report = json.loads(report_path.read_text())
                 if report.get("passed") is not True or report["manifest_sha256"] != manifest["manifest_sha256"]:
                     raise ValueError("Invalid saved pilot parity report")
+                if not marker.get("exact_roundtrip_verified", False):
+                    raise ValueError("Pilot lacks verified original-prediction disk round trips")
+                # A saved advisory report must not bypass a later strict request.
+                result = _parity_result(report["max_normalized_errors"], len(manifest["chunks"]), numerical_policy)
+                atomic_json(report_path, {**report, **result})
             print(f"Verified completed shard {shard}; skipping", flush=True)
             return
         started = time.monotonic()
-        finish_pilot(context, manifest, root, marker, started)
+        finish_pilot(context, manifest, root, marker, started, numerical_policy=numerical_policy)
         return
     # An advisory lock releases on process death and prevents duplicate writers.
     import fcntl
@@ -560,4 +584,4 @@ def generate_shard(context, manifest, root: Path, shard: int, *, resume=False, p
         verify_shard(root, manifest, shard, directory=temp)
         os.rename(temp, final)
         if parity:
-            finish_pilot(context, manifest, root, marker, started)
+            finish_pilot(context, manifest, root, marker, started, numerical_policy=numerical_policy)

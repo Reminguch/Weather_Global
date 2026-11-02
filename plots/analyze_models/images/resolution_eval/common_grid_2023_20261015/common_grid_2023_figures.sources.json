@@ -8,7 +8,6 @@
     "gc": "RMSE / paired GraphCast (1\u00b0) RMSE, same 122 starts",
     "ens": "RMSE / IFS ENS-mean RMSE; per (diagnostic, lead) every model is pooled over the starts with ENS data"
   },
-  "interval": "gc version only: primary paired 5-start-block bootstrap, M1 vs GC1",
   "ens_starts_per_diagnostic_lead": {
     "Z500": [
       95,
@@ -566,11 +565,11 @@
   "outputs": [
     {
       "path": "plots/analyze_models/images/resolution_eval/common_grid_2023_20261015/common_grid_2023_all_variables.pdf",
-      "sha256": "758fd2452131de526aa7084743f01937f971b5f4fb50051406d9d60d7bc75b34"
+      "sha256": "151c383e7fdfa2119cd688f7b84b3051bf088c74670b697126257568376cdc6b"
     },
     {
       "path": "plots/analyze_models/images/resolution_eval/common_grid_2023_20261015/common_grid_2023_three_panels.pdf",
-      "sha256": "aa21f0992884b0325e1b0f707da5f2f05a277fe1456827dc765f89a24fbee94f"
+      "sha256": "e4a9e88b978e973b9a1b9aa28ee9ba871511583df196caf0d8a6766c454ed12a"
     },
     {
       "path": "plots/analyze_models/images/resolution_eval/common_grid_2023_20261015/common_grid_2023_all_variables_vs_ens.pdf",

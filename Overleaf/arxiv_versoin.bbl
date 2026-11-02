@@ -1,0 +1,216 @@
+\begin{thebibliography}{24}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Bi et~al.(2023)Bi, Xie, Zhang, Chen, Gu, and Tian]{bi2023pangu}
+Kaifeng Bi, Lingxi Xie, Hengheng Zhang, Xin Chen, Xiaotao Gu, and Qi~Tian.
+\newblock Accurate medium-range global weather forecasting with 3d neural
+  networks.
+\newblock \emph{Nature}, 619:\penalty0 533--538, 2023.
+\newblock \doi{10.1038/s41586-023-06185-3}.
+\newblock URL \url{https://doi.org/10.1038/s41586-023-06185-3}.
+
+\bibitem[Buitrago~Ruiz et~al.(2025)Buitrago~Ruiz, Marwah, Gu, and
+  Risteski]{buitrago2025memory}
+Ricardo Buitrago~Ruiz, Tanya Marwah, Albert Gu, and Andrej Risteski.
+\newblock On the benefits of memory for modeling time-dependent {PDEs}.
+\newblock In \emph{International Conference on Learning Representations}, 2025.
+\newblock URL
+  \url{https://proceedings.iclr.cc/paper_files/paper/2025/hash/89379d5fc6eb34ff98488202fb52b9d0-Abstract-Conference.html}.
+
+\bibitem[Chen et~al.(2023{\natexlab{a}})Chen, Du, Hu, Wang, and
+  Wang]{chen2023swinrdm}
+Lei Chen, Fei Du, Yuan Hu, Zhibin Wang, and Fan Wang.
+\newblock {SwinRDM}: Integrate {SwinRNN} with diffusion model towards
+  high-resolution and high-quality weather forecasting.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial
+  Intelligence}, volume~37, pages 322--330, 2023{\natexlab{a}}.
+\newblock \doi{10.1609/aaai.v37i1.25105}.
+\newblock URL \url{https://ojs.aaai.org/index.php/AAAI/article/view/25105}.
+
+\bibitem[Chen et~al.(2023{\natexlab{b}})Chen, Zhong, Zhang, Cheng, Xu, Qi, and
+  Li]{chen2023fuxi}
+Lei Chen, Xiaohui Zhong, Feng Zhang, Yuan Cheng, Yinghui Xu, Yuan Qi, and Hao
+  Li.
+\newblock {FuXi}: a cascade machine learning forecasting system for 15-day
+  global weather forecast.
+\newblock \emph{npj Climate and Atmospheric Science}, 6:\penalty0 190,
+  2023{\natexlab{b}}.
+\newblock \doi{10.1038/s41612-023-00512-1}.
+\newblock URL \url{https://doi.org/10.1038/s41612-023-00512-1}.
+
+\bibitem[Chen et~al.(2022)Chen, Penny, Whitaker, Frolov, Pincus, and
+  Tulich]{chen2022correcting}
+Tse-Chun Chen, Stephen~G. Penny, Jeffrey~S. Whitaker, Sergey Frolov, Robert
+  Pincus, and Stefan Tulich.
+\newblock Correcting systematic and state-dependent errors in the {NOAA}
+  {FV3-GFS} using neural networks.
+\newblock \emph{Journal of Advances in Modeling Earth Systems}, 14:\penalty0
+  e2022MS003309, 2022.
+\newblock \doi{10.1029/2022MS003309}.
+\newblock URL \url{https://doi.org/10.1029/2022MS003309}.
+
+\bibitem[De~Wit et~al.(2026)De~Wit, Gabbana, Woodward, Lin, Toschi, and
+  Livescu]{de2026data}
+Xander~M De~Wit, Alessandro Gabbana, Michael Woodward, Yen~Ting Lin, Federico
+  Toschi, and Daniel Livescu.
+\newblock Data-driven mori--zwanzig modeling of lagrangian particle dynamics in
+  turbulent flows.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 123\penalty0
+  (13):\penalty0 e2525390123, 2026.
+
+\bibitem[Donzis et~al.(2008)Donzis, Yeung, and
+  Sreenivasan]{DonzisResolutionEffects}
+D.~A. Donzis, P.~K. Yeung, and K.~R. Sreenivasan.
+\newblock Dissipation and enstrophy in isotropic turbulence: Resolution effects
+  and scaling in direct numerical simulations.
+\newblock \emph{Physics of Fluids}, 20\penalty0 (4):\penalty0 045108, 04 2008.
+\newblock ISSN 1070-6631.
+\newblock \doi{10.1063/1.2907227}.
+\newblock URL \url{https://doi.org/10.1063/1.2907227}.
+
+\bibitem[Gu and Dao(2023)]{gu2023mamba}
+Albert Gu and Tri Dao.
+\newblock Mamba: Linear-time sequence modeling with selective state spaces.
+\newblock \emph{arXiv preprint arXiv:2312.00752}, 2023.
+
+\bibitem[Gupta and Lermusiaux(2021)]{gupta2021neuralclosures}
+Abhinav Gupta and Pierre F.~J. Lermusiaux.
+\newblock Neural closure models for dynamical systems.
+\newblock \emph{Proceedings of the Royal Society A: Mathematical, Physical and
+  Engineering Sciences}, 477\penalty0 (2252):\penalty0 20201004, 2021.
+\newblock \doi{10.1098/rspa.2020.1004}.
+\newblock URL \url{https://doi.org/10.1098/rspa.2020.1004}.
+
+\bibitem[Hersbach et~al.(2020)Hersbach, Bell, Berrisford,
+  et~al.]{hersbach2020era5}
+Hans Hersbach, Bill Bell, Paul Berrisford, et~al.
+\newblock The {ERA5} global reanalysis.
+\newblock \emph{Quarterly Journal of the Royal Meteorological Society},
+  146\penalty0 (730):\penalty0 1999--2049, 2020.
+\newblock \doi{10.1002/qj.3803}.
+\newblock URL \url{https://doi.org/10.1002/qj.3803}.
+
+\bibitem[Hu et~al.(2023)Hu, Chen, Wang, and Li]{hu2023swinvrnn}
+Yuan Hu, Lei Chen, Zhibin Wang, and Hao Li.
+\newblock {SwinVRNN}: A data-driven ensemble forecasting model via learned
+  distribution perturbation.
+\newblock \emph{Journal of Advances in Modeling Earth Systems}, 15:\penalty0
+  e2022MS003211, 2023.
+\newblock \doi{10.1029/2022MS003211}.
+\newblock URL \url{https://doi.org/10.1029/2022MS003211}.
+
+\bibitem[Izmailov et~al.(2019)Izmailov, Podoprikhin, Garipov, Vetrov, and
+  Wilson]{izmailov2019averagingweightsleadswider}
+Pavel Izmailov, Dmitrii Podoprikhin, Timur Garipov, Dmitry Vetrov, and
+  Andrew~Gordon Wilson.
+\newblock Averaging weights leads to wider optima and better generalization,
+  2019.
+\newblock URL \url{https://arxiv.org/abs/1803.05407}.
+
+\bibitem[Koren and Lanthaler(2025)]{koren2025ssno}
+Nodens~F. Koren and Samuel Lanthaler.
+\newblock Merging memory and space: A state space neural operator.
+\newblock arXiv preprint arXiv:2507.23428, 2025.
+\newblock URL \url{https://arxiv.org/abs/2507.23428v5}.
+\newblock Version 5, revised March 2026.
+
+\bibitem[Lam et~al.(2023)Lam, Sanchez-Gonzalez, Willson, Wirnsberger,
+  Fortunato, Alet, Ravuri, Ewalds, Eaton-Rosen, Hu, Merose, Hoyer, Holland,
+  Vinyals, Stott, Pritzel, Mohamed, and Battaglia]{lam2023graphcast}
+Remi Lam, Alvaro Sanchez-Gonzalez, Matthew Willson, Peter Wirnsberger, Meire
+  Fortunato, Ferran Alet, Suman Ravuri, Timo Ewalds, Zach Eaton-Rosen, Weihua
+  Hu, Alexander Merose, Stephan Hoyer, George Holland, Oriol Vinyals, Jacklynn
+  Stott, Alexander Pritzel, Shakir Mohamed, and Peter Battaglia.
+\newblock Learning skillful medium-range global weather forecasting.
+\newblock \emph{Science}, 382\penalty0 (6677):\penalty0 1416--1421, 2023.
+\newblock \doi{10.1126/science.adi2336}.
+\newblock URL \url{https://doi.org/10.1126/science.adi2336}.
+
+\bibitem[Levine and Stuart(2022)]{levine2022modelerror}
+Matthew~E. Levine and Andrew~M. Stuart.
+\newblock A framework for machine learning of model error in dynamical systems.
+\newblock \emph{Communications of the American Mathematical Society},
+  2:\penalty0 283--344, 2022.
+\newblock \doi{10.1090/cams/10}.
+\newblock URL \url{https://doi.org/10.1090/cams/10}.
+
+\bibitem[Liang et~al.(2026)Liang, Li, Wang, Chen, Zhang, Cui, Wang, and
+  Li]{liang2026forecast}
+Daojun Liang, Qi~Li, Yinglong Wang, Jing Chen, Hu~Zhang, Xiaoxiao Cui, Qizheng
+  Wang, and Shuo Li.
+\newblock The forecast after the forecast: A post-processing shift in time
+  series.
+\newblock In \emph{International Conference on Learning Representations}, 2026.
+\newblock URL
+  \url{https://proceedings.iclr.cc/paper_files/paper/2026/hash/6f7d90b1198fec96defd80b5ebd5bc81-Abstract-Conference.html}.
+
+\bibitem[Lin et~al.(2021)Lin, Tian, Livescu, and Anghel]{YenTingLinMZ2021}
+Yen~Ting Lin, Yifeng Tian, Daniel Livescu, and Marian Anghel.
+\newblock Data-driven learning for the mori--zwanzig formalism: A
+  generalization of the koopman learning framework.
+\newblock \emph{SIAM Journal on Applied Dynamical Systems}, 20\penalty0
+  (4):\penalty0 2558--2601, 2021.
+\newblock \doi{10.1137/21M1401759}.
+\newblock URL \url{https://doi.org/10.1137/21M1401759}.
+
+\bibitem[{OpenAI}(2026)]{openai2026academicresearchers}
+{OpenAI}.
+\newblock Accelerating scientific discovery with {ChatGPT} for academic
+  researchers.
+\newblock \url{https://openai.com/index/chatgpt-for-academic-researchers/},
+  July 2026.
+\newblock Published July 29, 2026; accessed October 14, 2026.
+
+\bibitem[Pietarila~Graham and Ringler(2013)]{pietarila2013closures}
+Jonathan Pietarila~Graham and Todd Ringler.
+\newblock A framework for the evaluation of turbulence closures used in
+  mesoscale ocean large-eddy simulations.
+\newblock \emph{Ocean Modelling}, 65:\penalty0 25--39, 2013.
+\newblock \doi{10.1016/j.ocemod.2013.01.004}.
+\newblock URL \url{https://doi.org/10.1016/j.ocemod.2013.01.004}.
+
+\bibitem[Um et~al.(2020)Um, Brand, Fei, Holl, and Thuerey]{um2020solver}
+Kiwon Um, Robert Brand, Yun~(Raymond) Fei, Philipp Holl, and Nils Thuerey.
+\newblock Solver-in-the-loop: Learning from differentiable physics to interact
+  with iterative {PDE}-solvers.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~33, 2020.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper/2020/hash/43e4e6a6f341e00671e123714de019a8-Abstract.html}.
+
+\bibitem[Wang et~al.(2025)Wang, Qin, Zeng, and Zhang]{wang2025gaumamba}
+Ziye Wang, Yiran Qin, Lin Zeng, and Ruimao Zhang.
+\newblock High-dynamic radar sequence prediction for weather nowcasting using
+  spatiotemporal coherent {Gaussian} representation.
+\newblock In \emph{International Conference on Learning Representations}, 2025.
+\newblock URL
+  \url{https://proceedings.iclr.cc/paper_files/paper/2025/hash/4d1344317478ad99ff5f4e414aeab689-Abstract-Conference.html}.
+
+\bibitem[Yang et~al.(2022)Yang, Hu, Babuschkin, Sidor, Liu, Farhi, Ryder,
+  Pachocki, Chen, and Gao]{yang2022tensorprogramsv}
+Greg Yang, Edward~J. Hu, Igor Babuschkin, Szymon Sidor, Xiaodong Liu, David
+  Farhi, Nick Ryder, Jakub Pachocki, Weizhu Chen, and Jianfeng Gao.
+\newblock Tensor programs {V}: Tuning large neural networks via zero-shot
+  hyperparameter transfer.
+\newblock arXiv preprint arXiv:2203.03466, 2022.
+\newblock URL \url{https://arxiv.org/abs/2203.03466}.
+
+\bibitem[Yang and Griffin(2021)]{yang2021grid}
+Xiang~IA Yang and Kevin~P Griffin.
+\newblock Grid-point and time-step requirements for direct numerical simulation
+  and large-eddy simulation.
+\newblock \emph{Physics of Fluids}, 33\penalty0 (1), 2021.
+
+\bibitem[Zhang et~al.(2025)Zhang, Fischer, Zscheischler, and
+  Engelke]{zhang2025numerical}
+Zhongwei Zhang, Erich Fischer, Jakob Zscheischler, and Sebastian Engelke.
+\newblock Numerical models outperform {AI} weather forecasts of record-breaking
+  extremes.
+\newblock arXiv preprint arXiv:2508.15724, 2025.
+\newblock URL \url{https://arxiv.org/abs/2508.15724}.
+
+\end{thebibliography}

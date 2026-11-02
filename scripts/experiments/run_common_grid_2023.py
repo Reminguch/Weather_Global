@@ -278,12 +278,46 @@ def analyze_values(values, times, settings, exposed=()):
     return rmse, analyses
 
 
-def merge(workflow):
-    import csv
+def plot_figures(summary, plot_dir):
+    """Render saved common-grid results without recomputing the analysis."""
     import numpy as np
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
+    plot_dir = Path(plot_dir)
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    names = summary['diagnostics']
+    rmse = {model: np.asarray(value) for model, value in summary['rmse'].items()}
+    days = np.asarray(summary['lead_hours'])/24
+    colors={'gc1':'#777777','m1':'#0072B2','gc025':'#009E73'}
+    labels={'gc1':'GraphCast 1°','m1':'GraphCast–Mamba','gc025':'GraphCast 0.25°'}
+    units=['m² s⁻²','m² s⁻²','K','K','K','Pa','kg kg⁻¹','kg kg⁻¹','m s⁻¹','m s⁻¹','m s⁻¹','m s⁻¹']
+    for selected,filename in [(list(range(12)),'common_grid_all'),([0,4,8],'common_grid_selected')]:
+        rows,cols=(3,4) if len(selected)==12 else (1,3)
+        fig,axes=plt.subplots(rows,cols,figsize=(11,7.5) if rows==3 else (9,3),squeeze=False)
+        for ax,j in zip(axes.flat,selected):
+            for m in ('gc1','gc025','m1'):
+                ax.plot(days,rmse[m][:,j],color=colors[m],ls='--' if m=='gc1' else '-',label=labels[m])
+            ax.set(title=names[j],ylabel=f'RMSE ({units[j]})',xlabel='Forecast lead (days)'); ax.grid(alpha=.2)
+        handles,legends=axes.flat[0].get_legend_handles_labels()
+        fig.legend(handles,legends,loc='upper center',ncol=3,frameon=False)
+        fig.tight_layout(rect=(0,0,1,.93))
+        for suffix in ('pdf','png'): fig.savefig(plot_dir/f'{filename}.{suffix}',dpi=180)
+        plt.close(fig)
+    fig,axes=plt.subplots(3,4,figsize=(11,7.5))
+    comparison=summary['analyses']['primary']['comparisons']['gc025']
+    for j,ax in enumerate(axes.flat):
+        ax.axhline(0,color='#888888',lw=.8)
+        ax.plot(days,np.asarray(comparison['rmse_reduction_pct'])[:,j],color=colors['m1'])
+        ax.set(title=names[j],xlabel='Forecast lead (days)',ylabel='RMSE reduction (%)'); ax.grid(alpha=.2)
+    fig.suptitle('GraphCast–Mamba vs GraphCast 0.25°')
+    fig.tight_layout()
+    for suffix in ('pdf','png'): fig.savefig(plot_dir/f'common_grid_reduction.{suffix}',dpi=180)
+    plt.close(fig)
+
+
+def merge(workflow):
+    import csv
     protocol, values, sources = gather(workflow)
     times, names = protocol['initialization_times'], protocol['verification']['diagnostics']
     settings = protocol['bootstrap']
@@ -315,33 +349,8 @@ def merge(workflow):
             for k,lead in enumerate(protocol['lead_hours']):
                 for j,name in enumerate(names):
                     writer.writerow([stamp,lead,name,*[values[m][i,k,j] for m in ('gc1','m1','gc025')]])
-    days=np.asarray(protocol['lead_hours'])/24
-    colors={'gc1':'#777777','m1':'#0072B2','gc025':'#009E73'}
-    labels={'gc1':'GraphCast 1°','m1':'GraphCast–Mamba','gc025':'GraphCast 0.25°'}
-    units=['m² s⁻²','m² s⁻²','K','K','K','Pa','kg kg⁻¹','kg kg⁻¹','m s⁻¹','m s⁻¹','m s⁻¹','m s⁻¹']
-    for selected,filename in [(list(range(12)),'common_grid_all'),([0,4,8],'common_grid_selected')]:
-        rows,cols=(3,4) if len(selected)==12 else (1,3)
-        fig,axes=plt.subplots(rows,cols,figsize=(11,7.5) if rows==3 else (9,3),squeeze=False)
-        for ax,j in zip(axes.flat,selected):
-            for m in ('gc1','gc025','m1'):
-                ax.plot(days,rmse[m][:,j],color=colors[m],ls='--' if m=='gc1' else '-',label=labels[m])
-            ax.set(title=names[j],ylabel=f'RMSE ({units[j]})',xlabel='Forecast lead (days)'); ax.grid(alpha=.2)
-        handles,legends=axes.flat[0].get_legend_handles_labels()
-        fig.legend(handles,legends,loc='upper center',ncol=3,frameon=False)
-        fig.tight_layout(rect=(0,0,1,.93))
-        for suffix in ('pdf','png'): fig.savefig(plot_dir/f'{filename}.{suffix}',dpi=180)
-        plt.close(fig)
-    fig,axes=plt.subplots(3,4,figsize=(11,7.5))
+    plot_figures(report, plot_dir)
     comparison=analyses['primary']['comparisons']['gc025']
-    for j,ax in enumerate(axes.flat):
-        ax.axhline(0,color='#888888',lw=.8)
-        ax.plot(days,np.asarray(comparison['rmse_reduction_pct'])[:,j],color=colors['m1'])
-        ax.fill_between(days,np.asarray(comparison['ci95_lower'])[:,j],np.asarray(comparison['ci95_upper'])[:,j],color=colors['m1'],alpha=.18)
-        ax.set(title=names[j],xlabel='Forecast lead (days)',ylabel='RMSE reduction (%)'); ax.grid(alpha=.2)
-    fig.suptitle('GraphCast–Mamba vs GraphCast 0.25° · paired pointwise 95% intervals')
-    fig.tight_layout()
-    for suffix in ('pdf','png'): fig.savefig(plot_dir/f'common_grid_reduction.{suffix}',dpi=180)
-    plt.close(fig)
     lines=['# 2023 common-grid comparison','', 'All three fixed models: 122 identical starts, 40 six-hour leads, common native-ERA5-derived 1.5° truth.',
            '', 'RMSE pools physical squared errors across initializations. Intervals are pointwise paired five-start-block bootstrap intervals; they do not measure training uncertainty.',
            '', '| Diagnostic | GC 1° day-10 RMSE | Mamba day-10 RMSE | GC 0.25° day-10 RMSE | Mamba vs 0.25° reduction |',

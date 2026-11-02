@@ -1,0 +1,226 @@
+{
+  "sources": [
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/protocol.json",
+      "sha256": "4807303392eb3cad3c1f946f45d43f67ee4241c07f40dced0c49a271b565db47"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/report/loss_summary.csv",
+      "sha256": "13a286f2f897e4c20ba34ab4c8b9e104c75abc971f50a102404fe21e6f4cc853"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/report/variable_rmse.csv",
+      "sha256": "4f796fc7e3b9128d4804037d0321613d93b37a3799fcd1691ebd5e2495b4628a"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/report/named_endpoints.csv",
+      "sha256": "2403a604d787b5c58ff97bef3234b02a1b325d55adcd8f7a873a63c4df5d8fc2"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/report/seasonal_exact_loss.csv",
+      "sha256": "3063c171a06f1fadd8c50e5929dcde8018ab6908f77aa3115b56138d55a54a6d"
+    },
+    {
+      "path": "artifacts/evaluations/v24_spectral_pilot_report_recovery_20261007/report/pooled_spectra.csv",
+      "sha256": "abae973e0a05f888253cff9cfd3bd482b23a255df8e5aa53c96523e04d2f4e57"
+    },
+    {
+      "path": "artifacts/evaluations/v24_spectral_pilot_report_recovery_20261007/report/summary.json",
+      "sha256": "8cc2135c310c6419479960a5068e568bcc886620b211b1e6b696fa8e976b53c6"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/res1_spectral_pilot_2023_20260917/protocol.json",
+      "sha256": "3c072fe7a16c539bf9ed4e906e46677bd9a323d74bd6cdb8d5e8e47ff16691da"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/protocol.json",
+      "sha256": "b6271d9b2672dede2812ae327ce5caf26a0a102fe81aa281d287e9b68213e99c"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/control/report_v24_matched_reset_2023.py",
+      "sha256": "3f23046da7efd77fed4b83d216d4b6a75414268ac3585e46a1fcf2b59021e1c1"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/report/summary.json",
+      "sha256": "08ba2eb0fe83d303e2849a023e00377ac77667851d799bf22b0967df9639b932"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/submissions/jobs.json",
+      "sha256": "61e81d8d0cb8712bd1fa75822d6dd548d3c52b36672d8089fccc4480395bb085"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/report/report.md",
+      "sha256": "be13e1bd8b20287d7045bbf237735d97bb3a13bd1636692311f4a8bd29456610"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_00.json",
+      "sha256": "c62c9ff88a075c77dbdd5e167f517b7f46902299d80e4e3276e53277f6c8142b"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_01.json",
+      "sha256": "3ac180da51246d8319dc446fb01c81c5ab4e89005aaca9f270cada46d7d2955b"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_02.json",
+      "sha256": "b55f55b2c1d69f03471bd41d31121f8106135e4b3cb50a222f16d909ec73fe62"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_03.json",
+      "sha256": "f77e43746c49892e4ab6a5869b6b7b37699bc7f4971abb69584042cb9b043448"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_04.json",
+      "sha256": "0001ca26059b136f08c89af6aa0fec55213dac4b8041c73eabcdccede6ba9c60"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_05.json",
+      "sha256": "c217863284c47687c2372910fbe6ea14b819111ac5a768aa39bfce9a6d71e0f9"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_06.json",
+      "sha256": "a225a6679d9a38e6d561e09110d594825e8c6fc2a7ec8ae150828001c2ae8327"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_07.json",
+      "sha256": "7f3d36ab2a53c3a885008ee66c7c0148a05c322819035b9b33cb0ccc74cb01c1"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_00.json",
+      "sha256": "2da4c5c8fa711b7a9b750d19504402684512ea748ffa6fa675b8f2f852f95849"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_01.json",
+      "sha256": "ade87783910f6181c6cf3e7bf11df681abd657930d765765179a8a0739d49cbb"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_02.json",
+      "sha256": "00980d5fdca465e8ddcb19f53a9802f0edb9fdbbe70bcf8e2bc0fed8c2ae8c48"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_03.json",
+      "sha256": "705473ad39e5b54055e00a6caeaa90c1fe0b073234a64be2e3f494b8f01f350f"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_04.json",
+      "sha256": "10534d59447540482804487e93eea82c9dda497c23630c36f62aa6b910645ed9"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_05.json",
+      "sha256": "e3f9edf23a1241dd8a259aced08c60a1d2a8eed38ae5017dd80287ad08e3f4e4"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_06.json",
+      "sha256": "3605b35d85b490e3a91e02cbc6548433f03f1621a86044f2df018d7f1217105a"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/shards/M1_reset_07.json",
+      "sha256": "084bcc29eac7dcc5228a00361199e69981562c604f6dd11800136be74179ae19"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_00.json",
+      "sha256": "71b69fc6e37285c80722c871c13377502f666a77308c6331d29b44d9ce8f371d"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_01.json",
+      "sha256": "16b8d2a2cb49ceb2438a7cd7f7f0f62654a636db52ff8c8a3b9b66b02fc1f7e7"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_02.json",
+      "sha256": "0858e809af06a33b5aeeb86ffe2ecc2ec537f63a96937653ffbd90eaa6f3d453"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_03.json",
+      "sha256": "6a5792e7d1082951eb9bbaa537a3075336701401d642f05cbb45e0e0673de84f"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_04.json",
+      "sha256": "7aa381e4ab3b87d061fba38d5447b26d1f1a2e8c795ecb3873fd01d9ce8452ad"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_05.json",
+      "sha256": "fc8b5f1b557d8bbdb5819c213c9212f4e1cb9aa4459e6c1178bebba4829e7827"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_06.json",
+      "sha256": "a5e2afc6d9d6021313903920f37a74a914f5571d6e1d47f38ed1440eef4c5c7d"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_2023_20261018/shards/R_matched_07.json",
+      "sha256": "8e7109a4b0e62281f0a1b87c65095898c62080a52de8aa5a9144476e066fa59a"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/pilot_validation.json",
+      "sha256": "f889ebbd556af2a99373ac21ff533785ace0c9f8b882a21f3c9b12628a71e754"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/report/report.md",
+      "sha256": "60e8e4d768534272e8d8e3252246d27cf3506ea08b7331472b11605a050862bd"
+    },
+    {
+      "path": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009/report/claim_sensitivity.csv",
+      "sha256": "b1824801d84676cdf56bb104cfc83796cbb5c9f5f4565120836ae305e4926789"
+    },
+    {
+      "path": "Overleaf/tools/prepare_arxiv_2023.py",
+      "sha256": "3a8086f444383fbc13b78a33944c046c86dcfd6074912afde07b54e815731bef"
+    },
+    {
+      "path": "Overleaf/Graphs/paper_style.py",
+      "sha256": "cf534053f32877ad9b153383b9a0a1656eb6038163ee01d017b427ef1b4ec05e"
+    }
+  ],
+  "figures": [
+    "forecast_skill",
+    "overview_heatmap",
+    "overview_coverage",
+    "memory_policies",
+    "variable_rmse",
+    "seasonal_loss",
+    "spectral_power",
+    "spectral_correlation"
+  ],
+  "accuracy_starts": 122,
+  "spectral_starts": 8,
+  "primary_checkpoint_sha256": "b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0",
+  "coverage_pooling": "Shard RMSE squared, weighted by evaluated_samples, then square root; groups cross-checked against report.",
+  "loss_intervals": "Lead-wise CSV confidence intervals are pointwise 95%; named_endpoints.csv retains simultaneous_ci95 fields from the original four-endpoint family. The matched memory extension and memory_paired_contrasts.csv use pointwise intervals only.",
+  "displayed_memory_models": [
+    "M1",
+    "M1_reset",
+    "R_matched"
+  ],
+  "matched_memory_control": {
+    "model_id": "R_matched",
+    "checkpoint_sha256": "db0e8032ac47daebd4e9c8869e4eac3c325613156507512567f20f6382086ab6",
+    "protocol_hash": "81520bf89343412676b7cdf7229200f673a868245426f6176d41756b9d12d9cb",
+    "reference_protocol_hash": "51bee2021076fffeabb58ca8bc86c9c08d951a43879e1b75cd62e6da431fe065",
+    "coverage": {
+      "policies": 3,
+      "initializations_per_policy": 122,
+      "leads": 40
+    },
+    "canonical_baseline": "Original M1 execution of GraphCast, pooled before ratios",
+    "analysis_scope": "Separate planned extension; does not inherit the original evaluation's prespecified confirmatory family.",
+    "primary_contrast": "M1_vs_R_matched_rollout",
+    "bootstrap": {
+      "method": "paired non-wrapping moving-block percentile bootstrap",
+      "block_starts": 5,
+      "block_elapsed_days": 12,
+      "replicates": 10000,
+      "seed": 20260916
+    },
+    "training_source_limit": "Original snapshot omitted dependencies and environment; bitwise historical reproduction is not claimed.",
+    "numerical_status": "warning",
+    "limitations": [
+      "Uncertainty conditions on these fixed checkpoints and the 2023 every-third-day sample; training-seed and between-year variation are unmeasured.",
+      "The training-policy comparison is a separate planned analysis added after the original M1 evaluation, not part of its confirmatory endpoint family.",
+      "Leadwise and contrast intervals are pointwise; no simultaneous significance across leads or contrast families is claimed.",
+      "Non-wrapping blocks underweight boundary dates; quarter blocks break cross-quarter dependence.",
+      "Excluding the three sampled pilot dates does not undo prior test-year exposure or overlapping forecast windows.",
+      "A reset-trained control estimates this training-policy contrast for one training realization; it does not isolate all possible memory mechanisms.",
+      "Forecast accuracy alone does not establish preservation of extremes or spatial structure."
+    ]
+  },
+  "numerics": "Saved repeatability warnings remain; no new inference.",
+  "main_model_selection": "Prespecified M1; 2023 is not used to select another checkpoint."
+}

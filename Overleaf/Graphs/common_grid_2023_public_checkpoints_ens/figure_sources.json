@@ -1,0 +1,2091 @@
+{
+  "schema_version": 1,
+  "manuscript": "Overleaf/arxiv_versoin.tex",
+  "approved_by_user": "2026-10-18: ok, let us use those ENS-relative figures",
+  "repair_protocol_hash": "a0e67b8a329c32f0d8c60880136beb17126f8130ee339eda3f3662c5a91dda76",
+  "reference_protocol_hash": "b69bf34e002a47cc12b17a6ffda91e377834412d31598e6bb6a20dea4fda5228",
+  "sources": {
+    "matched_summary": {
+      "path": "plots/analyze_models/data/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/summary.json",
+      "sha256": "4bd1d95067398e96c02743dbcb3195628b0097fc16c7f8e5ab6130642c0e32d3"
+    },
+    "matched_csv": {
+      "path": "plots/analyze_models/data/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/matched_per_initialization_mse.csv",
+      "sha256": "efebc49bec01d1b988c0c753e1178781ede52102339e22ffb1347987834e5b68"
+    },
+    "independent_validation": {
+      "path": "plots/analyze_models/data/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/independent_validation.json",
+      "sha256": "c8ebd740c9177d85eeb305f17431cd41fff54810deb0c16b85de255641ff18b8"
+    },
+    "model_scale_audit": {
+      "path": "artifacts/evaluations/graphcast_common_grid_2023_truth_repair_20261018/ens/model_scale_audit.json",
+      "sha256": "a7c25d0c12d050bc8d714e436c3493408827a00ec228104f39067d2a0af6f90b"
+    },
+    "ens_repair_audit": {
+      "path": "artifacts/evaluations/graphcast_common_grid_2023_truth_repair_20261018/ens/repair_audit.json",
+      "sha256": "723fc30b797041c23be3549d01efa79412511e2f65a345ad63353a9796069315"
+    },
+    "repair_protocol": {
+      "path": "artifacts/evaluations/graphcast_common_grid_2023_truth_repair_20261018/protocol.json",
+      "sha256": "0fd8defab06ea8b18261c2017515efd9beb55002af54cb24d7e2ea011ef7ecaa"
+    },
+    "parent_protocol": {
+      "path": "artifacts/evaluations/graphcast_common_grid_2023_20261015/protocol.json",
+      "sha256": "f874a677aeed8dddaa61bb77b399e4e4b3d6b14faa0a3d0e2eb034629281853e"
+    }
+  },
+  "figures": [
+    {
+      "number": 5,
+      "approved_source": {
+        "path": "plots/analyze_models/images/resolution_eval/public_checkpoints_2023_repaired_ens_q700_20261019/fig5_public_checkpoints_2023_repaired_vs_ens.pdf",
+        "sha256": "7c8bca93a19caaa9944b9285d89b240904d64acd30ff5f729cf34b4c4314e478"
+      },
+      "manuscript_copy": {
+        "path": "Overleaf/Graphs/common_grid_2023_public_checkpoints_ens/fig5_public_checkpoints_2023_repaired_vs_ens.pdf",
+        "sha256": "7c8bca93a19caaa9944b9285d89b240904d64acd30ff5f729cf34b4c4314e478"
+      }
+    },
+    {
+      "number": 5,
+      "approved_source": {
+        "path": "plots/analyze_models/images/resolution_eval/public_checkpoints_2023_repaired_ens_q700_20261019/fig5_public_checkpoints_2023_repaired_vs_ens.png",
+        "sha256": "7c5ecfffde09d333880240930fc3ff83fda37a897e91f882c5820a0953dcff01"
+      },
+      "manuscript_copy": {
+        "path": "Overleaf/Graphs/common_grid_2023_public_checkpoints_ens/fig5_public_checkpoints_2023_repaired_vs_ens.png",
+        "sha256": "7c5ecfffde09d333880240930fc3ff83fda37a897e91f882c5820a0953dcff01"
+      }
+    },
+    {
+      "number": 9,
+      "approved_source": {
+        "path": "plots/analyze_models/images/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/fig9_public_checkpoints_2023_repaired_vs_ens.pdf",
+        "sha256": "351b3d5f173cfab8db3e7e92865c3d295a4ace137ee10e0c56cbb162490297ff"
+      },
+      "manuscript_copy": {
+        "path": "Overleaf/Graphs/common_grid_2023_public_checkpoints_ens/fig9_public_checkpoints_2023_repaired_vs_ens.pdf",
+        "sha256": "351b3d5f173cfab8db3e7e92865c3d295a4ace137ee10e0c56cbb162490297ff"
+      }
+    },
+    {
+      "number": 9,
+      "approved_source": {
+        "path": "plots/analyze_models/images/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/fig9_public_checkpoints_2023_repaired_vs_ens.png",
+        "sha256": "9695372c3dc72a518cb1b6a7936c3c9641c405d02440c2beb0e21385b952bd45"
+      },
+      "manuscript_copy": {
+        "path": "Overleaf/Graphs/common_grid_2023_public_checkpoints_ens/fig9_public_checkpoints_2023_repaired_vs_ens.png",
+        "sha256": "9695372c3dc72a518cb1b6a7936c3c9641c405d02440c2beb0e21385b952bd45"
+      }
+    }
+  ],
+  "candidate_initializations": 122,
+  "initialization_times": [
+    "2023-01-01T00:00:00Z",
+    "2023-01-04T00:00:00Z",
+    "2023-01-07T00:00:00Z",
+    "2023-01-10T00:00:00Z",
+    "2023-01-13T00:00:00Z",
+    "2023-01-16T00:00:00Z",
+    "2023-01-19T00:00:00Z",
+    "2023-01-22T00:00:00Z",
+    "2023-01-25T00:00:00Z",
+    "2023-01-28T00:00:00Z",
+    "2023-01-31T00:00:00Z",
+    "2023-02-03T00:00:00Z",
+    "2023-02-06T00:00:00Z",
+    "2023-02-09T00:00:00Z",
+    "2023-02-12T00:00:00Z",
+    "2023-02-15T00:00:00Z",
+    "2023-02-18T00:00:00Z",
+    "2023-02-21T00:00:00Z",
+    "2023-02-24T00:00:00Z",
+    "2023-02-27T00:00:00Z",
+    "2023-03-02T00:00:00Z",
+    "2023-03-05T00:00:00Z",
+    "2023-03-08T00:00:00Z",
+    "2023-03-11T00:00:00Z",
+    "2023-03-14T00:00:00Z",
+    "2023-03-17T00:00:00Z",
+    "2023-03-20T00:00:00Z",
+    "2023-03-23T00:00:00Z",
+    "2023-03-26T00:00:00Z",
+    "2023-03-29T00:00:00Z",
+    "2023-04-01T00:00:00Z",
+    "2023-04-04T00:00:00Z",
+    "2023-04-07T00:00:00Z",
+    "2023-04-10T00:00:00Z",
+    "2023-04-13T00:00:00Z",
+    "2023-04-16T00:00:00Z",
+    "2023-04-19T00:00:00Z",
+    "2023-04-22T00:00:00Z",
+    "2023-04-25T00:00:00Z",
+    "2023-04-28T00:00:00Z",
+    "2023-05-01T00:00:00Z",
+    "2023-05-04T00:00:00Z",
+    "2023-05-07T00:00:00Z",
+    "2023-05-10T00:00:00Z",
+    "2023-05-13T00:00:00Z",
+    "2023-05-16T00:00:00Z",
+    "2023-05-19T00:00:00Z",
+    "2023-05-22T00:00:00Z",
+    "2023-05-25T00:00:00Z",
+    "2023-05-28T00:00:00Z",
+    "2023-05-31T00:00:00Z",
+    "2023-06-03T00:00:00Z",
+    "2023-06-06T00:00:00Z",
+    "2023-06-09T00:00:00Z",
+    "2023-06-12T00:00:00Z",
+    "2023-06-15T00:00:00Z",
+    "2023-06-18T00:00:00Z",
+    "2023-06-21T00:00:00Z",
+    "2023-06-24T00:00:00Z",
+    "2023-06-27T00:00:00Z",
+    "2023-06-30T00:00:00Z",
+    "2023-07-03T00:00:00Z",
+    "2023-07-06T00:00:00Z",
+    "2023-07-09T00:00:00Z",
+    "2023-07-12T00:00:00Z",
+    "2023-07-15T00:00:00Z",
+    "2023-07-18T00:00:00Z",
+    "2023-07-21T00:00:00Z",
+    "2023-07-24T00:00:00Z",
+    "2023-07-27T00:00:00Z",
+    "2023-07-30T00:00:00Z",
+    "2023-08-02T00:00:00Z",
+    "2023-08-05T00:00:00Z",
+    "2023-08-08T00:00:00Z",
+    "2023-08-11T00:00:00Z",
+    "2023-08-14T00:00:00Z",
+    "2023-08-17T00:00:00Z",
+    "2023-08-20T00:00:00Z",
+    "2023-08-23T00:00:00Z",
+    "2023-08-26T00:00:00Z",
+    "2023-08-29T00:00:00Z",
+    "2023-09-01T00:00:00Z",
+    "2023-09-04T00:00:00Z",
+    "2023-09-07T00:00:00Z",
+    "2023-09-10T00:00:00Z",
+    "2023-09-13T00:00:00Z",
+    "2023-09-16T00:00:00Z",
+    "2023-09-19T00:00:00Z",
+    "2023-09-22T00:00:00Z",
+    "2023-09-25T00:00:00Z",
+    "2023-09-28T00:00:00Z",
+    "2023-10-01T00:00:00Z",
+    "2023-10-04T00:00:00Z",
+    "2023-10-07T00:00:00Z",
+    "2023-10-10T00:00:00Z",
+    "2023-10-13T00:00:00Z",
+    "2023-10-16T00:00:00Z",
+    "2023-10-19T00:00:00Z",
+    "2023-10-22T00:00:00Z",
+    "2023-10-25T00:00:00Z",
+    "2023-10-28T00:00:00Z",
+    "2023-10-31T00:00:00Z",
+    "2023-11-03T00:00:00Z",
+    "2023-11-06T00:00:00Z",
+    "2023-11-09T00:00:00Z",
+    "2023-11-12T00:00:00Z",
+    "2023-11-15T00:00:00Z",
+    "2023-11-18T00:00:00Z",
+    "2023-11-21T00:00:00Z",
+    "2023-11-24T00:00:00Z",
+    "2023-11-27T00:00:00Z",
+    "2023-11-30T00:00:00Z",
+    "2023-12-03T00:00:00Z",
+    "2023-12-06T00:00:00Z",
+    "2023-12-09T00:00:00Z",
+    "2023-12-12T00:00:00Z",
+    "2023-12-15T00:00:00Z",
+    "2023-12-18T00:00:00Z",
+    "2023-12-21T00:00:00Z",
+    "2023-12-24T00:00:00Z",
+    "2023-12-27T00:00:00Z",
+    "2023-12-30T00:00:00Z"
+  ],
+  "lead_hours": [
+    6,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72,
+    78,
+    84,
+    90,
+    96,
+    102,
+    108,
+    114,
+    120,
+    126,
+    132,
+    138,
+    144,
+    150,
+    156,
+    162,
+    168,
+    174,
+    180,
+    186,
+    192,
+    198,
+    204,
+    210,
+    216,
+    222,
+    228,
+    234,
+    240
+  ],
+  "diagnostics": [
+    "Z500",
+    "Z850",
+    "T500",
+    "T850",
+    "T2m",
+    "MSL",
+    "Q700",
+    "Q850",
+    "U850",
+    "V850",
+    "U10",
+    "V10"
+  ],
+  "matched_initializations_per_lead_diagnostic": [
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      95,
+      95,
+      101,
+      101,
+      99,
+      95,
+      98,
+      98,
+      99,
+      94,
+      99,
+      97
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      99,
+      99,
+      97,
+      94,
+      105,
+      105,
+      95,
+      103,
+      95,
+      93
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      98,
+      98,
+      96,
+      96,
+      97,
+      97,
+      95,
+      95,
+      99,
+      94,
+      94,
+      104
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      99,
+      99,
+      108,
+      108,
+      98,
+      96,
+      97,
+      97,
+      103,
+      96,
+      98,
+      95
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      97,
+      97,
+      98,
+      98,
+      101,
+      98,
+      92,
+      92,
+      99,
+      93,
+      92,
+      100
+    ],
+    [
+      91,
+      91,
+      104,
+      104,
+      98,
+      97,
+      94,
+      94,
+      98,
+      99,
+      97,
+      106
+    ]
+  ],
+  "matched_initializations_min_max": [
+    91,
+    108
+  ],
+  "matched_score_cells_per_model": 46930,
+  "selection_basis": "Only ENS forecast availability; no error-based selection or interpolation.",
+  "aggregation": "For each diagnostic and lead, use the identical ENS-available initialization set for every model. Pool per-start spatial MSE before square root. Plot 100 times model RMSE divided by matched ENS-mean RMSE.",
+  "truth": "Same verification truth as the independently validated repaired comparison; ENS is rescored at the repaired valid times.",
+  "ens_store": "https://storage.googleapis.com/weatherbench2/datasets/ifs_ens/2016-2024-240x121_equiangular_with_poles_conservative_mean.zarr/",
+  "ens_store_note": "Public store without zarr metadata or coordinates; layout borrowed from the complete 2018-2022 sibling and verified on overlapping chunks. Absent chunks yield null MSE.",
+  "models": {
+    "gc1": {
+      "checkpoint": {
+        "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+        "sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29",
+        "size_bytes": 144041078
+      },
+      "parameter_count_stored": 35979347,
+      "parameter_array_count": 262,
+      "count_method": "Sum prod(shape) over every NPZ key starting params:; excludes config and metadata",
+      "model_config": {
+        "resolution": 1.0,
+        "mesh_size": 5,
+        "latent_size": 512,
+        "gnn_msg_steps": 16,
+        "hidden_layers": 1,
+        "radius_query_fraction_edge_length": 0.6,
+        "mesh2grid_edge_normalization_factor": 0.6180338738074472
+      },
+      "pressure_levels": [
+        50,
+        100,
+        150,
+        200,
+        250,
+        300,
+        400,
+        500,
+        600,
+        700,
+        850,
+        925,
+        1000
+      ],
+      "pressure_level_count": 13,
+      "mesh_vertices": 10242,
+      "mesh_faces": 20480,
+      "native_grid": {
+        "latitude": 181,
+        "longitude": 360
+      },
+      "native_grid_points": 65160
+    },
+    "gc025": {
+      "checkpoint": {
+        "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/params/GraphCast - ERA5 1979-2017 - resolution 0.25 - pressure levels 37 - mesh 2to6 - precipitation input and output.npz",
+        "sha256": "4e8cf600f3f402ebb430483e782b94648cef57bb757dec24dd7b11760d3fbacc",
+        "size_bytes": 145990258
+      },
+      "parameter_count_stored": 36464582,
+      "parameter_array_count": 264,
+      "count_method": "Sum prod(shape) over every NPZ key starting params:; excludes config and metadata",
+      "model_config": {
+        "resolution": 0.25,
+        "mesh_size": 6,
+        "latent_size": 512,
+        "gnn_msg_steps": 16,
+        "hidden_layers": 1,
+        "radius_query_fraction_edge_length": 0.5999912857713345,
+        "mesh2grid_edge_normalization_factor": 0.6180338738074472
+      },
+      "pressure_levels": [
+        1,
+        2,
+        3,
+        5,
+        7,
+        10,
+        20,
+        30,
+        50,
+        70,
+        100,
+        125,
+        150,
+        175,
+        200,
+        225,
+        250,
+        300,
+        350,
+        400,
+        450,
+        500,
+        550,
+        600,
+        650,
+        700,
+        750,
+        775,
+        800,
+        825,
+        850,
+        875,
+        900,
+        925,
+        950,
+        975,
+        1000
+      ],
+      "pressure_level_count": 37,
+      "source_only_auxiliary_decoder_parameters": {
+        "count": 116451,
+        "keys": [
+          "params:mesh2grid_gnn/~_networks_builder/decoder_nodes_mesh_nodes_mlp/~/linear_1:b",
+          "params:mesh2grid_gnn/~_networks_builder/decoder_nodes_mesh_nodes_mlp/~/linear_1:w"
+        ],
+        "note": "Frozen GraphCast graph requests output decoding only for grid_nodes; its overlay ignores source-only tensors. These mesh_nodes decoder tensors are stored in the public checkpoint but not requested by this graph. No model initialization was executed for this count audit."
+      },
+      "parameters_excluding_source_only_auxiliary_decoder": 36348131,
+      "mesh_vertices": 40962,
+      "mesh_faces": 81920,
+      "native_grid": {
+        "latitude": 721,
+        "longitude": 1440
+      },
+      "native_grid_points": 1038240
+    },
+    "m1": {
+      "correction_checkpoint": {
+        "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/swa/swa_step00500-02000.pkl",
+        "sha256": "b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0",
+        "size_bytes": 240678202
+      },
+      "baseline_checkpoint_sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29",
+      "frozen_backbone_parameters": 35979347,
+      "trainable_correction_parameters": 10348879,
+      "temporal_modules_including_layer_norm_parameters": 110016,
+      "spatial_correction_and_output_head_parameters": 10238863,
+      "total_parameters": 46328226,
+      "count_method": "Sum all array sizes in residual_params plus separately pinned frozen GC1 checkpoint; no optimizer state or metadata",
+      "correction_parameter_shapes": {
+        "grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_layer_norm:offset": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_layer_norm:scale": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_mlp/~/linear_0:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_mlp/~/linear_0:w": [
+          4,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_mlp/~/linear_1:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_layer_norm:offset": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_layer_norm:scale": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_0:w": [
+          186,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_layer_norm:offset": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_layer_norm:scale": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_0:w": [
+          186,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_layer_norm:offset": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_layer_norm:scale": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_mlp/~/linear_0:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_mlp/~/linear_0:w": [
+          1536,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_mlp/~/linear_1:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_grid_nodes_layer_norm:offset": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_grid_nodes_layer_norm:scale": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_0:w": [
+          512,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_layer_norm:offset": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_layer_norm:scale": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_0:w": [
+          1024,
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "grid2mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/decoder_nodes_grid_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/decoder_nodes_grid_nodes_mlp/~/linear_0:w": [
+          512,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/decoder_nodes_grid_nodes_mlp/~/linear_1:b": [
+          83
+        ],
+        "mesh2grid_gnn/~_networks_builder/decoder_nodes_grid_nodes_mlp/~/linear_1:w": [
+          512,
+          83
+        ],
+        "mesh2grid_gnn/~_networks_builder/encoder_edges_mesh2grid_layer_norm:offset": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/encoder_edges_mesh2grid_layer_norm:scale": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/encoder_edges_mesh2grid_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/encoder_edges_mesh2grid_mlp/~/linear_0:w": [
+          4,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/encoder_edges_mesh2grid_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/encoder_edges_mesh2grid_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_edges_0_mesh2grid_layer_norm:offset": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_edges_0_mesh2grid_layer_norm:scale": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_edges_0_mesh2grid_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_edges_0_mesh2grid_mlp/~/linear_0:w": [
+          1536,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_edges_0_mesh2grid_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_edges_0_mesh2grid_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_grid_nodes_layer_norm:offset": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_grid_nodes_layer_norm:scale": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_0:w": [
+          1024,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_grid_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_layer_norm:offset": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_layer_norm:scale": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_0:w": [
+          512,
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh2grid_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/encoder_edges_mesh_layer_norm:offset": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/encoder_edges_mesh_layer_norm:scale": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/encoder_edges_mesh_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/encoder_edges_mesh_mlp/~/linear_0:w": [
+          4,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/encoder_edges_mesh_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/encoder_edges_mesh_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_0_mesh_layer_norm:offset": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_0_mesh_layer_norm:scale": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_0_mesh_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_0_mesh_mlp/~/linear_0:w": [
+          1536,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_0_mesh_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_0_mesh_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_1_mesh_layer_norm:offset": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_1_mesh_layer_norm:scale": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_1_mesh_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_1_mesh_mlp/~/linear_0:w": [
+          1536,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_1_mesh_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_edges_1_mesh_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_layer_norm:offset": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_layer_norm:scale": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_0:w": [
+          1024,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_0_mesh_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_1_mesh_nodes_layer_norm:offset": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_1_mesh_nodes_layer_norm:scale": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_1_mesh_nodes_mlp/~/linear_0:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_1_mesh_nodes_mlp/~/linear_0:w": [
+          1024,
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_1_mesh_nodes_mlp/~/linear_1:b": [
+          512
+        ],
+        "mesh_gnn/~_networks_builder/processor_nodes_1_mesh_nodes_mlp/~/linear_1:w": [
+          512,
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/layer_norm_0:offset": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/layer_norm_0:scale": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/layer_norm_1:offset": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/layer_norm_1:scale": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0:A_log": [
+          16,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0:D": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/conv1d:bias": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/conv1d:kernel": [
+          16,
+          4
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/in_proj:w": [
+          512,
+          32
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/out_proj:w": [
+          16,
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/~ssm/dt_proj:b": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/~ssm/dt_proj:w": [
+          32,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_0/~ssm/x_proj:w": [
+          16,
+          64
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1:A_log": [
+          16,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1:D": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/conv1d:bias": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/conv1d:kernel": [
+          16,
+          4
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/in_proj:w": [
+          512,
+          32
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/out_proj:w": [
+          16,
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/~ssm/dt_proj:b": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/~ssm/dt_proj:w": [
+          32,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s0/~_run_sequence/mamba_block_1/~ssm/x_proj:w": [
+          16,
+          64
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/layer_norm_0:offset": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/layer_norm_0:scale": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/layer_norm_1:offset": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/layer_norm_1:scale": [
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0:A_log": [
+          16,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0:D": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/conv1d:bias": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/conv1d:kernel": [
+          16,
+          4
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/in_proj:w": [
+          512,
+          32
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/out_proj:w": [
+          16,
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/~ssm/dt_proj:b": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/~ssm/dt_proj:w": [
+          32,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_0/~ssm/x_proj:w": [
+          16,
+          64
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1:A_log": [
+          16,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1:D": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/conv1d:bias": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/conv1d:kernel": [
+          16,
+          4
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/in_proj:w": [
+          512,
+          32
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/out_proj:w": [
+          16,
+          512
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/~ssm/dt_proj:b": [
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/~ssm/dt_proj:w": [
+          32,
+          16
+        ],
+        "mesh_interleaved_temporal_r0_s1/~_run_sequence/mamba_block_1/~ssm/x_proj:w": [
+          16,
+          64
+        ],
+        "temporal_residual_head:b": [
+          83
+        ],
+        "temporal_residual_head:w": [
+          83,
+          83
+        ]
+      },
+      "native_grid": {
+        "latitude": 181,
+        "longitude": 360
+      },
+      "native_grid_points": 65160
+    }
+  },
+  "comparative_scale": {
+    "gc025_to_gc1_grid_points_ratio": 15.933701657458563,
+    "gc025_to_gc1_mesh_vertices_ratio": 3.9994141769185707,
+    "gc025_to_gc1_pressure_levels_ratio": 2.8461538461538463,
+    "gc025_to_gc1_stored_parameters_ratio": 1.0134864871227374,
+    "m1_total_to_gc025_stored_parameters_ratio": 1.2704993025835316,
+    "m1_total_to_gc025_parameters_excluding_auxiliary_ratio": 1.2745696883286792
+  },
+  "ens_matched_results": {
+    "Z500": {
+      "day10_m1_rmse_si": 671.7259926348363,
+      "day10_gc025_rmse_si": 733.927678195957,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 8.475179150351241,
+      "day10_matched_initializations": 91,
+      "day10_pct_of_ens": {
+        "m1": 107.35794596909102,
+        "gc1": 121.10559505793535,
+        "gc025": 117.29926917360694,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 36,
+      "sustained_lower_m1_rmse_from_lead_hours": 36,
+      "sustained_lower_m1_rmse_from_day": 1.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        36,
+        42,
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "Z850": {
+      "day10_m1_rmse_si": 481.2769130193548,
+      "day10_gc025_rmse_si": 522.6372212818808,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 7.913770121668884,
+      "day10_matched_initializations": 91,
+      "day10_pct_of_ens": {
+        "m1": 108.62225322019358,
+        "gc1": 121.63895285872042,
+        "gc025": 117.9571075542029,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 24,
+      "sustained_lower_m1_rmse_from_lead_hours": 36,
+      "sustained_lower_m1_rmse_from_day": 1.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        24,
+        36,
+        42,
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "T500": {
+      "day10_m1_rmse_si": 2.8129827554769418,
+      "day10_gc025_rmse_si": 3.104258459912038,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 9.383100930434441,
+      "day10_matched_initializations": 104,
+      "day10_pct_of_ens": {
+        "m1": 109.74970382257283,
+        "gc1": 125.27498874700123,
+        "gc025": 121.11394778397705,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 84,
+      "sustained_lower_m1_rmse_from_lead_hours": 84,
+      "sustained_lower_m1_rmse_from_day": 3.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "T850": {
+      "day10_m1_rmse_si": 3.0544948052098384,
+      "day10_gc025_rmse_si": 3.3533566931642422,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 8.91232025998393,
+      "day10_matched_initializations": 104,
+      "day10_pct_of_ens": {
+        "m1": 108.17039200756265,
+        "gc1": 122.0222952699676,
+        "gc025": 118.7541414122133,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 48,
+      "sustained_lower_m1_rmse_from_lead_hours": 48,
+      "sustained_lower_m1_rmse_from_day": 2.0,
+      "all_leads_with_lower_m1_rmse_hours": [
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "T2m": {
+      "day10_m1_rmse_si": 2.32765403927802,
+      "day10_gc025_rmse_si": 2.6030049486530062,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 10.578193849284611,
+      "day10_matched_initializations": 98,
+      "day10_pct_of_ens": {
+        "m1": 107.26303128333167,
+        "gc1": 119.77444164065116,
+        "gc025": 119.9517610978981,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 72,
+      "sustained_lower_m1_rmse_from_lead_hours": 84,
+      "sustained_lower_m1_rmse_from_day": 3.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        72,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "MSL": {
+      "day10_m1_rmse_si": 633.8913874823216,
+      "day10_gc025_rmse_si": 688.999164981805,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 7.998235745458226,
+      "day10_matched_initializations": 97,
+      "day10_pct_of_ens": {
+        "m1": 108.73634176355628,
+        "gc1": 122.62136183281376,
+        "gc025": 118.1894093494934,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 36,
+      "sustained_lower_m1_rmse_from_lead_hours": 36,
+      "sustained_lower_m1_rmse_from_day": 1.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        36,
+        42,
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "Q700": {
+      "day10_m1_rmse_si": 0.0014809659654868872,
+      "day10_gc025_rmse_si": 0.0016045751464576932,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 7.70354577931045,
+      "day10_matched_initializations": 94,
+      "day10_pct_of_ens": {
+        "m1": 103.9251658259586,
+        "gc1": 116.84644585521507,
+        "gc025": 112.59930481994867,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 72,
+      "sustained_lower_m1_rmse_from_lead_hours": 72,
+      "sustained_lower_m1_rmse_from_day": 3.0,
+      "all_leads_with_lower_m1_rmse_hours": [
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "Q850": {
+      "day10_m1_rmse_si": 0.0016753205570652625,
+      "day10_gc025_rmse_si": 0.0018263842608041122,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 8.271189528995393,
+      "day10_matched_initializations": 94,
+      "day10_pct_of_ens": {
+        "m1": 101.17649004622979,
+        "gc1": 114.36344226577124,
+        "gc025": 110.29957711946084,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 84,
+      "sustained_lower_m1_rmse_from_lead_hours": 84,
+      "sustained_lower_m1_rmse_from_day": 3.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "U850": {
+      "day10_m1_rmse_si": 5.234541257516161,
+      "day10_gc025_rmse_si": 5.805016664104229,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 9.827282841678064,
+      "day10_matched_initializations": 98,
+      "day10_pct_of_ens": {
+        "m1": 106.33737619860631,
+        "gc1": 122.9012702086415,
+        "gc025": 117.926330213498,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 66,
+      "sustained_lower_m1_rmse_from_lead_hours": 66,
+      "sustained_lower_m1_rmse_from_day": 2.75,
+      "all_leads_with_lower_m1_rmse_hours": [
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "V850": {
+      "day10_m1_rmse_si": 5.199091830662719,
+      "day10_gc025_rmse_si": 5.803916298911213,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 10.420971583652161,
+      "day10_matched_initializations": 99,
+      "day10_pct_of_ens": {
+        "m1": 105.80078495979798,
+        "gc1": 123.74833596415971,
+        "gc025": 118.10887752438464,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 72,
+      "sustained_lower_m1_rmse_from_lead_hours": 72,
+      "sustained_lower_m1_rmse_from_day": 3.0,
+      "all_leads_with_lower_m1_rmse_hours": [
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "U10": {
+      "day10_m1_rmse_si": 3.5719436142879357,
+      "day10_gc025_rmse_si": 4.032405456828036,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 11.419036291611107,
+      "day10_matched_initializations": 97,
+      "day10_pct_of_ens": {
+        "m1": 105.85209915805116,
+        "gc1": 123.37474931318467,
+        "gc025": 119.49757004960946,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 48,
+      "sustained_lower_m1_rmse_from_lead_hours": 60,
+      "sustained_lower_m1_rmse_from_day": 2.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        48,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    },
+    "V10": {
+      "day10_m1_rmse_si": 3.7420709606197082,
+      "day10_gc025_rmse_si": 4.214440806518281,
+      "day10_m1_rmse_reduction_vs_gc025_pct": 11.208363519259311,
+      "day10_matched_initializations": 106,
+      "day10_pct_of_ens": {
+        "m1": 105.8860777217213,
+        "gc1": 124.42562767190893,
+        "gc025": 119.25231014825195,
+        "ens": 100.0
+      },
+      "first_lower_m1_rmse_lead_hours": 60,
+      "sustained_lower_m1_rmse_from_lead_hours": 60,
+      "sustained_lower_m1_rmse_from_day": 2.5,
+      "all_leads_with_lower_m1_rmse_hours": [
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120,
+        126,
+        132,
+        138,
+        144,
+        150,
+        156,
+        162,
+        168,
+        174,
+        180,
+        186,
+        192,
+        198,
+        204,
+        210,
+        216,
+        222,
+        228,
+        234,
+        240
+      ]
+    }
+  },
+  "day10_reduction_range_pct": [
+    7.70354577931045,
+    11.419036291611107
+  ],
+  "interpretation": [
+    "The public0.25-degree checkpoint is a much higher-resolution model, but not much larger by trainable-weight count. Both GraphCast checkpoints use latent width512 and16 message-passing steps.",
+    "M1 uses more total stored parameters than publicGC025, while training only its10,348,879-parameter correction.",
+    "Grid/mesh counts are exact; they do not imply an equal FLOP, memory, or latency ratio. No controlled inference efficiency benchmark is established by this audit.",
+    "Crossover means the first sampled6-hour lead after which the pooled M1 RMSE remains lower at every later sampled lead throughday10; matched initialization subsets vary by lead/diagnostic.",
+    "All result claims concern the selected public checkpoints and coarse1.5-degree verification; they do not establish superiority at native0.25-degree scales or all forecast metrics.",
+    "The displayed ENS-matched subset has91\u2013108 starts per diagnostic/lead; no confidence intervals from the separate122-start comparison are transferred."
+  ],
+  "uncertainty": "Point estimates only. Full122 model-only confidence intervals are not transferred to the ENS-matched subsets.",
+  "presentation_revision": {
+    "date": "2026-10-19",
+    "request": "Replace Z500 with Q700 in Figure5",
+    "panels": {
+      "5": [
+        "Q700",
+        "T2m",
+        "U850"
+      ],
+      "9": [
+        "Z500",
+        "Z850",
+        "T500",
+        "T850",
+        "T2m",
+        "MSL",
+        "Q700",
+        "Q850",
+        "U850",
+        "V850",
+        "U10",
+        "V10"
+      ]
+    },
+    "figure5_matched_starts_min_max": [
+      92,
+      105
+    ],
+    "summary": {
+      "path": "plots/analyze_models/data/resolution_eval/public_checkpoints_2023_repaired_ens_q700_20261019/summary.json",
+      "sha256": "9db2738764e04af3620d02cdff5bcce5b8657a5d0c1dd3561d9352ca59e7638c"
+    },
+    "plotter": {
+      "path": "plots/analyze_models/data/resolution_eval/public_checkpoints_2023_repaired_ens_q700_20261019/source/plot_repaired_common_grid_with_ens.py",
+      "sha256": "1ae3ef93a20fa1c9c5729a851c686b7fdc152d8a05fcbf1c5a8b018715ff751d"
+    },
+    "old_data_unchanged": true,
+    "figure9_byte_identical": true
+  }
+}

@@ -1,0 +1,4 @@
+analysis,endpoint_id,first_arm,second_arm,aggregation,role,effect_units,effect,ci95_lower,ci95_upper,absolute_loss_reduction,absolute_pointwise_ci95_lower,absolute_pointwise_ci95_upper,interval_supports_positive,confirmatory_supported,simultaneous_ci95_lower,simultaneous_ci95_upper
+primary,M1_vs_GC_rollout,M1,GC,rollout,primary,percent,14.42401955936806,13.429544164501566,15.240153535555487,1.644986263711433,1.5170239452675718,1.7553105451423126,True,True,,
+primary,M1_vs_GC_day10,M1,GC,day10,secondary,percent,21.65842613268291,19.88891334804409,23.06922044069692,6.440720089146348,5.863998119166641,6.926060996290113,True,True,19.62366683246045,23.693185432905366
+primary,M1_vs_M1_reset_rollout,M1,M1_reset,rollout,secondary,percentage_points,9.851476641368125,9.203282666050752,10.626824025166975,1.1235109385164057,1.0519386628398395,1.2091586479639298,True,True,8.947773388081247,10.755179894655

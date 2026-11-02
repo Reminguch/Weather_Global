@@ -28,6 +28,9 @@ import xarray as xr
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+sys.path.insert(0, str(HERE.parent))
+from paper_style import ANNOTATION_SIZE, LABEL_SIZE, LEGEND_SIZE, apply_style
+
 REPORT = ROOT / "docs/reports/v24_optimizer_search_2026-09-10.sources.json"
 OPT_CSV = ROOT / "docs/reports/v24_optimizer_search_2026-09-10.csv"
 LR_REPORT = ROOT / "docs/reports/v24_mamba_lr_di_10day_2026-09-14.sources.json"
@@ -44,13 +47,7 @@ POLICIES = (
 )
 WINDOWS = ("swa_step02000-08000", "swa_step04000-10000", "swa_step06000-12000")
 WINDOW_LABELS = ("SWA 2k–8k", "SWA 4k–10k", "SWA 6k–12k")
-plt.rcParams.update({
-    "font.family": "DejaVu Sans", "font.size": 9,
-    "axes.labelsize": 9, "axes.titlesize": 10,
-    "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.fontsize": 8,
-    "axes.spines.top": False, "axes.spines.right": False,
-    "pdf.fonttype": 42, "ps.fonttype": 42, "savefig.facecolor": "white",
-})
+apply_style()
 
 
 def read_json(path):
@@ -129,48 +126,46 @@ def save(fig, stem, description, preview_dir):
 def format_leads(ax):
     ax.set_xlim(0, 10)
     ax.set_xticks([0, 2, 4, 6, 8, 10])
-    ax.set_xlabel("Forecast lead (days)")
+    ax.set_xlabel("Forecast lead time (days)")
     ax.grid(alpha=.18, linewidth=.6)
     ax.set_axisbelow(True)
 
 
 def exact_figure(best, preview_dir):
-    fig, axes = plt.subplots(2, 2, figsize=(6.5, 5.15))
-    fig.subplots_adjust(left=.09, right=.98, bottom=.18, top=.935,
-                        wspace=.35, hspace=.52)
+    fig, axes = plt.subplots(2, 2, figsize=(6.5, 5.2))
+    fig.subplots_adjust(left=.115, right=.975, bottom=.16, top=.93,
+                        wspace=.43, hspace=.79)
     days = np.arange(1, 41) / 4
     loss = best["original_graphcast_loss"]
     temperature = temperature_metrics(best)
     for ax, baseline in ((axes[0, 0], loss["baseline_per_step"]),
                          (axes[1, 0], temperature["rmse_baseline"])):
         ax.plot(days, baseline, color=".45", linestyle="--", linewidth=1.5,
-                label="GraphCast baseline")
+                label="GraphCast")
     curves = (loss["full_per_step"], loss["improvement_pct_per_step"],
               temperature["rmse_full"], temperature["improvement_pct_rmse"])
     for ax, values in zip(axes.flat, curves):
-        ax.plot(days, values, color="#0072B2", linewidth=1.6, label="3× Mamba LR + SWA")
-    axes[0, 0].set_ylabel("Exact GraphCast loss")
-    axes[0, 1].set_ylabel("Exact loss reduction (%)")
-    axes[1, 0].set_ylabel("2 m temperature RMSE (K)")
+        ax.plot(days, values, color="#0072B2", linewidth=1.6, label="GraphCast–Mamba")
+    axes[0, 0].set_ylabel("GraphCast loss")
+    axes[0, 1].set_ylabel("GraphCast loss\nreduction (%)")
+    axes[1, 0].set_ylabel("2 m temperature\nRMSE (K)")
     axes[1, 1].set_ylabel("RMSE reduction (%)")
     for ax in axes[:, 0]:
         ax.set_ylim(bottom=0)
     axes[0, 1].set_ylim(-2, 26)
     for ax in axes[:, 1]:
         ax.axhline(0, color=".5", linewidth=.8)
-    titles = ("(a) Forecast error", "(b) Loss reduction",
-              "(c) 2 m temperature error", "(d) RMSE reduction")
+    titles = ("(a) Forecast loss", "(b) Loss reduction",
+              "(c) 2 m temperature RMSE", "(d) 2 m temperature\nRMSE reduction")
     for ax, title in zip(axes.flat, titles):
         format_leads(ax)
         ax.set_title(title, loc="left")
     fig.legend(*axes[0, 0].get_legend_handles_labels(), loc="lower center",
-               ncol=2, frameon=False, bbox_to_anchor=(.5, .04),
+               ncol=2, frameon=False, bbox_to_anchor=(.5, .01),
                handlelength=2, columnspacing=1.2)
-    fig.text(.5, .014, r"Mamba: $d_{\mathrm{inner}}=16$, one $B,C$ group; SWA steps 500–2000",
-             ha="center", va="bottom", fontsize=7.5)
     save(fig, "exact_gc_loss", "32 matched starts, cold_full evaluation, zero initial state; "
          "40 six-hour steps. Threefold Mamba learning rate with SWA, inner dimension 16, "
-         "one B,C group, SWA steps 500–2000; "
+         "one B,C group, SWA post-warm-up updates 500–2000; "
          "reduction uses its saved paired baseline. "
          "Top: exact GraphCast loss. Bottom: 2 m temperature RMSE in kelvin and RMSE reduction. "
          "Gray dashed curves show the selected model's paired GraphCast baseline in the absolute-error panels.", preview_dir)
@@ -178,13 +173,13 @@ def exact_figure(best, preview_dir):
 
 def memory_figure(rows, full, preview_dir):
     if full:
-        fig, axes = plt.subplots(2, 3, figsize=(6.5, 4.35), sharex=True, sharey=True)
-        fig.subplots_adjust(left=.1, right=.985, bottom=.22, top=.92, wspace=.12, hspace=.28)
-        panels = [(axes[r, c], bcg, window, f"({chr(97 + 3*r+c)}) BCG = {bcg}, {WINDOW_LABELS[c]}")
+        fig, axes = plt.subplots(2, 3, figsize=(6.5, 4.7), sharex=True, sharey=True)
+        fig.subplots_adjust(left=.115, right=.975, bottom=.25, top=.88, wspace=.16, hspace=.65)
+        panels = [(axes[r, c], bcg, window, f"({chr(97 + 3*r+c)}) B,C groups: {bcg}\n{WINDOW_LABELS[c]}")
                   for r, bcg in enumerate((1, 4)) for c, window in enumerate(WINDOWS)]
     else:
-        fig, ax = plt.subplots(figsize=(6.5, 3.0))
-        fig.subplots_adjust(left=.105, right=.98, bottom=.29, top=.88)
+        fig, ax = plt.subplots(figsize=(6.5, 3.25))
+        fig.subplots_adjust(left=.12, right=.975, bottom=.34, top=.88)
         panels = [(ax, 1, WINDOWS[0], r"Temporal memory ablation ($d_{\mathrm{inner}}=16$)")]
     for ax, bcg, window, title in panels:
         for policy, label, color, linestyle in POLICIES:
@@ -199,16 +194,17 @@ def memory_figure(rows, full, preview_dir):
         format_leads(ax)
         ax.axhline(0, color=".5", linewidth=.8)
         ax.set_ylim(-42 if full else -22, 26)
-        ax.set_title(title, loc="left", fontsize=8.5 if full else 10)
+        ax.set_title(title, loc="left")
     if full:
-        for ax in axes[0]:
+        for ax in axes.flat:
             ax.set_xlabel("")
-        fig.supylabel("Approx. GraphCast loss reduction (%)", x=.015, y=.57, fontsize=9)
+        fig.supxlabel("Forecast lead time (days)", y=.15, fontsize=LABEL_SIZE)
+        fig.supylabel("GraphCast loss reduction (%)", x=.015, y=.57, fontsize=LABEL_SIZE)
     else:
-        panels[0][0].set_ylabel("Approx. GraphCast loss\nreduction (%)")
+        panels[0][0].set_ylabel("GraphCast loss\nreduction (%)")
     fig.legend(*panels[0][0].get_legend_handles_labels(), loc="lower center",
-               ncol=3, frameon=False, title="Training state / evaluation state",
-               title_fontsize=8, bbox_to_anchor=(.5, .01), columnspacing=2)
+               ncol=3, frameon=False, title="Training/forecasting memory policy",
+               title_fontsize=LEGEND_SIZE, bbox_to_anchor=(.5, .01), columnspacing=2)
     stem = "memory_reset_all" if full else "memory_reset"
     save(fig, stem, "32 matched starts; cold_full, zero initial state. "
          "Approximate loss reconstructed from saved channel RMSE, not exact GraphCast loss. "
@@ -261,9 +257,9 @@ def optimizer_figure(rows, preview_dir):
     ax.axhline(1.5, color="white", linewidth=2.5)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    cax = fig.add_axes([.27, .12, .65, .04])
+    cax = fig.add_axes([.27, .14, .65, .04])
     colorbar = fig.colorbar(im, cax=cax, orientation="horizontal", ticks=[12, 16, 20, 24])
-    colorbar.set_label("Day-10 exact GraphCast loss reduction (%)", fontsize=9)
+    colorbar.set_label("Day-10 GraphCast loss reduction (%)", fontsize=LABEL_SIZE)
     save(fig, "optimizer_sensitivity", "32 matched starts, cold_full zero-state evaluation; "
          "SWA day-10 exact GraphCast loss reductions in the frozen 2026-09-10 report. "
          "SWA 2k–8k, except starred cells use SWA 4k–8k. "

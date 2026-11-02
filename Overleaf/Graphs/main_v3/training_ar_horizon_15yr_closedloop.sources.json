@@ -1,0 +1,77 @@
+{
+  "metric": "Approximate paper-formula weighted MSE reduction reconstructed from saved channel RMSE; not exact original GraphCast loss.",
+  "formula": "100 * (1 - weighted_mse_full / weighted_mse_baseline)",
+  "label_mapping": {
+    "0": 1,
+    "4": 4,
+    "8": 8,
+    "10": 10,
+    "12": 12,
+    "16": 16,
+    "20": 20
+  },
+  "label_note": "K=1 denotes the ar_tail_K=0 teacher-forced reference.",
+  "original_generator": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/plot_kscan_15yr_closedloop.py",
+  "original_generator_sha256": "c7e51c9baae4f96c5ef2aaa17b89f39b74664a288ba2765cb18e239c1bac8911",
+  "metric_source": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-07-20-r1-K20-mem-ablate/plot_ckpt_sweep.py",
+  "metric_source_sha256": "9e48b90f94ac1367cf805ac6c2b81d319e1f6597d81468e9680c749332c660fd",
+  "normalization_source": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/data/graphcast/graphcast/stats/diffs_stddev_by_level.nc",
+  "normalization_sha256": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce",
+  "plotted_csv_sha256": "12e687eb682be408fc4cee1fd2a3ba4292d33e9bfb89d37128ea4d72c1966ad8",
+  "runs": [
+    {
+      "ar_tail_K": 0,
+      "legend_K": 1,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K0_SWA6k-11k.json",
+      "sha256": "31ca6b0e3dd67be0b3f57afaba9b080c8ac423a41f6216b247dd4038957b4978",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_markov_decomp_15yr/mdecomp_S0_K0_none_lr1e-4/v13_residual_SWA_step6k-11k.pkl"
+    },
+    {
+      "ar_tail_K": 4,
+      "legend_K": 4,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K4_SWA6k-11k.json",
+      "sha256": "584893f84eb43ae12a76c87f42b0cb8606d326892b73593763d428bdb4d7c65d",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_K4/v13_residual_SWA_step6k-11k.pkl"
+    },
+    {
+      "ar_tail_K": 8,
+      "legend_K": 8,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K8_SWA6k-11k.json",
+      "sha256": "8d71e6277951fa64e7363680e3bea850a6dd2185b52480d736e719f7e76c5b1d",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_K8/v13_residual_SWA_step6k-11k.pkl"
+    },
+    {
+      "ar_tail_K": 10,
+      "legend_K": 10,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K10_SWA6k-11k.json",
+      "sha256": "87af1867a883a86941b29d2373655c4282697742a6c1e7597ddf75ea8e6f5a85",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_K10/v13_residual_SWA_step6k-11k.pkl"
+    },
+    {
+      "ar_tail_K": 12,
+      "legend_K": 12,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K12_SWA6k-11k.json",
+      "sha256": "5c273909d118544786e7f37388f7d269b631e1230cf131565319312bddae8855",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_K12/v13_residual_SWA_step6k-11k.pkl"
+    },
+    {
+      "ar_tail_K": 16,
+      "legend_K": 16,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K16_SWA6k-11k.json",
+      "sha256": "87f1818b8d726f235d152fd3ff802d33817f64e025804682c878e6bf636b5654",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16_lr1e-4_K16/v13_residual_SWA_step6k-11k.pkl"
+    },
+    {
+      "ar_tail_K": 20,
+      "legend_K": 20,
+      "evaluation_json": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-kscan-15yr-closedloop/matched32_K20_SWA6k-11k.json",
+      "sha256": "fbba84bcc137e235b18ece058d2d7a2d62f3d5ed5f5849105cfc56a9d78d31b7",
+      "checkpoint": "/scratch/gpfs/DABANIN/lm8598/Weather_Global/results/v22_res1_sizeladder_15yr/ladder_15yr_S128_h128_di128_ds16/v13_residual_SWA_step6k-11k.pkl"
+    }
+  ],
+  "typography_validation": {
+    "values_verified_against_original_evaluation_jsons": 280,
+    "original_pdf_curve_points_verified": 280,
+    "max_original_pdf_coordinate_fit_error_pt": 1.6373138635117357e-05
+  }
+}

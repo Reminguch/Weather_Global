@@ -13,7 +13,7 @@ import pytest
 
 from src.models.mamba.v24_Ilya.metrics import ORIGINAL_GRAPHCAST_VARIABLE_WEIGHTS
 from src.models.mamba.v24_Ilya.training.config import (
-    MGDA_BACKTRACKING_DEFAULTS, load_training_config,
+    MGDA_BACKTRACKING_DEFAULTS, load_training_config, validate_resume_config,
 )
 from src.models.mamba.v24_Ilya.training.mse_amse_excess_loss import (
     build_mse_amse_excess_objectives,
@@ -137,6 +137,41 @@ def test_new_pair_config_roundtrip_freezes_direction_and_step_acceptance(tmp_pat
     assert replace(cfg, feedback_mode="baseline").feedback_mode == "baseline"
 
 
+@pytest.mark.parametrize("direction", ["mgda", "mse_control", "fixed_sum"])
+def test_full_feedback_config_preserves_window_and_rejects_changed_resume(tmp_path, direction):
+    cfg = excess_config(mgda_direction=direction, feedback_mode="closed_loop",
+                        bptt_steps=24, ar_tail_k=20, segment_steps=96)
+    assert cfg.truth_prefix_steps == 4
+    assert cfg.bptt_backend == "explicit_weather_reverse_vjp"
+    assert cfg.normalized_supervised_weights == (1 / 24,) * 24
+    path = tmp_path / "full_feedback.json"
+    path.write_text(json.dumps(cfg.to_dict()))
+    assert load_training_config(path) == cfg
+    validate_resume_config(cfg, cfg.to_dict(), completed_step=8)
+    stopped = replace(cfg, feedback_mode="closed_loop_sg")
+    with pytest.raises(ValueError, match="Resume configuration differs"):
+        validate_resume_config(cfg, stopped.to_dict(), completed_step=8)
+    with pytest.raises(ValueError, match="divisible"):
+        replace(cfg, segment_steps=100)
+    with pytest.raises(ValueError, match="ar_tail_k"):
+        replace(cfg, ar_tail_k=24)
+
+
+def test_pair_memory_contract_counts_two_sequential_weather_reverse_sweeps():
+    from src.models.mamba.v24_Ilya.training.endpoint_step import memory_contract
+    cfg = excess_config(feedback_mode="closed_loop", bptt_steps=24, ar_tail_k=20, segment_steps=96)
+    contract = memory_contract(input_frames=({"x": np.zeros((4, 2), np.float32)},) * 5,
+        static_inputs={}, truths=({"x": np.zeros((4, 2), np.float32)},) * 24,
+        residual_state={"s": np.zeros((4, 2), np.float32)}, config=cfg)
+    assert contract["graphcast_backward_calls"] == 48
+    assert contract["objective_reverse_sweeps"] == 2
+    assert contract["concurrent_weather_cotangent_tapes"] == 1
+    assert contract["teacher_input_windows"] == 4
+    assert contract["gradient_window_steps"] == contract["weather_restart_every_steps"] == 24
+    assert contract["recurrent_gradient_truncation_steps"] == 24
+    assert contract["graphcast_input_gradients"] and not contract["graphcast_parameters_trainable"]
+
+
 @pytest.mark.parametrize("changes,match", [
     ({"mgda_backtracking": None}, "post-update backtracking"),
     ({"mgda_backtracking": {"max_halvings": -1}}, "max_halvings"),
@@ -147,6 +182,8 @@ def test_new_pair_config_roundtrip_freezes_direction_and_step_acceptance(tmp_pat
     ({"mgda_backtracking": {"repeatability_repeats": 1}}, "repeatability_repeats"),
     ({"mgda_backtracking": {"repeatability_repeats": 2}}, "repeatability_repeats"),
     ({"mgda_backtracking": {"max_relative_noise": 1.}}, "max_relative_noise"),
+    ({"mgda_backtracking": {"repeatability_policy": "ignore"}}, "repeatability_policy"),
+    ({"mgda_backtracking": {"decrease_policy": "ignore"}}, "decrease_policy"),
     ({"mgda_backtracking": {"unknown": 1}}, "Unknown"),
     ({"mgda_direction": "other"}, "mgda_direction"),
     ({"amse_lambda": .5}, "unmodified lambda=1"),

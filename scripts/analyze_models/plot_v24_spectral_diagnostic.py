@@ -38,8 +38,6 @@ def plot_error_reductions(workflow, protocol, pooled, k, image_dir, data_dir):
             ax.grid(alpha=.2)
             lo, hi = ax.get_ylim()
             ax.set_ylim(min(lo, -2), max(hi, 2))
-            ax.axhspan(0, max(hi, 2), color='#009E73', alpha=.055)
-            ax.axhspan(min(lo, -2), 0, color='#D55E00', alpha=.055)
         fig.suptitle(title, fontsize=17, y=.985)
         fig.text(.5, .94, 'Positive = better than original GC · Negative = worse · Zero = original GC', ha='center', fontsize=11)
         handles, names = np.asarray(axes).ravel()[0].get_legend_handles_labels()

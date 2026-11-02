@@ -1,0 +1,95 @@
+% PROPOSED TEXT ONLY -- no manuscript files have been changed.
+% Repaired ENS scoring is complete. Independent matched-sample, pooling,
+% normalization, source-hash and figure validation passed on
+% 2026-10-19 at 01:33:16 UTC; both figures also passed a separate visual review.
+% Validated ENS-matched summary SHA256:
+% 4bd1d95067398e96c02743dbcb3195628b0097fc16c7f8e5ab6130642c0e32d3
+% Intended figures: fig5_public_checkpoints_2023_repaired_vs_ens.{pdf,png}
+% and fig9_public_checkpoints_2023_repaired_vs_ens.{pdf,png}.
+% Historical 1x3/3x4 panel layout and colors; ENS=100 line; no shading.
+% Repair protocol: a0e67b8a329c32f0d8c60880136beb17126f8130ee339eda3f3662c5a91dda76
+
+% Proposed Figure 5 caption:
+Forecast RMSE relative to the matched ECMWF IFS ensemble mean (ENS) for
+the principal GraphCast--Mamba correction M1 ($1^\circ$) and the public
+DeepMind GraphCast\_small ($1^\circ$) and GraphCast ($0.25^\circ$)
+checkpoints, evaluated on a common $1.5^\circ$ grid.
+The candidate sample contains 122 initializations at 00 UTC every third
+day from January 1 to December 30, 2023. At each diagnostic and lead,
+all four forecasts use the same ENS-available dates; sample sizes in these
+three panels range from 91 to 103. Curves show 100 times the ratio of pooled model RMSE to
+pooled ENS-mean RMSE. The horizontal line marks ENS at 100\%; lower
+values indicate lower RMSE. Panels show Z500, T2m and U850 through ten days.
+
+% Proposed Figure 9 caption:
+The ENS-relative comparison in Figure 5 extended to twelve diagnostics.
+Each plotted value uses the identical available dates for all models
+and ENS at that diagnostic and lead. The date set can vary between
+diagnostics and leads (91--108 initializations per point).
+The horizontal line denotes the matched ENS-mean RMSE at 100\%.
+
+% Proposed Appendix C methods:
+We use locally generated forecasts from the fixed principal M1 checkpoint
+and the public DeepMind GraphCast checkpoints~\citep{lam2023graphcast}.
+GraphCast\_small uses a $1^\circ$ grid, 13 pressure levels and mesh refinement
+level 5, with ERA5 training coverage of 1979--2015; the $0.25^\circ$
+checkpoint uses 37 pressure levels and mesh refinement level 6, with
+training coverage of 1979--2017. M1 is the same selected correction used
+in the principal evaluation. Forecasts start from two observed states
+six hours apart and subsequently feed back their own predictions;
+M1's recurrent state starts at zero for each forecast. Evaluation uses
+40 six-hourly leads through ten days, with candidate verification times
+extending through January 9, 2024.
+
+The ENS reference is the ECMWF IFS ensemble-mean forecast distributed
+through \href{https://weatherbench2.readthedocs.io/en/latest/data-guide.html}{WeatherBench2}
+on its conservative $240\times121$ grid. We decode available 2023 forecasts
+from the extended 2016--2024 store. Its missing Zarr metadata and coordinate
+arrays were reconstructed using the complete 2018--2022 sibling store;
+the interpretation was checked against 71 overlapping forecast chunks.
+Absent forecast chunks remain unavailable. Store paths, reconstruction
+checks and availability masks are retained with the evaluation artifacts.
+
+All forecasts are scored against the same ERA5~\citep{hersbach2020era5}
+verification fields from
+\href{https://github.com/google-research/arco-era5}{ARCO ERA5}, including
+documented repairs validated against the independently curated
+\href{https://doi.org/10.5065/BH6N-5N20}{NSF NCAR ERA5 archive}.
+Native model predictions and $0.25^\circ$ verification fields are remapped
+to the common $1.5^\circ$ grid using first-order conservative spherical-cell
+overlap with periodic longitude; the archived ENS fields already occupy
+this grid. Spatial mean squared errors use normalized cosine-latitude
+weights. For each diagnostic $d$ and lead $\ell$, let $S_{d,\ell}$ be the
+candidate initializations with an available ENS forecast. We apply this
+same set to every model and plot
+\[
+  100\,
+  \frac{\sqrt{|S_{d,\ell}|^{-1}\sum_{i\in S_{d,\ell}}
+                        \mathrm{MSE}_{m,i,d,\ell}}}
+       {\sqrt{|S_{d,\ell}|^{-1}\sum_{i\in S_{d,\ell}}
+                        \mathrm{MSE}_{\mathrm{ENS},i,d,\ell}}}.
+\]
+Thus squared errors are pooled before taking square roots and forming
+the ratio. Matching depends only on forecast availability, with
+46,930 available initialization--lead--diagnostic combinations per model
+and 91--108 initializations per plotted point. These are comparisons
+of the specified fixed models on the available matched samples; model
+architecture, pressure levels and training coverage also differ.
+
+% Editorial/provenance notes (not proposed caption text):
+% Candidate model cube:122x40x12=58,560 cells/model. ENS availability:46,930;
+% unavailable:11,630. No start has all480 ENS lead/diagnostic cells, so there
+% is no single complete date subset underlying all panels.
+% The full122 model-only bootstrap intervals do not apply automatically to
+% these availability-matched ratios; this variant presents point estimates.
+% Public ENS store:
+% https://storage.googleapis.com/weatherbench2/datasets/ifs_ens/2016-2024-240x121_equiangular_with_poles_conservative_mean.zarr/
+% Layout reference:
+% https://storage.googleapis.com/weatherbench2/datasets/ifs_ens/2018-2022-240x121_equiangular_with_poles_conservative_mean.zarr/
+% Original layout validation:71chunks; worst max-absolute difference divided
+% by maximum reference amplitude=6.743576406294185e-7.
+% This uses newly computed 2023 ENS scores, not the archived2022 benchmark.
+% Public GraphCast checkpoints are identified by their frozen hashes; no
+% equivalence to an internal WeatherBench2 GraphCast checkpoint is asserted.
+% Prior numerical-pilot exposure remains documented in the parent protocol;
+% do not describe every candidate initialization as previously unseen.

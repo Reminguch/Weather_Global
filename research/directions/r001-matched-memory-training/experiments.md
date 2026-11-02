@@ -205,7 +205,7 @@ three policies ×122 starts ×40 finite leads, raw pooled exact losses, report
 receipt and42 provenance hashes. The updated `exact_loss_primary.csv` uses
 `R_matched`, and `memory_paired_contrasts.csv` preserves the new pointwise
 contrast intervals separately from the original named-endpoint family.
-Figure6 has pointwise95% bands for all policies. All21 other figure files
+Figure6 presents all three policies. All21 other figure files
 were verified byte-identical. CSVs and source hashes accompany the figure in
 `Overleaf/Graphs/arxiv_2023/` and the usual resolution-eval output directories.
 

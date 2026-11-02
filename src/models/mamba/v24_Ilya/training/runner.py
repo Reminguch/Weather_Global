@@ -128,7 +128,8 @@ def _calibrate_initialized_training(*, config, transforms, training_data, task_c
         # the subsequent closed-loop replay checks the actual feedback trajectory.
         optimizer, _ = build_optimizer(dataclasses.replace(config, mgda_direction="mgda"))
         steps = {}
-        for mode in ("baseline", "closed_loop_sg"):
+        rollout_feedback = "closed_loop" if config.feedback_mode == "closed_loop" else "closed_loop_sg"
+        for mode in ("baseline", rollout_feedback):
             replay_config = dataclasses.replace(config, feedback_mode=mode, mgda_direction="mgda")
             steps[mode] = make_multiobjective_train_step(
                 transforms=transforms, optimizer=optimizer, baseline_params=baseline_params,
@@ -153,10 +154,10 @@ def _calibrate_initialized_training(*, config, transforms, training_data, task_c
                                                 for name, value in result.diagnostics.items()},
                                 "seconds": seconds,
                                 "acceptance_record": step.last_acceptance_record}
-                if mode == "closed_loop_sg":
+                if mode == rollout_feedback:
                     elapsed.append(seconds)
             # Carry only the unchanged parent's memory into the next batch.
-            _, state, _, _ = steps["closed_loop_sg"].forward_only(params, state, *args)
+            _, state, _, _ = steps[rollout_feedback].forward_only(params, state, *args)
             records.append(record)
             cursor = chunk.next_cursor
         return dict(version=1, kind="mse_amse_excess_qualification", passed=True,

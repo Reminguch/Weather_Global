@@ -178,10 +178,12 @@ def match_source_chunks(manifest, source) -> dict[int, dict]:
         result[item["id"]] = old
     if len(result) != len(source["chunks"]):
         raise ValueError("Aligned cache does not preserve every original train/validation chunk")
+    first_original_year = min(int(t[:4]) for item in source["chunks"] if item["split"] == "train"
+                              for t in item["target_timestamps"])
     for item in manifest["chunks"]:
         if item["id"] not in result:
-            if item["split"] != "train" or any(int(t[:4]) >= 2015 or int(t[:4]) < 1982 for t in item["target_timestamps"]):
-                raise ValueError("New cache chunks must contain only 1982–2014 training targets")
+            if item["split"] != "train" or any(int(t[:4]) >= first_original_year for t in item["target_timestamps"]):
+                raise ValueError("New cache chunks must contain only training targets earlier than the original cache")
     return result
 
 
@@ -217,11 +219,13 @@ def match_historical_chunks(manifest, historical, recent_chunks) -> dict[int, di
 def _require_prepared_ready(root, source):
     root = Path(root)
     ready = read(root / "READY.json")
+    years = ready.get("years", [])
     if ((root / ".incomplete").exists() or ready.get("status") != "complete"
-            or ready.get("years") != list(range(1982, 2023))
+            or not years or years != list(range(years[0], years[-1] + 1))
+            or years[0] >= 2015 or years[-1] != 2022
             or ready.get("metadata_sha256") != cache.sha256(root / "metadata.json")
             or ready.get("identity", {}).get("checkpoint_sha256") != source["compatibility"]["baseline_sha256"]):
-        raise ValueError("Aligned cache requires the complete matching 1982–2022 prepared store")
+        raise ValueError("Aligned cache requires the complete matching prepared store through validation year 2022")
     for relative, expected in ready.get("root_file_sha256", {}).items():
         if cache.sha256(root / relative) != expected:
             raise ValueError(f"Prepared READY root fingerprint changed: {relative}")
@@ -239,11 +243,12 @@ def _prepare_anchors(common, source):
     if cache.sha256(old_prepared / "metadata.json") != source["compatibility"]["prepared_metadata_sha256"]:
         raise ValueError("Original prepared metadata fingerprint changed")
     full_times = np.load(common.prepared_root / "coords/time.npy", allow_pickle=False)
-    for times, start, end in ((full_times, "1982-01-01", "2023-01-01"),
+    ready = _require_prepared_ready(common.prepared_root, source)
+    for times, start, end in ((full_times, f"{ready['years'][0]}-01-01", "2023-01-01"),
                               (old_times, "2015-01-01", "2023-01-01")):
         expected = np.arange(np.datetime64(start, "h"), np.datetime64(end, "h"), np.timedelta64(6, "h"))
         if not np.array_equal(times, expected):
-            raise ValueError("Data-scale campaign requires the exact 1982–2022 and 2015–2022 clocks")
+            raise ValueError("Data-scale campaign requires complete selected-year and original seven-year clocks")
     old_arrays = {name: np.load(old_root / "anchors" / f"{name}.npy", allow_pickle=False)
                   for name in ("anchor_indices", "anchor_times", "split_train", "split_val")}
     arrays, alignment = aligned_anchor_arrays(full_times, old_times, old_arrays,

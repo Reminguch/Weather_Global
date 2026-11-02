@@ -23,7 +23,7 @@ export OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-2}"
 export MPLCONFIGDIR="/tmp/mse-amse-excess-${SLURM_JOB_ID:-local}"
 mkdir -p "${MPLCONFIGDIR}"
 case "${STAGE}" in
-  qualify|train|evaluate-exact|evaluate-spectral)
+  qualify|observe|train|evaluate-exact|evaluate-spectral)
     nvidia-smi --query-gpu=timestamp,index,name,memory.used,memory.total,utilization.gpu \
       --format=csv,noheader,nounits -l 5 > "${EXPERIMENT}/logs/${STAGE}_${SLURM_JOB_ID}_${TASK}_gpu.csv" &
     MONITOR_PID=$!

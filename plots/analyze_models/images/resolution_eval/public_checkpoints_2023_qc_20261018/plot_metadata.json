@@ -2,11 +2,11 @@
   "status": "plots_regenerated_from_saved_qc_analysis",
   "summary_at_render": {
     "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/data/resolution_eval/public_checkpoints_2023_qc_20261018/summary.json",
-    "sha256": "7301ef3a0de4407144ed329b259f82cdd95014ab4edef3fbc5b4bfac5e392abc"
+    "sha256": "e45c9bac692ec8c38169ad32b673f9ab14b676b83643b2113e5b61f8f584e24e"
   },
   "plotter": {
     "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/scripts/analyze_models/plot_public_checkpoints_2023_qc.py",
-    "sha256": "5704fd88d6b85da977d084f04785cd01e003cf490e12b78ff6677ddc798d7c19"
+    "sha256": "70f728e85deebaa2589c04c0d473bcda382c7c1fc8f577e245ec01c207b6975d"
   },
   "outputs": [
     {
@@ -26,5 +26,5 @@
       "sha256": "2fe7caa6ea544c43195729e344c541eafc43dcbe00f73a554d33837d5d50147c"
     }
   ],
-  "display": "Physical-unit RMSE; no shading; detailed eligibility remains in analysis metadata."
+  "display": "Physical-unit RMSE; detailed eligibility remains in analysis metadata."
 }

@@ -2,7 +2,7 @@
 
 Category: evaluation
 Status: active
-Updated: 2026-10-18 (America/New_York)
+Updated: 2026-10-19 (America/New_York)
 Related: [matched memory training](../r001-matched-memory-training/overview.md)
 
 ## Question and hypothesis
@@ -14,12 +14,86 @@ the same 1.5° verification truth?
 
 ## Current understanding
 
-**Latest October18 result (e008):** PrincipalM1/public-checkpoint2023 previews
+**October 19 paper verification (e011):** Fresh hashes of the current GC025
+checkpoint and all three normalization files match live official DeepMind
+object metadata. Its 0.25°/37-level, mesh-6, width-512, 16-step architecture
+matches the released main-paper model. This establishes release identity,
+not reproduction of the paper's 2018 native-grid scorecard: the current
+comparison uses 2023 starts and 1.5° verification. Re-pooling the saved 122
+matched 2022 starts confirms day-3 RMSE above the unidentified DeepMind
+archive by 11.758% Z500, 11.991% T2m, 7.166% U850 and 6.744% Q700.
+The existing one-start upstream audit differs by at most 1.8431% in RMSE;
+it does not establish full numerical parity. No new forecasts were run.
+See [e011](experiments.md#e011) for the fresh audit artifact and limits.
+Follow-up reading found another protocol difference: paper Eq. 20 averages
+per-initialization spatial RMSE, whereas our WB2 comparison pools MSE before
+taking a square root. A proposed small numerical reproduction targets only
+the GraphCast Z500 curve in Figure 2a, initially at 12/24/48 h on 24
+seasonally spread 2018 starts at 06/18 UTC. This pilot is not yet run and
+would not establish full-year parity. Supplement Figure 50 provides an even
+smaller qualitative single-start check (2018-11-23 12 UTC).
+
+**October 19 figure revision:** Figure 5 now shows Q700/T2m/U850 at the
+user's request (92–105 matched starts per point); its Q700 day-10 RMSE
+reduction versus public GC025 is 7.70%. Numerical data and Figure 9 are
+unchanged. Updated captions/text and the checked PDF were pushed as `1b32b6c`.
+
+**Latest October 18 manuscript update (e010):** The user approved the
+ENS-relative previews for Figures 5/9. Section 4.4 and Appendix C now use the
+selected M1/public-checkpoint 2023 comparison. On the matched samples M1 has
+lower RMSE than public GC025 on all 12 diagnostics at every lead from 3.5 to
+10 days; day-10 reductions span 7.70–11.42% (Z500 8.48%, T2m 10.58%, U850 9.83%).
+The checkpoint audit establishes that GC025 is higher-resolution, not a
+larger-parameter model: 36.46M stored parameters versus 46.33M for M1 total.
+It uses about 16× the horizontal grid points and 37 vs 13 pressure levels.
+The user clarified that “larger” refers to memory and FLOPs. The published
+text emphasizes the larger spatial computational workload and retains the
+common-grid interpretation, without claiming measured cost ratios. The
+update was pushed to Non-Markovian-Weather/main as `098e948` after preserving
+two newer Overleaf formatting edits and checking the compiled PDF.
+
+The user requested the historical
+Figure5/9 style with an ENS baseline. Repaired 2023 ENS-relative previews are
+complete under
+`plots/analyze_models/images/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/`.
+They show100 × model RMSE / matched ENS-mean RMSE, with ENS=100 and the same
+panel layout and line colors. ENS availability permits91–108 starts per
+diagnostic/lead (91–103 in Figure5); every model uses exactly the same dates
+at each point. These are conditional subsets of the122 candidate starts,
+not a complete122-start ENS comparison. All42 available truth-affected ENS
+scores were repaired, with original scores reproduced exactly and missing
+entries preserved. Independent validation checked all187720 matched CSV
+rows and the pooling, ratios, hashes and plots. At day10, M1 is107.36%,
+107.26% and106.34% of ENS RMSE for Z500/T2m/U850 respectively: it does not
+outperform ENS at that lead. The validated full122 model-only comparison
+below remains intact; its confidence intervals are not transferred to these
+different ENS-matched subsets.
+
+**Repaired model-only comparison (e009):** Independent NCAR truth recovery, the three
+targeted reruns, the full 122-start merge and independent rescoring are complete.
+Every model has 122 samples at every lead and diagnostic. GPU jobs15802505
+and15802506 succeeded. Report job15802647 stopped at its source guard after
+a metadata-only plotter edit; a separately recorded CPU recovery completed
+without changing the plotting function or forecast results.
+The November anomaly disappears for all three models. Numerical rerun
+variation affects pooled RMSE by at most 0.02565%, separately measured from
+the truth repair. Day10 M1 physical-RMSE reductions versus public GC025 are
+7.6795–11.3843% across the twelve diagnostics, including Z500 8.4446%,
+T2m 10.2386% and U850 10.0592% on the common 1.5-degree grid.
+Previews are under
+`plots/analyze_models/images/resolution_eval/public_checkpoints_2023_repaired_20261018/`.
+Validation checked all 175680 CSV cells and independently recomputed 8640
+old/new-truth scores from 360 retained forecasts. The campaign is
+`artifacts/evaluations/graphcast_common_grid_2023_truth_repair_20261018`;
+its repaired summary hash is `dcda10d7...e4d5e81`. Manuscript incorporation
+awaits review; native GraphCast-loss repair remains separate.
+
+**Prior October18 result (e008):** PrincipalM1/public-checkpoint2023 previews
 are complete after user-approved identical data-quality handling: all122
 starts retained,121--122 paired valid samples per diagnostic/lead. The spike
 was traced to stale ARCO source fields, corroborated by raw copies and
 independent NCAR samples. Independent pooling and masked-bootstrap checks
-passed. New unshaded physical-RMSE previews are under
+passed. New physical-RMSE previews are under
 `plots/analyze_models/images/resolution_eval/public_checkpoints_2023_qc_20261018/`.
 Day10 reductions versus publicGC025 remain7.6785--11.3892% across12 diagnostics.
 At the user's request, figures/captions omit exclusion detail and methods
@@ -56,7 +130,7 @@ K22 has lower day10 RMSE on all12 diagnostics(5.465–10.465%). Z500/T2m/U850
 day10 reductions are9.388/8.120/9.866%, with sustained positive point
 estimates from days6.5/7.0/5.5. This is supplementary evidence on five
 seasonally uneven periods, not selected-M1, untouched-year or annual skill.
-The user approved incorporating the unshaded68-date figures into
+The user approved incorporating the68-date figures into
 `Overleaf/arxiv_versoin.tex`. Figures5/9, their captions, Section4.4 and
 AppendixC now document this evaluation, including the incomplete historical
 checkpoint provenance. The compiled PDF and changed pages were inspected;
@@ -125,10 +199,20 @@ Results do not answer the matched memory-training question in r001.
 
 ## Next decision
 
-Review the cleaned principalM1/public-checkpoint Figure5/9 previews and methods
-before replacing the current68-date K22 figures. The2023 truth anomaly is
-handled through documented user-approved eligibility (e008); the archive's
-precise checkpoint remains a separate unresolved provenance question (e006).
+Figure 2a's 24-start reproduction passed all 480 independent score checks
+(e012), using existing native 0.25°/37-level 2018–2019 ERA5, the verified
+public checkpoint and upstream inference. At days 1/2/3/5, mean spatial RMSE
+is within 0.8% of the approximate digitized paper curve; day 10 is 4.45% lower.
+This is a sampled check, not annual parity. Full 730-start array `15870083`
+is running; report `15870088` and corrected plot `15870456` are dependent.
+Inspect the full-year campaign's summary and plot after completion before
+concluding agreement with the paper.
+
+The approved e010 ENS-relative Figure 5/9 comparison replaces the historical
+68-date K22 figures. Broader claims require additional checkpoints, years,
+and native-scale or controlled-compute evaluation; these are not established
+by the present fixed-model comparison. The archive's precise checkpoint
+remains a separate unresolved provenance question (e006).
 If updating native-loss figures/tables, reconcile their corresponding
 data-quality sensitivity separately and consistently. Do not select
 checkpoints to reproduce an expected ranking.

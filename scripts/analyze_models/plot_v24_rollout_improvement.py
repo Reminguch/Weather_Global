@@ -76,8 +76,6 @@ def main():
     if result["eval_mode"] != "cold_full" or result["residual_state_init"] != "zero":
         raise ValueError("This figure's protocol label requires cold_full and zero state")
     ax.axhline(0, color="#8998A1", lw=1, linestyle="--")
-    ax.fill_between(days, 0, improvement, where=improvement >= 0, interpolate=True, color=blue, alpha=.10)
-    ax.fill_between(days, 0, improvement, where=improvement < 0, interpolate=True, color=red, alpha=.20)
     ax.plot(days, improvement, color=blue, lw=2.4)
     ax.scatter(days, improvement, color=blue, s=12, zorder=3)
     for day, offset, align in ((2, (2, -25), "center"), (5, (-8, 16), "right"),

@@ -1,0 +1,114 @@
+# Main v3 figures
+
+The additional fifteen-year ablation appendix uses
+[`ablation_15yr/additional_ablations_15yr.pdf`](ablation_15yr/additional_ablations_15yr.pdf).
+Its original two figures, frozen numerical data, plotting generator, source
+hashes, and interpretation notes are in
+[`ablation_15yr/README.md`](ablation_15yr/README.md). These experiments are
+separate from the principal seven-year RMSE and exact-loss studies below.
+
+## Seven-year RMSE figure
+
+Rebuild the active v3 heatmap and channel-coverage figure from the repository root:
+
+```bash
+source scripts/graphcast_env.sh
+python Overleaf/Graphs/main_v3/generate_7yr.py
+```
+
+The selected V24 correction is trained on ERA5 2015–2021, with inner dimension
+16, spatial width 512, two message-passing steps, threefold Mamba learning rate,
+and SWA at post-warm-up updates 500/1000/1500/2000. The frozen pretrained
+GraphCast checkpoint supplies the paired baseline, labeled GraphCast in the
+paper. This is the same correction and
+32-start 2022 development evaluation as the main exact-loss figure.
+
+## Active outputs
+
+- `common_grid_three_panels.pdf`: one row of Z500, T2m, and U850 panels for
+  the main-text comparison with the higher-resolution GraphCast reference.
+  Rebuild this and the full appendix `../add_mamba.pdf` from the repository
+  root with `python Overleaf/tools/rebuild_common_grid_figures.py` after
+  activating `scripts/graphcast_env.sh`. The script needs PyMuPDF, Pillow,
+  NumPy, and Matplotlib. In this workspace PyMuPDF is available with
+  `PYTHONPATH=/tmp/physics-pdf-audit-tools`.
+  Both PDFs are exactly 6.5 inches wide; shared axis labels are 9 pt,
+  ticks and shared legends are 9 pt, and panel titles are 11 pt. The common
+  styles come from `../paper_style.py`. Shared axis labels and fewer y tick
+  labels reserve room for larger text without changing the axes' ranges.
+  The only archived curve source is a raster image embedded in
+  `../../tools/figure_label_sources/Graphs/add_mamba.pdf`; panel crops remain
+  embedded at their original pixel resolution, with new vector text and
+  reinforced vector borders. The appendix retains its small original legend
+  inset because its semitransparent background overlaps early Z500 peak tips;
+  the readable shared legend provides the same key above the panels. Its
+  existing terminology boxes are the only modified source-pixel regions.
+  The selected-panel figure retains exactly the previous TeX figure's white
+  legend mask, without reconstructing the data obscured by that baked-in
+  legend. `../../tools/common_grid_typography.json` records source/crop
+  hashes, exact PDF embedding checks, font sizes, and unchanged pixels
+  outside the existing annotation regions. The old TeX entry point is now
+  an instruction-only stub, preventing it from overwriting this layout.
+- `overview_7yr_heatmap.pdf` / `.png` and `overview_7yr_coverage.pdf` / `.png`:
+  compact panels for Figure 1(b,c), beneath the temporal rollout diagram.
+  They use exactly the same data as `breadth_7yr`, with the GraphCast
+  baseline named explicitly; LaTeX supplies the panel letters and captions.
+- `breadth_7yr.pdf` and `.png`: 11-variable RMSE-reduction heatmap at days 5–10
+  and counts of improved channels across all 40 six-hour leads, retained as
+  the standalone version of the overview results.
+- `breadth_7yr_all_leads.csv`: absolute baseline/model group RMSEs and reductions.
+- `breadth_7yr_channels.csv`: corresponding results for all 83 channels.
+- `breadth_7yr_channel_counts.csv`: counts used in the coverage panel.
+- `seven_year_day10.csv`: the same checkpoint's day-ten group reductions on the
+  32-start development set and eight-date 2023 pilot, reported separately.
+- `provenance_7yr.json`: source paths, hashes, checkpoint identity, forecast
+  starts, training metadata sources, metric definition, and numerical findings.
+
+All 11 variable groups improve at each six-hour lead from 120 to 240 h.
+Day-ten reductions range from 10.21% to 17.06%. The channel count is 78 at day
+five, 81 at day seven, 83 at 216–228 h, and 82 at day ten. The day-ten exception
+is 50 hPa geopotential, with a 1.62% RMSE increase.
+
+## Metric and validation
+
+Reduction is `100 * (1 - rmse_full / rmse_baseline)`. Group errors pool physical
+squared errors across starts with cosine-latitude weights and equally across
+pressure levels before taking the square root. Channel counts test each level
+separately. These are RMSE reductions, distinct from exact GraphCast loss.
+
+The generator checks complete sample counts, cold full-feedback evaluation,
+zero initial memory, state carry, matching checkpoint and baseline identities,
+finite RMSEs, all saved reduction percentages, group pooling from channels,
+and the reported coverage and exception. The 2022 starts were used for model
+selection; the 2023 pilot contains only eight dates. No confidence intervals or
+significance claims are inferred from these aggregate summaries.
+
+Figure 6 uses `memory_reset_main_model.pdf`, generated by
+`generate_memory_comparison.py`. Its carry/carry curve is the principal model's
+exact GraphCast loss reduction (23.6831% at day 10), identical to the top-right
+panel of `../main_v2/exact_gc_loss.pdf`. Carry/reset and reset/reset retain the
+original approximate curves (9.2419% and 12.9072% at day 10). These controls use
+separate training runs, not the principal model's weights. The adjacent CSV
+freezes all 120 plotted values; `.sources.json` records source hashes and the
+verification of matching 32 forecast starts. The historical matched-policy
+figure remains `../main_v2/memory_reset.pdf`, with approximate carry/carry
+reduction of 22.5235%, documented in `../main_v2/figure_sources.json`.
+
+Earlier generators and unused figure assets are retained for provenance; the
+active manuscript uses the outputs listed here. No forecast evaluation or Slurm
+submission is required to regenerate them.
+
+## Closed-loop training horizon
+
+Rebuild `training_ar_horizon_15yr_closedloop.pdf` and its PNG preview with
+`python Overleaf/Graphs/main_v3/plot_training_ar_horizon_15yr.py` after sourcing
+`scripts/graphcast_env.sh`. The adjacent CSV freezes all 280 original plotted
+values, with actual `ar_tail_K=0` represented by the original legend label
+`K=1`. Its sources JSON records the original plotting script, evaluation JSON
+hashes, normalization statistics, and verification against the original vector
+PDF. This approximate historical metric and every curve are unchanged. A vertical dashed line at 20 × 6 = 120 h (5 days) marks the K=20 forecast-feedback training tail, matching the open-loop figure. The K=20 gains remain positive beyond this duration through day 10; the line does not mark the full training window or retained memory history.
+
+The generator uses `../paper_style.py`: 9 pt axis labels, ticks and
+legends, on the 6.5-inch export canvas; see `../FIGURE_TYPOGRAPHY.md` for
+the final ICLR display sizes. The larger margins and wrapped
+vertical label prevent clipping, including the final day-ten tick.

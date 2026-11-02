@@ -3,12 +3,11 @@
 Two normalizations are written:
 
 * RMSE relative to the paired GraphCast (1°) baseline on all 122 starts, from
-  the frozen campaign summary. The blue band is the paired five-start-block
-  bootstrap 95% interval for GraphCast–Mamba versus that baseline.
+  the frozen campaign summary.
 * RMSE relative to the IFS ENS mean, as in the archived figures. ENS scores
   come from score_ens_common_grid_2023.py; its source store lacks some chunks,
   so each (diagnostic, lead) pools every model over exactly the starts that
-  have ENS data. No interval is drawn for this version.
+  have ENS data.
 
     python scripts/analyze_models/plot_common_grid_2023.py
 """
@@ -23,7 +22,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,9 +92,6 @@ def plot_panel(ax, days, curves, j, label):
         ax.plot(days, curves["gc1"][:, j], color=GRAY, lw=1.5, ls="--")
     else:
         ax.axhline(100, color=GRAY, lw=1.5, ls="--")
-    if "m1_lo" in curves:
-        ax.fill_between(days, curves["m1_lo"][:, j], curves["m1_hi"][:, j],
-                        color=BLUE, alpha=.18, lw=0)
     ax.plot(days, curves["gc025"][:, j], color=GREEN, lw=1.7)
     if "m1" in curves:
         ax.plot(days, curves["m1"][:, j], color=BLUE, lw=1.7)
@@ -106,16 +101,13 @@ def plot_panel(ax, days, curves, j, label):
     ax.set_title(label, pad=5)
 
 
-def shared_legend(fig, y, *, band, mamba=True):
+def shared_legend(fig, y, *, mamba=True):
     handles = [Line2D([], [], color=BLUE, lw=1.7),
                Line2D([], [], color=GRAY, lw=1.5, ls="--"),
                Line2D([], [], color=GREEN, lw=1.7)]
     labels = ["GraphCast–Mamba", "GraphCast", "GraphCast (0.25°)"]
     if not mamba:
         handles, labels = handles[1:], labels[1:]
-    if band:
-        handles.append(Patch(color=BLUE, alpha=.18, lw=0))
-        labels.append("95% interval")
     return fig.legend(handles, labels,
         loc="upper center", bbox_to_anchor=(.52, y), ncol=len(labels),
         frameon=False, handlelength=2.1, handletextpad=.5,
@@ -131,11 +123,11 @@ def write_figure(path, days, curves, diagnostics, labels, *, full, ylabel):
                             wspace=.39, hspace=.53)
         fig.suptitle("2023 forecasts on the common 1.5° verification grid",
                      x=.52, y=.994)
-        shared_legend(fig, .937, band="m1_lo" in curves, mamba="m1" in curves)
+        shared_legend(fig, .937, mamba="m1" in curves)
     else:
         fig.subplots_adjust(left=.112, right=.988, bottom=.265, top=.80,
                             wspace=.29)
-        shared_legend(fig, .985, band="m1_lo" in curves, mamba="m1" in curves)
+        shared_legend(fig, .985, mamba="m1" in curves)
     for ax, label in zip(axes.flat, labels, strict=True):
         plot_panel(ax, days, curves, diagnostics.index(label), label)
     fig.supxlabel("Forecast lead time (days)", x=.55,
@@ -184,7 +176,6 @@ def main():
                    "ens": ("RMSE / IFS ENS-mean RMSE; per (diagnostic, lead) every model "
                            "is pooled over the starts with ENS data"),
                },
-               "interval": "gc version only: primary paired 5-start-block bootstrap, M1 vs GC1",
                "ens_starts_per_diagnostic_lead": {
                    d: count[:, j].tolist() for j, d in enumerate(diagnostics)},
                "ens_starts_min_max": [int(count.min()), int(count.max())],

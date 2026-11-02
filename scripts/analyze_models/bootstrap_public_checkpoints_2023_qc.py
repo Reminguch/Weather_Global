@@ -66,7 +66,6 @@ def main():
         'bootstrap': settings, 'analyses': analyses,
         'method': 'Same paired nonwrapping block draws as original analysis; invalid truth cells have zero weight for every model, with a separate eligible denominator for each draw, lead, and diagnostic.',
         'interpretation': 'Pointwise 95% percentile intervals conditional on fixed checkpoints, the 2023 sample, and documented truth exclusions; no training-seed or simultaneous-coverage claim.',
-        'plot_shading': False,
         'sources': sources + [identity(summary_path), identity(audit_path), identity(__file__),
                               identity(ROOT / 'scripts/experiments/run_common_grid_2023.py')],
     }

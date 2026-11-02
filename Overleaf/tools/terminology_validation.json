@@ -1,0 +1,25 @@
+{
+  "main_v2.tex": {
+    "reported_percentages_preserved": true,
+    "equations_preserved_except_approved_names": true,
+    "collaborator_annotations_preserved": true,
+    "undefined_references": []
+  },
+  "main_v3.tex": {
+    "reported_percentages_preserved": true,
+    "equations_preserved_except_approved_names": true,
+    "collaborator_annotations_preserved": true,
+    "undefined_references": []
+  },
+  "introduction_draft.tex": {
+    "reported_percentages_preserved": true,
+    "equations_preserved_except_approved_names": true,
+    "collaborator_annotations_preserved": true,
+    "undefined_references": []
+  },
+  "figures": {
+    "checked_pdf_count": 17,
+    "pixels_changed_outside_label_regions": 0
+  },
+  "scope": "Terminology and notation; forecast arrays and reported results unchanged."
+}

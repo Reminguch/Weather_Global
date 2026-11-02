@@ -134,6 +134,75 @@ def test_download_gate_budget_follows_observed_slow_download(flow):
     assert '--qos=vlong' in campaign.dry_run(flow)['first_command']
 
 
+def test_selected_twenty_year_producer_pins_years_paths_and_endpoint(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    template = campaign.read(campaign.ROOT / campaign.TEMPLATE)
+    template["data"]["baseline_checkpoint"] = "baseline.npz"
+    template["data"]["stats_dir"] = "stats"
+    campaign.write(workspace / campaign.TEMPLATE, template)
+    (workspace / "baseline.npz").write_bytes(b"checkpoint")
+    (workspace / "stats").mkdir()
+    (workspace / "stats/normalization.nc").write_bytes(b"stats")
+    download = workspace / "download.json"
+    campaign.write(download, {"status": "complete", "start_year": 1982, "end_year": 2022,
+                             "output": str(workspace / "source.zarr"), "source_sha256": "download"})
+    def freeze(_, destination):
+        destination.mkdir()
+        return {"source_digest": "snapshot"}
+    monkeypatch.setattr(campaign, "freeze_source", freeze)
+    monkeypatch.setattr(campaign, "verify_source", lambda _: {"source_digest": "snapshot"})
+    options = dict(workspace=workspace, download_status=download, stop_after="cache_verify",
+                   training_start_year=2002)
+    flow = campaign.prepare(tmp_path / "campaign20", **options)
+    assert flow["years"] == flow["prepared_years"] == list(range(2002, 2023))
+    assert flow["training_years"] == [2002, 2021] and flow["train_years"] == list(range(2002, 2022))
+    assert flow["validation_year"] == 2022 and flow["val_years"] == [2022]
+    assert "prepared_stream_2002_2022" in flow["paths"]["prepared_root"]
+    assert "gcsmall_2002_2022" in flow["paths"]["cache_root"]
+    assert flow["paths"]["download_status"] == str(download)
+    assert flow["gpu_kinds"] == ["full"] and flow["gpu_partition"] == "auto"
+    estimate = flow["storage_estimate"]
+    assert 1.48 < (sum(estimate.values()) + flow["storage_reserve_bytes"]) / 1024**4 < 1.51
+    assert flow["numerical_policy"] == "advisory" and flow["init_from"] is None
+    assert campaign.prepare(tmp_path / "campaign20", **options) == flow
+    with pytest.raises(ValueError, match="selected years"):
+        campaign.prepare(tmp_path / "campaign20", **{**options, "training_start_year": 2001})
+    preview = campaign.dry_run(flow)
+    assert "--time=5" in preview["first_command"]
+    assert "prepare_years[21]" in preview["stages"] and "cache_full" in preview["stages"]
+    assert preview["stages"][-1] == "cache_verify"
+    gpu = campaign.sbatch_args(flow, "cache_full", campaign.spec("cache_pilot", constraint="gpu40&nomig"))
+    assert not any(item.startswith("--partition=") for item in gpu)
+    assert "--gres=gpu:1" in gpu and "--job-name=c20-cache_full" in gpu and "--qos=gpu-short" in gpu
+
+
+def test_twenty_year_preparation_releases_only_selected_annual_tasks(flow, monkeypatch):
+    flow["years"] = list(range(2002, 2023))
+    path = Path(flow["root"]) / "state.json"
+    state = campaign.read(path)
+    state["jobs"]["prepare_pilot"] = {"job_id": "123"}
+    campaign.write(path, state)
+    calls = []
+    def record(_, key, spec, **options):
+        calls.append((key, spec, options))
+        return "456"
+    monkeypatch.setattr(campaign, "submit_job", record)
+    campaign.advance(flow, "prepare_pilot", campaign.spec("prepare_pilot"),
+                     {"peak_host_gib": 12., "slowest_year_seconds": 1200.})
+    assert calls[0][0] == "prepare_years" and calls[0][1]["array"] == 21
+    assert calls[1][2]["dependencies"] == ["456"]
+
+
+def test_twenty_year_cache_rejects_old_training_targets():
+    flow = {"training_years": [2002, 2021], "validation_year": 2022}
+    manifest = {"chunks": [{"split": "train", "target_timestamps": ["2002-01-01T12:00"]},
+                           {"split": "val", "target_timestamps": ["2022-01-01T12:00"]}]}
+    assert campaign.verify_target_split(manifest, flow)["train_chunks"] == 1
+    manifest["chunks"][0]["target_timestamps"] = ["2001-12-31T18:00"]
+    with pytest.raises(ValueError, match="2002–2021"):
+        campaign.verify_target_split(manifest, flow)
+
+
 def test_precompute_endpoint_stops_after_cache_and_rejects_training(flow, monkeypatch):
     flow["stop_after"] = "cache_verify"
     path = Path(flow["root"]) / "state.json"

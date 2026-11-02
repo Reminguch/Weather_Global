@@ -1,0 +1,12 @@
+variable,label,development_2022,pilot_2023
+geopotential,Geopotential,10.205894907145275,11.28777139660857
+temperature,Temperature,11.221341569378762,10.31648792459886
+specific_humidity,Specific humidity,12.8324163661911,11.72492834612009
+u_component_of_wind,Zonal wind,13.347059471703771,11.646625371540997
+v_component_of_wind,Meridional wind,13.664299088876975,11.202062430416404
+vertical_velocity,Pressure vertical velocity,11.59672066501537,6.429876280496282
+10m_u_component_of_wind,10 m zonal wind,17.05579939552635,12.141606640310298
+10m_v_component_of_wind,10 m meridional wind,15.179456093145017,12.301029230319072
+2m_temperature,2 m temperature,10.98155677364655,12.655077333728427
+mean_sea_level_pressure,Mean sea-level pressure,12.423800565028543,7.949572221295432
+total_precipitation_6hr,6 h accumulated precipitation,13.437579261207533,9.295165960597618

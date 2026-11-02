@@ -1,0 +1,202 @@
+{
+  "generator_sha256": "d2930705294b813a13a53f98f7295d7b8ce47db37da3a46a2695ae2965817ea2",
+  "formula": "100*(1-rmse_full/rmse_baseline)",
+  "metric": "cosine-latitude-weighted RMSE reduction; not GraphCast loss",
+  "group_aggregation": "mean of physical-unit squared errors over starts and equally over pressure levels, then square root",
+  "correction_training_years": [
+    2015,
+    2021
+  ],
+  "training_sources": {
+    "scripts/experiments/run_v24_res1_batch4_lr.py": "d497d2af846204aa26665eb03a940361d08ccb1208bcaf96afd6aca4c7c3615d",
+    "artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/run_config.json": "2daf51a5077efa8b0f00d7140f7fc4e256f323993a7aa8e14dfeccff0295c0f0"
+  },
+  "sources": {
+    "development_2022": {
+      "path": "artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/eval/cold_full_zero_exact_gc/matched32/swa_step00500-02000.json",
+      "sha256": "ad5018e4797f93d3ec9e6a8d5655709ac5da0da829a482cd95330ccca02fc1fb",
+      "ckpt": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/swa/swa_step00500-02000.pkl",
+      "chosen_idx": [
+        4,
+        23,
+        47,
+        57,
+        104,
+        241,
+        246,
+        369,
+        384,
+        422,
+        548,
+        693,
+        699,
+        751,
+        771,
+        774,
+        836,
+        870,
+        873,
+        893,
+        930,
+        1006,
+        1017,
+        1065,
+        1117,
+        1130,
+        1161,
+        1181,
+        1191,
+        1256,
+        1294,
+        1338
+      ],
+      "evaluated_samples": 32
+    },
+    "pilot_2023": {
+      "path": "plots/analyze_models/data/resolution_eval/res1_spectral_pilot_2023_20260917/models/M1/evaluation.json",
+      "sha256": "96f34b392e42c350b49ef705a8623f0b63069ca3ff3643a4e36bd3d716a4a8f0",
+      "ckpt": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/swa/swa_step00500-02000.pkl",
+      "chosen_idx": [
+        1,
+        125,
+        361,
+        481,
+        725,
+        849,
+        1093,
+        1217
+      ],
+      "evaluated_samples": 8
+    }
+  },
+  "findings": {
+    "all_groups_improve_from_120h": true,
+    "all_channels_improve_at_hours": [
+      216,
+      222,
+      228
+    ],
+    "channel_counts": [
+      76,
+      57,
+      24,
+      22,
+      23,
+      19,
+      19,
+      22,
+      21,
+      18,
+      23,
+      38,
+      56,
+      64,
+      73,
+      73,
+      74,
+      76,
+      79,
+      78,
+      78,
+      79,
+      80,
+      81,
+      81,
+      81,
+      81,
+      81,
+      81,
+      81,
+      81,
+      81,
+      81,
+      82,
+      82,
+      83,
+      83,
+      83,
+      82,
+      82
+    ],
+    "day10_nonimproving_channels": {
+      "geopotential_level50": -1.6210713375861108
+    },
+    "day5_group_reduction_range_pct": [
+      2.2320365403374343,
+      5.775122359227236
+    ],
+    "day10_group_reduction_range_pct": [
+      10.205894907145275,
+      17.05579939552635
+    ]
+  },
+  "day10_variable_rmse_reduction_pct": [
+    {
+      "variable": "geopotential",
+      "label": "Geopotential",
+      "development_2022": 10.205894907145275,
+      "pilot_2023": 11.28777139660857
+    },
+    {
+      "variable": "temperature",
+      "label": "Temperature",
+      "development_2022": 11.221341569378762,
+      "pilot_2023": 10.31648792459886
+    },
+    {
+      "variable": "specific_humidity",
+      "label": "Specific humidity",
+      "development_2022": 12.8324163661911,
+      "pilot_2023": 11.72492834612009
+    },
+    {
+      "variable": "u_component_of_wind",
+      "label": "Zonal wind",
+      "development_2022": 13.347059471703771,
+      "pilot_2023": 11.646625371540997
+    },
+    {
+      "variable": "v_component_of_wind",
+      "label": "Meridional wind",
+      "development_2022": 13.664299088876975,
+      "pilot_2023": 11.202062430416404
+    },
+    {
+      "variable": "vertical_velocity",
+      "label": "Pressure vertical velocity",
+      "development_2022": 11.59672066501537,
+      "pilot_2023": 6.429876280496282
+    },
+    {
+      "variable": "10m_u_component_of_wind",
+      "label": "10 m zonal wind",
+      "development_2022": 17.05579939552635,
+      "pilot_2023": 12.141606640310298
+    },
+    {
+      "variable": "10m_v_component_of_wind",
+      "label": "10 m meridional wind",
+      "development_2022": 15.179456093145017,
+      "pilot_2023": 12.301029230319072
+    },
+    {
+      "variable": "2m_temperature",
+      "label": "2 m temperature",
+      "development_2022": 10.98155677364655,
+      "pilot_2023": 12.655077333728427
+    },
+    {
+      "variable": "mean_sea_level_pressure",
+      "label": "Mean sea-level pressure",
+      "development_2022": 12.423800565028543,
+      "pilot_2023": 7.949572221295432
+    },
+    {
+      "variable": "total_precipitation_6hr",
+      "label": "6 h accumulated precipitation",
+      "development_2022": 13.437579261207533,
+      "pilot_2023": 9.295165960597618
+    }
+  ],
+  "uncertainty": "Descriptive aggregate scores; no confidence intervals or significance claims. Development starts were used for model selection; the pilot contains eight dates."
+}

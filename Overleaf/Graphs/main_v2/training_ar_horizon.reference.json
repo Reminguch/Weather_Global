@@ -1,0 +1,13 @@
+{
+  "reference_type": "vertical training-tail duration marker",
+  "ar_tail_K": 20,
+  "step_hours": 6,
+  "lead_hours": 120,
+  "lead_days": 5.0,
+  "display_label": "K=20: 120 h (5 days)",
+  "shared_y_limits": [
+    -12,
+    28
+  ],
+  "interpretation": "Marks the forecast-feedback training tail for K=20, not the full training window or memory history. Other K curves have their own tail durations."
+}

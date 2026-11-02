@@ -1,0 +1,46 @@
+{
+  "source": "presentation/02_correction_branch.pptx",
+  "backup": "artifacts/figure-edits/20260925T173406Z_ppt_font_resync",
+  "renderer": "LibreOffice 25.8.7.3",
+  "changes": [
+    "Branch upper memory: 18 pt base, 10.8 pt scripts; all other branch objects unchanged",
+    "Rollout model labels: 7 pt; rendered subscripts: 4.9 pt",
+    "Rollout memory and correction labels: 7 pt with 4.9 pt subscripts",
+    "Correction indices: c_1, c_2, c_3",
+    "49 lower rollout objects verified byte-for-byte unchanged; all 3 existing media files preserved"
+  ],
+  "pdfs": [
+    {
+      "path": "Overleaf/Pics/gc_mamba_architecture/02_correction_branch.pdf",
+      "slide": 1,
+      "crop": [
+        42.0,
+        5.0,
+        1103.5,
+        230.5
+      ],
+      "sha256": "0432cb6fb19c94579a1c21e49a6ead2f65a66220009d1030413b7339fdf5ea0d"
+    },
+    {
+      "path": "Overleaf/Pics/gc_mamba_architecture/03_temporal_rollout.pdf",
+      "slide": 2,
+      "crop": [
+        309.5,
+        11.0,
+        838.0,
+        238.0
+      ],
+      "sha256": "03db2029e37eb7a3833f61feb9d1686dfa49752a6faf4f33387964984795e6c5"
+    }
+  ],
+  "pptx_sha256": "5c7c079233ca0b903e6a21245aa7e32045f5696df8ae108a6780c4b2d7266d16",
+  "previous_font_update": {
+    "backup": "artifacts/figure-edits/20260925T170450Z",
+    "pptx_sha256": "66930279088c7af0a43dbb6a73fb6788a991e644961ce8ce0b27e34f42010fe1"
+  },
+  "source_before_resync_sha256": "e81a4db038a4a473699ed19e70a3a13f010426026ce086c7db47ab6c8b63fa2a",
+  "resynced_at": "2026-09-25T17:36:59.549186+00:00",
+  "pdfs_exported_from_pptx_sha256": "66930279088c7af0a43dbb6a73fb6788a991e644961ce8ce0b27e34f42010fe1",
+  "pdf_note": "Listed published PDFs are the earlier font-update exports. This resync applies the same fonts to the later manually edited PowerPoint; published PDFs were not changed.",
+  "validation": "Updated PPTX reopened; both slides rendered with LibreOffice and visually inspected. Native PowerPoint rendering is not available on this host."
+}

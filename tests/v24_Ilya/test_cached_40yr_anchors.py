@@ -10,8 +10,8 @@ from scripts.experiments import run_v24_cached_40yr as campaign
 from src.models.graphcast.training.core import model
 
 
-@pytest.fixture
-def anchored(tmp_path, monkeypatch):
+@pytest.fixture(params=(1982, 2002))
+def anchored(tmp_path, monkeypatch, request):
     source = tmp_path / "source.zarr"
     source.mkdir()
     (source / ".zmetadata").write_text("{}")
@@ -19,12 +19,13 @@ def anchored(tmp_path, monkeypatch):
     checkpoint.write_bytes(b"pinned checkpoint")
     prepared = tmp_path / "prepared"
     (prepared / "coords").mkdir(parents=True)
-    times = pd.date_range("1982-01-01", "2022-12-31 18:00", freq="6h").values
+    selected_years = list(range(request.param, 2023))
+    times = pd.date_range(f"{request.param}-01-01", "2022-12-31 18:00", freq="6h").values
     np.save(prepared / "coords/time.npy", times)
     campaign.write(prepared / "metadata.json", {"source_data_path": str(source),
                                                  "checkpoint_sha256": campaign.sha(checkpoint)})
     campaign.write(prepared / "READY.json", {"metadata_sha256": campaign.sha(prepared / "metadata.json"),
-        "years": campaign.YEARS, "status": "complete", "identity": {
+        "years": selected_years, "status": "complete", "identity": {
             "checkpoint_sha256": campaign.sha(checkpoint), "source_metadata_sha256": campaign.sha(source / ".zmetadata")},
         "root_file_sha256": {"coords/time.npy": campaign.sha(prepared / "coords/time.npy")}})
     target = tmp_path / "anchors"
@@ -43,7 +44,8 @@ def anchored(tmp_path, monkeypatch):
         "n_anchors_train": len(train), "n_anchors_val": len(val), "source_time_start": str(times[0]),
         "source_time_end": str(times[-1]), "campaign_prepared_metadata_sha256": campaign.sha(prepared / "metadata.json"),
         "campaign_baseline_checkpoint_sha256": campaign.sha(checkpoint), "campaign_workflow_id": "workflow"})
-    flow = {"workflow_id": "workflow", "paths": {"source_zarr": str(source), "prepared_root": str(prepared),
+    flow = {"workflow_id": "workflow", "years": selected_years, "training_years": [request.param, 2021],
+            "validation_year": 2022, "paths": {"source_zarr": str(source), "prepared_root": str(prepared),
             "baseline_checkpoint": str(checkpoint), "anchor_root": str(target)},
             "assets": {str(checkpoint): campaign.sha(checkpoint)}}
     return flow, target

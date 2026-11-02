@@ -20,13 +20,13 @@ from src.models.mamba.v24_Ilya.training.endpoint_step import (
 )
 
 
-def config(steps=4, loss_mode="all_steps", batch=1, reset=False):
-    sparse = {"supervised_horizons": (1, steps), "supervised_weights": (1., 3.)} if loss_mode == "sparse_steps" else {}
+def config(steps=4, loss_mode="all_steps", batch=1, reset=False, prefix=1):
+    sparse = {"supervised_horizons": (1, steps - prefix + 1), "supervised_weights": (1., 3.)} if loss_mode == "sparse_steps" else {}
     return V24IlyaTrainConfig(
         prepared_root=Path("prepared"), anchor_manifest_root=Path("anchors"),
         baseline_checkpoint=Path("baseline"), output_root=Path("output"), run_name="feedback-test",
         architecture=V24IlyaArchitectureConfig(width=4), segment_steps=steps,
-        bptt_steps=steps, ar_tail_k=steps - 1, feedback_mode="closed_loop",
+        bptt_steps=steps, ar_tail_k=steps - prefix, feedback_mode="closed_loop",
         loss_kind="mse_fp32", loss_mode=loss_mode, precision="fp32",
         temporal_state_policy="reset_every_anchor" if reset else "carry",
         distributed=V24IlyaDistributedConfig(per_device_batch_size=batch), **sparse,
@@ -41,7 +41,8 @@ def dataset(value, batch=1, name="x", hour=0):
 
 def arguments(cfg):
     batch = cfg.distributed.per_device_batch_size
-    frames = tuple(xr.merge([dataset([v, -.4 * v], batch), dataset([.1, -.2], batch, "forcing")]) for v in (1., 2.))
+    frames = tuple(xr.merge([dataset([v, -.4 * v], batch), dataset([.1, -.2], batch, "forcing")])
+                   for v in range(1, cfg.truth_prefix_steps + 2))
     truths = tuple(dataset([1.2 + i * .1, -.7 + i * .02], batch, hour=6) for i in cfg.supervised_step_indices)
     return (jax.random.split(jax.random.PRNGKey(1), cfg.bptt_steps), frames, xr.Dataset(), truths,
             tuple(dataset([.1, -.2], batch, "forcing", 6) for _ in range(cfg.bptt_steps)))
@@ -105,7 +106,7 @@ def reference(params, initial_state, baseline, cfg, args, *, stop_baseline_input
             losses.append(scale * jnp.mean((prediction - truth) ** 2))
         if reset:
             state = jnp.zeros_like(state)
-        if index < cfg.bptt_steps - 1:
+        if cfg.truth_prefix_steps - 1 <= index < cfg.bptt_steps - 1:
             weather.append(prediction)
     components = jnp.stack(losses)
     return jnp.dot(components, jnp.asarray(cfg.normalized_supervised_weights)), ({"s": state}, components)
@@ -127,12 +128,13 @@ def assert_close(actual, expected, *, rtol=3e-5, atol=2e-6):
         np.testing.assert_allclose(left, right, rtol=rtol, atol=atol)
 
 
-@pytest.mark.parametrize("steps,mode,batch,reset", [
-    (2, "last_step", 1, False), (4, "all_steps", 4, False),
-    (8, "sparse_steps", 1, False), (4, "all_steps", 1, True),
+@pytest.mark.parametrize("steps,mode,batch,reset,prefix", [
+    (2, "last_step", 1, False, 1), (4, "all_steps", 4, False, 1),
+    (8, "sparse_steps", 1, False, 1), (4, "all_steps", 1, True, 1),
+    (8, "sparse_steps", 1, False, 4), (24, "all_steps", 1, False, 4),
 ])
-def test_streaming_feedback_matches_direct_ad_and_validation(steps, mode, batch, reset):
-    cfg = config(steps, mode, batch, reset)
+def test_streaming_feedback_matches_direct_ad_and_validation(steps, mode, batch, reset, prefix):
+    cfg = config(steps, mode, batch, reset, prefix)
     params, state, baseline = values(cfg)
     baseline_copy = jax.tree_util.tree_map(lambda value: np.array(value, copy=True), baseline)
     args, kwargs = arguments(cfg), factories(cfg, baseline)
@@ -152,8 +154,9 @@ def test_streaming_feedback_matches_direct_ad_and_validation(steps, mode, batch,
     assert_close(baseline, baseline_copy, rtol=0, atol=0)
 
 
-def test_feedback_gradient_passes_finite_differences_and_includes_baseline_inputs():
-    cfg = config(4, "last_step")
+@pytest.mark.parametrize("steps,prefix", [(4, 1), (8, 4)])
+def test_feedback_gradient_passes_finite_differences_and_includes_baseline_inputs(steps, prefix):
+    cfg = config(steps, "last_step", prefix=prefix)
     params, state, baseline = values(cfg)
     args = arguments(cfg)
     objective = make_bptt_objective(**factories(cfg, baseline))

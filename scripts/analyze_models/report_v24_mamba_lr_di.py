@@ -245,25 +245,22 @@ def main():
             left = .075 + .48 * col
             ax_loss = fig.add_axes([left, .53, .38, .28])
             ax_imp = fig.add_axes([left, .16, .38, .28])
-            baselines = []
             for condition in CONDITIONS:
                 d = complete(f'di{di}_{condition}')
                 if d is None:
                     continue
                 g = d['original_graphcast_loss']
-                baselines.append(g['baseline_per_step'])
                 ax_loss.plot(DAYS, g['full_per_step'], color=COLORS[condition], lw=2, label=LABELS[condition])
                 ax_imp.plot(DAYS, g['improvement_pct_per_step'], color=COLORS[condition], lw=2)
             b = complete(f'di{di}_joint')['original_graphcast_loss']['baseline_per_step']
             ax_loss.plot(DAYS, b, color='#333333', ls='--', lw=1.7, label='Frozen GraphCast')
-            ax_loss.fill_between(DAYS, np.min(baselines, axis=0), np.max(baselines, axis=0), color='gray', alpha=.15)
             ax_imp.axhline(0, color='gray', lw=1)
             style(ax_loss, 'GC loss (normalized weighted MSE)', f'di{di}: absolute loss (lower is better)')
             style(ax_imp, 'GC loss reduction (%)', f'di{di}: improvement (higher is better)')
             ax_loss.set_ylim(bottom=0)
             ax_imp.set_ylim(-3, 28)
             ax_loss.legend(fontsize=8, frameon=False, loc='upper left')
-        fig.text(.06, .08, 'Each improvement uses its own matched baseline. Gray bands show baseline variation across completed runs.',
+        fig.text(.06, .08, 'Each improvement uses its own matched baseline.',
                  fontsize=9, color=MUTED)
         save(pdf, fig)
 

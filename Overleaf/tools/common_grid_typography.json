@@ -1,0 +1,223 @@
+{
+  "source": "tools/figure_label_sources/Graphs/add_mamba.pdf",
+  "source_sha256": "482721b6244f985d5a479e9350744e7a58a14838fc981adadc0308a147f15597",
+  "selected_previous_tex_legend_mask_pixels": [
+    105,
+    105,
+    431,
+    179
+  ],
+  "appendix_existing_terminology_boxes_pixels": [
+    [
+      153,
+      106,
+      423,
+      128
+    ],
+    [
+      153,
+      132,
+      423,
+      154
+    ],
+    [
+      153,
+      156,
+      423,
+      178
+    ]
+  ],
+  "changed_source_pixels_outside_label_regions": 0,
+  "selected_changed_source_pixels_outside_previous_mask": 0,
+  "outputs": [
+    {
+      "path": "Graphs/add_mamba.pdf",
+      "sha256": "4ef9bfdd900b7c0ba2b6adbac059f492c19eb379203c05767165aae66e808006",
+      "pdf_width_pt": 468,
+      "embedded_panel_bitmaps_match": true,
+      "font_sizes_pt": [
+        9.0,
+        11.0
+      ],
+      "panels": [
+        {
+          "label": "Z500",
+          "box": [
+            98,
+            97,
+            634,
+            483
+          ],
+          "sha256": "53b10c6f514bd2f77811bf0c138f8bc7f82dd3fa23480a4dae1462babdbd4b26",
+          "index": 0
+        },
+        {
+          "label": "Z850",
+          "box": [
+            716,
+            97,
+            1252,
+            483
+          ],
+          "sha256": "d24676835def8eaa8a567ebf7ce4744cabc7180c98c78151e30768c6f7f2b661",
+          "index": 1
+        },
+        {
+          "label": "T500",
+          "box": [
+            1334,
+            97,
+            1870,
+            483
+          ],
+          "sha256": "e8ffab19ae974c76597f02e706d9be39e35680e69cfd70d761ebabdaae0b7b89",
+          "index": 2
+        },
+        {
+          "label": "T850",
+          "box": [
+            1952,
+            97,
+            2488,
+            483
+          ],
+          "sha256": "5b5ee15534bb80e9cdab6fab666f1d4dcb6686fa80b3f0b02266c1aa9712f586",
+          "index": 3
+        },
+        {
+          "label": "T2m",
+          "box": [
+            98,
+            588,
+            634,
+            974
+          ],
+          "sha256": "c70d02f0d1088f11d5a4fb4147d7b255f4b375c0fae57aa527f93ad58775498b",
+          "index": 4
+        },
+        {
+          "label": "MSL",
+          "box": [
+            716,
+            588,
+            1252,
+            974
+          ],
+          "sha256": "ffb0be838cd39da32a15c7618343505eb4225a9e830780e4f805e2dc5551b90d",
+          "index": 5
+        },
+        {
+          "label": "Q700",
+          "box": [
+            1334,
+            588,
+            1870,
+            974
+          ],
+          "sha256": "576b8139725f09ecc2e22f57b425830c8dddd57e5fa1581ef639d57739b0b214",
+          "index": 6
+        },
+        {
+          "label": "Q850",
+          "box": [
+            1952,
+            588,
+            2488,
+            974
+          ],
+          "sha256": "0c502a7740685b5e9672da13a8473112ea6b679cb623ba897bc5c4f85baa9ddd",
+          "index": 7
+        },
+        {
+          "label": "U850",
+          "box": [
+            98,
+            1079,
+            634,
+            1465
+          ],
+          "sha256": "269692678db552dd361ec1f803697f0ca7922c47fb8c4aa0044384fd9b52bb66",
+          "index": 8
+        },
+        {
+          "label": "V850",
+          "box": [
+            716,
+            1079,
+            1252,
+            1465
+          ],
+          "sha256": "46499abf2537a977c11569915b8e0a90d547c435d8b633123c7061eb49adbf44",
+          "index": 9
+        },
+        {
+          "label": "U10",
+          "box": [
+            1334,
+            1079,
+            1870,
+            1465
+          ],
+          "sha256": "acf36d04f8081014a32458d2c16190d52327e34234e59a708d4dad91c6995328",
+          "index": 10
+        },
+        {
+          "label": "V10",
+          "box": [
+            1952,
+            1079,
+            2488,
+            1465
+          ],
+          "sha256": "6531a96c8da04565252dd8041e096eac744d01181d8bde34b6503e2baea195d0",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "path": "Graphs/main_v3/common_grid_three_panels.pdf",
+      "sha256": "f6547d0629bc6f52e46c6b3e78535cc749bb31f18d309057700dd6bb53a8d4c3",
+      "pdf_width_pt": 468,
+      "embedded_panel_bitmaps_match": true,
+      "font_sizes_pt": [
+        9.0,
+        11.0
+      ],
+      "panels": [
+        {
+          "label": "Z500",
+          "box": [
+            98,
+            97,
+            634,
+            483
+          ],
+          "sha256": "29af76c27a08afb643d2a9fb49b65d2288ffbf76929701e5b96f3088f6bbf2c7",
+          "index": 0
+        },
+        {
+          "label": "T2m",
+          "box": [
+            98,
+            588,
+            634,
+            974
+          ],
+          "sha256": "c70d02f0d1088f11d5a4fb4147d7b255f4b375c0fae57aa527f93ad58775498b",
+          "index": 4
+        },
+        {
+          "label": "U850",
+          "box": [
+            98,
+            1079,
+            634,
+            1465
+          ],
+          "sha256": "269692678db552dd361ec1f803697f0ca7922c47fb8c4aa0044384fd9b52bb66",
+          "index": 8
+        }
+      ]
+    }
+  ]
+}

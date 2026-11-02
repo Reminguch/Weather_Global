@@ -16,7 +16,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 import numpy as np
 
 
@@ -131,8 +130,6 @@ def scatter(report, records, output, manifest, *, stem="joint_rmse_power", recip
     xpad, ypad = max(1., (xmax-xmin)*.12), max(2., (ymax-ymin)*.12)
     ax.set_xlim(xmin-xpad, xmax+xpad)
     ax.set_ylim(ymin-ypad, ymax+ypad)
-    ax.add_patch(Rectangle((0, 0), xmax+xpad, ymax+ypad,
-                           facecolor="#E5F1E8", alpha=.8, edgecolor="none", zorder=0))
     ax.axhline(0, color="#8A929B", linewidth=1)
     ax.axvline(0, color="#8A929B", linewidth=1)
     ax.grid(color="#E3E7EB", linewidth=.7, alpha=.7)

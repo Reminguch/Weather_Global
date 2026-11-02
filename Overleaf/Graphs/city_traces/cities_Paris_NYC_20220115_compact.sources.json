@@ -1,0 +1,53 @@
+{
+  "source": "/scratch/gpfs/DABANIN/lm8598/Weather_Global_experiments_data/results/2026-09-25-headline-figures/cities_allvars_S128_K20_15yr_SWA6k-11k_15th.npz",
+  "source_sha256": "6eab01e6d237453d87b84327039a022776497e859f673a2851b6917bec7afce8",
+  "initialization_utc": "2022-01-15 00:00:00",
+  "mae_window_hours": [
+    120,
+    240
+  ],
+  "panels": [
+    {
+      "city": "Paris",
+      "variable": "2m_temperature",
+      "level_hpa": null,
+      "graphcast_mae": 1.1920529320126487,
+      "corrected_mae": 1.6512552897135417
+    },
+    {
+      "city": "Paris",
+      "variable": "u_component_of_wind",
+      "level_hpa": 850,
+      "graphcast_mae": 4.436072873572509,
+      "corrected_mae": 2.7986694365030242
+    },
+    {
+      "city": "Paris",
+      "variable": "total_precipitation_6hr",
+      "level_hpa": null,
+      "graphcast_mae": 0.24673817517918364,
+      "corrected_mae": 0.10212918698538856
+    },
+    {
+      "city": "NYC",
+      "variable": "2m_temperature",
+      "level_hpa": null,
+      "graphcast_mae": 2.3185177757626487,
+      "corrected_mae": 1.4558962867373513
+    },
+    {
+      "city": "NYC",
+      "variable": "u_component_of_wind",
+      "level_hpa": 850,
+      "graphcast_mae": 3.2611513549373266,
+      "corrected_mae": 3.0306212203133676
+    },
+    {
+      "city": "NYC",
+      "variable": "total_precipitation_6hr",
+      "level_hpa": null,
+      "graphcast_mae": 0.21034261944291324,
+      "corrected_mae": 0.577974440311718
+    }
+  ]
+}

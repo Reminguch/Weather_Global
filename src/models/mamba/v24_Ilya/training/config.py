@@ -33,6 +33,8 @@ MGDA_BACKTRACKING_DEFAULTS = {
     "relative_floor": 1e-7,
     "max_relative_noise": 1e-3,
     "repeatability_repeats": 3,
+    "repeatability_policy": "warn",
+    "decrease_policy": "warn",
 }
 WEATHER_TAPE_PRECISIONS = ("fp32",)
 BPTT_BACKEND = "explicit_reverse_vjp"
@@ -190,6 +192,10 @@ class V24IlyaTrainConfig:
             if unknown:
                 raise ValueError(f"Unknown mgda_backtracking keys: {sorted(unknown)}")
             backtracking = {**MGDA_BACKTRACKING_DEFAULTS, **self.mgda_backtracking}
+            if backtracking["repeatability_policy"] not in ("warn", "error"):
+                raise ValueError("mgda_backtracking.repeatability_policy must be 'warn' or 'error'")
+            if backtracking["decrease_policy"] not in ("warn", "error"):
+                raise ValueError("mgda_backtracking.decrease_policy must be 'warn' or 'error'")
             for name, minimum in (("max_halvings", 0), ("repeatability_repeats", 3)):
                 if type(backtracking[name]) is not int or backtracking[name] < minimum:
                     raise ValueError(f"mgda_backtracking.{name} must be an integer >= {minimum}")
@@ -248,10 +254,12 @@ class V24IlyaTrainConfig:
                 pass
             elif self.loss_kind != "mse_fp32" or self.power_calibration is None:
                 raise ValueError("RMS/MGDA requires mse_fp32 and embedded power_calibration")
-            allowed_feedback = (("baseline", "closed_loop_sg")
+            allowed_feedback = (("baseline", "closed_loop_sg", "closed_loop")
                                 if self.objective_pair == "mse_amse_excess" else ("closed_loop_sg",))
             if self.distributed.mode != "single" or self.feedback_mode not in allowed_feedback:
-                raise ValueError("RMS/MGDA requires single-device closed_loop_sg training")
+                raise ValueError(
+                    "RMS/MGDA requires single-device training with an objective-supported feedback mode"
+                )
             if self.learning_rate_schedule != "warmup_cosine_constant":
                 raise ValueError("RMS/MGDA requires warmup_cosine_constant schedule")
             if self.weight_decay != 0:
@@ -298,10 +306,9 @@ class V24IlyaTrainConfig:
         if self.feedback_mode not in FEEDBACK_MODES:
             raise ValueError(f"feedback_mode must be one of {FEEDBACK_MODES}")
         if self.feedback_mode == "closed_loop":
-            if self.bptt_steps not in (2, 4, 8) or self.ar_tail_k != self.bptt_steps - 1:
+            if self.bptt_steps not in (2, 4, 8, 24):
                 raise ValueError(
-                    "closed_loop requires bptt_steps in (2, 4, 8) and "
-                    "ar_tail_k=bptt_steps-1 for fully differentiable short forecasts"
+                    "closed_loop requires bptt_steps in (2, 4, 8, 24)"
                 )
             if self.distributed.mode != "single":
                 raise ValueError("closed_loop currently requires single-device training")

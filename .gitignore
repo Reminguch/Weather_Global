@@ -28,6 +28,10 @@ build/
 dist/
 *.egg-info/
 
+# Crash dumps
+core
+core.[0-9]*
+
 # Common large binary artifacts
 *.nc
 *.grib

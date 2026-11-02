@@ -111,10 +111,12 @@ def test_cache_pilot_requires_parity_and_measured_gpu_headroom(tmp_path, monkeyp
     assert result['integrity_passed'] is parity
 
 
-def test_cache_worker_records_runtime_and_preserves_measured_peak_on_resume(tmp_path, monkeypatch):
+@pytest.mark.parametrize('numerical_policy', ['strict', 'advisory'])
+def test_cache_worker_records_runtime_and_preserves_measured_peak_on_resume(tmp_path, monkeypatch, numerical_policy):
     from src.models.mamba.v24_Ilya import baseline_cache
     from src.models.mamba.v24_Ilya.training import cached_diagnostics
-    campaign = {'root': str(tmp_path), 'paths': {'cache_config': '/config'}}
+    campaign = {'root': str(tmp_path), 'paths': {'cache_config': '/config'},
+                'numerical_policy': numerical_policy}
     pilot = tmp_path / 'qualification/cache_full'
     pilot.mkdir(parents=True)
     monkeypatch.setattr(cached_diagnostics, 'require_matched_gpu_environment',
@@ -127,6 +129,7 @@ def test_cache_worker_records_runtime_and_preserves_measured_peak_on_resume(tmp_
     monkeypatch.setattr(baseline_cache, 'build_manifest', lambda context, shards, chunks: {'chunks': chunks})
     def generate(context, manifest, root, index, **kwargs):
         assert context == 'context' and manifest['chunks'] == 4
+        assert kwargs['numerical_policy'] == numerical_policy
         if not (root / 'pilot_report.json').exists():
             (root / 'pilot_report.json').write_text(json.dumps({'passed': True}))
     monkeypatch.setattr(baseline_cache, 'generate_shard', generate)

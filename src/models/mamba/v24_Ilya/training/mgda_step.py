@@ -1,4 +1,4 @@
-"""Two objectives on one stopped-weather trajectory and explicit reverse tape."""
+"""Two objectives on one trajectory and a shared explicit reverse tape."""
 
 from __future__ import annotations
 
@@ -42,8 +42,8 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
     Both gradients use the exact same forward predictions and recurrent state.
     The second reverse pass never advances state, RNG or the data cursor.
     """
-    if input_steps != 2 or config.feedback_mode not in ("baseline", "closed_loop_sg"):
-        raise ValueError("Multiobjective training requires two inputs and stopped weather feedback")
+    if input_steps != 2 or config.feedback_mode not in ("baseline", "closed_loop_sg", "closed_loop"):
+        raise ValueError("Multiobjective training requires two-frame inputs and a supported feedback mode")
     if config.distributed.mode != "single":
         raise ValueError("Multiobjective training currently requires a single device")
     if jax.tree_util.tree_leaves(baseline_state):
@@ -53,6 +53,16 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
     positions = {index: pos for pos, index in enumerate(config.supervised_step_indices)}
     amse_split = getattr(config, "objective_pair", None) == "amse_split"
     amse_excess = getattr(config, "objective_pair", None) == "mse_amse_excess"
+    weather_engine = None
+    if config.feedback_mode == "closed_loop":
+        if not amse_excess:
+            raise ValueError("Differentiable multiobjective weather feedback requires MSE/AMSE excess")
+        from .weather_feedback_step import _WeatherSteps
+
+        weather_engine = _WeatherSteps(
+            transforms=transforms, baseline_params=baseline_params,
+            baseline_state=baseline_state, config=config, time_step=time_step,
+            input_steps=input_steps)
     weights = np.asarray(config.normalized_supervised_weights, np.float32)
     final_index = config.bptt_steps - 1
     reset_state = config.temporal_state_policy == "reset_every_anchor"
@@ -114,6 +124,12 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
     accumulate = jax.jit(_tree_add)
 
     def forward(params, initial_state, keys, input_frames, static_inputs, truths, forcings):
+        if weather_engine is not None:
+            raw, state, components, frames, steps = weather_engine.forward(
+                params, initial_state, keys, input_frames, static_inputs, truths, forcings)
+            # The excess pair's first component is exact grid GC-MSE. It has
+            # no truth-power flooring or independent objective normalization.
+            return (frames, steps), state, raw, components, 0., components[:, 0]
         if len(input_frames) != config.truth_prefix_steps + 1:
             raise ValueError("Incorrect teacher-frame count for multiobjective step")
         if len(truths) != len(positions) or len(forcings) != config.bptt_steps:
@@ -167,6 +183,10 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
                 np.asarray(gc_losses, np.float32))
 
     def reverse(params, initial_state, tape, objective, scale):
+        if weather_engine is not None:
+            frames, steps = tape
+            return weather_engine.reverse(
+                params, initial_state, frames, steps, objective=objective, scale=scale)
         keys, static, truths, forcings, frames, states, targets = tape
         gradient, cotangent = _tree_zeros_like(params), _tree_zeros_like(initial_state)
         for index in range(final_index, -1, -1):
@@ -214,15 +234,21 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
         scaled = jax.tree_util.tree_map(lambda x: x * scale, updates)
         return optax.apply_updates(params, scaled)
 
+    @jax.jit
+    def tree_is_finite(tree):
+        leaves = jax.tree_util.tree_leaves(tree)
+        return jnp.all(jnp.stack([jnp.all(jnp.isfinite(x)) for x in leaves])) if leaves else jnp.asarray(True)
+
     def train_excess_step(params, state, optimizer_state, keys, input_frames,
                           static_inputs, truths, forcings):
         from .mgda_acceptance import backtrack_losses, calibrate_loss_tolerances
         from .mgda_optimizer import tree_dot, tree_norm, validate_optimizer_diagnostics
 
         policy = config.mgda_backtracking
+        decrease_policy = policy.get("decrease_policy", "warn") if policy is not None else "warn"
         train_step.last_acceptance_record = None
         if optimizer is None or policy is None or transforms.full_field_objectives is None:
-            raise ValueError("MSE/AMSE-excess training requires pair RMS and measured-loss acceptance")
+            raise ValueError("MSE/AMSE-excess training requires pair RMS and objective diagnostics")
         args = (keys, input_frames, static_inputs, truths, forcings)
         tape, _, raw, _, _, gc_before = forward(params, state, *args)
         repeated = [np.asarray(raw, np.float64)]
@@ -232,11 +258,19 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
             tolerances = calibrate_loss_tolerances(
                 repeated, absolute_floor=policy["absolute_floor"],
                 relative_floor=policy["relative_floor"],
-                max_relative_noise=policy["max_relative_noise"])
+                max_relative_noise=policy["max_relative_noise"],
+                repeatability_policy=policy.get("repeatability_policy", "warn"))
         except ValueError as error:
             raise JointDescentFailure({"reason": "repeatability_failed", "error": str(error),
                                        "repeated_losses": [x.tolist() for x in repeated]}) from error
         before = np.mean(repeated, axis=0)
+        repeatability = {
+            **tolerances.to_dict(), "repeated_losses": [x.tolist() for x in repeated],
+            "noise_bounds": list(tolerances.noise_bounds),
+            "noise_exceeded": list(tolerances.noise_exceeded),
+            "warning": any(tolerances.noise_exceeded),
+            "noise_thresholds": list(tolerances.noise_thresholds(before))}
+        train_step.last_acceptance_record = {"repeatability": repeatability}
         if np.any(before < 0):
             raise JointDescentFailure({"reason": "negative_objective", "losses": before.tolist()})
         first = reverse(params, state, tape, 0, 1.)
@@ -245,7 +279,8 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
         updates, proposed_optimizer_state, diagnostics = propose_pair(
             params, optimizer_state, first, second)
         jax.block_until_ready(updates)
-        validate_optimizer_diagnostics(diagnostics)
+        if decrease_policy == "error" or not bool(diagnostics["finite"]):
+            validate_optimizer_diagnostics(diagnostics)
         diagnostics = dict(jax.device_get(diagnostics))
         base_lr = float(diagnostics["learning_rate"])
         mode = config.mgda_direction
@@ -266,29 +301,44 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
             else:
                 summed = jax.tree_util.tree_map(lambda x, y: x + y, first, second)
                 valid = sum(dots) >= -1e-6 * float(tree_norm(summed)) * norm
-            if not valid:
+            if not valid and decrease_policy == "error":
                 candidate_cache.clear()
                 return (np.nan, np.nan)
+            if not bool(tree_is_finite(candidate)):
+                raise JointDescentFailure({"reason": "nonfinite_candidate_parameters"})
             _, next_state, values, components, fraction, gc_components = forward(candidate, state, *args)
             candidate_cache.clear()
             candidate_cache.update(params=candidate, state=next_state, values=values,
                                    components=components, fraction=fraction, gc_components=gc_components,
-                                   update_norm=norm, dots=dots)
+                                   update_norm=norm, dots=dots, descent_valid=bool(valid))
             return values
 
         acceptance = backtrack_losses(
             before, evaluate_candidate, mode=mode, tolerances=tolerances,
-            initial_learning_rate=base_lr, max_halvings=policy["max_halvings"], shrink=policy["shrink"])
+            initial_learning_rate=base_lr, max_halvings=policy["max_halvings"], shrink=policy["shrink"],
+            decrease_policy=decrease_policy)
         train_step.last_acceptance_record = {
-            "acceptance": acceptance.to_dict(), "repeatability": tolerances.to_dict()}
+            "acceptance": acceptance.to_dict(), "repeatability": repeatability}
         if not acceptance.accepted:
             raise JointDescentFailure({"reason": acceptance.reason, "acceptance": acceptance.to_dict(),
-                                       "repeatability": tolerances.to_dict(),
+                                       "repeatability": repeatability,
                                        "gradient_norms": [float(tree_norm(first)), float(tree_norm(second))],
                                        "mgda_alpha": float(diagnostics["mgda_alpha"])})
         after = np.asarray(acceptance.losses, np.float64)
+        if not bool(tree_is_finite(candidate_cache["state"])):
+            raise JointDescentFailure({"reason": "nonfinite_candidate_state",
+                                       **train_step.last_acceptance_record})
+        noise_floors = tolerances.noise_thresholds(before)
+        decreases = before - after
+        above_noise = (all(delta > floor for delta, floor in zip(decreases, noise_floors, strict=True))
+                       if mode == "mgda" else decreases[0] > noise_floors[0] if mode == "mse_control"
+                       else float(np.sum(decreases)) > sum(noise_floors))
+        repeatability["accepted_decrease_above_noise"] = bool(above_noise)
         diagnostics.update(
-            finite=True, descent_valid=True, stalled=False,
+            finite=True, descent_valid=bool(diagnostics["descent_valid"]) and candidate_cache["descent_valid"],
+            stalled=candidate_cache["update_norm"] == 0,
+            measured_decrease=acceptance.measured_decrease,
+            decrease_warning=not acceptance.measured_decrease,
             learning_rate=float(acceptance.learning_rate),
             update_norm=candidate_cache["update_norm"],
             gc_displacement_dot=candidate_cache["dots"][0],
@@ -299,6 +349,9 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
             acceptance_threshold_1=acceptance.thresholds[0], acceptance_threshold_2=acceptance.thresholds[1],
             repeatability_span_1=tolerances.repeatability_span[0],
             repeatability_span_2=tolerances.repeatability_span[1],
+            repeatability_warning=any(tolerances.noise_exceeded),
+            noise_threshold_1=noise_floors[0], noise_threshold_2=noise_floors[1],
+            accepted_decrease_above_noise=bool(above_noise),
             backtracking_accepted=True, backtracking_trials=len(acceptance.trials),
             backtracking_halvings=len(acceptance.trials) - 1,
             backtracking_baseline_repeats=len(repeated))
@@ -306,6 +359,7 @@ def make_multiobjective_train_step(*, transforms, optimizer, baseline_params,
             raise JointDescentFailure({"reason": "nonfinite_accepted_diagnostics"})
         diagnostics["objective_pair"] = "mse_amse_excess"
         diagnostics["mgda_direction"] = mode
+        diagnostics["decrease_policy"] = decrease_policy
         # Commit exactly the accepted candidate's regenerated end memory. The
         # old-parameter forward memory and all rejected candidates are discarded.
         return MultiObjectiveResult(

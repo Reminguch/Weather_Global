@@ -1,0 +1,33 @@
+{
+  "generator": "Overleaf/Graphs/main_v3/generate_memory_comparison.py",
+  "generator_sha256": "ff839ee919873c274776ac827b471c32fe38da1a7fa4718bfaad5694f6336b7d",
+  "control_csv": {
+    "path": "plots/analyze_models/data/resolution_eval/res1_reset_training_gc_loss_approx/curves.csv",
+    "sha256": "f33ddd75732b361f113ee039387229e251ffdab0b138942cad6c9b9b7c8598c0"
+  },
+  "matched_32_indices_verified": true,
+  "comparison": "Principal model replaces the historical carry/carry curve. Controls use separate training runs and approximate loss; this is not a shared-weight reset ablation of the principal model.",
+  "curves": [
+    {
+      "label": "Carry / carry (main model)",
+      "metric": "exact",
+      "source": "artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/eval/cold_full_zero_exact_gc/matched32/swa_step00500-02000.json",
+      "sha256": "ad5018e4797f93d3ec9e6a8d5655709ac5da0da829a482cd95330ccca02fc1fb",
+      "day10_pct": 23.683071295749947
+    },
+    {
+      "label": "Carry / reset",
+      "metric": "approximate",
+      "source": "artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_20k_20260813/di16_bcg1_closed_sg_stateful_20k/eval/cold_full_reset_every_step_zero/swa_step02000-08000.json",
+      "sha256": "d5b5abe0d961baa1f7c65983dc07b5fad563630f2f8dfe45e5df96e7a168b164",
+      "day10_pct": 9.241861932900896
+    },
+    {
+      "label": "Reset / reset",
+      "metric": "approximate",
+      "source": "artifacts/checkpoints/v22_final/res1_dm_7yr_k20_di_bcg_reset_every_anchor_20k_20260815/di16_bcg1_closed_sg_reset_every_anchor_20k/eval/cold_full_reset_every_step_zero/swa_step02000-08000.json",
+      "sha256": "faafb16729c5dc2acb8283eb4b065b438792ada7a4a9227093bb757954d9aad7",
+      "day10_pct": 12.90723381442076
+    }
+  ]
+}

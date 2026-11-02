@@ -423,19 +423,27 @@ def write_outputs(workflow, protocol, reference, result, baseline, full):
         lines += [f"- Training source provenance: {result['training_source_limit']}"]
     lines += ["", f"Source audit, full paired losses, bootstrap details, and figure paths: `{report_dir / 'summary.json'}`.", ""]
     (report_dir / "report.md").write_text("\n".join(lines))
+    plot_figures(result, reference, image_dir)
+    return report_dir / "report.md"
+
+
+def plot_figures(result, reference, image_dir):
+    """Render the saved analysis without repeating inference or bootstrap draws."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    image_dir = Path(image_dir)
+    image_dir.mkdir(parents=True, exist_ok=True)
+    primary = result["primary"]
     days = np.asarray(reference["lead_hours"]) / 24
     fig, ax = plt.subplots(figsize=(8.6, 5.1))
     for m, (label, color) in enumerate(zip(POLICY_LABELS, ("#245c9b", "#d18524", "#267d55"))):
         ax.plot(days, primary["improvement_pct"][m][1:], label=label, color=color, lw=2)
-        ax.fill_between(days, primary["pointwise_ci95_lower"][m][1:], primary["pointwise_ci95_upper"][m][1:], color=color, alpha=.16)
     ax.axhline(0, color="0.35", lw=.8)
     ax.set(xlabel="Forecast lead (days)", ylabel="Exact GraphCast loss reduction (%)", xlim=(.25, 10))
     ax.legend(frameon=False)
     ax.grid(alpha=.2)
-    fig.text(.5, .01, "Canonical M1 GraphCast baseline; shaded intervals are paired pointwise 95% intervals.", ha="center", fontsize=9)
+    fig.text(.5, .01, "Canonical M1 GraphCast baseline.", ha="center", fontsize=9)
     fig.tight_layout(rect=(0, .04, 1, 1))
     for suffix in ("png", "pdf"):
         fig.savefig(image_dir / f"exact_loss_reduction.{suffix}", dpi=180)
@@ -444,17 +452,15 @@ def write_outputs(workflow, protocol, reference, result, baseline, full):
     for contrast, label, color in zip(primary["contrasts"][:2],
             ("Carry/carry − matched reset/reset", "Carry/reset − matched reset/reset"), ("#245c9b", "#d18524")):
         ax.plot(days, contrast["effect"][1:], label=label, color=color, lw=2)
-        ax.fill_between(days, contrast["pointwise_ci95_lower"][1:], contrast["pointwise_ci95_upper"][1:], color=color, alpha=.16)
     ax.axhline(0, color="0.35", lw=.8)
     ax.set(xlabel="Forecast lead (days)", ylabel="Difference in loss reduction (percentage points)", xlim=(.25, 10))
     ax.legend(frameon=False)
     ax.grid(alpha=.2)
-    fig.text(.5, .01, "Positive favors first arm; intervals are paired pointwise 95% intervals.", ha="center", fontsize=9)
+    fig.text(.5, .01, "Positive favors first arm.", ha="center", fontsize=9)
     fig.tight_layout(rect=(0, .04, 1, 1))
     for suffix in ("png", "pdf"):
         fig.savefig(image_dir / f"paired_memory_contrasts.{suffix}", dpi=180)
     plt.close(fig)
-    return report_dir / "report.md"
 
 
 def main():

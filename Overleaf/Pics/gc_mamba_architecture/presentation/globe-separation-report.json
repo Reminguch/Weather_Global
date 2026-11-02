@@ -1,0 +1,28 @@
+{
+  "source": "presentation/02_correction_branch.pptx",
+  "updated_at": "2026-09-25T17:50:04.963487+00:00",
+  "backup": "artifacts/figure-edits/20260925T174933Z_globe_opacity75",
+  "source_before_edit_sha256": "39bbec6a322c54600abb74593b64c14da176e12798f4f315a11eba9dd960bc3e",
+  "original_layout_source": "artifacts/figure-edits/20260925T174057Z_globe_separation/presentation/02_correction_branch.pptx",
+  "original_layout_sha256": "5c7c079233ca0b903e6a21245aa7e32045f5696df8ae108a6780c4b2d7266d16",
+  "pptx_sha256": "719a33bea2bc10056164ccef9c3a67fde40404f45c048418591701a5b394b036",
+  "changes": [
+    "Reduced rear Earth and mesh transparency from 40% to 25% (75% opacity) in all three input pairs",
+    "Preserved original spacing, front globes, fonts, and all other objects"
+  ],
+  "pdfs": [
+    {
+      "path": "Overleaf/Pics/gc_mamba_architecture/03_temporal_rollout.pdf",
+      "sha256": "427bf384237ac7816b018cbed156e74c2bee57c929eb4421dc1954febce5f742",
+      "slide": 2,
+      "crop": [
+        309.5,
+        11,
+        838,
+        238
+      ]
+    }
+  ],
+  "validation": "Reopened PPTX and verified native opacity; 84 other rollout objects preserved; visually checked LibreOffice render.",
+  "preview": "artifacts/figure-edits/20260925T174933Z_globe_opacity75/updated-preview.png"
+}
