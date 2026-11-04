@@ -1,5 +1,12 @@
 # Experiment preferences
 
+User terminology instruction on 2026-11-04: call the downloaded frozen model
+"official pretrained NeuralGCM" or "original NeuralGCM baseline", never
+"old NGCM". Earlier/deleted experiments refer to residual code and residual
+training results, not to the official pretrained backbone. Keep these distinct
+in Chinese and English reports. All weather data, environments, caches, logs,
+temporary files and experiment outputs must remain on scratch, not in home.
+
 User instruction reaffirmed on 2026-10-19: finite numerical variance,
 repeatability differences and finite restart drift are warnings, not failure or
 release-blocking conditions. Preserve their measured values, reference bounds

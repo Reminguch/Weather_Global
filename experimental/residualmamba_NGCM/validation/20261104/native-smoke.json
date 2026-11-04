@@ -1,0 +1,24 @@
+{
+  "cache_roundtrip_bitwise": true,
+  "checkpoint_sha256": "bdec1b4612c7385fc492aa031db252c66fb74b788a7efbb118b8b60b06644d3e",
+  "finite": true,
+  "native_evaluator_max_diff_in_pilot_std": 0.0,
+  "production_T1_3_train_1_val": "pending full restored data and production statistics",
+  "shape": [
+    24,
+    7,
+    37,
+    128,
+    64
+  ],
+  "source_identity": "db4d8f39fb7aca18f919f3320d4e3e57d971d39d569799f3f11b353bd748f70c",
+  "static_shape": [
+    128,
+    64,
+    2
+  ],
+  "status": "passed",
+  "store_identity": "988d6659de1452e6e8be627d8f67f039362cb4ac8d466b5cc2072a93d73eb76f",
+  "warning": false,
+  "within_reference_bound": true
+}

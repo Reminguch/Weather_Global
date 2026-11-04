@@ -1,6 +1,9 @@
 # residualmamba_NGCM — open-loop GraphCast-Mamba residual on a frozen NeuralGCM
 
-**Status:** implementation specification (no code yet). Everything below is
+**Status:** normative specification, with a new implementation in
+`residualmamba_ngcm/` on `residualmamba_NGCM_rebuild_20261104`.
+See [OPERATIONS.md](OPERATIONS.md) for commands, validation evidence and pending
+data-dependent checks. This does not establish forecast improvement. Everything below is
 normative: if the code disagrees with this file, the code is wrong or this file
 must be versioned first.
 

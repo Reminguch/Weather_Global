@@ -1,0 +1,8 @@
+{
+  "gpu_smoke_sha256": "63d8f8d556a84810d74e3892f919c2eff05eed01dde511be80ab3d83cb66eb83",
+  "native_smoke_sha256": "970cda987a0687ac5260939eba5d0bedbdf0e093721b1a6ecfd6c554b291a761",
+  "scope": "unit tests and real-model smoke; cache/census checked separately",
+  "source_identity": "db4d8f39fb7aca18f919f3320d4e3e57d971d39d569799f3f11b353bd748f70c",
+  "status": "passed",
+  "unit_test_log_sha256": "cd616f4e26c8ea879d2c93f574bdf31b5712e57b7f225ca9fb88047cf6a092b1"
+}
