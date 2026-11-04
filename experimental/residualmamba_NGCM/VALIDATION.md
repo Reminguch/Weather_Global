@@ -1,8 +1,38 @@
 # Validation record — 2026-11-04
 
-The new open-loop implementation has passed the checks below. This is an
+The new open-loop implementation has passed the historical checks below. This is an
 implementation and smoke-test result, **not a demonstration of improved weather
 forecast skill**. The official pretrained NeuralGCM weights are unchanged.
+
+The initial GPU restart discrepancy has since been isolated and a deterministic
+execution policy has passed independent probes and the actual trainer's
+fresh-process continuation. See
+[GPU_RESTART_DIAGNOSTIC_20261104.md](GPU_RESTART_DIAGNOSTIC_20261104.md) for the
+cause, correction and fresh-process verification. Historical receipts are kept
+so the original warning remains auditable.
+
+## Current evidence, after the runtime correction
+
+H200 job **16864762** completed with exit code **0** in **10 min 32 s**, on
+ailab. All three real-model receipts below refer to the integrated source
+`85c78befa884098f8f37874705ff2bda2307b0f2314dfcb1f42d3eb553135b45`.
+
+| Check | Result | Evidence |
+|---|---|---|
+| CPU suite after the correction | 23 passed, including execution-policy regression checks | [unit-tests.txt](validation/20261104_deterministic/unit-tests.txt) |
+| Full GraphCast-Mamba GPU smoke | Passed; checkpoint continuation bitwise equal, max difference 0 | [gpu-smoke.json](validation/20261104_deterministic/gpu-smoke.json) |
+| Actual production trainer across fresh Python processes | Uninterrupted 3 versus split 2+1; parameters, memory, Adam, RNG and cursor all bitwise equal | [trainer-resume.json](validation/20261104_deterministic/trainer-resume.json) |
+| Official pretrained NGCM with deterministic GPU policy | Passed on 29 real ERA5 frames; native evaluator difference 0; cache round trip bitwise equal | [native-smoke.json](validation/20261104_deterministic/native-smoke.json) |
+| Source and execution-policy qualification | Three smoke receipts checked against this source and policy, with a fresh CPU suite | [qualification.json](validation/20261104_deterministic/qualification.json) |
+
+The correction addresses repeatability in the tested H200 environment. It does
+not establish equality across hardware or dependency versions, production data
+readiness, or improved forecast skill. The optimized deterministic update took
+about 4.3 seconds in the controlled probe, compared with 0.35 seconds using the
+original nondeterministic configuration. See the diagnostic report for the full
+timing comparison and evidence distinguishing execution from serialization.
+
+## Initial implementation evidence, before the runtime correction
 
 | Check | Result | Evidence |
 |---|---|---|
@@ -28,15 +58,17 @@ The synthetic losses were 0.0510000102, 0.0510000102 and 0.0509608388. The first
 update uses LR zero, as specified by the warmup schedule. These numbers test the
 training machinery; they are not ERA5 evaluation results.
 
-The GPU test also serialized a checkpoint after update 2 and replayed update 3.
-**GPU continuation was not bitwise identical:** the largest absolute difference
+The initial GPU test also serialized a checkpoint after update 2 and replayed update 3.
+**GPU continuation was not bitwise identical in that original configuration:** the largest absolute difference
 across parameter, memory and optimizer arrays was **0.00161409378**. This was
-finite and is retained as a warning under `AGENTS.md`. Its component and cause
-have not been isolated, so this record does not attribute it to a particular
-CUDA kernel. The independent CPU split-versus-uninterrupted training test was
+finite and was initially recorded as a warning under `AGENTS.md`. The user then
+explicitly requested a fix. Subsequent controlled probes isolated execution
+nondeterminism, with the largest differences in Mamba memory and a lossless
+checkpoint round trip. The independent CPU split-versus-uninterrupted training test was
 bitwise identical, including the optimizer, memory, RNG and cursor. Complete
-resume state is implemented; exact floating-point reproducibility on GPU is
-not established.
+resume state was already implemented; the added runtime policy addresses GPU
+numerical execution. The diagnosis does not attribute the entire discrepancy to
+one isolated CUDA kernel.
 
 The native test used 29 restored ERA5 frames, all seven weather fields and the
 official checkpoint. It generated the three independent one-step forecasts and

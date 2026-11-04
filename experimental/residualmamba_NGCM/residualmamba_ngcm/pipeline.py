@@ -11,6 +11,8 @@ from .model import read_model_config
 
 
 def preflight(args,config):
+    from .runtime import require_production_policy
+    require_production_policy()
     bb,store=load(args.checkpoint,args.checkpoint_sha256,args.store)
     read_model_config(args.gc_checkpoint,args.gc_sha256)
     segments={split:split_segments(store.times,split) for split in ('train','val')}
@@ -45,6 +47,8 @@ def preflight(args,config):
 
 
 def context(root,config):
+    from .runtime import require_production_policy
+    require_production_policy()
     root=Path(root)
     manifest=read_json(root/'preflight.json')
     # JSON round-trip turns tuples into lists; digest canonically compares values.
@@ -101,20 +105,28 @@ def training_identity(root,config):
                    'baseline_audit':sha256(root/'baseline-audit/summary.json')}),manifest,store,geometry,stats
 
 
-def qualify(root,gpu_smoke,native_smoke):
+def qualify(root,gpu_smoke,native_smoke,resume_smoke):
     """Generate qualification from executed tests, never from a hand-written pass flag."""
+    from .runtime import require_production_policy
+    policy=require_production_policy()
     import os
     import subprocess
     import sys
     from . import ROOT
     root=Path(root);root.mkdir(parents=True,exist_ok=True)
-    gpu,native=read_json(gpu_smoke),read_json(native_smoke)
+    gpu,native,resume=read_json(gpu_smoke),read_json(native_smoke),read_json(resume_smoke)
     identity=source_identity()
-    for name,evidence in [('GPU',gpu),('native',native)]:
+    for name,evidence in [('GPU',gpu),('native',native),('fresh-process resume',resume)]:
         if evidence.get('status')!='passed' or evidence.get('source_identity')!=identity:
             raise ValueError(f'{name} evidence is missing or belongs to different source')
     if not gpu.get('zero_head_bitwise') or not gpu.get('upper_levels_bitwise') or not native.get('finite'):
         raise ValueError('Incomplete real-model smoke evidence')
+    for evidence in (gpu,resume):
+        if evidence.get('libraries',{}).get('gpu_execution')!=policy:
+            raise ValueError('GPU evidence must use the production execution policy')
+    groups=('params','memory','opt_state','rng','cursor')
+    if not gpu.get('restart_bitwise') or not all(resume.get('comparisons',{}).get(k,{}).get('bitwise_equal') for k in groups):
+        raise ValueError('The requested deterministic GPU restart fix has not passed its regression test')
     env=dict(os.environ,JAX_PLATFORMS='cpu',PYTHONDONTWRITEBYTECODE='1',PYTEST_ADDOPTS='-p no:cacheprovider')
     log=root/'qualification-pytest.log'
     with log.open('w') as f:
@@ -122,4 +134,5 @@ def qualify(root,gpu_smoke,native_smoke):
             '--basetemp='+str(root/'pytest-tmp')],env=env,stdout=f,stderr=subprocess.STDOUT,check=True)
     write_json(root/'qualification.json',{'status':'passed','source_identity':identity,
         'gpu_smoke_sha256':sha256(gpu_smoke),'native_smoke_sha256':sha256(native_smoke),
+        'resume_smoke_sha256':sha256(resume_smoke),
         'unit_test_log_sha256':sha256(log),'scope':'unit tests and real-model smoke; cache/census checked separately'},immutable=True)

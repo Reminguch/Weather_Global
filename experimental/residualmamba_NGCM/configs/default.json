@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "runtime_policy": "deterministic_gpu_v1",
   "feedback_mode": "baseline",
   "arm": "main",
   "seed": 22,

@@ -60,10 +60,15 @@ def main():
                 'rng':jax.random.PRNGKey(24),'cursor':{'epoch':0,'segment_index':0,'segment_offset':48},
                 'step':2,'identity':smoke_identity})
     restored=load_checkpoint(checkpoint_path,smoke_identity)
-    resumed=update(restored['params'],restored['memory'],restored['opt_state'],batch,restored['rng'])
+    restored_params,restored_memory,restored_opt,restored_key=jax.device_put(
+        (restored['params'],restored['memory'],restored['opt_state'],restored['rng']))
+    resumed=update(restored_params,restored_memory,restored_opt,batch,restored_key)
     differences=[float(np.max(np.abs(np.asarray(a,dtype=np.float64)-np.asarray(b,dtype=np.float64))))
         for a,b in zip(jax.tree_util.tree_leaves((params,memory,state)),jax.tree_util.tree_leaves(resumed[:3]))]
     restart_delta=max(differences,default=0.)
+    restart_bitwise=all(np.asarray(a).dtype==np.asarray(b).dtype and
+        np.asarray(a).shape==np.asarray(b).shape and np.asarray(a).tobytes()==np.asarray(b).tobytes()
+        for a,b in zip(jax.tree_util.tree_leaves((params,memory,state)),jax.tree_util.tree_leaves(resumed[:3])))
     if not np.isfinite(restart_delta):raise FloatingPointError('Nonfinite resumed GPU update')
     finite=all(np.isfinite(np.asarray(v)).all() for v in jax.tree_util.tree_leaves((params,memory,state)))
     if not finite:raise FloatingPointError('Nonfinite smoke optimizer/parameters/memory')
@@ -71,7 +76,7 @@ def main():
         'production_data_validation':False,'device':str(jax.devices()[0]),'source_identity':source_identity(),
         'libraries':versions(),'input_channels':796,'output_channels':203,'width':512,'mesh_size':4,
         'zero_head_bitwise':True,'upper_levels_bitwise':True,'memory_nonzero':True,'updates':records,
-        'restart_max_abs_delta':restart_delta,'restart_bitwise':restart_delta==0.,
+        'restart_max_abs_delta':restart_delta,'restart_bitwise':restart_bitwise,
         'seconds':time.monotonic()-started,'parameters':sum(x.size for x in jax.tree_util.tree_leaves(params)),
         'memory_bytes':sum(x.size*x.dtype.itemsize for x in jax.tree_util.tree_leaves(memory))},immutable=True)
     print('GPU smoke passed',flush=True)

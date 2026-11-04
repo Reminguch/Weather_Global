@@ -1,0 +1,125 @@
+{
+  "device": "NVIDIA H200",
+  "flags": "--xla_gpu_exclude_nondeterministic_ops=true --xla_gpu_deterministic_ops=true --xla_gpu_autotune_level=0",
+  "grad_norm": {
+    "repeat": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    },
+    "resume": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    }
+  },
+  "host_inputs": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "initial_device_values": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "jit_cache_sizes_before_recompile": [
+    1,
+    1,
+    2,
+    2
+  ],
+  "loss": {
+    "repeat": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    },
+    "resume": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    }
+  },
+  "memory": {
+    "repeat": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    },
+    "resume": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    }
+  },
+  "opt_state": {
+    "repeat": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    },
+    "resume": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    }
+  },
+  "params": {
+    "repeat": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    },
+    "resume": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    }
+  },
+  "precision": "None",
+  "recompile": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "repeat_same_executable": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "seconds": [
+    109.53905647201464,
+    47.025660519022495,
+    46.45547695399728,
+    46.31595412606839,
+    68.11720743100159
+  ],
+  "serialization": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "serialized_then_placed": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "source_identity": "db4d8f39fb7aca18f919f3320d4e3e57d971d39d569799f3f11b353bd748f70c"
+}

@@ -79,6 +79,8 @@ def census(segments,load,latitude,path,upstream):
 
 
 def run(model,config,segments,val_segments,load,latitude,root,identity,steps=None,resume=None):
+    from .runtime import require_production_policy
+    require_production_policy()
     root=Path(root)
     root.mkdir(parents=True,exist_ok=True)
     from dataclasses import asdict
@@ -89,7 +91,7 @@ def run(model,config,segments,val_segments,load,latitude,root,identity,steps=Non
     endpoint=min(config.max_steps,steps if steps is not None else config.max_steps)
     if resume:
         saved=load_checkpoint(resume,identity)
-        params,state,opt_state,key=saved['params'],saved['memory'],saved['opt_state'],saved['rng']
+        params,state,opt_state,key=jax.device_put((saved['params'],saved['memory'],saved['opt_state'],saved['rng']))
         cursor=TrainingCursor.from_mapping(saved['cursor'])
         start=saved['step']
     else:

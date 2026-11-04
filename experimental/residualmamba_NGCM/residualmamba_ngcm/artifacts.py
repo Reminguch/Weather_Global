@@ -9,11 +9,13 @@ from src.models.neuralgcm_residual.io import atomic_bytes, digest, sha256, read_
 
 def versions():
     import importlib.metadata
+    from .runtime import identity
     result=backbone_versions()
     for name in ('pandas','scipy','chex','jraph','trimesh','rtree','dm-tree',
                  'jax-cuda12-plugin','jax-cuda12-pjrt','gcsfs','zarr'):
         try:result[name]=importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:result[name]=None
+    result['gpu_execution']=identity()
     return result
 
 

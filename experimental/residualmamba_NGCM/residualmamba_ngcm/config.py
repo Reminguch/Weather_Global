@@ -10,6 +10,7 @@ P = LEVELS[8:]
 @dataclass(frozen=True)
 class Config:
     schema_version: int = 1
+    runtime_policy: str = 'deterministic_gpu_v1'
     feedback_mode: str = 'baseline'
     arm: str = 'main'
     seed: int = 22

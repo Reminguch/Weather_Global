@@ -6,6 +6,16 @@ User terminology instruction on 2026-11-04: call the downloaded frozen model
 training results, not to the official pretrained backbone. Keep these distinct
 in Chinese and English reports. All weather data, environments, caches, logs,
 temporary files and experiment outputs must remain on scratch, not in home.
+GitHub publishing for this project uses the user's `hsz0403` (huangsuozhi)
+account. On this host, `ssh -T git@github.com` verified that identity on
+2026-11-04; use `git@github.com:Reminguch/Weather_Global.git` for pushes.
+The HTTPS credential cache belongs to another account and must not be used
+as a substitute for the requested identity.
+
+User instruction on 2026-11-04 specifically requests fixing the residual-Mamba
+GPU restart drift, rather than merely reporting it. Use its versioned
+deterministic GPU execution policy and verify fresh-process continuation.
+This does not introduce a monotonic-loss or forecast-improvement gate.
 
 User instruction reaffirmed on 2026-10-19: finite numerical variance,
 repeatability differences and finite restart drift are warnings, not failure or

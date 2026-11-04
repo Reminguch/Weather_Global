@@ -1,0 +1,449 @@
+{
+  "device": "NVIDIA H200",
+  "flags": "",
+  "grad_norm": {
+    "repeat": {
+      "bitwise_equal": false,
+      "changed_leaves": 1,
+      "max_abs": 5.960464477539063e-08,
+      "worst_leaves": [
+        {
+          "max_abs": 5.960464477539063e-08,
+          "path": "",
+          "reference_max_abs": 0.654905378818512,
+          "relative_l2": 9.101260533685176e-08
+        }
+      ]
+    },
+    "resume": {
+      "bitwise_equal": false,
+      "changed_leaves": 1,
+      "max_abs": 1.1920928955078125e-07,
+      "worst_leaves": [
+        {
+          "max_abs": 1.1920928955078125e-07,
+          "path": "",
+          "reference_max_abs": 0.654905378818512,
+          "relative_l2": 1.8202521067370352e-07
+        }
+      ]
+    }
+  },
+  "host_inputs": {
+    "bitwise_equal": false,
+    "changed_leaves": 273,
+    "max_abs": 0.0015302300453186035,
+    "worst_leaves": [
+      {
+        "max_abs": 0.0015302300453186035,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.3307442665100098,
+        "relative_l2": 0.00020420912121657035
+      },
+      {
+        "max_abs": 0.0013796687126159668,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.315120220184326,
+        "relative_l2": 0.00020520081200593192
+      },
+      {
+        "max_abs": 0.0011970996856689453,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.7206473350524902,
+        "relative_l2": 0.00010446129001915233
+      },
+      {
+        "max_abs": 0.0011815577745437622,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.4208056926727295,
+        "relative_l2": 0.00010711475620942526
+      },
+      {
+        "max_abs": 3.777444362640381e-05,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_ssm_state']",
+        "reference_max_abs": 0.17614370584487915,
+        "relative_l2": 0.0001102872527996851
+      }
+    ]
+  },
+  "initial_device_values": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "jit_cache_sizes_before_recompile": [
+    1,
+    1,
+    2,
+    2
+  ],
+  "loss": {
+    "repeat": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    },
+    "resume": {
+      "bitwise_equal": true,
+      "changed_leaves": 0,
+      "max_abs": 0.0,
+      "worst_leaves": []
+    }
+  },
+  "memory": {
+    "repeat": {
+      "bitwise_equal": false,
+      "changed_leaves": 8,
+      "max_abs": 0.0015700459480285645,
+      "worst_leaves": [
+        {
+          "max_abs": 0.0015700459480285645,
+          "path": "['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_conv_cache']",
+          "reference_max_abs": 3.3307442665100098,
+          "relative_l2": 0.00020657278811058455
+        },
+        {
+          "max_abs": 0.0013958215713500977,
+          "path": "['~']['mesh_interleaved_temporal_r0_s1_state_layer_0_conv_cache']",
+          "reference_max_abs": 3.315120220184326,
+          "relative_l2": 0.00020764261059445682
+        },
+        {
+          "max_abs": 0.001220703125,
+          "path": "['~']['mesh_interleaved_temporal_r0_s0_state_layer_1_conv_cache']",
+          "reference_max_abs": 3.4208056926727295,
+          "relative_l2": 0.00010852583553534452
+        },
+        {
+          "max_abs": 0.0011970996856689453,
+          "path": "['~']['mesh_interleaved_temporal_r0_s0_state_layer_0_conv_cache']",
+          "reference_max_abs": 3.7206473350524902,
+          "relative_l2": 0.00010614228720261387
+        },
+        {
+          "max_abs": 2.8353184461593628e-05,
+          "path": "['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_ssm_state']",
+          "reference_max_abs": 0.17614370584487915,
+          "relative_l2": 0.00011549048375477264
+        }
+      ]
+    },
+    "resume": {
+      "bitwise_equal": false,
+      "changed_leaves": 8,
+      "max_abs": 0.0015302300453186035,
+      "worst_leaves": [
+        {
+          "max_abs": 0.0015302300453186035,
+          "path": "['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_conv_cache']",
+          "reference_max_abs": 3.3307442665100098,
+          "relative_l2": 0.00020420912121657035
+        },
+        {
+          "max_abs": 0.0013796687126159668,
+          "path": "['~']['mesh_interleaved_temporal_r0_s1_state_layer_0_conv_cache']",
+          "reference_max_abs": 3.315120220184326,
+          "relative_l2": 0.00020520081200593192
+        },
+        {
+          "max_abs": 0.0011970996856689453,
+          "path": "['~']['mesh_interleaved_temporal_r0_s0_state_layer_0_conv_cache']",
+          "reference_max_abs": 3.7206473350524902,
+          "relative_l2": 0.00010446129001915233
+        },
+        {
+          "max_abs": 0.0011815577745437622,
+          "path": "['~']['mesh_interleaved_temporal_r0_s0_state_layer_1_conv_cache']",
+          "reference_max_abs": 3.4208056926727295,
+          "relative_l2": 0.00010711475620942526
+        },
+        {
+          "max_abs": 3.777444362640381e-05,
+          "path": "['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_ssm_state']",
+          "reference_max_abs": 0.17614370584487915,
+          "relative_l2": 0.0001102872527996851
+        }
+      ]
+    }
+  },
+  "opt_state": {
+    "repeat": {
+      "bitwise_equal": false,
+      "changed_leaves": 188,
+      "max_abs": 4.6566128730773926e-09,
+      "worst_leaves": [
+        {
+          "max_abs": 4.6566128730773926e-09,
+          "path": "[1][0].mu['temporal_residual_head']['w']",
+          "reference_max_abs": 0.005730358883738518,
+          "relative_l2": 7.415564061630119e-07
+        },
+        {
+          "max_abs": 2.2737367544323206e-11,
+          "path": "[1][0].nu['temporal_residual_head']['w']",
+          "reference_max_abs": 2.629493610584177e-05,
+          "relative_l2": 8.37974036644836e-07
+        },
+        {
+          "max_abs": 7.275957614183426e-12,
+          "path": "[1][0].mu['temporal_residual_head']['b']",
+          "reference_max_abs": 0.003503058571368456,
+          "relative_l2": 3.9355921258406935e-10
+        },
+        {
+          "max_abs": 4.078515303262975e-12,
+          "path": "[1][0].mu['grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_1']['b']",
+          "reference_max_abs": 1.336591935796605e-06,
+          "relative_l2": 3.6346190199060097e-06
+        },
+        {
+          "max_abs": 2.7640112421067897e-12,
+          "path": "[1][0].mu['grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_1']['b']",
+          "reference_max_abs": 1.9008235767614678e-06,
+          "relative_l2": 1.467387634505406e-06
+        }
+      ]
+    },
+    "resume": {
+      "bitwise_equal": false,
+      "changed_leaves": 188,
+      "max_abs": 4.6566128730773926e-09,
+      "worst_leaves": [
+        {
+          "max_abs": 4.6566128730773926e-09,
+          "path": "[1][0].mu['temporal_residual_head']['w']",
+          "reference_max_abs": 0.005730358883738518,
+          "relative_l2": 8.493401240694014e-07
+        },
+        {
+          "max_abs": 4.656612873077393e-10,
+          "path": "[1][0].mu['temporal_residual_head']['b']",
+          "reference_max_abs": 0.003503058571368456,
+          "relative_l2": 3.982539218905794e-08
+        },
+        {
+          "max_abs": 2.091837814077735e-11,
+          "path": "[1][0].nu['temporal_residual_head']['w']",
+          "reference_max_abs": 2.629493610584177e-05,
+          "relative_l2": 9.840760016491122e-07
+        },
+        {
+          "max_abs": 5.343281372915953e-12,
+          "path": "[1][0].mu['grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_1']['b']",
+          "reference_max_abs": 1.336591935796605e-06,
+          "relative_l2": 4.060763154670717e-06
+        },
+        {
+          "max_abs": 2.5863755581667647e-12,
+          "path": "[1][0].mu['grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_1']['b']",
+          "reference_max_abs": 1.9008235767614678e-06,
+          "relative_l2": 1.6618556130373484e-06
+        }
+      ]
+    }
+  },
+  "params": {
+    "repeat": {
+      "bitwise_equal": false,
+      "changed_leaves": 77,
+      "max_abs": 7.450580596923828e-09,
+      "worst_leaves": [
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.0883837640285492,
+          "relative_l2": 1.5755727969268491e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_0']['w']",
+          "reference_max_abs": 0.0707545280456543,
+          "relative_l2": 4.392573679252373e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.08838562667369843,
+          "relative_l2": 2.768487684685011e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.08838711678981781,
+          "relative_l2": 2.1086148946659297e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.08838582783937454,
+          "relative_l2": 1.6981082785807593e-09
+        }
+      ]
+    },
+    "resume": {
+      "bitwise_equal": false,
+      "changed_leaves": 76,
+      "max_abs": 7.450580596923828e-09,
+      "worst_leaves": [
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_edges_grid2mesh_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.0883837640285492,
+          "relative_l2": 1.6264934732047932e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_0']['w']",
+          "reference_max_abs": 0.0707545280456543,
+          "relative_l2": 4.613285757888074e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_nodes_grid_nodes_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.08838562667369843,
+          "relative_l2": 2.764204487516045e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/encoder_nodes_mesh_nodes_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.08838711678981781,
+          "relative_l2": 2.0765707140195875e-09
+        },
+        {
+          "max_abs": 7.450580596923828e-09,
+          "path": "['grid2mesh_gnn/~_networks_builder/processor_edges_0_grid2mesh_mlp/~/linear_1']['w']",
+          "reference_max_abs": 0.08838582783937454,
+          "relative_l2": 1.496677726190142e-09
+        }
+      ]
+    }
+  },
+  "precision": "None",
+  "recompile": {
+    "bitwise_equal": false,
+    "changed_leaves": 274,
+    "max_abs": 0.0015302300453186035,
+    "worst_leaves": [
+      {
+        "max_abs": 0.0015302300453186035,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.3307442665100098,
+        "relative_l2": 0.00020113312240618568
+      },
+      {
+        "max_abs": 0.0015152543783187866,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.315120220184326,
+        "relative_l2": 0.00020248589853823752
+      },
+      {
+        "max_abs": 0.001198338344693184,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.7206473350524902,
+        "relative_l2": 0.00010367686414399596
+      },
+      {
+        "max_abs": 0.0011815577745437622,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.4208056926727295,
+        "relative_l2": 0.00010612184227232362
+      },
+      {
+        "max_abs": 2.6609748601913452e-05,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_ssm_state']",
+        "reference_max_abs": 0.17614370584487915,
+        "relative_l2": 0.00011295581501039484
+      }
+    ]
+  },
+  "repeat_same_executable": {
+    "bitwise_equal": false,
+    "changed_leaves": 274,
+    "max_abs": 0.0015700459480285645,
+    "worst_leaves": [
+      {
+        "max_abs": 0.0015700459480285645,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.3307442665100098,
+        "relative_l2": 0.00020657278811058455
+      },
+      {
+        "max_abs": 0.0013958215713500977,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.315120220184326,
+        "relative_l2": 0.00020764261059445682
+      },
+      {
+        "max_abs": 0.001220703125,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.4208056926727295,
+        "relative_l2": 0.00010852583553534452
+      },
+      {
+        "max_abs": 0.0011970996856689453,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.7206473350524902,
+        "relative_l2": 0.00010614228720261387
+      },
+      {
+        "max_abs": 2.8353184461593628e-05,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_ssm_state']",
+        "reference_max_abs": 0.17614370584487915,
+        "relative_l2": 0.00011549048375477264
+      }
+    ]
+  },
+  "seconds": [
+    63.97554341610521,
+    0.35010722500737756,
+    0.3962903569918126,
+    0.3613501680083573,
+    21.3561090528965
+  ],
+  "serialization": {
+    "bitwise_equal": true,
+    "changed_leaves": 0,
+    "max_abs": 0.0,
+    "worst_leaves": []
+  },
+  "serialized_then_placed": {
+    "bitwise_equal": false,
+    "changed_leaves": 273,
+    "max_abs": 0.0016140937805175781,
+    "worst_leaves": [
+      {
+        "max_abs": 0.0016140937805175781,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.3307442665100098,
+        "relative_l2": 0.00021097822916208624
+      },
+      {
+        "max_abs": 0.001474618911743164,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.315120220184326,
+        "relative_l2": 0.00021195813810992602
+      },
+      {
+        "max_abs": 0.0012289434671401978,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_0_conv_cache']",
+        "reference_max_abs": 3.7206473350524902,
+        "relative_l2": 0.00010992157598434958
+      },
+      {
+        "max_abs": 0.0011815577745437622,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s0_state_layer_1_conv_cache']",
+        "reference_max_abs": 3.4208056926727295,
+        "relative_l2": 0.00011258213701520874
+      },
+      {
+        "max_abs": 4.250183701515198e-05,
+        "path": "['memory']['~']['mesh_interleaved_temporal_r0_s1_state_layer_1_ssm_state']",
+        "reference_max_abs": 0.17614370584487915,
+        "relative_l2": 0.0001156680701951525
+      }
+    ]
+  },
+  "source_identity": "db4d8f39fb7aca18f919f3320d4e3e57d971d39d569799f3f11b353bd748f70c"
+}

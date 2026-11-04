@@ -7,6 +7,16 @@ data-dependent checks. This does not establish forecast improvement. Everything 
 normative: if the code disagrees with this file, the code is wrong or this file
 must be versioned first.
 
+**Runtime amendment, 2026-11-04 (`deterministic_gpu_v1`).** The user requested
+that GPU restart drift be fixed. All production stages now configure XLA before
+backend initialization with `xla_gpu_enable_scatter_determinism_expander=true`,
+`xla_gpu_exclude_nondeterministic_ops=true`, `xla_gpu_deterministic_ops=true`,
+and `xla_gpu_autotune_level=0`. Restored arrays are explicitly placed on device.
+The execution policy is part of artifact/run identities. It changes numerical
+execution, not the architecture, loss, optimizer or data split. Qualification
+includes an actual trainer continuation test across separate Python processes
+on H200. Forecast quality and per-update loss decrease remain separate questions.
+
 **One-sentence summary.** Take the frozen deterministic NeuralGCM 2.8° model
 (NGCM), roll it out exactly as NGCM itself would, and train a GraphCast-style
 encoder–processor–decoder with interleaved Mamba memory to predict

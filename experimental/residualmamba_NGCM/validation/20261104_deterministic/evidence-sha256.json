@@ -1,0 +1,20 @@
+{
+  "files": {
+    "deterministic.json": "e58c8072552cede4f96ae1355ce041c1c3a05591b2919d8f708fe076e73e2d72",
+    "deterministic_fresh.json": "17fd06bdccff8e8f3481bb23c41351c22264a4c5eb7aaaa8036a756da05d0e2d",
+    "fast.json": "63395a7530866e99de44e7cf5e2e818f1d5b26f08ff9c2556a426c93f9e692cf",
+    "gpu-smoke.json": "59728d73591e7e0a8d05d1f5b9c5a397285fcd12d6bdea769784372686de425d",
+    "native-smoke.json": "8543721e8d6b8a1c2a6053f634f2fb5704a88310f6a054b39c73f41746d0f8c0",
+    "no_autotune.json": "e1afcdfa21f51073090eb14a7c6ae79db9b6d04415275e244e0325610052136f",
+    "optimized.json": "8f1a2c402a1582939aec144e599802c3f2edb9be59f7db61bbff4032ac7139ae",
+    "optimized_fresh.json": "7982d5d3507619a3cdaa56f63727967b14572d4fef1d95def85dd3a4adc75df9",
+    "probe-evidence.json": "d379ad20d89ae6bea4f344466a8a4221ad68f1bf194965f07ed0e0ea23f44d2d",
+    "qualification.json": "013c064c3b18a24ff73fb74c96be626f3750b5eadd398b5fa021ca063620fbf5",
+    "trainer-full.jsonl": "f4803b6b6b7c691fcbe373712dc57325d839fe6537a2c1f107ee4ba178718618",
+    "trainer-resume.json": "9a032fda80e1e888d68ab14b62e80b7c34000ad7ad088ecc03fdaca3ca66a798",
+    "trainer-split.jsonl": "9e7d0b8e8822a6a1d072f633067e247b5bf4034f30215836f0794d2dc1d257b6",
+    "unit-tests.txt": "b7b7a4c076389ed46f7803d957935799a66a5b9947c3ae56f5711923fc3004a6"
+  },
+  "integrated_slurm_job": 16864762,
+  "source_identity": "85c78befa884098f8f37874705ff2bda2307b0f2314dfcb1f42d3eb553135b45"
+}

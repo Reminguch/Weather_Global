@@ -29,6 +29,37 @@ subtracting a mean. Loss sums seven field scores with Gaussian area weights,
 pressure weights normalized over the 29 corrected levels, and 0.05 weights for
 cloud ice and liquid. There is no sliding-window weighting in this protocol.
 
+## Deterministic GPU execution and restart
+
+The default `deterministic_gpu_v1` execution policy configures XLA before JAX
+initializes a backend. Import `residualmamba_ngcm` before calling `jax.devices()`,
+creating device arrays or otherwise initializing JAX in an embedding script.
+The CLI and supplied Slurm scripts do this automatically. The required options
+are:
+
+```text
+--xla_gpu_enable_scatter_determinism_expander=true
+--xla_gpu_exclude_nondeterministic_ops=true
+--xla_gpu_deterministic_ops=true
+--xla_gpu_autotune_level=0
+```
+
+Conflicting options and imports that are too late to set missing options fail
+explicitly. Restored parameters, memory, optimizer state and RNG are placed on
+the device before the next update. The execution policy is included in artifact
+identity, so previous artifacts cannot silently qualify a new execution setup.
+`NGCM_GPU_EXECUTION_POLICY=diagnostic_external` is only for controlled probes;
+the production pipeline rejects it.
+
+The original GPU discrepancy reproduced without saving or loading a checkpoint.
+The combined execution policy eliminated it in repeated-execution, recompilation
+and fresh-process probes on H200. The optimized deterministic scatter path took
+about 4.3 seconds per synthetic BPTT24 update, versus 46–47 seconds with the slower
+deterministic fallback and 0.35 seconds with the original nondeterministic setup.
+These exclude compilation and are diagnostic timings, not production throughput.
+See [GPU_RESTART_DIAGNOSTIC_20261104.md](GPU_RESTART_DIAGNOSTIC_20261104.md) for
+the comparisons, their scope and the actual trainer regression result.
+
 ## Environment and recovered prerequisites
 
 Everything in this session is under
@@ -156,37 +187,43 @@ JAX_PLATFORMS=cpu "$NGCM_PYTHON" -m pytest -q \
   experimental/residualmamba_NGCM/tests -p no:cacheprovider \
   --basetemp="$PWD/.tmp/pytest-final"
 
-sbatch experimental/residualmamba_NGCM/tests/gpu_smoke.sbatch
-sbatch experimental/residualmamba_NGCM/tests/native_smoke.sbatch
+sbatch experimental/residualmamba_NGCM/tests/deterministic_resume.sbatch
 ```
 
 The H200 script requests **ailab**, `gpu-test`, one GPU and one hour. It uses
 the actual 8192-grid-node, 2562-mesh-node, width-512, four-Mamba-layer model,
 checks the zero head and unchanged upper levels bitwise, checks nonzero memory,
 and executes three optimizer updates with full 24-step BPTT plus a checkpoint
-continuation comparison. Its inputs are
+continuation comparison. It then invokes the production trainer in independent
+Python processes, comparing three uninterrupted updates with two updates followed
+by a fresh-process resume to update three, including parameters, memory, Adam
+state, RNG and cursor. Its inputs are
 synthetic and its numerical losses are not weather skill measurements.
 
-The separate native script uses 29 already restored real ERA5 frames and the
+The final stage uses 29 already restored real ERA5 frames and the
 official checkpoint. It builds one complete 24-step chunk, serializes it,
 and compares the 21-step tail to the existing native evaluator. Its pilot
 normalization is diagnostic only. It cannot substitute for production T1,
 which requires three randomly selected training chunks and one validation
 chunk with the full train-only statistics.
 
-`qualify` verifies the source identities of both real-model smoke receipts and
-reruns the unit tests. Supply the actual successful receipts:
+`qualify` verifies all three smoke source identities, checks the GPU execution
+policy and bitwise restart comparisons, and reruns the unit tests. Supply the
+actual successful receipts:
 
 ```bash
 "$NGCM_PYTHON" -m residualmamba_ngcm qualify \
   --config "$NGCM_CONFIG" --run-root "$NGCM_RUN" \
-  --gpu-smoke logs/gpu-smoke-<job>.json \
-  --native-smoke logs/native-smoke-<job>/result.json
+  --gpu-smoke logs/deterministic-resume-<job>/gpu-smoke.json \
+  --native-smoke logs/deterministic-resume-<job>/native/result.json \
+  --resume-smoke logs/deterministic-resume-<job>/trainer/comparison.json
 ```
 
 Per the repository's `AGENTS.md`, finite numerical repeatability differences
 are recorded with their reference bounds and warnings. They do not silently
-cancel a bounded experiment. Nonfinite computation, corrupt inputs, mismatched
+cancel a bounded experiment. The user's specific November 4 request to fix GPU
+restart drift adds a regression check for that fix; it does not impose a
+monotonic-loss or forecast-improvement condition. Nonfinite computation, corrupt inputs, mismatched
 identities and unusable execution remain errors. Test losses need not decrease
 at every update. Validation monitors all 15 segments and does not select a
 checkpoint or an SWA window.
@@ -216,9 +253,10 @@ checkpoint or an SWA window.
 ```
 
 Checkpoints include parameters, Adam state, Mamba memory, RNG, update and the
-next chronological cursor. Resume requires an identical run identity. GPU
-floating-point continuation showed a finite difference in the smoke test; see
-[VALIDATION.md](VALIDATION.md). SWA
+next chronological cursor. Resume requires an identical run identity, including
+the deterministic execution policy. See [VALIDATION.md](VALIDATION.md) for the
+verified restart comparisons. Bitwise equivalence across different GPU types,
+JAX/CUDA versions or CPU versus GPU is not claimed. SWA
 averages parameters from exactly 13 checkpoints, updates 2000–8000 inclusive;
 it never averages memory or optimizer state. Evaluate update 10000 separately.
 
