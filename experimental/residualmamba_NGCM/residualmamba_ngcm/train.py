@@ -78,7 +78,8 @@ def census(segments,load,latitude,path,upstream):
     return result
 
 
-def run(model,config,segments,val_segments,load,latitude,root,identity,steps=None,resume=None):
+def run(model,config,segments,val_segments,load,latitude,root,identity,steps=None,resume=None,
+        *,stop_after_update=None,defer_validation=False):
     from .runtime import require_production_policy
     require_production_policy()
     root=Path(root)
@@ -131,10 +132,13 @@ def run(model,config,segments,val_segments,load,latitude,root,identity,steps=Non
                 'seconds':time.monotonic()-clock,'cursor':cursor.to_dict()}
         append_jsonl(root/'training.jsonl',record)
         print(record,flush=True)
-        if step%config.checkpoint_every==0 or step==endpoint:
+        stop=bool(stop_after_update(record)) if stop_after_update is not None else False
+        if step%config.checkpoint_every==0 or step==endpoint or stop:
             save_checkpoint(root/f'step_{step:05d}.pkl',{'params':params,'memory':state,'opt_state':opt_state,
                 'rng':key,'cursor':cursor.to_dict(),'step':step,'identity':identity})
-        if step%config.validation_every==0:
+        if step%config.validation_every==0 and not defer_validation:
             report=validate(model,params,initial_state,val_segments,load,latitude,config)
             write_json(root/f'validation_{step:05d}.json',report,immutable=True)
+        if stop:
+            return {'step':step,'identity':identity,'stop_reason':'requested_after_committed_update'}
     return {'step':endpoint,'identity':identity}

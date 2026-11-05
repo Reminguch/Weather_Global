@@ -17,6 +17,12 @@ GPU restart drift, rather than merely reporting it. Use its versioned
 deterministic GPU execution policy and verify fresh-process continuation.
 This does not introduce a monotonic-loss or forecast-improvement gate.
 
+User follow-up on 2026-11-04 requests automatically running a bounded 2,000-update
+loss diagnostic after the restored data are complete, using ailab H200 gpu-test
+jobs and checkpoint continuation. The separate DIAGNOSTIC_2K.md documents the
+MENGDIW scratch diagnostic cache and deferral of the full production year-by-year
+audit. Preserve the qualified architecture, loss and original LR schedule.
+
 User instruction reaffirmed on 2026-10-19: finite numerical variance,
 repeatability differences and finite restart drift are warnings, not failure or
 release-blocking conditions. Preserve their measured values, reference bounds

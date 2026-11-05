@@ -181,7 +181,9 @@ def test_exact_training_resume_and_segment_carry(tmp_path):
     load=lambda a:batch
     cfg=Config();full=tmp_path/'full';split=tmp_path/'split'
     run(model,cfg,segments,(),load,LAT,full,'test',steps=5)
-    run(model,cfg,segments,(),load,LAT,split,'test',steps=2)
+    stopped=run(model,cfg,segments,(),load,LAT,split,'test',steps=5,
+                stop_after_update=lambda record:record['step']==2)
+    assert stopped['step']==2 and stopped['stop_reason']=='requested_after_committed_update'
     run(model,cfg,segments,(),load,LAT,split,'test',steps=5,resume=split/'step_00002.pkl')
     a=load_checkpoint(full/'step_00005.pkl');b=load_checkpoint(split/'step_00005.pkl')
     for x,y in zip(jax.tree_util.tree_leaves(a),jax.tree_util.tree_leaves(b)):

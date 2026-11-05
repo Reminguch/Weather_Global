@@ -1,5 +1,23 @@
 # Validation record — 2026-11-04
 
+## Subsequent 2k orchestration extension
+
+The 2,000-update request adds a callback that saves a complete checkpoint after
+an update when a short job approaches its time limit. Default training math is
+unchanged. CPU tests cover exact callback-stop/resume continuation, the scheduler
+stage transitions, submission deduplication and matched-anchor loss reporting.
+All **31 CPU tests passed** in 13.98 seconds, with eight dependency deprecation
+warnings. The [executed test log](validation/20261105_2k_controls/unit-tests.txt)
+is retained. The core source identity for this extension is
+`ba35cf865c859861b932842b7fb02319ac9d66d3a51b8b85567095a967bb10aa`.
+The corresponding H200 regression was submitted as **16882825** and was queued
+at the time of this commit. The automatic diagnostic will require its successful
+fresh-process comparison before optimizer updates begin. See
+[DIAGNOSTIC_2K.md](DIAGNOSTIC_2K.md) for the explicit diagnostic scope.
+
+The evidence below records the previously completed runtime-policy correction;
+its source identity must not be substituted for qualification of the extension.
+
 The new open-loop implementation has passed the historical checks below. This is an
 implementation and smoke-test result, **not a demonstration of improved weather
 forecast skill**. The official pretrained NeuralGCM weights are unchanged.

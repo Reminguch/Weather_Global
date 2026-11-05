@@ -26,7 +26,7 @@ def main():
             raise AssertionError('Production trainer differs after a fresh-process restart')
         write_json(a.root/'comparison.json',{'status':'passed','comparisons':result,
             'source_identity':source_identity(),'libraries':versions(),
-            'scope':'production train.run; uninterrupted 3 vs 2+1 in separate Python processes',
+            'scope':'production train.run; uninterrupted 3 vs callback-stopped 2+1 in separate Python processes',
             'device':jax.devices()[0].device_kind},immutable=True)
         print('Production trainer fresh-process resume is bitwise identical',flush=True)
         return
@@ -40,7 +40,7 @@ def main():
     segments=(np.arange(96),np.arange(96,192))
     output=a.root/('full' if a.mode=='full' else 'split')
     resume=output/'step_00002.pkl' if a.mode=='resume' else None
-    run(model,cfg,segments,(),lambda _:batch,latitude,output,identity,
-        steps=2 if a.mode=='partial' else 3,resume=resume)
+    run(model,cfg,segments,(),lambda _:batch,latitude,output,identity,steps=3,resume=resume,
+        stop_after_update=(lambda record:record['step']==2) if a.mode=='partial' else None)
 
 if __name__=='__main__':main()

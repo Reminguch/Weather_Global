@@ -29,6 +29,11 @@ subtracting a mean. Loss sums seven field scores with Gaussian area weights,
 pressure weights normalized over the 29 corrected levels, and 0.05 weights for
 cloud ice and liquid. There is no sliding-window weighting in this protocol.
 
+The user's subsequent bounded 2,000-update H200 request has a separate
+[automatic diagnostic procedure](DIAGNOSTIC_2K.md), including its explicit
+MENGDIW cache location, deferred full production audit, one-hour job continuation
+and fixed validation at updates 1,000 and 2,000.
+
 ## Deterministic GPU execution and restart
 
 The default `deterministic_gpu_v1` execution policy configures XLA before JAX
