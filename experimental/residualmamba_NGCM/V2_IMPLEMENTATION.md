@@ -87,7 +87,9 @@ contributions is **8.08e-9**.
 | Specific humidity | 1.1744343809 | 33.32% |
 
 No individual field/level exceeds 10% of the objective averaged over steps.
-This does not establish forecast improvement. The earlier seven-field total
+Checking the one-step prefix and each tail lead separately, the largest
+field/level share is 3.291%. No new humidity scale floor is indicated by this
+census. This does not establish forecast improvement. The earlier seven-field total
 must not be compared directly with the v2 total.
 
 CPU tests cover the independent loss formula and gradient, excluded fields,
@@ -98,7 +100,9 @@ cached inputs, runs full 24-step BPTT updates, and compares uninterrupted
 training with a fresh-process resume across parameters, memory, optimizer,
 RNG and cursor. It also exercises the native rollout smoke.
 
-Executed evidence and final GPU status are recorded in
-`validation/20261105_v2/`. GPU results must be read from those receipts; preparing
-or submitting the smoke script is not a passing result. No v2 2k forecast-skill
-claim is made by this implementation change.
+Executed evidence is recorded in `validation/20261105_v2/`. All 46 CPU tests,
+the full-cache loss regression, actual input import, H200 model smoke, native
+rollout and fresh-process restart checks passed. All five resumed state groups
+are bitwise identical, with maximum absolute difference zero. H200 job 16928171
+used the frozen implementation commit `db93a3a`. No v2 2k forecast-skill claim is
+made by this implementation change.

@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "source_identity": "bb79520da23d4de9713c38e038dc6726d0d5fc90abcb390ac621ad274f6e384b",
+  "tests": 46,
+  "cpu_log_sha256": "a01ab1b44839a224bc0fa388adaf43934872f7de86eb937d27c54a2885c8af50",
+  "input_import": "passed; pipeline.context validated the new v2 identity and original input receipts",
+  "store_identity": "acc1cbd0683e61e960cab1d60beca48190b619ce26b804c9deb08d509cb21af6",
+  "schema_version": 2,
+  "output_channels": 145,
+  "scope": "CPU tests and actual input import; GPU evidence in separate receipts"
+}

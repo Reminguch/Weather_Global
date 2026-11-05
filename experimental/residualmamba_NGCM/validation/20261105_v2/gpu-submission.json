@@ -1,0 +1,18 @@
+{
+  "job_id": 16928171,
+  "account": "mengdiw",
+  "partition": "ailab",
+  "qos": "gpu-test",
+  "gpu": "h200:1",
+  "time_limit": "01:00:00",
+  "source_commit": "db93a3a",
+  "status_at_submission": "PENDING",
+  "reason": "QOSMaxJobsPerUserLimit",
+  "output_root": "artifacts/v2_qualification_20261105/gpu",
+  "log": "logs/v2-smoke-16928171.log",
+  "last_observed_status": "COMPLETED",
+  "node": "della-i21g2",
+  "verification_result": "passed",
+  "elapsed": "00:11:11",
+  "exit_code": "0:0"
+}

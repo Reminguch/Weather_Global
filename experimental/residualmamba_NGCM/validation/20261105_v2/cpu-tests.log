@@ -1,0 +1,21 @@
+..............................................                           [100%]
+=============================== warnings summary ===============================
+../Weather_Global/.venv_ngcm_data/lib/python3.11/site-packages/jax/_src/config.py:283
+  /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/.venv_ngcm_data/lib/python3.11/site-packages/jax/_src/config.py:283: DeprecationWarning: Setting `jax_pmap_shmap_merge` is deprecated in JAX v0.9.0 and will be removed in JAX v0.10.0.
+    value = self._parser(value)
+
+experimental/residualmamba_NGCM/tests/test_contracts.py::test_progress_features_use_graphcast_helpers
+experimental/residualmamba_NGCM/tests/test_contracts.py::test_eval_never_feeds_corrected_weather_back
+experimental/residualmamba_NGCM/tests/test_contracts.py::test_eval_never_feeds_corrected_weather_back
+experimental/residualmamba_NGCM/tests/test_contracts.py::test_eval_never_feeds_corrected_weather_back
+  /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/third_party/graphcast/graphcast/solar_radiation.py:151: Pandas4Warning: DatetimeIndex.dayofyear is deprecated and will be removed in a future version. Use DatetimeIndex.day_of_year instead.
+    year_fraction = (timestamps.dayofyear - 1 + day_fraction) / year_length
+
+experimental/residualmamba_NGCM/tests/test_contracts.py: 3 warnings
+experimental/residualmamba_NGCM/tests/test_dense_eval.py: 4 warnings
+experimental/residualmamba_NGCM/tests/test_tail1.py: 3 warnings
+  /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/.venv_ngcm_data/lib/python3.11/site-packages/optax/_src/linear_algebra.py:44: DeprecationWarning: optax.global_norm is deprecated in favor of optax.tree.norm
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+46 passed, 15 warnings in 31.82s
