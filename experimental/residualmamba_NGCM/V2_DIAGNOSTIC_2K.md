@@ -48,3 +48,37 @@ run. Job submissions, checkpoint steps and scheduling status are journaled under
 `controller/`. A completed run requires both update 2,000 and evaluation of all
 saved checkpoints. All data, environments, logs, temporary files and outputs
 remain under scratch.
+
+## Independent ar_tail_k=1 v2 run
+
+The user additionally requested this arm on 2026-11-05. Prepare a **new** run
+with `--tail1-donor-root` pointing to the completed v1 tail1 raw cache, alongside
+the usual tail20 `--donor-root` for shared statistics and common evaluation.
+`v2_tail1_inputs.py` authenticates the native producer, all 484 chunk receipts,
+READY, train-statistics identity and the existing native/restart evidence.
+No v1 learned parameters or optimizer state are imported.
+
+The v2 core remains exactly the qualified five-field implementation. The
+unchanged `tail1_extension.py` supplies `Tail1Config`: BPTT 24, segment 96,
+ar_tail_k 1, truth prefix 23. Thus the final native tail consists of the 6 h and
+12 h forecasts, following 22 independent one-step prefix forecasts. Memory
+still carries across four chunks and resets at the next segment. Only tail
+length and its derived prefix change. The raw-input preflight describes shared
+tail20 evaluation inputs; `plan.json` identifies the training arm and the
+trainer's `checkpoints/run.json` records the actual Tail1Config.
+
+Both arms use fresh seed-22 initialization, 2,000 updates, the same optimizer
+schedule and five-field loss. The tail1 arm saves every 100 updates and receives
+dense evaluation on the **same tail20 validation inputs** as the tail20 arm.
+Its plots are labelled tail1; its shorter-horizon training loss must not be
+compared directly with tail20 training loss. This comparison changes training
+horizon and teacher forcing, so it is not by itself an isolated memory ablation.
+The already running tail20 arm uses its original immutable snapshot.
+
+Validation reuses the passing v2 GPU model/restart qualification and the prior
+native tail1 loader/continuation evidence, with v2 CPU tests for actual routing,
+configuration, continuation and checkpoint labels. `check --sample` additionally
+loads a real full tail1 chunk under v2, checks 796 input / 145 target channels,
+finite values and all five loss contributions before submission. The first
+live H200 updates provide the real-data integration check. Reusing evidence is
+not described as a newly executed tail1-specific GPU restart experiment.

@@ -7,9 +7,11 @@ import ngcm_2k_controller as controller
 
 def pending_checkpoints(root):
     root=Path(root)
+    plan=root/'plan.json'
+    arm=controller.read(plan).get('arm','tail20') if plan.exists() else 'tail20'
     return [p for p in sorted((root/'checkpoints').glob('step_*.pkl'))
             if p.with_suffix('.json').exists() and not
-            (root/'eval/tail20'/p.stem/'summary.json').exists()]
+            (root/'eval'/arm/p.stem/'summary.json').exists()]
 
 
 def next_actions(root):
@@ -30,7 +32,8 @@ def main():
     original_batch=controller.batch
     def batch(plan,key,gpu,extra):
         args,script=original_batch(plan,key,gpu,extra)
-        args=[x.replace('--job-name=ngcm2k-','--job-name=ngcm-v2-') for x in args]
+        label='ngcm-v2-tail1-' if plan.get('arm')=='tail1' else 'ngcm-v2-'
+        args=[x.replace('--job-name=ngcm2k-','--job-name='+label) for x in args]
         return args,script
     controller.batch=batch;controller.next_actions=next_actions
     try:controller.watch(root)

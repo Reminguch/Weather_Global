@@ -62,3 +62,8 @@ its resubmission controllers. Preserve v1 checkpoints/results and shared raw
 inputs. Continue with the qualified loss v2 2k H200 diagnostic described in
 experimental/residualmamba_NGCM/V2_DIAGNOSTIC_2K.md. This supersedes the earlier
 instruction to keep the v1 tail20 and tail1 jobs running.
+
+User follow-up on 2026-11-05: submit an additional independent loss v2
+ar_tail_k=1 2k H200 run. Keep the running v2 ar_tail_k=20 arm unchanged and
+compare both on the same tail20 validation inputs. Reuse the authenticated
+raw tail1 cache and shared train-only statistics, with fresh learned state.
