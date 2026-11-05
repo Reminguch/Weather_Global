@@ -50,3 +50,9 @@ checkpoints, unusable execution, resource limits, and explicit user stop rules.
 
 Current MGDA implementation and rerun history:
 [research/directions/r005-mgda-accuracy-spectral-adjustment/devel.md](research/directions/r005-mgda-accuracy-spectral-adjustment/devel.md).
+
+User clarification on 2026-11-05: keep the running ar_tail_k=20 diagnostic and
+add an independent ar_tail_k=1 2k run. This is not a sequential curriculum.
+TAIL1_COMPARE.md documents the separately versioned extension, its derived
+truth prefix of 23, shared full training statistics, and common tail20
+validation. Preserve the original running source snapshot and its jobs.
