@@ -1,0 +1,36 @@
+{
+  "finite": true,
+  "groups": {
+    "cursor": {
+      "bitwise": true,
+      "max_abs_diff": 0.0
+    },
+    "memory": {
+      "bitwise": true,
+      "max_abs_diff": 0.0
+    },
+    "opt_state": {
+      "bitwise": true,
+      "max_abs_diff": 0.0
+    },
+    "params": {
+      "bitwise": true,
+      "max_abs_diff": 0.0
+    },
+    "rng": {
+      "bitwise": true,
+      "max_abs_diff": 0.0
+    }
+  },
+  "native": [
+    {
+      "a0": 4,
+      "prefix_max_diff_in_std": 0.0,
+      "tail_max_diff_in_std": 0.0,
+      "warning": false
+    }
+  ],
+  "restart_warning": false,
+  "scope": "full architecture, real tail1 data, continuous 3 vs callback stop 2 and fresh-process resume",
+  "source_identity": "ba35cf865c859861b932842b7fb02319ac9d66d3a51b8b85567095a967bb10aa"
+}
