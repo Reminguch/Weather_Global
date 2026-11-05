@@ -56,3 +56,9 @@ add an independent ar_tail_k=1 2k run. This is not a sequential curriculum.
 TAIL1_COMPARE.md documents the separately versioned extension, its derived
 truth prefix of 23, shared full training statistics, and common tail20
 validation. Preserve the original running source snapshot and its jobs.
+
+User update on 2026-11-05: cancel v1 residual training and evaluation and stop
+its resubmission controllers. Preserve v1 checkpoints/results and shared raw
+inputs. Continue with the qualified loss v2 2k H200 diagnostic described in
+experimental/residualmamba_NGCM/V2_DIAGNOSTIC_2K.md. This supersedes the earlier
+instruction to keep the v1 tail20 and tail1 jobs running.
