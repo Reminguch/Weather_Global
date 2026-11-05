@@ -1,0 +1,145 @@
+{
+  "created_unix": 1793905659.7072737,
+  "checkpoints": {
+    "tail20": [
+      323,
+      500,
+      649,
+      700
+    ],
+    "tail1": []
+  },
+  "pending_evaluations": {
+    "tail20": [
+      500,
+      649,
+      700
+    ],
+    "tail1": []
+  },
+  "training_checkpoint_points": [
+    {
+      "arm": "tail20",
+      "checkpoint_step": 323,
+      "loss_at_update": 20.730146408081055,
+      "previous_100_update_mean": 25.395310363769532,
+      "window_start": 224,
+      "window_end": 323,
+      "cumulative_recorded_update_seconds": 2766.3397375093773
+    },
+    {
+      "arm": "tail20",
+      "checkpoint_step": 500,
+      "loss_at_update": 17.461612701416016,
+      "previous_100_update_mean": 19.227169742584227,
+      "window_start": 401,
+      "window_end": 500,
+      "cumulative_recorded_update_seconds": 4334.869135887362
+    },
+    {
+      "arm": "tail20",
+      "checkpoint_step": 649,
+      "loss_at_update": 14.376520156860352,
+      "previous_100_update_mean": 15.091123104095459,
+      "window_start": 550,
+      "window_end": 649,
+      "cumulative_recorded_update_seconds": 5575.254621434258
+    },
+    {
+      "arm": "tail20",
+      "checkpoint_step": 700,
+      "loss_at_update": 13.441967010498047,
+      "previous_100_update_mean": 14.419565391540527,
+      "window_start": 601,
+      "window_end": 700,
+      "cumulative_recorded_update_seconds": 6100.523117551464
+    }
+  ],
+  "evaluations": [
+    {
+      "arm": "tail20",
+      "baseline_mean_loss": 36.93013916962716,
+      "baseline_per_field": {
+        "geopotential": 0.5522368673761776,
+        "specific_cloud_ice_water_content": 3.9789774021612097,
+        "specific_cloud_liquid_water_content": 29.425996658517573,
+        "specific_humidity": 1.1744344106898554,
+        "temperature": 0.5466317514815777,
+        "u_component_of_wind": 0.7131393850526769,
+        "v_component_of_wind": 0.5387226943480832
+      },
+      "baseline_per_step": [
+        38.39023760451692,
+        38.46753089711486,
+        38.84759471122464,
+        38.26284396280189,
+        30.18026060518205,
+        29.18457016176065,
+        28.99102023186533,
+        29.36245164207994,
+        29.770997268713597,
+        31.000619040097625,
+        32.09534057117575,
+        33.278983628514474,
+        35.28821535917594,
+        37.80909069226133,
+        38.552882145640126,
+        40.24671161337367,
+        39.339077517061014,
+        40.246815665220005,
+        40.75615050526068,
+        42.23086652516601,
+        41.825820715072396,
+        42.89932450934333,
+        43.850108301259866,
+        45.445826197169715
+      ],
+      "checkpoint": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/diagnostic_2k_20261105/checkpoints/step_00323.pkl",
+      "checkpoint_sha256": "d39911b72f20b9bb635b905257280f7628f4c6f66daff98f8a9fa80d241b63c3",
+      "chunks": 60,
+      "completed_unix": 1793904641.294578,
+      "improvement_percent": 39.19062963260242,
+      "mean_loss": 22.456985104853942,
+      "parameter_selection": "monitor only; no validation-based tuning",
+      "per_field": {
+        "geopotential": 0.5521304724028595,
+        "specific_cloud_ice_water_content": 3.904066502486473,
+        "specific_cloud_liquid_water_content": 15.025696147782908,
+        "specific_humidity": 1.172009855371122,
+        "temperature": 0.549012085310177,
+        "u_component_of_wind": 0.7145094606634907,
+        "v_component_of_wind": 0.5395605808369106
+      },
+      "per_step": [
+        21.161438018933584,
+        21.315904880616046,
+        21.381354593014958,
+        21.22212441097236,
+        16.683012445719218,
+        16.24245899770255,
+        15.978616923384955,
+        16.418597721347215,
+        16.611364287223964,
+        17.68586878240058,
+        18.440477450194884,
+        19.650292265206126,
+        21.251367206446957,
+        23.539361772504947,
+        24.068855993828404,
+        25.777956365913752,
+        24.91227614486682,
+        25.945160150993615,
+        26.342001175573383,
+        27.874915786895993,
+        27.448669598290387,
+        28.58524912882931,
+        29.355425111124354,
+        31.074893304510205
+      ],
+      "protocol_hash": "3056a22f84646ffe37dbfd20eeb8a3e0b489087a26f5e6fbd4ade0e406e90658",
+      "segments": 15,
+      "step": 323
+    }
+  ],
+  "script_sha256": "6e9d67c51e4741f76a71182a2b5d9a740abf2903ca15c23d616a01d0bf20b6a7"
+}
