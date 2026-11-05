@@ -1,0 +1,9 @@
+{
+  "cache_ready_sha256": "57c3b6957e7973c7424d8ae4427c12d1b2c5ff1c85e29d9009bea23d63744c7c",
+  "evaluator_sha256": "58cfcce01411fe76c246d49230a4f1b7e538ef66a620b31a0f92398d5d577f21",
+  "geometry_sha256": "517c706c8c3e65f01e54bd9399f54ec350ac8710bf9664cd024b23fc24a365db",
+  "memory": "reset each 96-anchor segment, carry all 4 chunks",
+  "seed": 22,
+  "stats_sha256": "d5c5c850caffc2bfc54b41640483ac524a71bbfad6eb22bac06693880884aacd",
+  "validation": "all 15 complete 2022 segments, native tail20 inputs, leads 6..126h"
+}
