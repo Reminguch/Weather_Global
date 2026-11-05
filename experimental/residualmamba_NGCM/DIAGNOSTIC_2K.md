@@ -110,8 +110,12 @@ scratch.
   --root "$PWD/artifacts/diagnostic_2k_20261105"
 ```
 
-Create `code/` from the recorded Git commit before starting the watcher, and
-create its `.tmp` and `.cache` directories on scratch. The detached launcher
+Create `code/` from the recorded Git commit before starting the watcher. Archive
+the required source paths (`AGENTS.md`, `src`, `third_party/graphcast`,
+`experimental/residualmamba_NGCM`, and the controller/launcher scripts), rather
+than historical result directories containing external symlinks. Verify the
+snapshot source identity against the plan and create its `.tmp` and `.cache`
+directories on scratch. The detached launcher
 records its PID and log under `controller/`; it does not depend on an open SSH
 session.
 

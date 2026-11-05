@@ -93,3 +93,10 @@ def test_explicit_cluster_capacity_rejection_is_retryable(tmp_path,monkeypatch):
     assert control.read(tmp_path/'controller/jobs/setup-001.json')['phase']=='rejected'
     control.submit(plan,'setup',False,[],2)
     assert control.read(tmp_path/'controller/jobs/setup-002.json')['job_id']=='12345'
+
+
+def test_finished_job_can_leave_squeue_before_accounting_lookup(monkeypatch):
+    monkeypatch.setattr(control.subprocess,'run',lambda *a,**k:control.subprocess.CompletedProcess(
+        [],1,'','slurm_load_jobs error: Invalid job id specified'))
+    monkeypatch.setattr(control.subprocess,'check_output',lambda *a,**k:'12345|COMPLETED|0:0|\n')
+    assert control.state_of('12345')==('COMPLETED','0:0')

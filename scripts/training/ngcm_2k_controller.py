@@ -101,7 +101,10 @@ def batch(plan,key,gpu,extra):
 
 
 def state_of(job):
-    text=subprocess.check_output(['squeue','-h','-j',job,'-o','%T'],text=True,timeout=30).strip()
+    query=subprocess.run(['squeue','-h','-j',job,'-o','%T'],capture_output=True,text=True,timeout=30)
+    if query.returncode and 'Invalid job id' not in query.stderr:
+        raise RuntimeError('Unable to query scheduler: '+query.stderr)
+    text=query.stdout.strip()
     if text:return text.splitlines()[0],None
     text=subprocess.check_output(['sacct','-X','-n','-P','-j',job,'-o','JobIDRaw,State,ExitCode'],text=True,timeout=30)
     for line in text.splitlines():

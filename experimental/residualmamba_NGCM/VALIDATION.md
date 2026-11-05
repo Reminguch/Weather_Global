@@ -10,9 +10,15 @@ All **31 CPU tests passed** in 13.98 seconds, with eight dependency deprecation
 warnings. The [executed test log](validation/20261105_2k_controls/unit-tests.txt)
 is retained. The core source identity for this extension is
 `ba35cf865c859861b932842b7fb02319ac9d66d3a51b8b85567095a967bb10aa`.
-The corresponding H200 regression was submitted as **16882825** and was queued
-at the time of this commit. The automatic diagnostic will require its successful
-fresh-process comparison before optimizer updates begin. See
+The corresponding H200 regression **16882825** completed successfully in
+**10 min 32 s**. Callback-triggered checkpointing followed by fresh-process
+continuation was bitwise equal for parameters, memory, Adam, RNG and cursor,
+with all maximum differences zero. The
+[trainer receipt](validation/20261105_2k_controls/trainer-resume.json),
+[GPU smoke](validation/20261105_2k_controls/gpu-smoke.json) and
+[native pilot](validation/20261105_2k_controls/native-smoke.json) are retained.
+An additional scheduler-accounting regression covers completed jobs disappearing
+from `squeue`; the eight controller tests passed together. See
 [DIAGNOSTIC_2K.md](DIAGNOSTIC_2K.md) for the explicit diagnostic scope.
 
 The evidence below records the previously completed runtime-policy correction;
