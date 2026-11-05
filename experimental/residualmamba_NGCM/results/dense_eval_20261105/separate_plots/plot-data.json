@@ -1,11 +1,13 @@
 {
-  "created_unix": 1793905740.3295124,
+  "created_unix": 1793907150.399602,
   "checkpoints": {
     "tail20": [
       323,
       500,
       649,
-      700
+      700,
+      800,
+      900
     ],
     "tail1": []
   },
@@ -13,7 +15,9 @@
     "tail20": [
       500,
       649,
-      700
+      700,
+      800,
+      900
     ],
     "tail1": []
   },
@@ -53,6 +57,24 @@
       "window_start": 601,
       "window_end": 700,
       "cumulative_recorded_update_seconds": 6100.523117551464
+    },
+    {
+      "arm": "tail20",
+      "checkpoint_step": 800,
+      "loss_at_update": 11.636866569519043,
+      "previous_100_update_mean": 12.988091316223144,
+      "window_start": 701,
+      "window_end": 800,
+      "cumulative_recorded_update_seconds": 7000.2927903906675
+    },
+    {
+      "arm": "tail20",
+      "checkpoint_step": 900,
+      "loss_at_update": 10.247602462768555,
+      "previous_100_update_mean": 11.576056776046753,
+      "window_start": 801,
+      "window_end": 900,
+      "cumulative_recorded_update_seconds": 7902.135766013293
     }
   ],
   "evaluations": [
