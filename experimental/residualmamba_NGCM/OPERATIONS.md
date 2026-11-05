@@ -94,7 +94,12 @@ requires all **13,148** timestamps before publishing the complete store.
 The two-frame download pilot passed shape, dtype, finiteness, checksum and
 no-redownload resume checks. Compute nodes could not resolve Google Cloud, so
 restoration runs on the previously used internet-enabled `della-vis1` node,
-with four workers and four CPU threads per worker. The supervisor retries each
+with four original workers and four CPU threads per worker. On November 4,
+twelve cooperative workers were added on the same node, bringing the total to
+sixteen after a successful concurrency smoke test. Observed aggregate throughput
+increased about 2.9 times. Per-month locks and completed-month skipping prevent
+duplicate writes. See the [parallel download record](../../scripts/preprocessing/DOWNLOAD_PARALLEL_20261104.md)
+for the H200 network probe, launch commands and measured evidence. The supervisor retries each
 month at most three times and can be restarted to resume outstanding work.
 This node switch does not change the data producer or its output contract.
 

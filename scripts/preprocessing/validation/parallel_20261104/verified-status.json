@@ -1,0 +1,143 @@
+{
+  "additional_pool": {
+    "cpu_offset": 16,
+    "excluded_legacy_active_months": [
+      24,
+      29,
+      30,
+      31
+    ],
+    "host": "della-vis1.princeton.edu",
+    "pid": 2646938,
+    "started_unix": 1793842622.6488645,
+    "workers": 12
+  },
+  "before_pool_600s_frames": 162,
+  "checked_unix": 1793846086.742542,
+  "complete_months": 44,
+  "complete_store": false,
+  "frames": 6202,
+  "host": "della-vis1.princeton.edu",
+  "lanes": [
+    {
+      "index": 32,
+      "lock_held": true,
+      "pool": "restore_20261104",
+      "status": "running",
+      "worker": 0
+    },
+    {
+      "index": 33,
+      "lock_held": true,
+      "pool": "restore_20261104",
+      "status": "running",
+      "worker": 1
+    },
+    {
+      "index": 34,
+      "lock_held": true,
+      "pool": "restore_20261104",
+      "status": "running",
+      "worker": 2
+    },
+    {
+      "index": 35,
+      "lock_held": true,
+      "pool": "restore_20261104",
+      "status": "running",
+      "worker": 3
+    },
+    {
+      "index": 91,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 0
+    },
+    {
+      "index": 94,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 1
+    },
+    {
+      "index": 90,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 10
+    },
+    {
+      "index": 95,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 11
+    },
+    {
+      "index": 84,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 2
+    },
+    {
+      "index": 85,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 3
+    },
+    {
+      "index": 87,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 4
+    },
+    {
+      "index": 89,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 5
+    },
+    {
+      "index": 92,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 6
+    },
+    {
+      "index": 86,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 7
+    },
+    {
+      "index": 93,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 8
+    },
+    {
+      "index": 88,
+      "lock_held": true,
+      "pool": "restore_parallel_20261104",
+      "status": "running",
+      "worker": 9
+    }
+  ],
+  "local_download_processes": 16,
+  "pool_age_seconds": 3464.093677520752,
+  "recent_frames": {
+    "300": 254,
+    "60": 48,
+    "600": 466
+  },
+  "total_frames": 13148
+}
