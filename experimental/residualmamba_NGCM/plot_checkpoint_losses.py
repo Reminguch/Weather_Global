@@ -21,7 +21,7 @@ LABELS={'tail20':'ar_tail_k = 20','tail1':'ar_tail_k = 1'}
 
 def write_csv(path,rows,fields):
     with path.open('w',newline='') as f:
-        w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+        w=csv.DictWriter(f,fieldnames=fields,lineterminator='\n');w.writeheader();w.writerows(rows)
 
 
 def save(fig,path):
