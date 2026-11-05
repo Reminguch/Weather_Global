@@ -66,6 +66,9 @@ def draw(root,out):
     fig.suptitle('Markers show the preceding 100-update mean; weather samples change across updates.',fontsize=10)
     save(fig,out/'train_loss_vs_checkpoint.png')
     if not evals:raise ValueError('No completed checkpoint evaluation yet')
+    fields=[(f,label) for f,label in FIELDS if f in evals[0]['per_field']]
+    if any(set(e['per_field'])!=set(evals[0]['per_field']) for e in evals):
+        raise ValueError('Do not mix v1 and v2 objectives in one plot root')
     baseline=evals[0]['baseline_mean_loss'];last=max(max(v,default=0) for v in available.values())
     fig,ax=plt.subplots(figsize=(10,4.8),layout='constrained')
     ax.axhline(baseline,color='#64748b',ls='--',lw=1.2,label='Official NeuralGCM zero-head reference')
@@ -79,7 +82,7 @@ def draw(root,out):
     fig.suptitle('Fixed 2022 validation: 15 segments / 60 chunks. Only completed evaluations are plotted.',fontsize=10)
     save(fig,out/'eval_loss_vs_checkpoint.png')
     fig,axes=plt.subplots(4,2,figsize=(12,13),layout='constrained');axes=axes.ravel()
-    for ax,(field,label) in zip(axes,FIELDS):
+    for ax,(field,label) in zip(axes,fields):
         reference=evals[0]['baseline_per_field'][field]
         ax.axhline(reference,color='#64748b',ls='--',lw=1.1)
         for arm in ('tail20','tail1'):
@@ -90,7 +93,7 @@ def draw(root,out):
             ax.text(.98,.96 if arm=='tail20' else .86,f"{LABELS[arm]}, step {latest['step']}: {change:+.2f}%",transform=ax.transAxes,ha='right',va='top',fontsize=9,color=COLORS[arm],bbox={'facecolor':'white','edgecolor':'none','alpha':.85,'pad':2})
         ax.set(title=label,xlabel='Checkpoint step',ylabel='Weighted validation loss contribution',xlim=(0,max(last,1)*1.08))
         ax.grid(alpha=.2);ax.ticklabel_format(axis='y',style='plain',useOffset=False)
-    axes[-1].axis('off')
+    for ax in axes[len(fields):]:ax.axis('off')
     axes[-1].text(.03,.95,'Reading these panels\n\nNegative change = lower loss.\nPositive change = higher loss.\n\nEach variable has its own y-axis scale.\nAnnotations report changes relative to the zero head.\n\nThese are normalized, weighted eval losses.\nPer-variable training loss was not logged.\n\nPending eval checkpoints:\n'+ '\n'.join(f'{LABELS[a]}: {v}' for a,v in pending.items()),va='top',fontsize=11)
     axes[0].legend(fontsize=8,loc='lower left')
     fig.suptitle('Per-variable evaluation loss vs checkpoint\nSame validation samples, normalization and loss weights for every checkpoint',fontsize=14)
@@ -101,7 +104,7 @@ def draw(root,out):
     evrows=[]
     for e in evals:
         evrows.append({'arm':e['arm'],'checkpoint_step':e['step'],'variable':'total','loss':e['mean_loss'],'baseline':e['baseline_mean_loss'],'change_percent':100*(e['mean_loss']/e['baseline_mean_loss']-1)})
-        for field,_ in FIELDS:
+        for field,_ in fields:
             x,b=e['per_field'][field],e['baseline_per_field'][field]
             evrows.append({'arm':e['arm'],'checkpoint_step':e['step'],'variable':field,'loss':x,'baseline':b,'change_percent':100*(x/b-1)})
     write_csv(out/'eval_checkpoint_losses.csv',evrows,['arm','checkpoint_step','variable','loss','baseline','change_percent'])

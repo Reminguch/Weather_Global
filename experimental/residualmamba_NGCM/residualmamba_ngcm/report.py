@@ -1,7 +1,7 @@
 """Render immutable evaluation arrays without selecting checkpoints on metrics."""
 from pathlib import Path
 import numpy as np
-from .config import LEVELS
+from .config import LEVELS,SCORED_FIELDS
 from .artifacts import load_arrays,sha256,write_json
 
 
@@ -25,6 +25,13 @@ def render(summary,output):
         f'Mean-over-leads J improvement: {100*(1-c.mean()/b.mean()):.3f}%.','',
         'The NPZ also contains every field, pressure level and lead, paired weekly bootstrap intervals,',
         'ACC, and Z500/T850/U850 spherical power spectra at 24/120/240 h.',''])
+    lines += ['| Field | Native mean J | Corrected mean J | Native share | Corrected share |',
+              '|---|---:|---:|---:|---:|']
+    fields=data['J_per_field'].mean(axis=0)
+    for i,name in enumerate(SCORED_FIELDS):
+        lines.append(f'| {name} | {fields[0,i]:.8f} | {fields[1,i]:.8f} | '
+                     f'{100*fields[0,i]/fields[0].sum():.3f}% | {100*fields[1,i]/fields[1].sum():.3f}% |')
+    lines += ['', 'Cloud fields are input-only and copied from the official pretrained NeuralGCM.', '']
     (output/'REPORT.md').write_text('\n'.join(lines))
     import matplotlib
     matplotlib.use('Agg')

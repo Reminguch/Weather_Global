@@ -1,4 +1,4 @@
-"""Open-loop decoded-weather correction of frozen NeuralGCM (spec v1)."""
+"""Open-loop decoded-weather correction of frozen NeuralGCM (spec v2)."""
 from .runtime import configure
 configure()
 from pathlib import Path

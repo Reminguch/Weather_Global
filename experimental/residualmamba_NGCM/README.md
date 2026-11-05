@@ -1,26 +1,19 @@
 # residualmamba_NGCM — open-loop GraphCast-Mamba residual on a frozen NeuralGCM
 
-**Status:** normative specification, with a new implementation in
-`residualmamba_ngcm/` on `residualmamba_NGCM_rebuild_20261104`.
-See [OPERATIONS.md](OPERATIONS.md) for commands, validation evidence and pending
-data-dependent checks. This does not establish forecast improvement. Everything below is
-normative: if the code disagrees with this file, the code is wrong or this file
-must be versioned first.
+**Spec version: v2 (2026-11-05).** The loss and the correction cover only
+T, Z, u, v and q. Cloud fields are inputs only. See
+[§0](#0-version-history) for why, and [§15](#15-v1--v2-implementation-delta)
+for what changes in the v1 code.
 
-**Runtime amendment, 2026-11-04 (`deterministic_gpu_v1`).** The user requested
-that GPU restart drift be fixed. All production stages now configure XLA before
-backend initialization with `xla_gpu_enable_scatter_determinism_expander=true`,
-`xla_gpu_exclude_nondeterministic_ops=true`, `xla_gpu_deterministic_ops=true`,
-and `xla_gpu_autotune_level=0`. Restored arrays are explicitly placed on device.
-The execution policy is part of artifact/run identities. It changes numerical
-execution, not the architecture, loss, optimizer or data split. Qualification
-includes an actual trainer continuation test across separate Python processes
-on H200. Forecast quality and per-update loss decrease remain separate questions.
+**Status:** implementation specification. A v1 implementation exists on branch
+`residualmamba_NGCM_rebuild_20261104`; it must be updated to v2 (§15).
+Everything below is normative: if the code disagrees with this file, the code is
+wrong or this file must be versioned first.
 
 **One-sentence summary.** Take the frozen deterministic NeuralGCM 2.8° model
 (NGCM), roll it out exactly as NGCM itself would, and train a GraphCast-style
 encoder–processor–decoder with interleaved Mamba memory to predict
-`ERA5 − NGCM` in decoded weather space. Use the *same open-loop logic, sequence
+`ERA5 − NGCM` for T, Z, u, v and q in decoded weather space. Use the *same open-loop logic, sequence
 layout, normalization, loss family, optimizer and evaluation protocol* as our
 GraphCast residual-Mamba (v24 cached open loop ≡ v22clean residual Mamba with
 `feedback_mode=baseline`). NGCM-specific details (grid, fields, forcing, native
@@ -28,6 +21,7 @@ rollout) follow NGCM.
 
 Contents
 
+0. [Version history](#0-version-history)
 1. [Scope, prerequisites, non-goals](#1-scope-prerequisites-non-goals)
 2. [What the model is, theoretically](#2-what-the-model-is-theoretically)
 3. [Data contract (grid, fields, levels, splits, forcing, array layout)](#3-data-contract)
@@ -42,9 +36,54 @@ Contents
 12. [Consistency check against our GraphCast residual-Mamba](#12-consistency-check-against-our-graphcast-residual-mamba)
 13. [Common mistakes (checklist)](#13-common-mistakes-checklist)
 14. [Open decisions](#14-open-decisions)
+15. [v1 → v2 implementation delta](#15-v1--v2-implementation-delta)
 
 All repository paths are relative to the root of the `Weather_Global` repository
 (`minimalistic_code` branch, which also contains `src/models/neuralgcm_residual/`).
+
+---
+
+## 0. Version history
+
+| version | date | change |
+|---|---|---|
+| v1 | 2026-11-04 | Initial spec. All 7 fields scored and corrected: cloud ice and liquid at α = 0.05, per-level σΔ with a `1e-3 × median` floor. 203 outputs |
+| **v2** | 2026-11-05 | Loss and correction restricted to **T, Z, u, v, q** (145 outputs). Cloud fields are input-only. Inputs (796 channels), statistics, baseline cache, sequence, model trunk, optimizer and evaluation protocol are unchanged |
+
+**Why v2.** Evidence comes from the v1 implementation:
+`experimental/residualmamba_NGCM/results/dense_eval_20261105/` on branch
+`residualmamba_NGCM_rebuild_20261104`. It used the 2022 validation set
+(15 segments, 60 chunks, tail20 inputs).
+
+* **Clouds dominated the v1 objective.** At the zero head (= NGCM), cloud liquid
+  contributed 29.43 of the total 36.93 (79.7%) and cloud ice 3.98 (10.8%),
+  despite α = 0.05. The five fields shared with GraphCast summed to only 3.525
+  (9.5%). Without α, cloud liquid's normalized MSE is ≈ 588, i.e. errors of
+  ≈ 24 σΔ. For T/Z/u/v the errors are ≈ 0.73–0.84 σΔ.
+* **The v1 "improvement" was all cloud.** After 323 updates the total fell
+  39.2%, and cloud liquid accounted for 99.5% of that drop. T/Z/u/v/q together
+  went from 3.5252 to 3.5272 (+0.06%, slightly worse).
+* **The pattern was bias-like, not forecast skill.** The zero-head loss was
+  non-monotonic in lead: 38.4 at 6 h, 30.2 at 12 h, 29.0 at 24 h, 45.4 at
+  126 h. That is a cloud spin-up signature. The reduction was a near-uniform
+  ≈ 45% at every lead from 6 to 36 h, which fits a cloud bias correction.
+* **GraphCast has no cloud fields**, so the v1 cloud terms had no GC
+  counterpart. v2 scores exactly the variables both models share, each at
+  GC's weight 1.
+* **Likely mechanism (unconfirmed until the per-level census is inspected).**
+  ERA5 cloud liquid is near zero at upper levels, so its σΔ there is tiny.
+  The `1e-3 × median` floor barely lifts it, because the median over 37
+  levels is itself pulled down by those levels. Small NGCM cloud values at
+  those levels then become tens of σΔ.
+
+**Consequences.**
+
+* The v1 statistics artifact, baseline cache and feature layout are reused
+  unchanged.
+* v1 training runs and checkpoints optimized a different objective. They are
+  not used for v2 claims.
+* v1 validation numbers for the five shared fields remain valid as zero-head
+  references (§7).
 
 ---
 
@@ -56,8 +95,9 @@ All repository paths are relative to the root of the `Weather_Global` repository
   never fed back to NGCM. NGCM's trajectory is the native NGCM forecast.
 * A residual branch with the GraphCast mesh architecture and interleaved Mamba
   memory, as in v24/v22. The head is zero‑initialized.
-* Supervision in **decoded weather space** (7 fields on pressure levels) against
-  ERA5 regridded to the NGCM grid.
+* Supervision in **decoded weather space** on **T, Z, u, v, q** at 29 pressure
+  levels (50–1000 hPa), against ERA5 regridded to the NGCM grid. Cloud ice
+  and cloud liquid are inputs only: they are neither scored nor corrected (v2).
 * Evaluation against the native NGCM forecast on identical origins.
 
 ### Prerequisites (must already exist on disk — this package never downloads anything)
@@ -94,7 +134,7 @@ forecast at lead `k` from origin `o`. `c_k` is the residual branch output.
 
 ```
 b_k = D( A^k( E(x_o, F_o) ), F_o )            # native NGCM rollout, frozen, θ-independent
-y_k = b_k + c_θ(inputs_k, h_{k-1})            # corrected forecast (levels ≥ 50 hPa only)
+y_k = b_k + c_θ(inputs_k, h_{k-1})            # corrected forecast (T/Z/u/v/q at ≥ 50 hPa; elsewhere y = b)
 r_k = x_{o+k} − b_k                           # residual target
 ```
 
@@ -136,7 +176,8 @@ r_k = x_{o+k} − b_k                           # residual target
 | Internal timestep | 1 h; `advance_6h` = `fori_loop` of **6** `model.advance` calls | `FrozenBackbone.internal_steps` (assert == 6) |
 | Decoded fields (`FIELDS`, this order) | `temperature`, `geopotential`, `u_component_of_wind`, `v_component_of_wind`, `specific_humidity`, `specific_cloud_ice_water_content`, `specific_cloud_liquid_water_content` | `neuralgcm_residual/config.py` |
 | Pressure levels | 37 ERA5 levels, ascending: 1,2,3,5,7,10,20,30,50,70,100,125,150,175,200,225,250,300,350,400,450,500,550,600,650,700,750,775,800,825,850,875,900,925,950,975,1000 hPa | `model.data_coords.vertical.centers` (assert equal to this list) |
-| Corrected levels `P` | the **29 levels with p > 30 hPa** (50…1000), i.e. indices 8…36 | §5 |
+| Scored and corrected fields `V` | **T, Z, u, v, q** (the first five FIELDS, indices 0…4). Cloud ice and liquid are input-only (v2) | §0, §7 |
+| Scored and corrected levels `P` | the **29 levels with p > 30 hPa** (50…1000), i.e. indices 8…36 | §5 |
 | Forcing fields | `sea_surface_temperature`, `sea_ice_cover` | `FORCING_FIELDS` |
 | Array layout (store, NGCM decode) | 3‑D fields `[level, lon, lat]`, forcing `[lon, lat]`; **longitude first** | `prepare_era5`, `PreparedStore.frame` |
 | Splits | train 2015–2021, val 2022, test 2023 | `data.split_for` |
@@ -301,14 +342,16 @@ def chunk_baseline(bb, store, times, a0, n=24, prefix=4):
   itself.
 * S uses only forcing NGCM already saw, so there is no future information.
 * `t_A`, `t_B`, `t_target` = `times[a0+i-1]`, `times[a0+i]`, `times[a0+i+1]`.
+* Cloud fields stay in blocks A, B and N in v2. They carry information about
+  NGCM's moist state even though they are neither scored nor corrected.
 
 ### 5.2 Outputs
 
-* 203 channels = 7 FIELDS × 29 levels (50…1000 hPa), field-major, levels
-  ascending.
-* Scatter into the 37-level array. **The correction at 1–30 hPa is exactly 0**,
-  so `y = b` there. This is stronger than a zero loss weight and matches the
-  existing weather-space design.
+* **145 channels** = 5 fields (T, Z, u, v, q, in FIELDS order) × 29 levels
+  (50…1000 hPa), field-major, levels ascending.
+* Scatter into the 7-field, 37-level array. **The correction is exactly 0 for
+  both cloud fields at all levels, and for every field at 1–30 hPa**, so
+  `y = b` there. Producing no correction is stronger than a zero loss weight.
 * Physical correction `ĉ = σΔ[v,p] · head_output` (no location), as in
   `DirectResidualNormalizer`.
 
@@ -318,7 +361,7 @@ def chunk_baseline(bb, store, times, a0, n=24, prefix=4):
 |---|---|---|
 | `mean_by_level μ[v,p]` | mean of ERA5 over all train frames and all grid points (unweighted, like GC stats) | inputs A, B, N |
 | `stddev_by_level σ[v,p]` | std, same sample | inputs A, B, N |
-| `diffs_stddev_by_level σΔ[v,p]` | std of **6 h** differences `x_{t+1} − x_t`, same sample | residual target/output scale |
+| `diffs_stddev_by_level σΔ[v,p]` | std of **6 h** differences `x_{t+1} − x_t`, same sample | residual target/output scale (T, Z, u, v, q only) |
 | μ, σ of R, Y, H, S, G channels | same sample | inputs |
 
 * Use every train frame (preferred; at 2.8° it is a one-pass I/O job) or a
@@ -327,10 +370,12 @@ def chunk_baseline(bb, store, times, a0, n=24, prefix=4):
   It gets no separate statistics.
 * **Floors (NGCM extension, same rule as `experimental/weather_space_residual`).**
   For the two cloud fields, apply
-  `scale ← max(scale, 1e-3 × median_positive_scale[v])` separately to σ and σΔ.
-  Record every floored level. Fail on non-finite values or a field with no
-  positive scale. For other fields, assert `σ, σΔ > 0` and do not floor unless
-  the loss census (§11, T10) forces a recorded decision *before* training.
+  `scale ← max(scale, 1e-3 × median_positive_scale[v])` to σ, their input
+  scale. Their σΔ is computed and floored the same way for the record, but v2
+  never uses it. Record every floored level. Fail on non-finite values or a
+  field with no positive scale. For T, Z, u, v, q, assert `σ, σΔ > 0` and do
+  not floor unless the loss census (§11, T10) forces a recorded decision
+  *before* training. The v1 statistics artifact is valid for v2 unchanged.
 * Never use the 24 h-lag statistics from `paper_statistics.py`. Never estimate
   statistics on 2022/2023.
 
@@ -369,51 +414,80 @@ then mesh→grid decoder, then a **zero-initialized linear head**.
 | `conv_bias / bias / dropout` | True / False / 0.0 | |
 | `temporal_stateful` | True | memory = Haiku state |
 | `temporal_zero_init_out` | **True** | GC parity. `NativeResidualGraph` uses False — do not copy that |
-| head | `hk.Linear(203, w=0, b=0)` | output exactly 0 at init |
+| head | `hk.Linear(145, w=0, b=0)` | output exactly 0 at init |
 | init | **fresh**, `PRNGKey(22)` | no compatible GC weights exist for these channels and this grid |
 | precision | fp32 everywhere | 2.8° is small |
 
 **Orientation (error-prone).** NGCM arrays are `[..., lon, lat]`. GraphCast
 grid nodes are flattened **lat-major**. Build `x[lon, lat, ch]`, then
 `transpose → [lat, lon, ch]` and `reshape(64*128, 1, ch)`. Invert this exactly
-on the output: `reshape(64, 128, 203) → transpose → [lon, lat, 203] →
-reshape to [7, 29, lon, lat]`. Copy the pattern in
+on the output: `reshape(64, 128, 145) → transpose → [lon, lat, 145] →
+reshape to [5, 29, lon, lat]`. Copy the pattern in
 `NativeResidualGraph.__call__`. Keep the receiver-connectivity assertion from
 its constructor. With mesh 4 and `radius_query_fraction_edge_length=0.6`,
 every mesh and grid receiver must have degree > 0.
 
 ---
 
-## 7. Loss
+## 7. Loss (v2)
 
-GC's `losses.weighted_mse_per_level` applied to the normalized residual, with
-two NGCM changes: Gaussian quadrature latitude weights and the NGCM field set.
+GC's `losses.weighted_mse_per_level` applied to the normalized residual. It is
+restricted to the variables GraphCast and NGCM share, and uses Gaussian
+quadrature latitude weights.
 
 ```
-ℓ_i = Σ_v α_v · mean_{p∈P, lon, lat} [ w_lat · (p / p̄) · ((ĉ_i − r_i) / σΔ_{v,p})² ]
+V = (temperature, geopotential, u_component_of_wind, v_component_of_wind, specific_humidity)
+P = 29 levels, 50 … 1000 hPa
+
+ℓ_i = Σ_{v∈V} (1/|P|) Σ_{p∈P} (p/p̄) · mean_{lon,lat}[ w_lat · ((ĉ_{i,v,p} − r_{i,v,p}) / σΔ_{v,p})² ]
 L_chunk = (1/24) Σ_{i=0}^{23} ℓ_i                    # loss_mode = all_steps
 ```
 
+In words: for each step, field and level, take the latitude-weighted mean
+squared error of the normalized residual. Average over levels with pressure
+weights, sum over the five fields, then average over the 24 steps.
+
 | symbol | value |
 |---|---|
-| `r_i` | `x[a0+i+1] − stop_gradient(b[i])`, on `P` only |
+| `r_{i,v,p}` | `x[a0+i+1] − stop_gradient(b[i])`, for `v ∈ V`, `p ∈ P` |
+| `ĉ_{i,v,p}` | `σΔ_{v,p} · head_output` (145 channels) |
+| `V` | T, Z, u, v, q, **each with weight 1**. This is GC's weight for its atmospheric variables. No α, no other field weights |
 | `P` | 29 levels, 50…1000 hPa |
 | `p̄` | mean of the **29** levels = 15470/29 = 533.45 hPa. GC uses the mean over the levels present in the target; do not use the 37-level mean |
 | `w_lat` | `64 × loss.gaussian_weights(lat)`, i.e. Gauss–Legendre weights **normalized to mean 1** (GC normalizes cos-lat to mean 1). Broadcast over lon |
-| `α_v` | 1.0 for T, Z, u, v, q; **0.05** for each cloud field (NGCM extension; GC has no cloud fields) |
+| `σΔ_{v,p}` | 6 h-difference std from train years (§5.3); no floor for these five fields |
 | reduction over variables | **sum** (GC `sum_per_variable_losses`), not mean |
+| reduction over steps | mean over all 24 steps, including the 3 one-step prefix steps |
+
+**Excluded on purpose:**
+
+| excluded | why |
+|---|---|
+| cloud ice, cloud liquid | GraphCast has no cloud fields. In v1 they took 90% of the objective (§0). They are input-only: no loss term, no correction |
+| levels 1–30 hPa | unchanged from v1. Not scored, not corrected |
+| vertical velocity, 2t, 10 m winds, MSLP, precipitation | NGCM does not output them |
+| spectral terms, bias term, lead down-weighting, adaptive weights | GC has none of these. Do not import them from NGCM's own loss |
+
+**Reference value (regression check).** Use the v1 statistics artifact and the
+2022 validation cache (15 segments, 60 chunks, tail20 inputs). There, the
+zero-head v2 loss must equal the sum of the five v1 per-field contributions:
+
+```
+T 0.546632 + Z 0.552237 + u 0.713139 + v 0.538723 + q 1.174434 = 3.525165
+```
+
+A v2 implementation must reproduce this to ~1e-6 relative on the same
+artifacts. Each field's share must be reported separately in every validation
+and evaluation report. q is the largest term (33%). If one q level dominates
+it, that shows up in the census (T10).
 
 * GC's `normalized_latitude_weights` (and the uniform-grid fallback in
   `training/core/model.py`) raises on Gaussian latitudes. Never pass NGCM data
   through it, and never replace it with cos(lat) or uniform weights.
 * `neuralgcm_residual/loss.py::WeatherLoss` has the same per-field reduction
   as GC (its `p/Σp` and `w/Σw` equal GC's mean-1 weights after averaging). But
-  it **divides by the number of fields and has no α**. Reuse its per-field
-  scores only through `Σ_v α_v · field_scores[v]`, restricted to `P`.
-* No spectral terms, no bias term, no lead down-weighting, no adaptive
-  weighting. GC has none of these.
-* GC's surface terms (2t, 10 m winds, MSLP, precipitation) do not exist here.
-  This is an intended difference.
+  it **divides by the number of fields** and scores all 7 fields. Reuse its
+  per-field scores only as `Σ_{v∈V} field_scores[v]`, restricted to `P`.
 
 ---
 
@@ -463,9 +537,10 @@ def chunk_loss(params, state, batch):                   # full BPTT through 24 s
 * **Checkpoints.** Every 500 steps, saving params, opt_state, memory state,
   cursor, step and RNG, for exact resume (`--resume`).
 * **Validation (monitoring only, every 1,000 steps).** All 15 val segments,
-  memory zeroed at each segment start. Report `ℓ_i` per step class: steps 0–2,
-  and tail leads 6–126 h. Compare against the zero-head (NGCM) value. **Val is
-  not used to select anything** (see §9 for why).
+  memory zeroed at each segment start. Report `ℓ_i` **per field** and per step
+  class: steps 0–2, and tail leads 6–126 h. Compare against the zero-head
+  (NGCM) value (3.525165 in total, §7). **Val is not used to select
+  anything** (see §9 for why).
 * **Primary model = fixed-window SWA over steps 2,000–8,000.** Average the 13
   saved checkpoints, uniform weights. Fix this window before training. GC
   experience: convergence ≈ 2k steps, and 7-year training degraded after ≈ 8k.
@@ -514,7 +589,8 @@ tuned on 2022.
 ### 9.3 Metrics (all latitude-weighted with Gaussian weights; never uniform)
 
 * RMSE per field × level × lead. Headline: Z500, T850, U850, V850, Q700
-  (`evaluate.unit_metrics`), plus cloud fields.
+  (`evaluate.unit_metrics`). Cloud fields are uncorrected (`y = b`) and are
+  not reported as results.
 * % MSE change vs native NGCM: `100·(1 − MSE_y/MSE_b)`.
 * `J_k` = the training loss `ℓ` at lead `k` (GC "paper-weighted MSE" analogue),
   for corrected and NGCM; % change at 120 h and 240 h and averaged over leads.
@@ -531,7 +607,7 @@ tuned on 2022.
 | id | arm | answers |
 |---|---|---|
 | C0 | native NGCM | reference |
-| C1 | lead-dependent bias table: `B[k, v, p, lon, lat] = mean(x − b)` over all 00/12 UTC origins of 2015–2021, k = 1…40 (no learning) | is the gain just bias removal? |
+| C1 | lead-dependent bias table: `B[k, v, p, lon, lat] = mean(x − b)` for `v ∈ V`, `p ∈ P`, over all 00/12 UTC origins of 2015–2021, k = 1…40 (no learning) | is the gain just bias removal? |
 | C2 | Markov: memory zeroed before every step (v24 `temporal_state_policy="reset_every_anchor"`) | what does memory add? |
 | C3 | C2 + lead-time input (`lead_hours/240`; 6 h for steps 0–3, `(i−2)·6` h for tail steps) | is memory only a lead-time clock? |
 | C4 | main model without block N (`b_next`) | GC-literal inputs vs NGCM-adapted |
@@ -588,14 +664,14 @@ or `WeatherLoss.__call__` as the training loss.
 | T3 | time bookkeeping | `assert_time` on every advance. `valid_times[i] == times[a0+i+1]`. Window times match §4.2 for all 24 steps |
 | T4 | no future leakage | perturbing any truth `x[t]` with `t ≥ a0+4` changes only targets, never any input of any step. (Truth `x[a0−4..a0+3]` may legitimately reach inputs: windows of steps 0–4, forcing lags, and the whole tail through `E(x[a0+3])`) |
 | T5 | indexing ≡ GC | with a toy *Markov* baseline (`pred = f(window)`), our window/target sequence equals v24 `iter_trajectory` for the same anchors |
-| T6 | zero head | untrained model gives `y == b` bitwise, and the loss equals the NGCM baseline loss |
+| T6 | zero head | untrained model gives `y == b` bitwise, and the loss equals the NGCM baseline loss. On the 2022 val cache with the v1 statistics, that loss is 3.525165 (§7) |
 | T7 | normalization | inputs use `(x−μ)/σ` with `σ = stddev_by_level`. Target uses `r/σΔ`, no location. Output uses `σΔ·out`. Unit test with hand-built stats |
 | T8 | BPTT | `scan`+`checkpoint` gradient == step-by-step `vjp` gradient (rtol 1e‑5). The gradient w.r.t. the carried input state at a chunk boundary is 0 |
 | T9 | memory reset | state is exactly 0 at every `segment_offset == 0`, and non-zero after step 0 otherwise |
-| T10 | loss census | on the val cache with the zero head: share of `L` per (field, level, step class). Any single (v, p) above 10% → record a decision (floor or not) **before** training |
+| T10 | loss census | on the val cache with the zero head: share of `L` per (field ∈ V, level ∈ P, step class), arrays `[24, 5, 29]`. Any single (v, p) above 10% → record a decision (floor or not) **before** training |
 | T11 | orientation | a synthetic field `= sin(lat)` lands on GraphCast grid nodes with matching latitude, and the round trip input→output layout is the identity |
 | T12 | Gaussian weights | `gaussian_weights` node check passes. `w_lat.mean() == 1`. `p̄ == 533.45` |
-| T13 | output scatter | 203 channels map to the 29 levels ≥ 50 hPa. Levels 1–30 hPa of `y` equal `b` bitwise |
+| T13 | output scatter | 145 channels map to T/Z/u/v/q × the 29 levels ≥ 50 hPa. Both cloud fields (all 37 levels) and levels 1–30 hPa of every field in `y` equal `b` bitwise, also after training |
 | T14 | statistics provenance | the stats manifest lists only 2015–2021 frames. Floored levels are recorded |
 
 ---
@@ -619,14 +695,14 @@ branch and is logic-equivalent to v22clean residual Mamba open loop:
 |---|---|---|---|
 | feedback mode | `baseline`: the frozen forecast is fed back, the correction never is | same | **identical** |
 | how the baseline continues | 2-frame window of its own decoded predictions (= GC's native rollout) | native state continuation `A^k(z_o)` (= NGCM's native rollout); no re-encode | **equivalent** (each is its model's native rollout) |
-| residual target | `truth − stop_grad(baseline)` | same, decoded space, 29 levels | identical |
+| residual target | `truth − stop_grad(baseline)` | same, decoded space, T/Z/u/v/q × 29 levels | identical |
 | residual input window | same 2 frames as the baseline (truth in prefix, baseline predictions in tail) | same 2-frame rule (§4.2) on decoded NGCM frames | identical rule |
 | baseline forecast as input | implicit (function of the inputs) | explicit block N (`b_next`) | **NGCM-adapted** (§2); C4 is the GC-literal control |
 | forcings / static | TISR + year/day progress at 2 input times + target; orography, LSM | same 15 time channels; orography, LSM from NGCM aux; plus SST/ice that NGCM used | NGCM-adapted (SST/ice are NGCM's own forcing) |
 | normalization | `DirectResidualNormalizer`: inputs `(x−μ)/σ`, residual `/σΔ`, no location | same; stats recomputed on the NGCM grid, 37 levels, train years; cloud floors | identical rule, NGCM stats |
 | latitude weights | cos-lat cell area, mean 1 | Gauss–Legendre weights, mean 1 | NGCM-adapted (required) |
 | level weights | `p/p̄` over the 13 GC levels | `p/p̄` over 29 levels | NGCM-adapted (more boundary-layer levels; see §14) |
-| variable weights | atmos 1; 2t 1; 10u/10v/msl/tp 0.1 | T/Z/u/v/q 1; cloud ice/liquid 0.05; no surface fields | NGCM-adapted |
+| scored variables and weights | 6 atmospheric (T, Z, u, v, w, q) at 1; 2t 1; 10u/10v/msl/tp 0.1 | T, Z, u, v, q at 1 (the shared set); clouds input-only; no w and no surface fields (NGCM lacks them) | **identical on the shared variables** (v2) |
 | sequence | segment 96, bptt 24, prefix 4, `ar_tail_k` 20 (GC K = 21), loss on all 24 steps at 1/24 | same | identical |
 | anchors | first anchor at final-input index ≥ 1 | ≥ 4 (24 h forcing lag) | NGCM-adapted (3-step shift) |
 | memory | zero at segment start; carried across chunks, stop-grad | same | identical |
@@ -642,7 +718,8 @@ branch and is logic-equivalent to v22clean residual Mamba open loop:
 family, memory semantics and optimizer are carried over unchanged. The
 differences are (a) required by NGCM (Gaussian grid weights, fields/levels,
 native-state continuation, forcing lag) or (b) deliberate and covered by a
-control (`b_next` → C4; fresh init is unavoidable).
+control (`b_next` → C4; fresh init is unavoidable). Since v2 the loss scores
+exactly the variables both models share (T, Z, u, v, q), each at GC's weight 1.
 
 ---
 
@@ -660,7 +737,8 @@ control (`b_next` → C4; fresh init is unavoidable).
 7. cos(lat), uniform, or sum-to-1 latitude weights. Weights must be Gaussian
    with mean 1.
 8. `p̄` over 37 levels instead of 29.
-9. Averaging over fields (`WeatherLoss.__call__`) instead of `Σ α_v`.
+9. Averaging over fields (`WeatherLoss.__call__`) instead of summing over the
+   five fields in `V`.
 10. Inputs divided by σΔ, or without mean subtraction (the drifted-tree bug).
     Residual normalized with a location.
 11. 24 h-lag statistics, or statistics touching 2022/2023.
@@ -673,6 +751,10 @@ control (`b_next` → C4; fresh init is unavoidable).
 16. Selecting checkpoints or SWA windows on 2022 and then reporting E1 on 2022.
 17. Unweighted metrics, or mixing cold and warm-3 numbers in one table.
 18. Comparing absolute 2.8° RMSE with our 1° GC RMSE.
+19. Scoring or correcting cloud fields, at any weight. In v2 they are inputs
+    only.
+20. Reporting only the total loss. Always give the per-field breakdown, since a
+    single field can carry a "gain" that is not forecast skill (§0).
 
 ---
 
@@ -694,3 +776,31 @@ control (`b_next` → C4; fresh init is unavoidable).
    240 h, so leads 132–240 h are extrapolated in time, exactly as in the GC
    protocol.
 5. **Disk.** About 100 GB of fp32 cache on DABANIN. Confirm the quota first.
+6. **Cloud correction.** Not part of v2. If it is ever wanted, run it as a
+   separate ablation, never mixed into the v2 headline. First inspect the v1
+   per-level census (`census.json`, `loss_by_step_field_level`). Then use one
+   pooled scale per cloud field (as `balanced_scales` in
+   `neuralgcm_residual/loss.py`) instead of per-level σΔ.
+
+---
+
+## 15. v1 → v2 implementation delta
+
+These are the changes for the v1 package `residualmamba_ngcm/` on branch
+`residualmamba_NGCM_rebuild_20261104`. Everything not listed stays as it is.
+
+| file | change |
+|---|---|
+| `config.py` | `schema_version = 2`. `output_channels = 145`. Remove `cloud_alpha`. Keep `cloud_scale_floor`: it still floors the cloud input σ. The protocol identity changes, so v1 run roots cannot be resumed under v2 |
+| `loss.py` | `weights()`: field weights for the 5 fields only, all 1. `contributions()` takes `[5, 29, lon, lat]`. `target_norm()`: `(truth[:5, 8:] − baseline[:5, 8:]) / diff_std[:5, 8:]`. `correct()`: add the correction only to fields 0–4 at levels 8–36; copy both cloud fields and levels 0–7 verbatim |
+| `model.py` | head `hk.Linear(145)`; reshape to `(5, 29, lon, lat)` |
+| `features.py` | unchanged: 796 channels; clouds stay in blocks A, B and N; C4 stays 537, C3 stays 797 |
+| `stats.py` | unchanged. The v1 `stats.npz` is reusable |
+| `cache.py` | unchanged. The v1 baseline cache (tail20 and tail1) is reusable |
+| `train.py` | census arrays become `[24, 5, 29]`. Validation logs per-field contributions as well as the total |
+| `evaluate.py` | `J` uses the v2 loss. The C1 bias table covers only the 5 fields. Cloud fields of `y` equal `b` |
+| tests | T6: the reference value 3.525165. T13: 145 channels, clouds bitwise `b` |
+
+Practical consequence: switching to v2 needs **no new statistics and no new
+cache**, only a new training run. Compare v2 runs with the v1 runs on the five
+shared fields only, never on the v1 total.

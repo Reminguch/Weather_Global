@@ -50,7 +50,7 @@ def main():
     key=jax.device_put(checkpoint['rng'])
     x=np.random.default_rng(22).normal(0,.1,(128,64,796)).astype(np.float32)
     batch={'features':jnp.broadcast_to(jnp.asarray(x),(24,*x.shape)),
-           'target':jnp.full((24,7,29,128,64),.1,dtype=jnp.float32)}
+           'target':jnp.full((24,5,29,128,64),.1,dtype=jnp.float32)}
     def step(state,batch,key):
         (loss,h),g=jax.value_and_grad(lambda params:chunk_loss(model.apply,params,state['memory'],batch,key,lat),has_aux=True)(state['params'])
         updates,s=optimizer.update(g,state['opt_state'],state['params'])

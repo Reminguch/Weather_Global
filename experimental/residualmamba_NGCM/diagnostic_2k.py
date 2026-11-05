@@ -156,6 +156,8 @@ def validation(root,plan,store,geometry,endpoint,deadline):
     report={'step':endpoint,'segments':15,'per_step':value.tolist(),'baseline_per_step':baseline.tolist(),
             'one_step_prefix_mean':float(value[:3].mean()),'tail_leads_hours':list(range(6,127,6)),
             'tail':value[3:].tolist(),'selection':'monitor_only','checkpoint_sha256':checkpoint_sha,
+            'per_field':{f:float(np.mean([r['per_field'][f] for r in rows])) for f in rows[0]['per_field']},
+            'baseline_per_field':{f:float(np.mean([r['baseline_per_field'][f] for r in rows])) for f in rows[0]['baseline_per_field']},
             'mean_loss':float(value.mean()),'baseline_mean_loss':float(baseline.mean()),
             'improvement_percent':float(100*(1-value.mean()/baseline.mean()))}
     write_json(root/f'checkpoints/validation_{endpoint:05d}.json',report,immutable=True)

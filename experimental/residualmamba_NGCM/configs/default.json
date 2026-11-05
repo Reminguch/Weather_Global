@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "runtime_policy": "deterministic_gpu_v1",
   "feedback_mode": "baseline",
   "arm": "main",
@@ -42,13 +42,12 @@
   "temporal_stateful": true,
   "input_steps": 2,
   "input_channels_main": 796,
-  "output_channels": 203,
+  "output_channels": 145,
   "corrected_level_min_hpa": 50,
   "forecast_steps": 40,
   "forcing_policy": "lag24h_then_persist_at_origin",
   "loss_mode": "all_steps",
   "radius_query_fraction_edge_length": 0.6,
-  "cloud_alpha": 0.05,
   "cloud_scale_floor": 0.001,
   "swa_steps": [
     2000,

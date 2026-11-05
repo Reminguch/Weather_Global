@@ -75,7 +75,7 @@ def test_t7_normalization_and_control_feature_layout():
     assert f.shape==(2,4,796)
     np.testing.assert_array_equal(f,2)
     np.testing.assert_array_equal(target_norm(x+12,x,stats),3)
-    np.testing.assert_array_equal(np.asarray(correct(x,np.ones((7,29,2,4)),stats))[:,8:],18)
+    np.testing.assert_array_equal(np.asarray(correct(x,np.ones((5,29,2,4)),stats))[:5,8:],18)
     assert len(set(channel_names()))==796
     no_next=assemble(x,x,x+900,extra,stats,Config(arm='C4'))
     assert no_next.shape[-1]==537 and np.all(no_next==2)
@@ -94,14 +94,15 @@ def test_t6_t12_t13_weights_zero_head_scatter():
     lat,p,alpha=weights(LAT)
     np.testing.assert_allclose(np.mean(lat),1,atol=1e-7)
     assert np.mean(P)==15470/29
-    ones=np.ones((7,29,8,4),np.float32)
-    np.testing.assert_allclose(weighted_mse(ones,np.zeros_like(ones),LAT),5.1,rtol=1e-6)
+    ones=np.ones((5,29,8,4),np.float32)
+    np.testing.assert_allclose(weighted_mse(ones,np.zeros_like(ones),LAT),5.,rtol=1e-6)
     b=np.random.default_rng(22).normal(size=(7,37,8,4)).astype(np.float32)
     b[:,:,0,0]=-0.
     y=np.asarray(correct(b,np.zeros_like(ones),hand_stats()))
     np.testing.assert_array_equal(y.view(np.uint32),b.view(np.uint32))
     y=np.asarray(correct(b,ones,hand_stats()))
     np.testing.assert_array_equal(y[:,:8].view(np.uint32),b[:,:8].view(np.uint32))
+    np.testing.assert_array_equal(y[5:].view(np.uint32),b[5:].view(np.uint32))
     from src.models.neuralgcm_residual.loss import gaussian_weights
     with pytest.raises(ValueError):gaussian_weights(np.linspace(-1,1,4))
 
@@ -130,10 +131,10 @@ def test_progress_features_use_graphcast_helpers():
 
 def test_t8_scan_remat_matches_explicit_reverse_vjp_and_stops_boundary():
     features=jnp.linspace(.1,.9,24)
-    targets=jnp.ones((24,7,29,1,4))*.3
+    targets=jnp.ones((24,5,29,1,4))*.3
     def apply(p,state,key,x):
         h=jnp.tanh(p['w']*state['h']+x)
-        return jnp.broadcast_to(p['v']*h,(7,29,1,4)),{'h':h}
+        return jnp.broadcast_to(p['v']*h,(5,29,1,4)),{'h':h}
     p={'w':jnp.array(.6),'v':jnp.array(.2)};state={'h':jnp.array(.9)}
     batch={'features':features,'target':targets}
     f=lambda p,s:chunk_loss(apply,p,s,batch,jax.random.PRNGKey(22),LAT)
@@ -173,11 +174,11 @@ def test_exact_training_resume_and_segment_carry(tmp_path):
         h=hk.get_state('h',(),init=hk.initializers.Constant(0))
         new=jnp.tanh(h*p+x)
         hk.set_state('h',new)
-        return jnp.broadcast_to(new*p,(7,29,1,4))
+        return jnp.broadcast_to(new*p,(5,29,1,4))
     model=hk.transform_with_state(forward)
     segments=(np.arange(96),np.arange(96,192))
     batch={'features':np.linspace(.1,.5,24,dtype=np.float32),
-           'target':np.ones((24,7,29,1,4),np.float32)*.1}
+           'target':np.ones((24,5,29,1,4),np.float32)*.1}
     load=lambda a:batch
     cfg=Config();full=tmp_path/'full';split=tmp_path/'split'
     run(model,cfg,segments,(),load,LAT,full,'test',steps=5)
@@ -263,7 +264,7 @@ def test_parity_origins_requires_real_gc_timestamps(tmp_path):
 
 def test_census_exposes_dominant_field_without_aborting_finite_metrics(tmp_path):
     from residualmamba_ngcm.train import census
-    batch={'target':np.zeros((24,7,29,1,4),np.float32)}
+    batch={'target':np.zeros((24,5,29,1,4),np.float32)}
     batch['target'][:,4,2]=100
     result=census((np.arange(96),),lambda _:batch,LAT,tmp_path/'census.json',{'test':'mock'})
     assert result['decision_required']
@@ -294,19 +295,19 @@ def test_eval_never_feeds_corrected_weather_back(monkeypatch):
     class Model:
         def apply(self,p,h,key,x):
             # A visible huge correction would immediately expose accidental feedback.
-            return jnp.full((7,29,2,4),1000.),{'h':h['h']+1}
+            return jnp.full((5,29,2,4),1000.),{'h':h['h']+1}
     stats=hand_stats();stats['mean'][:]=0;stats['std'][:]=1;stats['diff_std'][:]=1
     baseline=list(evaluate.forecast(BB(),store,None,None,{},stats,Config(),times[10],steps=3))
     corrected=list(evaluate.forecast(BB(),store,Model(),{}, {'h':jnp.array(0.)},stats,Config(),times[10],steps=3))
     for (_,b,y,t),(_,ref,_,_) in zip(corrected,baseline):
         np.testing.assert_array_equal(b,ref)
         np.testing.assert_array_equal(y[:,:8],b[:,:8])
-        np.testing.assert_allclose(y[:,8:]-b[:,8:],1000,rtol=1e-6)
+        np.testing.assert_allclose(y[:5,8:]-b[:5,8:],1000,rtol=1e-6)
 
 
 def test_census_zero_error_step_class_is_valid(tmp_path):
     from residualmamba_ngcm.train import census
-    batch={'target':np.zeros((24,7,29,1,4),np.float32)}
+    batch={'target':np.zeros((24,5,29,1,4),np.float32)}
     batch['target'][3,0,0]=1
     result=census((np.arange(96),),lambda _:batch,LAT,tmp_path/'census-zero.json',{})
     assert np.isfinite(result['step_class_share']).all()

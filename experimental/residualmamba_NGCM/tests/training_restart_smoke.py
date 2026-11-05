@@ -36,7 +36,7 @@ def main():
     model=make_model(base,cfg,latitude,longitude)
     x=np.random.default_rng(22).normal(0,.1,(128,64,796)).astype(np.float32)
     batch={'features':np.broadcast_to(x,(24,*x.shape)),
-           'target':np.full((24,7,29,128,64),.1,np.float32)}
+           'target':np.full((24,5,29,128,64),.1,np.float32)}
     segments=(np.arange(96),np.arange(96,192))
     output=a.root/('full' if a.mode=='full' else 'split')
     resume=output/'step_00002.pkl' if a.mode=='resume' else None

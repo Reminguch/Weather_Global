@@ -97,12 +97,13 @@ def evaluate(root,arm_root,checkpoint,deadline):
     loss=np.mean([r['loss_by_step_field_level'] for r in rows],axis=0)
     baseline=np.mean([r['baseline_by_step_field_level'] for r in rows],axis=0)
     value=float(loss.sum(axis=(1,2)).mean());ref=float(baseline.sum(axis=(1,2)).mean())
+    fields=FIELDS[:loss.shape[1]]
     result={'arm':arm,'step':step,'segments':15,'chunks':60,'checkpoint':str(checkpoint),
         'checkpoint_sha256':cksha,'protocol_hash':digest(protocol),'mean_loss':value,
         'baseline_mean_loss':ref,'improvement_percent':100*(1-value/ref),
         'per_step':loss.sum(axis=(1,2)).tolist(),'baseline_per_step':baseline.sum(axis=(1,2)).tolist(),
-        'per_field':{f:float(loss.mean(axis=0).sum(axis=1)[i]) for i,f in enumerate(FIELDS)},
-        'baseline_per_field':{f:float(baseline.mean(axis=0).sum(axis=1)[i]) for i,f in enumerate(FIELDS)},
+        'per_field':{f:float(loss.mean(axis=0).sum(axis=1)[i]) for i,f in enumerate(fields)},
+        'baseline_per_field':{f:float(baseline.mean(axis=0).sum(axis=1)[i]) for i,f in enumerate(fields)},
         'completed_unix':time.time(),'parameter_selection':'monitor only; no validation-based tuning'}
     write_json(directory/'summary.json',result,immutable=True)
     plot(root)

@@ -2,12 +2,12 @@
 from pathlib import Path
 import jax
 import numpy as np
-from .config import FIELDS,LEVELS
+from .config import SCORED_FIELDS,LEVELS
 from .timeline import stack_weather,evaluation_origins
 from .features import ancillary,assemble,static_fields
 from .model import zero_memory
 from .ngcm import rollout
-from .loss import correct,target_norm,weighted_mse
+from .loss import correct,target_norm,weighted_mse,contributions
 from .artifacts import save_arrays,write_json,read_json,sha256,load_arrays
 from src.models.neuralgcm_residual.data import STEP,split_for
 from src.models.neuralgcm_residual.loss import gaussian_weights
@@ -52,7 +52,10 @@ def forecast(bb,store,model,params,initial_memory,stats,config,origin,warm=False
         target_time=origin+k*STEP
         target=stack_weather(store.frame(target_time))
         if bias is not None:
-            corrected=np.concatenate((baseline[:,:8],baseline[:,8:]+bias[k-1]),axis=1)
+            corrected=baseline.copy()
+            if bias[k-1].shape != (5,29,*baseline.shape[-2:]):
+                raise ValueError('v2 bias must contain only five fields and 29 levels')
+            corrected[:5,8:]+=bias[k-1]
         elif model is None:
             corrected=baseline.copy()
         else:
@@ -115,17 +118,19 @@ def run(bb,store,model,params,initial_memory,stats,config,origins,root,identity,
             if meta['identity']!=identity or meta['warm']!=warm:
                 raise ValueError('Evaluation artifact belongs to a different run')
             used.append(origin);continue
-        mses,accs,js,ps=[],[],[],[]
+        mses,accs,js,ps,jfields=[],[],[],[],[]
         for k,b,y,t in forecast(bb,store,model,params,initial_memory,stats,config,origin,warm,bias=bias):
-            bm,ba=metrics(b,t,stats['climatology'],grid.latitudes)
-            ym,ya=metrics(y,t,stats['climatology'],grid.latitudes)
+            bm,ba=metrics(b[:5],t[:5],stats['climatology'][:5],grid.latitudes)
+            ym,ya=metrics(y[:5],t[:5],stats['climatology'][:5],grid.latitudes)
             mses.append([bm,ym]);accs.append([ba,ya])
             r=target_norm(t,b,stats)
-            correction=(y[:,8:]-b[:,8:])/stats['diff_std'][:,8:,None,None]
-            js.append([float(weighted_mse(np.zeros_like(r),r,grid.latitudes)),float(weighted_mse(correction,r,grid.latitudes))])
+            correction=(y[:5,8:]-b[:5,8:])/stats['diff_std'][:5,8:,None,None]
+            fields=np.stack([np.asarray(contributions(c,r,grid.latitudes)).sum(axis=-1)
+                             for c in (np.zeros_like(r),correction)])
+            jfields.append(fields);js.append(fields.sum(axis=-1))
             if k in (4,20,40):ps.append(spectra(grid,[t,b,y]))
-        save_arrays(path,{'mse':np.asarray(mses),'acc':np.asarray(accs),'J':np.asarray(js),'spectra':np.asarray(ps)},
-            {'origin':str(origin),'identity':identity,'warm':warm,'field_order':FIELDS,'levels':LEVELS,
+        save_arrays(path,{'mse':np.asarray(mses),'acc':np.asarray(accs),'J':np.asarray(js),'J_per_field':np.asarray(jfields),'spectra':np.asarray(ps)},
+            {'origin':str(origin),'identity':identity,'warm':warm,'field_order':SCORED_FIELDS,'levels':LEVELS,
              'model_axis':['native','corrected'],'spectrum_models':['truth','native','corrected'],
              'spectrum_fields':['Z500','T850','U850'],'spectrum_leads_hours':[24,120,240]})
         used.append(origin)
@@ -135,14 +140,17 @@ def run(bb,store,model,params,initial_memory,stats,config,origins,root,identity,
     mse=np.stack([r['mse'] for r in rows]); j=np.stack([r['J'] for r in rows])
     base,corrected=mse[:,:,0].mean(axis=0),mse[:,:,1].mean(axis=0)
     change=np.divide(100*(base-corrected),base,out=np.full_like(base,np.nan),where=base>0)
+    jf=np.mean(np.stack([r['J_per_field'] for r in rows]),axis=0)
+    jf_share=np.divide(jf,jf.sum(axis=-1,keepdims=True),out=np.zeros_like(jf),where=jf.sum(axis=-1,keepdims=True)>0)
     save_arrays(root/'summary.npz',{'origins':np.asarray(used,dtype='datetime64[h]'),
         'rmse_native':np.sqrt(base),'rmse_corrected':np.sqrt(corrected),'mse_improvement_pct':change,
         'mse_improvement_ci95':bootstrap(used,mse[:,:,1],mse[:,:,0]),
         'J_native':j[:,:,0].mean(axis=0),'J_corrected':j[:,:,1].mean(axis=0),
+        'J_per_field':jf,'J_field_share':jf_share,
         'J_improvement_ci95':bootstrap(used,j[:,:,1],j[:,:,0]),
         'acc':np.nanmean(np.stack([r['acc'] for r in rows]),axis=0),
         'spectra':np.mean(np.stack([r['spectra'] for r in rows]),axis=0)},
-        {'identity':identity,'warm':warm,'skipped_origins':skipped,'origins':len(used),
+        {'identity':identity,'field_order':SCORED_FIELDS,'warm':warm,'skipped_origins':skipped,'origins':len(used),
          'bootstrap':'1000 paired calendar-week blocks','historical_2022_tuning':True,
          'claim':'2023 held-out only; 2022 has historical tuning exposure'})
 
@@ -151,15 +159,15 @@ def bias_table(bb,store,path,upstream,stats=None,audit_root=None):
     """C1 streaming mean over ALL eligible 00/12 UTC train origins, never validation."""
     candidates=[t for t in store.times if split_for(t)=='train' and int(t.astype(np.int64))%12==0
         and all(t+k*STEP in store.times and split_for(t+k*STEP)=='train' for k in range(-4,41))]
-    mean=np.zeros((40,7,29,128,64),dtype=np.float64)
+    mean=np.zeros((40,5,29,128,64),dtype=np.float64)
     if not candidates:raise ValueError('No C1 training origins')
     for n,origin in enumerate(candidates,1):
         values=[]
         for k,(b,_) in enumerate(rollout(bb,store,origin,40)):
-            residual=stack_weather(store.frame(origin+(k+1)*STEP))[:,8:]-b[:,8:]
+            residual=stack_weather(store.frame(origin+(k+1)*STEP))[:5,8:]-b[:5,8:]
             mean[k]+=(residual-mean[k])/n
             if stats is not None:
-                r=residual/stats['diff_std'][:,8:,None,None]
+                r=residual/stats['diff_std'][:5,8:,None,None]
                 values.append(float(weighted_mse(np.zeros_like(r),r,bb.model.data_coords.horizontal.latitudes)))
         if stats is not None and audit_root is not None:
             write_json(Path(audit_root)/f'{origin}.json',{'origin':str(origin),'J':values,'upstream':upstream},immutable=True)

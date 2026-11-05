@@ -51,6 +51,8 @@ def context(root,config):
     require_production_policy()
     root=Path(root)
     manifest=read_json(root/'preflight.json')
+    from .reuse import check_receipts
+    check_receipts(manifest)
     # JSON round-trip turns tuples into lists; digest canonically compares values.
     if digest(manifest['config'])!=digest(asdict(config)) or manifest['source_identity']!=source_identity():
         raise ValueError('Protocol or source changed; create a new run root')
@@ -68,7 +70,7 @@ def training_identity(root,config):
     root=Path(root)
     manifest,store,geometry=context(root,config)
     stats,sm=load_arrays(root/'stats.npz')
-    if sm['store_identity']!=store.identity or sm['preflight_hash']!=sha256(root/'preflight.json'):
+    if sm['store_identity']!=store.identity or sm['preflight_hash']!=manifest.get('reused_inputs',{}).get('stats_preflight_hash',sha256(root/'preflight.json')):
         raise ValueError('Statistics provenance mismatch')
     for t in sm['train_times']+sm['extra_times']+[t for pair in sm['diff_pairs'] for t in pair]:
         if not 2015<=int(t[:4])<=2021:raise ValueError('Statistics include non-training frames')
@@ -78,7 +80,7 @@ def training_identity(root,config):
     ready=read_json(cache/'READY.json')
     contract=read_json(cache/'contract.json')
     expected_cache={'store_identity':store.identity,'checkpoint_sha256':manifest['checkpoint_sha256'],
-                    'source_identity':source_identity(),'libraries':versions()}
+                    'source_identity':manifest.get('reused_inputs',{}).get('producer_source_identity',source_identity()),'libraries':versions()}
     if ready['contract_hash']!=sha256(cache/'contract.json') or any(contract[k]!=v for k,v in expected_cache.items()):
         raise ValueError('Cache contract mismatch')
     verification=read_json(root/'verify-cache.json')
@@ -86,11 +88,12 @@ def training_identity(root,config):
         raise ValueError('Missing/mismatched cache verification')
     census=read_json(root/'census.json')
     upstream={'stats':sha256(root/'stats.npz'),'cache':sha256(cache/'READY.json')}
+    if census.get('source_identity')!=source_identity():raise ValueError('Recompute the census with the v2 objective')
     if census['upstream']!=upstream:raise ValueError('Census must use this cache and statistics')
     if census['decision_required']:
         decision=read_json(root/'census-decision.json')
-        if decision.get('census_sha256')!=sha256(root/'census.json') or decision.get('action')!='retain_v1_scales' or not decision.get('rationale','').strip():
-            raise ValueError('Record whether to retain the v1 scales before training. Changed floors require a versioned spec and new statistics.')
+        if decision.get('census_sha256')!=sha256(root/'census.json') or decision.get('action')!='retain_declared_scales' or not decision.get('rationale','').strip():
+            raise ValueError('Record whether to retain the declared scales before training. Changed floors require a versioned spec and new statistics.')
     tests=read_json(root/'qualification.json')
     if tests.get('source_identity')!=source_identity() or tests.get('status')!='passed':
         raise ValueError('A matching successful unit + real-model qualification is required')
@@ -119,6 +122,8 @@ def qualify(root,gpu_smoke,native_smoke,resume_smoke):
     for name,evidence in [('GPU',gpu),('native',native),('fresh-process resume',resume)]:
         if evidence.get('status')!='passed' or evidence.get('source_identity')!=identity:
             raise ValueError(f'{name} evidence is missing or belongs to different source')
+    if gpu.get('output_channels')!=145 or not gpu.get('cloud_fields_bitwise'):
+        raise ValueError('v2 qualification requires 145 outputs and bitwise cloud passthrough')
     if not gpu.get('zero_head_bitwise') or not gpu.get('upper_levels_bitwise') or not native.get('finite'):
         raise ValueError('Incomplete real-model smoke evidence')
     for evidence in (gpu,resume):

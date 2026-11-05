@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+from .config import SCORED_FIELDS
 from .model import zero_memory
 from .timeline import TrainingCursor,advance_cursor
 from .loss import weighted_mse,contributions
@@ -28,7 +29,7 @@ def chunk_loss(apply,params,state,batch,key,latitude,reset_every_step=False):
 
 
 def validate(model,params,initial_state,segments,load,latitude,config):
-    totals,baseline = np.zeros(24),np.zeros(24)
+    totals,baseline = np.zeros((24,5)),np.zeros((24,5))
     count=0
     predict = jax.jit(model.apply)
     for segment in segments:
@@ -39,18 +40,28 @@ def validate(model,params,initial_state,segments,load,latitude,config):
                 if config.reset_every_step:
                     state=zero_memory(state)
                 out,state=predict(params,state,jax.random.PRNGKey(config.seed),batch['features'][i])
-                totals[i]+=float(weighted_mse(out,batch['target'][i],latitude))
-                baseline[i]+=float(weighted_mse(jnp.zeros_like(out),batch['target'][i],latitude))
+                totals[i]+=np.asarray(contributions(out,batch['target'][i],latitude)).sum(axis=-1)
+                baseline[i]+=np.asarray(contributions(jnp.zeros_like(out),batch['target'][i],latitude)).sum(axis=-1)
             count+=1
     if not count or not np.isfinite(totals).all():
         raise ValueError('Empty or nonfinite validation')
-    return {'per_step':(totals/count).tolist(),'baseline_per_step':(baseline/count).tolist(),
+    fields,baseline_fields=totals/count,baseline/count
+    totals,baseline=totals.sum(axis=-1),baseline.sum(axis=-1)
+    shares=lambda a:dict(zip(SCORED_FIELDS,np.divide(a.mean(axis=0),a.mean(axis=0).sum(),
+        out=np.zeros(5),where=a.mean(axis=0).sum()>0).tolist()))
+    return {'field_order':SCORED_FIELDS,
+            'field_share':shares(fields),'baseline_field_share':shares(baseline_fields),
+            'per_field':dict(zip(SCORED_FIELDS,fields.mean(axis=0).tolist())),
+            'baseline_per_field':dict(zip(SCORED_FIELDS,baseline_fields.mean(axis=0).tolist())),
+            'per_step_field':fields.tolist(),'baseline_per_step_field':baseline_fields.tolist(),
+            'mean_loss':float(totals.mean()/count),'baseline_mean_loss':float(baseline.mean()/count),
+            'per_step':(totals/count).tolist(),'baseline_per_step':(baseline/count).tolist(),
             'one_step_prefix_mean':float(totals[:3].mean()/count),'tail_leads_hours':list(range(6,127,6)),
             'tail':(totals[3:]/count).tolist(),'segments':len(segments),'selection':'monitor_only'}
 
 
 def census(segments,load,latitude,path,upstream):
-    totals=np.zeros((24,7,29),dtype=np.float64)
+    totals=np.zeros((24,5,29),dtype=np.float64)
     n=0
     for segment in segments:
         for off in range(0,96,24):
@@ -70,7 +81,7 @@ def census(segments,load,latitude,path,upstream):
     class_names=['one_step_prefix']+[f'tail_{h}h' for h in range(6,127,6)]
     class_hot=[{'step_class':class_names[c],'field_index':int(v),'level_index':int(p),
                 'share':float(class_shares[c,v,p])} for c,v,p in zip(*np.where(class_shares>.10))]
-    result={'upstream':upstream,'source_identity':source_identity(),'loss_by_step_field_level':totals.tolist(),
+    result={'field_order':SCORED_FIELDS,'upstream':upstream,'source_identity':source_identity(),'loss_by_step_field_level':totals.tolist(),
             'share_by_field_level':shares.tolist(),'above_ten_percent':hot,'chunks':n,
             'step_class_share':class_shares.tolist(),'step_class_names':class_names,
             'above_ten_percent_by_class':class_hot,'decision_required':bool(hot or class_hot)}

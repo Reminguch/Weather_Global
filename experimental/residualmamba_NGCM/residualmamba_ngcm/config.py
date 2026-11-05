@@ -6,10 +6,11 @@ from src.models.neuralgcm_residual.config import FIELDS, FORCING_FIELDS
 
 LEVELS = (1,2,3,5,7,10,20,30,50,70,100,125,150,175,200,225,250,300,350,400,450,500,550,600,650,700,750,775,800,825,850,875,900,925,950,975,1000)
 P = LEVELS[8:]
+SCORED_FIELDS = FIELDS[:5]
 
 @dataclass(frozen=True)
 class Config:
-    schema_version: int = 1
+    schema_version: int = 2
     runtime_policy: str = 'deterministic_gpu_v1'
     feedback_mode: str = 'baseline'
     arm: str = 'main'
@@ -52,22 +53,21 @@ class Config:
     temporal_stateful: bool = True
     input_steps: int = 2
     input_channels_main: int = 796
-    output_channels: int = 203
+    output_channels: int = 145
     corrected_level_min_hpa: int = 50
     forecast_steps: int = 40
     forcing_policy: str = 'lag24h_then_persist_at_origin'
     loss_mode: str = 'all_steps'
     radius_query_fraction_edge_length: float = .6
-    cloud_alpha: float = .05
     cloud_scale_floor: float = 1e-3
     swa_steps: tuple = tuple(range(2000,8001,500))
 
     def __post_init__(self):
-        # Only the predeclared controls and sampling option may vary in v1.
+        # Only the predeclared controls and sampling option may vary in v2.
         defaults = {f.name: f.default for f in self.__dataclass_fields__.values()}
         for name, value in asdict(self).items():
             if name not in ('arm', 'stats_stride') and value != defaults[name]:
-                raise ValueError(f'{name} changes the v1 protocol; version the specification first')
+                raise ValueError(f'{name} changes the v2 protocol; version the specification first')
         if self.arm not in ('main','C2','C3','C4') or self.stats_stride not in (1,7):
             raise ValueError('arm must be main/C2/C3/C4; stats_stride must be 1 or 7')
 

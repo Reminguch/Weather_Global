@@ -18,7 +18,7 @@ from src.models.mamba.v24_Ilya.training.endpoint_step import build_optimizer
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--gc-checkpoint',required=True);p.add_argument('--output',required=True)
+    p=argparse.ArgumentParser();p.add_argument('--gc-checkpoint',required=True);p.add_argument('--output',required=True);p.add_argument('--donor-root',type=Path)
     a=p.parse_args();started=time.monotonic()
     if jax.devices()[0].platform!='gpu':raise RuntimeError('This is a real GPU smoke test')
     cfg=Config();lat=np.arcsin(np.polynomial.legendre.leggauss(64)[0]);lon=np.arange(128)*2*np.pi/128
@@ -30,15 +30,32 @@ def main():
     params,memory=jax.jit(model.init)(jax.random.PRNGKey(22),x)
     memory=zero_memory(memory)
     out,next_memory=jax.jit(model.apply)(params,memory,jax.random.PRNGKey(22),x)
-    assert out.shape==(7,29,128,64)
+    assert out.shape==(5,29,128,64)
     np.testing.assert_array_equal(np.asarray(out),0)
     assert any(np.any(np.asarray(v)!=0) for v in jax.tree_util.tree_leaves(next_memory))
     b=rng.normal(size=(7,37,128,64)).astype(np.float32);b[:,:,0,0]=-0.
     stats={'diff_std':np.ones((7,37),np.float32)}
     y=np.asarray(correct(b,out,stats))
     np.testing.assert_array_equal(b.view(np.uint32),y.view(np.uint32))
+    perturbed=np.asarray(correct(b,jnp.ones_like(out),stats))
+    np.testing.assert_array_equal(perturbed[5:].view(np.uint32),b[5:].view(np.uint32))
+    np.testing.assert_array_equal(perturbed[:,:8].view(np.uint32),b[:,:8].view(np.uint32))
+    real_data=None
+    if a.donor_root:
+        from residualmamba_ngcm.artifacts import load_arrays,read_json
+        from residualmamba_ngcm.cache import load_chunk
+        from src.models.neuralgcm_residual.data import PreparedStore
+        plan=read_json(a.donor_root/'plan.json')
+        store=PreparedStore(Path(plan['download_root'])/'res2p8')
+        geom,_=load_arrays(a.donor_root/'geometry.npz')
+        real_stats,_=load_arrays(a.donor_root/'stats.npz')
+        real=load_chunk(store,a.donor_root/'cache',4,real_stats,cfg,geom['static'],geom['latitude'],geom['longitude'])
+        real_out,_=jax.jit(model.apply)(params,zero_memory(memory),jax.random.PRNGKey(22),real['features'][0])
+        real_loss=float(weighted_mse(real_out,real['target'][0],geom['latitude']))
+        assert np.isfinite(real_loss) and real['target'].shape==(24,5,29,128,64)
+        real_data={'first_anchor':4,'first_step_zero_head_loss':real_loss,'target_shape':list(real['target'].shape)}
     batch={'features':jnp.broadcast_to(jnp.asarray(x),(24,*x.shape)),
-           'target':jnp.full((24,7,29,128,64),.1,dtype=jnp.float32)}
+           'target':jnp.full((24,5,29,128,64),.1,dtype=jnp.float32)}
     optimizer,schedule=build_optimizer(cfg.v24());state=optimizer.init(params)
     def update(p,h,s,batch,key):
         (loss,new_h),grad=jax.value_and_grad(lambda par:chunk_loss(model.apply,par,h,batch,key,lat),has_aux=True)(p)
@@ -74,8 +91,8 @@ def main():
     if not finite:raise FloatingPointError('Nonfinite smoke optimizer/parameters/memory')
     write_json(a.output,{'status':'passed','scope':'full architecture, synthetic features, 3 optimizer updates each BPTT24',
         'production_data_validation':False,'device':str(jax.devices()[0]),'source_identity':source_identity(),
-        'libraries':versions(),'input_channels':796,'output_channels':203,'width':512,'mesh_size':4,
-        'zero_head_bitwise':True,'upper_levels_bitwise':True,'memory_nonzero':True,'updates':records,
+        'libraries':versions(),'input_channels':796,'output_channels':145,'width':512,'mesh_size':4,
+        'zero_head_bitwise':True,'cloud_fields_bitwise':True,'real_data':real_data,'upper_levels_bitwise':True,'memory_nonzero':True,'updates':records,
         'restart_max_abs_delta':restart_delta,'restart_bitwise':restart_bitwise,
         'seconds':time.monotonic()-started,'parameters':sum(x.size for x in jax.tree_util.tree_leaves(params)),
         'memory_bytes':sum(x.size*x.dtype.itemsize for x in jax.tree_util.tree_leaves(memory))},immutable=True)

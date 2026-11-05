@@ -15,13 +15,13 @@ def tiny_model():
         p=hk.get_parameter('p',(),init=hk.initializers.Constant(.2))
         h=hk.get_state('h',(),init=hk.initializers.Constant(0))
         new=jnp.tanh(h*p+x);hk.set_state('h',new)
-        return jnp.broadcast_to(new*p,(7,29,1,4))
+        return jnp.broadcast_to(new*p,(5,29,1,4))
     return hk.transform_with_state(forward)
 
 
 def test_dense_evaluator_matches_qualified_validation_and_reset():
     model=tiny_model();params,memory=model.init(jax.random.PRNGKey(22),.1)
-    batch={'features':np.linspace(.1,.5,24,dtype=np.float32),'target':np.ones((24,7,29,1,4),np.float32)*.3}
+    batch={'features':np.linspace(.1,.5,24,dtype=np.float32),'target':np.ones((24,5,29,1,4),np.float32)*.3}
     load=lambda _:batch;segment=np.arange(96)
     expected=validate(model,params,memory,[segment],load,LAT,Config())
     loss,baseline=evaluate_segment(predictor(model,LAT,22),params,memory,segment,load,LAT,22)
@@ -33,7 +33,7 @@ def test_dense_evaluator_matches_qualified_validation_and_reset():
 
 
 def test_reentering_trainer_preserves_every_state(tmp_path):
-    model=tiny_model();batch={'features':np.linspace(.1,.5,24,dtype=np.float32),'target':np.ones((24,7,29,1,4),np.float32)*.1}
+    model=tiny_model();batch={'features':np.linspace(.1,.5,24,dtype=np.float32),'target':np.ones((24,5,29,1,4),np.float32)*.1}
     segments=(np.arange(96),np.arange(96,192));load=lambda _:batch;cfg=Config()
     run(model,cfg,segments,(),load,LAT,tmp_path/'full','dense-test',steps=5,defer_validation=True)
     resume=None

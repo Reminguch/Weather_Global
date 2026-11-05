@@ -124,7 +124,9 @@ def validation(root,plan,pp,store,geometry,stats,endpoint,deadline):
         if any(r['checkpoint_sha256']!=ck for r in rows):raise ValueError('Changed validation checkpoint')
         value=np.mean([r['per_step'] for r in rows],axis=0);baseline=np.mean([r['baseline_per_step'] for r in rows],axis=0)
         write_json(directory/'summary.json',{'step':endpoint,'evaluation':label,'per_step':value.tolist(),
-            'baseline_per_step':baseline.tolist(),'mean_loss':float(value.mean()),
+            'baseline_per_step':baseline.tolist(),'per_field':{f:float(np.mean([r['per_field'][f] for r in rows])) for f in rows[0]['per_field']},
+            'baseline_per_field':{f:float(np.mean([r['baseline_per_field'][f] for r in rows])) for f in rows[0]['baseline_per_field']},
+            'mean_loss':float(value.mean()),
             'baseline_mean_loss':float(baseline.mean()),'improvement_percent':float(100*(1-value.mean()/baseline.mean())),
             'segments':15,'checkpoint_sha256':ck},immutable=True) if not (directory/'summary.json').exists() else None
     write_json(root/f'validation_{endpoint:05d}/COMPLETE.json',{'step':endpoint,'checkpoint_sha256':ck},immutable=True)
