@@ -1,5 +1,7 @@
 # Loss v2 checkpoint evaluation
 
+**Historical update-1,900 snapshot.** Both runs have now completed 2,000 updates. See the [final K=1 versus K=20 comparison and plots](../v2_comparison_20261106/README.md).
+
 This publication snapshot reports the ar_tail_k=20 checkpoint at update 1,900. Every evaluation uses all 15 fixed 2022 validation segments (60 chunks), the same native tail20 inputs, 50–1000 hPa targets, Gaussian latitude weights, pressure weights and train-only 6 h-difference scales. Memory resets per segment and carries across its four chunks.
 
 The total weighted normalized MSE is **3.3667028**, versus **3.5251651** for the official pretrained NeuralGCM zero-head reference: **4.50% lower**. All five scored fields improve at this checkpoint.
