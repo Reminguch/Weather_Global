@@ -14,7 +14,7 @@ FIELDS=[('temperature','Temperature'),('geopotential','Geopotential'),('u_compon
 
 
 def read(path):return json.loads(path.read_text())
-def save(fig,path):fig.savefig(path,dpi=160,bbox_inches='tight');plt.close(fig)
+def save(fig,path):fig.savefig(path,dpi=160);plt.close(fig)
 def gain(value,baseline):return 100*(1-value/baseline)
 
 
@@ -91,7 +91,7 @@ def report(matched_root,out):
             if d['step']==2000:
                 (out/f'k{k}_matched_step_02000.json').write_text(json.dumps(d,indent=2)+'\n')
     with (out/'matched_eval_losses.csv').open('w',newline='') as f:
-        w=csv.DictWriter(f,fieldnames=list(flat[0]));w.writeheader();w.writerows(flat)
+        w=csv.DictWriter(f,fieldnames=list(flat[0]),lineterminator='\n');w.writeheader();w.writerows(flat)
     (out/'plot-data.json').write_text(json.dumps({'sources':sources,'evaluations':rows},indent=2)+'\n')
     complete=len(rows[1])==27 and len(rows[20])==26
     lines=['# Primary loss v2 results: training-matched evaluation','',

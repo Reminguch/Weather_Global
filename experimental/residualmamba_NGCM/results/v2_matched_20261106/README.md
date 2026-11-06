@@ -1,6 +1,6 @@
 # Primary loss v2 results: training-matched evaluation
 
-**Status: K=1: 2/27 matched evaluations complete; K=20: 26/26 complete.**
+**Status: K=1: 3/27 matched evaluations complete; K=20: 26/26 complete.**
 
 The primary analysis evaluates each model using the same input/origin/forecast-horizon protocol as its own training run. K=1 has its own official pretrained NeuralGCM baseline. K=20 has its own baseline. Absolute losses across these different tasks must not be ranked.
 
@@ -35,6 +35,8 @@ The previous [common-tail20 comparison](../v2_comparison_20261106/README.md) is 
 
 
 ## Matched evaluation curves
+
+Only completed checkpoints are shown. Lines connect observations; missing intermediate checkpoints do not imply a measured trend. Step zero is the zero-head official baseline.
 
 ![Separate matched evaluations](matched_eval_loss_vs_checkpoint.png)
 
