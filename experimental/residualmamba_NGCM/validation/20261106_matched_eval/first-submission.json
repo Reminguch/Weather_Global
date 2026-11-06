@@ -1,0 +1,21 @@
+{
+  "attempt": 1,
+  "job_id": "16986379",
+  "phase": "submitted",
+  "sbatch": [
+    "sbatch",
+    "--parsable",
+    "--account=mengdiw",
+    "--cpus-per-task=8",
+    "--partition=ailab",
+    "--qos=gpu-test",
+    "--gres=gpu:h200:1",
+    "--mem=96G",
+    "--time=01:00:00",
+    "--job-name=ngcm-v2-matched-k1-2000",
+    "--output=/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_matched_eval_20261106/logs/step-2000-%j.log"
+  ],
+  "script": "#!/usr/bin/env bash\nset -euo pipefail\nunset LD_LIBRARY_PATH\ncd /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/code\nexport TMPDIR=/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/code/.tmp\nexport XDG_CACHE_HOME=/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/code/.cache\nexport MPLCONFIGDIR=/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/code/.cache/matplotlib\nexport PYTHONPATH=/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/code/experimental/residualmamba_NGCM\nexport PYTHONDONTWRITEBYTECODE=1\nexport PYTHONNOUSERSITE=1\nexport JAX_PLATFORMS=cuda\nexport XLA_PYTHON_CLIENT_PREALLOCATE=false\nexport XLA_FLAGS='--xla_gpu_enable_scatter_determinism_expander=true --xla_gpu_exclude_nondeterministic_ops=true --xla_gpu_deterministic_ops=true --xla_gpu_autotune_level=0'\nexport OMP_NUM_THREADS=8\nexport OPENBLAS_NUM_THREADS=8\nexport MKL_NUM_THREADS=8\nexport NGCM_GPU_EXECUTION_POLICY=deterministic_gpu_v1\nexec /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/.venv_ngcm_data/bin/python -u /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_matched_eval_20261106/code/matched_v2_eval.py --root /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105 --output /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_matched_eval_20261106/tail1 --step 2000\n",
+  "step": 2000,
+  "submitted_unix": 1793989365.0772932
+}

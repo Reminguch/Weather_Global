@@ -1,0 +1,7 @@
+{
+  "segments": 15,
+  "exact_mean_loss_match": true,
+  "exact_per_step_match": true,
+  "mean_loss": 3.3614495430637312,
+  "baseline_mean_loss": 3.5251651089483707
+}

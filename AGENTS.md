@@ -67,3 +67,11 @@ User follow-up on 2026-11-05: submit an additional independent loss v2
 ar_tail_k=1 2k H200 run. Keep the running v2 ar_tail_k=20 arm unchanged and
 compare both on the same tail20 validation inputs. Reuse the authenticated
 raw tail1 cache and shared train-only statistics, with fresh learned state.
+
+User correction on 2026-11-06: primary evaluation must match each training arm's
+own input/origin/horizon protocol. Evaluate K1 with K1 inputs and K20 with K20
+inputs, each against its own official pretrained NeuralGCM baseline. Separate
+the plots and baselines; do not rank their absolute losses across different
+tasks. Common-tail20 evaluation is supplementary cross-horizon analysis only.
+This supersedes the earlier instruction treating the common-tail20 comparison
+as the main evaluation. Preserve completed training checkpoints and source snapshots.

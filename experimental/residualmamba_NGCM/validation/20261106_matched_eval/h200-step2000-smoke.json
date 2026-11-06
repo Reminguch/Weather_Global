@@ -1,0 +1,27 @@
+{
+  "baseline_scan_vs_direct_max_abs": 0.0,
+  "checkpoint_sha256": "92c4ca7ed980f78b0dbf01e1d8b8d5385142878f7014e9a412c1122bafd0b208",
+  "finite": true,
+  "first_chunk_baseline_loss": 0.6774903535842896,
+  "first_chunk_model_loss": 0.6521971821784973,
+  "protocol": {
+    "aggregation": "mean all 24 positions and all chunks/segments; sum five weighted normalized fields",
+    "baseline": "official pretrained NeuralGCM with identical origins, valid times and leads",
+    "evaluation_ar_tail_k": 1,
+    "evaluator_sha256": "c3b24e37751159f892d94f1598d038c9315e7f979c4a7088d95ead82686ebf22",
+    "independent_prefix_predictions": 22,
+    "input_receipt_sha256": "433e8b4fd25df126fa0cd2247ae82649af69db2baa4dc20afbb5824bf96eeba1",
+    "kind": "training_matched_validation",
+    "memory": "reset each 96-anchor segment; carry through four 24-step chunks",
+    "run_identity": "1fd0677d232d0794732691d7a276ced5db0f74d7524452640179f180853b407e",
+    "stats_sha256": "d5c5c850caffc2bfc54b41640483ac524a71bbfad6eb22bac06693880884aacd",
+    "tail_lead_hours": [
+      6,
+      12
+    ],
+    "training_ar_tail_k": 1,
+    "training_source_identity": "bb79520da23d4de9713c38e038dc6726d0d5fc90abcb390ac621ad274f6e384b",
+    "truth_prefix_steps": 23,
+    "validation": "all 15 fixed 2022 segments / 60 chunks"
+  }
+}

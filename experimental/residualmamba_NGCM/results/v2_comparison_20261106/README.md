@@ -1,6 +1,8 @@
-# Final loss v2: ar_tail_k=1 versus ar_tail_k=20
+# Supplementary loss v2: common K20 evaluation
 
-**Both independent runs finished 2,000 updates and every saved checkpoint evaluation.** K=20 has 26 complete evaluations; K=1 has 27. There are no remaining weather training/evaluation jobs from these two runs.
+**This is cross-horizon evaluation for the model trained with K=1. It is not the primary training-matched comparison.** See the [primary matched K1 and K20 report](../v2_matched_20261106/README.md). The K1 result of 0.20% here does not describe its short-horizon performance.
+
+**Both independent runs finished 2,000 updates and every saved checkpoint common-K20 evaluation.** K=20 has 26 complete evaluations; K=1 has 27. Matched K1 evaluation is tracked separately in the primary report.
 
 ## Common validation results
 
@@ -51,7 +53,7 @@ Repository directory: `experimental/residualmamba_NGCM/results/v2_comparison_202
 
 Published local directory: `/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/experimental/residualmamba_NGCM/results/v2_comparison_20261106`.
 
-- ar_tail_k = 20 original plots: `/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_2k_20261105/eval/separate_plots`
-- ar_tail_k = 1 original plots: `/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/eval/separate_plots`
+- Train K=20 original plots: `/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_2k_20261105/eval/separate_plots`
+- Train K=1 original plots: `/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105/eval/separate_plots`
 
 [All eval values](eval_checkpoint_losses.csv) · [Final metrics](final_metrics.csv) · [Training values](train_update_losses.csv) · [Lead metrics](final_lead_metrics.csv) · [Source receipts and plot data](plot-data.json).

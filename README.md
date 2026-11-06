@@ -1,10 +1,10 @@
 # Weather Global: Stateful Mamba for GraphCast
 
-**NeuralGCM loss v2 final results (2026-11-06):** Both ar_tail_k=1 and ar_tail_k=20 finished 2,000 updates and all 53 saved-checkpoint evaluations. On the common 2022 validation set, K=20 reduces weighted normalized MSE by **4.64%** versus the official pretrained NeuralGCM baseline; K=1 reduces it by **0.20%**.
+**NeuralGCM loss v2: training-matched evaluation.** Both models finished 2,000 updates. Primary results now evaluate train K=1 with eval K=1 and train K=20 with eval K=20, each against its own official pretrained NeuralGCM baseline. The earlier common-tail20 comparison is a supplementary cross-horizon experiment; its 0.20% K1 improvement is not matched short-horizon performance.
 
-[Open the final report, training curves, per-variable curves and CSV data](experimental/residualmamba_NGCM/results/v2_comparison_20261106/README.md).
+[Open the primary report and separate matched evaluation curves](experimental/residualmamba_NGCM/results/v2_matched_20261106/README.md). [Supplementary common-tail20 results](experimental/residualmamba_NGCM/results/v2_comparison_20261106/README.md).
 
-![Loss v2 common validation curves](experimental/residualmamba_NGCM/results/v2_comparison_20261106/eval_loss_vs_checkpoint.png)
+![Separate training-matched evaluation curves](experimental/residualmamba_NGCM/results/v2_matched_20261106/matched_eval_loss_vs_checkpoint.png)
 
 This project integrates a **Mamba-style selective state space model (SSM)** into the [GraphCast](https://github.com/google-deepmind/graphcast) weather forecasting architecture, exploring whether explicit temporal memory across autoregressive rollout steps can improve multi-step weather prediction.
 

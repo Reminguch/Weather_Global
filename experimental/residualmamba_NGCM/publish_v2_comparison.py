@@ -15,7 +15,7 @@ FIELDS=[('temperature','Temperature'),('geopotential','Geopotential'),
         ('u_component_of_wind','Zonal wind (u)'),('v_component_of_wind','Meridional wind (v)'),
         ('specific_humidity','Specific humidity')]
 COLORS={'tail20':'#2563eb','tail1':'#d97706'}
-LABELS={'tail20':'ar_tail_k = 20','tail1':'ar_tail_k = 1'}
+LABELS={'tail20':'Train K=20','tail1':'Train K=1'}
 
 
 def read(path):return json.loads(path.read_text())
@@ -90,7 +90,7 @@ def publish(runs,out):
         v=values[-1];ax.annotate(f"{v['mean_loss']:.4f}  ({v['improvement_percent']:.2f}% lower)",
             (2000,v['mean_loss']),xytext=(-7,-19 if arm=='tail20' else -25),textcoords='offset points',ha='right',color=COLORS[arm],fontweight='bold')
     style(ax,'Checkpoint update','Normalized weighted validation MSE')
-    ax.set_title('Common validation loss vs checkpoint\n2022: 15 fixed segments / 60 chunks, identical tail20 inputs')
+    ax.set_title('Supplementary: both models evaluated with K=20 inputs\n2022: 15 fixed segments / 60 chunks, identical tail20 inputs')
     ax.set_xlim(0,2100);ax.margins(y=.15);ax.legend(loc='lower left',fontsize=10)
     save(fig,out/'eval_loss_vs_checkpoint.png')
     fig,axes=plt.subplots(3,2,figsize=(12,10),layout='constrained');axes=axes.ravel()
@@ -106,14 +106,14 @@ def publish(runs,out):
         ax.set_title(label);style(ax,'Checkpoint update','Loss contribution');ax.ticklabel_format(axis='y',style='plain',useOffset=False)
     axes[-1].axis('off');axes[0].legend(fontsize=9)
     axes[-1].text(.03,.92,'Final checkpoint: update 2,000\n\nPositive improvement = lower MSE.\nNegative improvement = higher MSE.\n\nEach variable has its own y-axis.\nCloud fields are input-only.\n\nAll 53 checkpoint evaluations are complete.\nPer-variable training histories were not logged.',va='top',linespacing=1.6)
-    fig.suptitle('Five-variable validation loss vs checkpoint\nSame normalization, latitude / pressure weights and samples',fontsize=14)
+    fig.suptitle('Supplementary per-variable evaluation: eval K=20 for both models\nTrain K=1 is a cross-horizon test; not matched short-horizon performance',fontsize=14)
     save(fig,out/'per_variable_eval_loss_vs_checkpoint.png')
     fig,ax=plt.subplots(figsize=(10.5,4.8),layout='constrained')
     for arm,values in evaluations.items():
         ax.plot([0]+[time_hours[arm][v['step']-1] for v in values],[0]+[v['improvement_percent'] for v in values],
                 marker='o',markersize=3,color=COLORS[arm],label=LABELS[arm])
     style(ax,'Cumulative recorded update time (hours)','Validation MSE improvement (%)');ax.axhline(0,color='#64748b',lw=1)
-    ax.set_title('Validation improvement vs recorded training time\nIncludes timed updates and batch loading; excludes queues and setup outside updates.')
+    ax.set_title('Supplementary eval K=20: improvement vs recorded training time\nIncludes timed updates and batch loading; excludes queues and setup outside updates.')
     ax.legend();save(fig,out/'eval_improvement_vs_training_time.png')
     fig,ax=plt.subplots(figsize=(10.5,4.8),layout='constrained');leadrows=[]
     for arm,values in evaluations.items():
@@ -121,7 +121,7 @@ def publish(runs,out):
         ax.plot(hours,gains,marker='o',markersize=3,color=COLORS[arm],label=LABELS[arm])
         for h,g in zip(hours,gains):leadrows.append({'arm':arm,'checkpoint':2000,'lead_hours':int(h),'improvement_pct':float(g)})
     ax.axhline(0,color='#64748b',lw=1);style(ax,'Tail forecast lead (hours)','Normalized weighted MSE improvement (%)')
-    ax.set_title('Final checkpoint: improvement by validation tail lead');ax.legend();save(fig,out/'eval_improvement_by_lead.png')
+    ax.set_title('Supplementary eval K=20: final improvement by tail lead');ax.legend();save(fig,out/'eval_improvement_by_lead.png')
     trainrows=[];evalrows=[];finalrows=[]
     for arm,rows in training.items():
         for r in rows:trainrows.append({'arm':arm,**{k:r[k] for k in ('step','loss','lr','seconds')},'cumulative_update_hours':float(time_hours[arm][r['step']-1])})
@@ -138,8 +138,9 @@ def publish(runs,out):
     write_csv(out/'final_metrics.csv',finalrows);write_csv(out/'final_lead_metrics.csv',leadrows)
     finals={a:v[-1] for a,v in evaluations.items()}
     (out/'plot-data.json').write_text(json.dumps({'runs':metadata,'evaluations':evaluations,'plot_script_sha256':sha(Path(__file__))},indent=2)+'\n')
-    lines=['# Final loss v2: ar_tail_k=1 versus ar_tail_k=20','',
-        '**Both independent runs finished 2,000 updates and every saved checkpoint evaluation.** K=20 has 26 complete evaluations; K=1 has 27. There are no remaining weather training/evaluation jobs from these two runs.','',
+    lines=['# Supplementary loss v2: common K20 evaluation','',
+        '**This is cross-horizon evaluation for the model trained with K=1. It is not the primary training-matched comparison.** See the [primary matched K1 and K20 report](../v2_matched_20261106/README.md). The K1 result of 0.20% here does not describe its short-horizon performance.','',
+        '**Both independent runs finished 2,000 updates and every saved checkpoint common-K20 evaluation.** K=20 has 26 complete evaluations; K=1 has 27. Matched K1 evaluation is tracked separately in the primary report.','',
         '## Common validation results','',
         'The fixed 2022 validation set contains 15 segments / 60 chunks. Both arms use the same tail20 native inputs, 50–1000 hPa targets, Gaussian latitude weights, pressure weights and train-only 6 h-difference normalization. Memory resets once per segment and carries across four chunks. Percentages below are reductions in normalized weighted MSE relative to the official pretrained NeuralGCM baseline.','',
         '| Quantity | Baseline | K=1 loss | K=1 improvement | K=20 loss | K=20 improvement |','|---|---:|---:|---:|---:|---:|']
