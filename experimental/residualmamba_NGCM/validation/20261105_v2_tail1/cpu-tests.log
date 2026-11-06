@@ -1,0 +1,18 @@
+............                                                             [100%]
+=============================== warnings summary ===============================
+../Weather_Global/.venv_ngcm_data/lib/python3.11/site-packages/jax/_src/config.py:283
+  /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/.venv_ngcm_data/lib/python3.11/site-packages/jax/_src/config.py:283: DeprecationWarning: Setting `jax_pmap_shmap_merge` is deprecated in JAX v0.9.0 and will be removed in JAX v0.10.0.
+    value = self._parser(value)
+
+experimental/residualmamba_NGCM/tests/test_tail1.py::test_tail1_training_resume_and_memory_segment_boundary
+experimental/residualmamba_NGCM/tests/test_tail1.py::test_tail1_training_resume_and_memory_segment_boundary
+experimental/residualmamba_NGCM/tests/test_tail1.py::test_tail1_training_resume_and_memory_segment_boundary
+experimental/residualmamba_NGCM/tests/test_dense_eval.py::test_reentering_trainer_preserves_every_state
+experimental/residualmamba_NGCM/tests/test_dense_eval.py::test_reentering_trainer_preserves_every_state
+experimental/residualmamba_NGCM/tests/test_dense_eval.py::test_reentering_trainer_preserves_every_state
+experimental/residualmamba_NGCM/tests/test_dense_eval.py::test_reentering_trainer_preserves_every_state
+  /scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global/.venv_ngcm_data/lib/python3.11/site-packages/optax/_src/linear_algebra.py:44: DeprecationWarning: optax.global_norm is deprecated in favor of optax.tree.norm
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+12 passed, 8 warnings in 12.57s

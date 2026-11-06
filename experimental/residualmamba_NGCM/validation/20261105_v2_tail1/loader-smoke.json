@@ -1,0 +1,21 @@
+{
+  "ar_tail_k": 1,
+  "finite": true,
+  "per_field": {
+    "geopotential": 0.02314148098230362,
+    "specific_humidity": 0.2926883399486542,
+    "temperature": 0.09575548768043518,
+    "u_component_of_wind": 0.13008370995521545,
+    "v_component_of_wind": 0.09833614528179169
+  },
+  "schema_version": 2,
+  "scope": "actual reused cache and ERA5 features, first full 24-step chunk",
+  "target_shape": [
+    24,
+    5,
+    29,
+    128,
+    64
+  ],
+  "zero_head_loss_first_train_chunk": 0.6400051712989807
+}

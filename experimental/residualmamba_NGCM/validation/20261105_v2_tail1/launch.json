@@ -1,0 +1,17 @@
+{
+  "training_job": 16945328,
+  "source_commit": "96881915de463588274f595450c2c7683a1a7bab",
+  "run_identity": "1fd0677d232d0794732691d7a276ced5db0f74d7524452640179f180853b407e",
+  "source_identity": "bb79520da23d4de9713c38e038dc6726d0d5fc90abcb390ac621ad274f6e384b",
+  "ar_tail_k": 1,
+  "truth_prefix_steps": 23,
+  "schema_version": 2,
+  "target_updates": 2000,
+  "checkpoint_spacing": 100,
+  "fresh_initialization": true,
+  "shared_validation": "15 fixed tail20 validation segments / 60 chunks",
+  "gpu": "H200",
+  "partition": "ailab",
+  "qos": "gpu-test",
+  "run_root": "/scratch/gpfs/MENGDIW/sh4809/weatherforecast/Weather_Global_rebuild/artifacts/v2_tail1_2k_20261105"
+}
