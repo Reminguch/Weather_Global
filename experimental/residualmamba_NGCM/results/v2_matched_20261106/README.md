@@ -1,6 +1,6 @@
 # Primary loss v2 results: training-matched evaluation
 
-**Status: K=1: 3/27 matched evaluations complete; K=20: 26/26 complete.**
+**Status: all 53 checkpoint evaluations complete.**
 
 The primary analysis evaluates each model using the same input/origin/forecast-horizon protocol as its own training run. K=1 has its own official pretrained NeuralGCM baseline. K=20 has its own baseline. Absolute losses across these different tasks must not be ranked.
 
