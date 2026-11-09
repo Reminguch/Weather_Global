@@ -15,7 +15,7 @@ seed repeats are straightforward but require additional GPU time.
 | Priority | Reviewer concern | Owner | Importance | Difficulty | Deliverable |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Lower MSE may reflect smoothing; power spectra and λ tradeoffs | **Ilya** | 4/5 | Moderate | MSE, power/error spectra, correlation and development-fitted smoothing comparisons for M1, public GC and both methods at λ = 0, 0.25, 0.5, 0.75 and 1. |
-| 2 | Further fine-tuning of the already fine-tuned GC baseline | **Lianghong** | 4/5 | Relatively easy | Assess standard-loss full-GC fine-tuning at K8/K12/K16/K20 through 2,500 updates, with checkpoint spectra and optional SWA. Compare with public GC and principal M1 on common evaluation dates; equal training budgets are not required. New submissions are on hold for the comparison revisions below. |
+| 2 | Further fine-tuning of the already fine-tuned GC baseline | **Lianghong** | 4/5 | Relatively easy | Assess standard-loss full-GC fine-tuning at K8/K12/K16/K20 through 2,500 updates, with checkpoint spectra and optional SWA. Compare with public GC and principal M1 on common evaluation dates; equal training budgets are not required. New submissions are on hold; see the [dedicated experiment README](README_FULL_GC_AR.md). |
 | 3 | Extreme-event performance | **Lianghong** | 4/5 | Easy | Review the completed occurrence/intensity evaluation and prepare tables, figures and a short interpretation. |
 | 4 | Multiple training seeds | **Lianghong** | 4/5 | Easy; additional compute | Proposed first scope: principal M1 recipe and matched reset-trained control at seeds 23 and 24, alongside existing seed 22. |
 | 6 | Predicted-field maps and gradient diagnostics | **Unassigned** | 3/5 | Easy–moderate | Nobody is working on this so far. Whoever finishes their assigned work first could take it on, using the same forecast models without another training campaign. |
@@ -118,10 +118,11 @@ artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/
   runs/gcft_s22_l000_lr3em7_fresh_20261107/checkpoints/checkpoint_step00002500.pkl
 ```
 
-This is the **raw, unaveraged endpoint**. The proposed SWA below is a separate
-checkpoint and result. Evaluate the fine-tuned GC against the unmodified public
-GC baseline. Include M1 as a separate correction reference; its historical
-training used stopped weather-feedback gradients and SWA.
+This is the **raw, unaveraged endpoint**. The SWA proposed in the
+[dedicated experiment README](README_FULL_GC_AR.md) is a separate checkpoint and
+result. Evaluate the fine-tuned GC against the unmodified public GC baseline.
+Include M1 as a separate correction reference; its historical training used
+stopped weather-feedback gradients and SWA.
 
 **Current GC λ=0 revision:** the active run is
 `gcft_s22_l000_lr3em7_fresh_20261107`, starting fresh at peak LR `3e-7`.
@@ -137,70 +138,9 @@ configuration and results to Ilya for reuse as the GC λ=0 reference in item 1.
 Use the 2022 development cohort for tuning decisions and the common 2023 cohort
 for evaluation, as specified in the protocol.
 
-### Proposed AR-horizon extension and comparison with M1
-
-**Status: prepared, not submitted; on hold for comparison revisions.** The
-existing K20 run is separate from this hold. The draft extension evaluates GC
-horizons on development data, but does not yet include M1 in its report or the
-2023 comparison. The requirements below describe the intended reviewer response,
-not completed implementation. See the [detailed campaign review](v24_full_gc_ar_horizons_2026-11-09.md).
-
-**Training and checkpoints:** start K8, K12 and K16 independently from public GC;
-reuse the existing K20 run. Use the standard GC loss, seed 22, peak LR `3e-7`
-and 2,500 updates. Evaluate updates **500, 1,000, 1,500, 2,000 and 2,500** and
-compare their power spectra. Also assess an equal-weight SWA of total updates
-**1,000, 1,500, 2,000 and 2,500** for each horizon, reporting raw and averaged
-results separately. These SWA positions correspond to M1's main-stage updates
-500–2,000 after its 500-update warm-up.
-
-| Horizon | Total training window | Teacher-forced prefix | Feedback-conditioned tail |
-| --- | ---: | ---: | ---: |
-| K8 | 24 steps | 16 steps | 8 steps |
-| K12 | 24 steps | 12 steps | 12 steps |
-| K16 | 24 steps | 8 steps | 16 steps |
-| K20 | 24 steps | 4 steps | 20 steps |
-
-Each step is six hours. With the fixed 24-step window, changing K also changes
-teacher forcing. Describe this as a comparison of training recipes; K20 is the
-closest horizon match to principal M1.
-
-**Fairness to M1:** use the principal M1 SWA listed above, the same public
-backbone, 1° grid, training years, evaluation dates, truth, forecast leads and
-exact GC loss. Historical M1 and full GC nevertheless have different gradient
-rules (stopped versus full weather-feedback gradients), optimizer schedules and
-training-window order. M1 trains a correction while full GC updates the entire
-backbone. Disclose these choices and actual compute cost. This supports a
-comparison of forecasting methods under their stated training recipes; it does
-not isolate persistent memory or architecture. Use the matched reset-trained
-control for the memory claim. The fresh GC–Mamba/full-GC λ campaign supplies a
-separate comparison with a more closely matched training protocol.
-
-**Evaluation needed for the reviewer response:**
-
-1. On the **same 32 development starts in 2022**, compare all checkpoints and
-   SWAs with public GC and M1. Reuse existing M1 exact-loss records; its saved
-   development calibration statistics lack raw spectra, so add that spectral
-   evaluation. Use one common public-GC denominator for loss reductions and
-   retain finite repeated-baseline differences as warnings.
-2. Freeze the checkpoint-selection rule using **2022 only**, then compare the
-   selected GC models with M1/public GC on the **same 122 starts and 40 leads in
-   2023**. Proposed coverage is each horizon's final raw checkpoint and SWA,
-   plus a distinct intermediate checkpoint if selected on development data.
-   Reuse completed reference results and existing K20 evaluation when available.
-   Report paired block-bootstrap intervals for model differences, disclose prior
-   2023 exposure, and separate forecast-sample uncertainty from seed variability.
-3. Report **forecast power, error power, power ratios and spectral correlation**,
-   alongside exact GC loss. Power amplitude alone cannot answer whether lower
-   MSE reflects smoothing. Coordinate with Ilya to give each new finalist its
-   own development-fitted smoothing baseline, reusing the existing GC/M1 filters.
-   The draft saves error/cross powers but currently plots only forecast power.
-
-**Reviewer scope:** this addresses R1's request for direct multi-step full-GC
-fine-tuning; the added spectral and filtering comparisons also inform R1/R3's
-smoothing concern. It does not establish that GC is fully optimized or that
-further fine-tuning cannot help. Seed replication, equal-budget LoRA and memory
-architecture comparisons remain separate tasks. Report every planned horizon
-and checkpoint, including unfavorable results, and let valid runs finish.
+The K8/K12/K16/K20 extension, checkpoint/SWA schedule, comparison with M1 and
+remaining evaluation work are documented in the separate
+[full-GC experiment README](README_FULL_GC_AR.md).
 
 ## 3. Extreme-event analysis — Lianghong
 
