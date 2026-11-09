@@ -156,6 +156,31 @@ def test_full_feedback_uses_two_diverging_trajectories() -> None:
     np.testing.assert_allclose(_values(result.full_prediction), [3.0, 6.0, 9.0])
 
 
+def test_full_gc_predictor_is_not_added_to_baseline_and_has_own_feedback():
+    baseline_calls = []
+
+    def baseline(*args):
+        baseline_calls.append(1)
+        return _baseline_step(*args)
+
+    def full_gc(params, state, key, inputs, targets, forcings):
+        del params, key, forcings
+        last = inputs['x'].isel(time=-1, drop=True)
+        return xr.Dataset({'x': xr.zeros_like(targets['x']) + 2 * (last + 1)}), state
+
+    result = run_v24_Ilya_rollout(
+        rng=jax.random.PRNGKey(0), inputs=_inputs(), all_targets=_dataset([0., 0., 0.]),
+        all_forcings=_forcings(3), baseline_step=baseline, residual_step=full_gc,
+        baseline_params={}, residual_params={}, baseline_state_init={'count': 0},
+        residual_state_init={}, time_step=TIME_STEP, input_steps=2, warmup_steps=0,
+        target_steps=3, full_feedback=True, reset_state_after_warmup=False,
+        residual_alpha=1., predictor_returns_full=True,
+    )
+    np.testing.assert_array_equal(_values(result.baseline_prediction), [1., 2., 3.])
+    np.testing.assert_array_equal(_values(result.full_prediction), [2., 6., 14.])
+    assert len(baseline_calls) == 3
+
+
 def test_streamed_predictions_match_retained_rollout() -> None:
     for full_feedback in (False, True):
         retained = _run(full_feedback=full_feedback)

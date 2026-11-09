@@ -198,11 +198,19 @@ class V24IlyaEvalConfig:
     merge_state_out: Path | None = None
     initialization_manifest: Path | None = None
     model_id: str | None = None
+    model_family: str = "auto"
 
     def __post_init__(self) -> None:
         # Preserve the flat legacy evaluator interface while validating its
         # architecture through the object shared with training.
         self.architecture
+        if self.model_family not in ("auto", "gc_mamba", "full_gc"):
+            raise ValueError("model_family must be auto, gc_mamba or full_gc")
+        if self.model_family == "full_gc" and (
+            self.eval_mode != "cold_full" or self.residual_alpha != 1.0
+            or self.residual_state_init != "zero"
+        ):
+            raise ValueError("Full-GC evaluation requires cold_full, zero state and residual_alpha=1")
         if self.eval_mode not in EVAL_MODES:
             raise ValueError(f"eval_mode must be one of {EVAL_MODES}, got {self.eval_mode!r}")
         if self.residual_state_init not in RESIDUAL_STATE_INIT_MODES:
@@ -441,6 +449,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--model-id", default=None, help="Frozen protocol model identifier.")
+    parser.add_argument("--model-family", choices=("auto", "gc_mamba", "full_gc"), default="auto",
+                        help="Predictor family; auto reads the native checkpoint tag.")
     parser.add_argument(
         "--anchor-shard-count",
         type=int,

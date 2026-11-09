@@ -511,3 +511,572 @@ Finite warnings remained advisory. MGDA/MSE-control/fixed-sum recorded
 zero-update events in all arms. Completion is execution evidence, not proof of
 the scientific hypothesis. No new submission or automatic extension is needed
 or authorized; review the observed tradeoff before choosing another experiment.
+
+<a id="e005"></a>
+## e005 — Extend the existing full-BPTT trajectories
+
+Date:2026-11-02. Execution: submitted, pending priority. Outcome: pending.
+
+The user explicitly authorized continuation after reviewing e004. Extend MGDA
+and its matched paired-RMS MSE control from200 to2000 total updates at unchanged
+LR1e-6. Copy the actual checkpoints and histories into a separate campaign,
+retaining parameters, optimizer moments, RNG, recurrent memory and cursor.
+Preserve e004. Keep24/K20/96, batch4, seed22, full weather gradients, precision
+and the exact-GC/AMSE-excess pair. This adds1800 updates per arm; the first200
+are not repeated. No fixed-sum arm or checkpoint averaging is included.
+
+[Campaign manifest](../../../artifacts/checkpoints/v24_Ilya/res1_mgda_full_bptt_continuation_20261102/manifest.json).
+Training arrays16672907/16672908/16672910/16672911/16672912 stop at
+600/1000/1400/1800/2000. Exact evaluation16672913, spectral16672914 and
+report16672915 follow. Indices0/1 mean MGDA/MSE control. Matching indices use
+`aftercorr` between stages, preserving independent training progression.
+
+Resources use completed full-feedback jobs16402493_0/1: p90 end-to-end latency
+137.356s/update and historical host-RSS floor234.71GiB.400-update stages request
+384GiB/1320min/8CPUs/one80GB GPU; the last200 use690min. Final evaluation uses
+same eight2022 starts and40 six-hour leads. Reuse the verified best-MSE
+reference evaluations, report exact GC loss first and retain comparison with
+each arm's step200 result. Finite increases, variance and stalls remain warnings.
+
+<a id="e006"></a>
+## e006 — Fresh DeepMind-initialized full-BPTT training
+
+Date:2026-11-02. Execution: submitted, pending priority. Outcome: pending.
+
+The user approved the best setup's initialization recipe: copy compatible
+DeepMind GraphCast spatial parameters, initialize Mamba using Mamba1/seed22,
+and zero the temporal/residual output heads. Internal randomness follows that
+same seeded recipe. No trained Mamba/residual checkpoint is loaded; the separate
+GraphCast baseline remains frozen. MGDA and matched MSE control start with fresh
+optimizer, RNG, cursor and zero recurrent memory. MGDA applies from update1.
+
+Train2500 updates with24/K20/96, batch4, full feedback and the same objective pair.
+Use the previously exercised paired-RMS rate range:100-update warm-up1e-6→1e-5,
+cosine decay to3e-6 by2000, then constant. Spatial/Mamba multipliers1/3, clipping1,
+RMS decay.98, epsilon1e-8, no weight decay. This differs from the best historical
+model's AdamW schedule and500-update MSE pretraining. e005/e006 compare training
+strategies; different rates/histories prevent an initialization-only claim.
+The October7 relative-power surrogate is not substituted. No SWA or extra seeds.
+
+[Campaign manifest](../../../artifacts/checkpoints/v24_Ilya/res1_mgda_full_bptt_fresh_20261102/manifest.json).
+Training arrays16672971/16672972/16672973/16672974/16672975/16672981/16672982 stop
+at400/800/1200/1600/2000/2400/2500. Exact16672983, spectral16672984 and
+report16672985 complete the bounded chain. Resource requests match e005 for
+400-update stages; the last100 use360min. No discarded numerical qualifier,
+automatic failure retry or further extension is included.
+
+**Shared implementation and submission evidence:** Both source snapshots have
+digest `f9537816c104ff2c5bf381ae639b70ae73b60331ee752e741bb7fbd369146615`.
+They preserve e004's runtime and historical prepared loader except the new
+campaign driver/wrapper and allowance for exact-resume output relocation.
+104 focused CPU cases passed, covering bitwise relocated-resume equality,
+feedback-mode mismatch rejection, matched configs, stage counts/dependencies,
+source preservation, tamper rejection and finite-warning behavior. Preparation
+validated both actual step200 checkpoint configurations. Parent evaluation
+reuse and Slurm's resource test passed. On November2 at15:53:52EST, Slurm showed
+both initial arrays pending priority and later stages/reports pending their
+specified dependencies. Submission records are retained under each campaign's
+`submissions/`. Successful submission is not a training or forecast-skill result.
+
+### November 2 resubmission: exactly two parts per arm
+
+The user requested two execution parts to reduce repeated queue waits. All old
+e005/e006 jobs above were still pending and were cancelled at16:00:13EST;
+no training progress was lost. Those campaign snapshots and submission records
+remain historical evidence, with `superseded.json` linking their replacements.
+
+- e005 replacement: [manifest](../../../artifacts/checkpoints/v24_Ilya/res1_mgda_full_bptt_continuation_two_parts_20261102/manifest.json).
+  Training16673752→16673753 performs900+900 new updates, stopping at1100/2000.
+  Exact evaluation16673754, spectral16673755, report16673756.
+- e006 replacement: [manifest](../../../artifacts/checkpoints/v24_Ilya/res1_mgda_full_bptt_fresh_two_parts_20261102/manifest.json).
+  Training16673757→16673758 performs1250+1250 updates, stopping at1250/2500.
+  Exact evaluation16673759, spectral16673760, report16673761.
+
+Both training arrays retain indices0/1 for MGDA/matched MSE control and use
+`aftercorr` between parts. Initialization, optimizer schedules, total updates,
+window boundaries and evaluation are unchanged. Each part requests384GiB,
+8CPUs and one80GB GPU; continuation requests49h and fresh67.5h, within the72h
+limit. Both revised Slurm resource tests passed. Nine focused campaign tests
+passed after the split change; the prior104-case implementation evidence was
+reused, not rerun. Both new frozen source digests are
+`39f6cadbdf213f007497d796e483f9a61c772d04931606082426a2d7aa527d3b`.
+
+Post-submission Slurm inspection confirmed initial arrays pending priority
+and subsequent training/evaluation/report jobs pending dependencies. Launch
+records are saved in each replacement's `checks/launch_validation.json`.
+Training and scientific outcomes remain pending.
+
+### 2026-11-06 — Comprehensive saved-evaluation comparison
+
+Recomputed all26 available checkpoint/reference rows across relative-power
+MGDA, amplitude/pattern di16/di32, stopped-feedback MSE/excess200 and shared
+full-BPTT200, including matched MSE controls and fixed-sum controls where run.
+[Report and full tables](../../../plots/analyze_models/data/resolution_eval/mgda_comparison_20261106/comparison.md),
+[rollout figure](../../../plots/analyze_models/images/resolution_eval/mgda_comparison_20261106/rollout_comparison.png),
+and [reproduction script](../../../scripts/analyze_models/report_mgda_comparison_20261106.py).
+Source hashes, all40-lead metrics and finite numerical discrepancies are saved
+beside the report. All eight existing pilot MSE/power summaries reproduce to
+1e-10. Completed evaluation status, checkpoint identities, dates, lead coverage,
+matched32 indices and finite metrics were checked; no GPU work was launched.
+
+Important reference correction: the main-text best model M1 is
+`di16_fast_mamba`, SHA256
+`b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0`.
+The newer pilot parent is `di16_joint`, a different trained checkpoint.
+M1 gives16.3434% exact loss reduction on matched32/2022; its independent
+122-start2023 main-text result remains14.4240%. Relative-power MGDA SWA
+gives15.5244% on matched32, i.e.0.9790% more MSE than M1, while reducing
+power error14.0167% relative to M1 on the eight2023 spectral starts.
+Against original GC its power-error reduction is only1.3623%; raw2000 gives
+1.9238%. The amplitude/pattern endpoints reduce power error52–53% vs GC
+but worsen matched32 MSE29–36%.
+
+On eight2022 origins, full-BPTT MGDA200 gives16.2531% MSE reduction vs GC,
+but23.7700% higher power error. Relative to its trained parent, MSE worsens
+0.4275% and power error improves2.9712%. Power error here is pooled zonal
+relative-power error across nine fields, positive modes, days1/3/7/10 and
+30–60-degree latitude bands; it is distinct from spherical training AMSE.
+Historical MSE and power headline cohorts differ (32/2022 versus8/2023);
+the figure also shows historical exact MSE on the same8/2023 spectral cohort.
+No matched M1 evaluation was located for the newer8/2022 origins, so no
+direct newer-pilot-versus-M1 ranking is established. The failed split report's
+finite truth-power differences are retained as warnings, not omitted results.
+No new significance claim is made. Long e005/e006 first parts remained pending
+in the November6 scheduler inspection and have no scientific results yet.
+
+### 2026-11-06 — Actual power spectra reproduced after metric interpretation query
+
+Reproduced actual zonal power and forecast/ERA5 ratios at days1/3/7/10 for
+all nine fields, separately for historical8/2023 and current8/2022 cohorts.
+Script: `scripts/analyze_models/plot_mgda_actual_spectra_20261106.py`.
+Plots are beside the comprehensive comparison under
+`plots/analyze_models/images/resolution_eval/mgda_comparison_20261106/`:
+`actual_spectra_{historical,current}_all_fields.pdf`, selected-field PNGs,
+and `power_ratio_day10_{historical,current}.{png,pdf}`. Raw pooled powers,
+CSV curves, source hashes and `power_metric_audit.csv` are beside the summary.
+
+Independent original pilot diagnostic CSV reproduces GC49.40950934% and
+M1 56.68124469% mean relative power error to rtol1e-12. Thus the prior14.72%
+relative increase is arithmetically correct, but represents a7.27-percentage-
+point increase in this particular error score, not uniform power loss.
+Raw log-scale spectra retain similar shapes and large-scale power, especially
+at short leads. Equal weighting of180 modes gives weak high-wavenumber bins
+substantial influence. This does not fully explain late-lead differences:
+M1's day10 mean relative power error over modes1–10 is50.78% vsGC16.57%,
+and modes11–60 is71.93% vs39.59%, averaged across nine fields. Day1 aggregate
+M1 error44.90% is slightly better thanGC46.32%, whereas day10 is67.12% vs50.67%.
+Plots of T850 in both cohorts were inspected. No computation error was found;
+interpretation is refined to distinguish visible spectral shape, relative-bin
+power matching and forecast accuracy. All quantities remain exploratory.
+
+User then requested original GraphCast as the unit reference. Added
+`plot_mgda_gc_relative_power_20261106.py`: forecast power divided by canonical
+GC power at each mode/lead, with GC=1 and ERA5/GC shown as the target. Saved
+`gc_relative_power_{historical,current}_all_fields.pdf`, selected-field PNGs,
+day10 grids and NPZ ratios beside the preceding comparison. This is a power
+ratio (above1 means more power), not an accuracy improvement or error ratio.
+
+### 2026-11-06 — User clarified intended spectral-error metric
+
+The requested quantity is `full_error_power / baseline_error_power`, not
+forecast-power/GC-power and not relative mismatch between forecast and truth
+powers. Corrected `plot_mgda_gc_relative_power_20261106.py` to pool the saved
+error powers over starts before division. Error power includes amplitude and
+phase via `P_forecast + P_truth - 2*cross_power`; this identity is checked
+against saved spectra. GC=1; below1 is better. A canonical GC denominator is
+shared within each cohort. Keep original nine-field/day1/3/7/10 PDF paths so
+the user's open file displays the requested metric; old plots/data are retained
+under `superseded_raw_power_ratio/`. Export per-field rollout/day10 error
+reductions by summing positive-mode error powers before ratios, without mixing
+physical units across fields. Prior power-mismatch percentages describe a
+different diagnostic and must not be presented as this spectral-error metric.
+
+User subsequently requested the specific power-mismatch ratio
+`abs(P_model-P_truth)/abs(P_GC-P_truth)`. Generated separately as
+`power_mismatch_vs_gc_{historical,current}_all_fields.pdf` and per-field PNGs
+with `plot_mgda_relative_power_mismatch_20261106.py`. GC=1, lower is better.
+Raw powers are pooled before taking differences and ratios. No denominator
+floor or clipping; exact zero denominators are undefined/NaN. A y-axis linear
+on0–1 and logarithmic above1 displays peaks when GC power nearly matches truth.
+This metric differs from the earlier forecast-error-spectrum ratio; filenames
+and provenance retain that distinction.
+
+<a id="e007"></a>
+## e007 — Full2023 relative-power MGDA evaluation
+
+Date:2026-11-06. Execution: submitted. Outcome: pending.
+
+User requested extending the exact power-mismatch comparison to the main-text
+full2023 set. Default scope stated before submission: relative-power MGDA late
+SWA and main-text GC-Mamba M1, with paired vanillaGC forecasts. The optional
+broader-model question had no response before proceeding with that stated
+scope. No amplitude/pattern model, new training or checkpoint selection.
+
+Frozen campaign:
+[metadata](../../../artifacts/evaluations/v24_mgda_power_2023_20261106/campaign.json).
+The122 exact origins every third day from Jan1 through Dec30 and40 six-hour
+leads match the existing main-text protocol. Cold full-feedback forecasts,
+zero initial memory, same2023 store and vanillaGC/normalization identities.
+Existing annual M1 records do not include these spectral observations, so both
+models need new spectral forecasts. The evaluator also records exact GC loss,
+physical RMSE and forecast-error spectra. The requested plot is specifically
+`abs(mean(Pmodel)-mean(Ptruth))/abs(mean(PGC)-mean(Ptruth))`: pool powers across
+starts first, use M1's GC as the canonical denominator, GC=1, lower is better.
+No floor/clipping is imposed on these diagnostic ratios; exact zero denominators
+remain undefined. Report full-rollout/day10 MSE and relative-power-mismatch
+reductions separately; preserve baseline/truth drift as warnings. Aggregated
+power-mismatch scores average relative errors over nine fields and positive
+modes, then pool leads before taking ratios, rather than averaging plotted ratios.
+This is descriptive evaluation on an already explored year, not independent
+confirmation or evidence of training-seed robustness.
+
+Training/evaluator code comes from the proven e004 frozen snapshot, preserving
+its historical loader. Only the new evaluation orchestration script and wrapper
+are added; all runtime files, checkpoint/config inputs and shard manifests are
+hash recorded. Eight shards per model contain16/16/15/15/15/15/15/15 origins.
+GPU array **16982943_0–15**: indices0–7 M1,8–15 relative-power MGDA SWA.
+CPU report **16982944** waits on successful array completion. No concurrency
+throttle. Each GPU task requests1gpu80,8CPUs,12GiB,62min; report2CPUs,4GiB,30min.
+Resource basis: completed eight-start spectral work938.9s/7.50GiB and matched
+16-start full2023 shards22–24min/7.4–7.8GiB. Slurm resource test passed.
+
+Validation: frozen runtime/input/specification checks passed; formula/zero-
+denominator checks passed; a synthetic122-origin/eight-shard report fixture
+reproduced known MSE and mismatch reductions, generated plots and a completion
+record. The fixture is explicitly not scientific evidence. No GPU qualification
+rerun. Submission records and launch validation are in the campaign. Scientific
+completion requires `complete.json` and `report/report.json`; planned outputs
+include the all-field ratio PDF, rollout plots, CSVs and raw pooled spectra.
+
+## 2026-11-06 — Existing scalar AMSE lambda comparisons retrieved
+
+User requested the existing MSE/power graphs after pointing out that lambda0.5
+had already been tested. Replotted saved evaluations only; no training or new
+forecast jobs. The October4 campaign contains a completed, matched500-update
+continuation from September24 MSE SWA (not principal M1): exact-grid MSE and
+spectral lambda0/0.25/0.5, with seed22, B4/BPTT24/K20 and stopped weather
+feedback. Positive lambda ramps over100 updates. All five saved checkpoints
+per arm have forecast evaluations.
+
+On the same eight exploratory2023 starts, using the parent's GC denominator,
+the final exact-GC rollout MSE reductions are13.1374/12.9757/11.9645/9.7863%
+for gridMSE/spectral0/lambda0.25/lambda0.5. Corresponding mean relative zonal
+power errors are56.4936/56.4634/54.9090/53.4048%, versus49.3765% for GC.
+These describe an accuracy–power tradeoff. The score averages nine primitive
+fields, positive modes1–180 and days1/3/7/10, pooling raw powers over starts
+first. It is distinct from forecast-error spectral power.
+
+Earlier lambda0.1 and1 trajectories share a500-update warm-up parent and
+2000-update training budget, with different frozen runtime versions. Their
+prescribed SWA checkpoints and both campaign-specific MSE controls are plotted
+in a separate group. Lambda1 has4.3291% higher rollout MSE than GC while its
+power-error score is35.8009% lower. These cannot be joined to the mature-parent
+500-update pilot as a controlled lambda sweep.
+
+The historical scalar loss is spectralMSE+lambda*(AMSE1-spectralMSE), not the
+new exact-grid-MSE-plus-excess objective. Avoid proposing another lambda grid
+without accounting for this existing evidence. Full-GC fine-tuning is not
+represented by these correction-model runs. Finite truth/baseline differences
+are retained as warnings, with no numerical acceptance gate.
+
+Artifacts: [overview](../../../plots/analyze_models/images/resolution_eval/amse_lambda_comparison_20261106/mse_and_power_overview.png),
+[checkpoint evolution](../../../plots/analyze_models/images/resolution_eval/amse_lambda_comparison_20261106/pilot_checkpoint_tradeoff.png),
+[summary](../../../plots/analyze_models/data/resolution_eval/amse_lambda_comparison_20261106/summary.csv),
+[source hashes and warnings](../../../plots/analyze_models/data/resolution_eval/amse_lambda_comparison_20261106/provenance.json).
+The output directory also contains separate day10 absolute power, forecast/truth
+power, forecast-error/GC-error and absolute-power-mismatch/GC-mismatch plots.
+Reproduce with `source scripts/graphcast_env.sh && python scripts/analyze_models/plot_amse_lambda_comparison_20261106.py`.
+
+<a id="scalar-plan-20261106"></a>
+## 2026-11-06 — Decision: document the fresh scalar λ and smoothing comparison
+
+User requested a detailed shareable Markdown plan, exact formulas and links to
+existing checkpoints. Saved the [collaborator plan](../../../docs/experiments/v24_fresh_gc_mamba_gc_lambda_smoothing_plan_2026-11-06.md)
+and [verified inventory](../../../docs/experiments/v24_fresh_gc_mamba_gc_lambda_smoothing_inventory_2026-11-06.json).
+Execution: planned, not submitted. Scientific observation: pending. No training
+implementation or job changes were made for this documentation request.
+
+The planned core is ten fresh seed-22 runs: GC–Mamba with frozen public GC and
+full-GC fine-tuning, each at λ=0/0.25/0.5/0.75/1. Loss is exact GC grid MSE plus
+outer λ times the stable AMSE1-minus-spectral-MSE excess; internal AMSE λ stays
+one. The λ1 endpoint remains a hybrid because grid and fitted spectral norms
+differ. All arms use full weather gradients, B4/BPTT24/K20/segment96, and2,500
+updates with final-checkpoint reporting. Method-specific λ0 LR calibration
+retains the winning 500-update trajectories, costing 26,000 total core/calibration
+updates. Principal M1 remains a separate historical stopped-feedback SWA reference.
+
+The plan makes a proposed shared seeded segment-order manifest explicit, so
+both architectures see identical data within a seed and future full-GC seed
+repeats vary training order. It specifies the training/development/evaluation
+split, target-timestamp checks, and conversion of the existing 32 development
+selection indices into a timestamp manifest. The 2023 cohort has already been
+explored and is labeled reused evaluation data.
+
+Smoothing fits output-only Gaussian or four-band spherical attenuation on 2022,
+preserves the native unresolved residual and exact grid mean, ties wind-component
+parameters, and freezes filters before 2023. Four-band gains minimize pooled
+exact normalized grid MSE relative to unfiltered development MSE plus a fixed
+0.01 quadratic smoothness/identity penalty. This removes a separate regularizer
+search; both filter families remain visible in reporting.
+
+Verified nine existing checkpoint byte hashes and all plan-local links; no
+checkpoint was unpickled. The inventory includes source/config/statistics and
+data-cohort locators. Full-GC K20 fit/runtime remain unmeasured; the scalar dispatch,
+full-GC adapter, sampling replay and smoothing fitter/observer need implementation.
+Current checkout HEAD is `fc6a306c32d8ea4a84abd117c5663bd933367638` with pre-existing
+uncommitted work, so future jobs need an immutable runtime snapshot. Numerical
+variance and finite worsening remain warnings, not release or evaluation gates.
+
+Next action, when implementation is requested: follow plan §7–8; retain the first
+useful resource-measurement chunks, then calibrate the learning rates and execute
+the bounded sweep. Existing e005/e006 training and r006 extreme-event evaluation
+retain their separate scope/status. No new scientific result is asserted here.
+
+<a id="e008"></a>
+## e008 — Fresh scalar λ, full-GC fine-tuning and smoothing
+
+Event/record date: 2026-11-07, America/New_York. Execution: submitted; initially
+queued. Outcome: pending. User explicitly authorized implementation and start
+of all three workstreams after reviewing the detailed plan.
+
+**Question:** compare fresh GC–Mamba versus all-parameter GC fine-tuning under
+the exact grid-MSE/AMSE-excess tradeoff, and determine what output attenuation
+alone can explain. The [plan](../../../docs/experiments/v24_fresh_gc_mamba_gc_lambda_smoothing_plan_2026-11-06.md)
+contains exact mathematical, initialization, optimizer, filter and evaluation
+definitions and now records the launch.
+
+**Implementation:** ordinary scalar AdamW, stable excess with inner λ1 and outer
+λ=0/0.25/0.5/0.75/1, λ0 transform fast path, genuine full-GC parameter gradients,
+native model-family tagging, direct full-field evaluation, step-zero checkpoints,
+and shared seeded segment replay. GC–Mamba uses fresh Mamba1/seed22/zero output
+heads with public spatial overlays and a frozen public GC. It never loads M1
+or another trained correction as initialization. Both methods use full weather
+BPTT24/K20/segment96, batch4, and a 2,500-update schedule. Gaussian and four-band
+filters preserve the unresolved field and exact weighted mean, fit on2022 and
+score output-only on2023. Existing jobs/snapshots are untouched.
+
+**Artifacts:** [training manifest](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/manifest.json),
+[smoothing manifest](../../../artifacts/evaluations/v24_smoothing_m1_20261107/manifest.json).
+Shared frozen source digest is
+`ab39c404b062a55f2ee93883672442973fa4a2351699529ac11492a1a6b88475`.
+It contains the actual dirty-workspace implementation, independent of future edits.
+The prepared format1 loader was verified against a real finite T2m field and
+keeps `WEATHER_PREPARED_BOUNDED_READS=0`; no legacy loader replacement was needed.
+Actual manifests contain106 eligible96-position segments and2,500 update mappings;
+the last training target is2021-12-19T12. Development32 is resolved from actual
+year-sliced store coordinates, from2022-01-02T00 to2022-12-01T12. Annual122 retains
+the existing2023 cadence and January2024 verification tail. The year is reused
+evaluation data, not an independent confirmatory test.
+
+**Submitted jobs:** training array17022621 has GC λ0 rates1e-5/3e-5 at indices0/1,
+Mamba λ0 spatial rates3e-5/1e-4 at2/3, and positive λ0.5 lower-rate profiles at4/5.
+Each retains8 actual updates and requests1gpu80,8CPUs,384GiB,180min. Controllers
+17022622 and17022623 depend only on their own method's three profiles. A GC
+resource failure does not block Mamba. They size later jobs from measured timing
+and host RSS, continue the two λ0 candidates to500, evaluate development32,
+select a rate, and run the five λ arms in two production parts1250/2500. Winning
+λ0 trajectories resume their own state. λ0.5 retains its profile only if its
+rate is selected, otherwise it restarts fresh and the extra8 updates are recorded.
+Full-GC fit is not yet demonstrated; LoRA has not been substituted.
+
+Standalone GC/M1 smoothing first-start job17022624 requests1gpu80,4CPUs,32GiB,
+120min; controller17022625 releases remaining development forecasts, fitting,
+first annual forecast, measured annual shards and report. First forecasts remain
+in their planned cohorts. All five top-level submissions were verified PENDING;
+both resource shapes passed Slurm test-only checks. No concurrency throttle.
+
+**Automatic downstream work:** each finished training method launches its five
+models' smoothing/evaluation immediately. Saved intermediate checkpoints provide
+development history. Final reports retain raw and filtered exact losses, all83
+primitive spherical spectra, zonal diagnostics, negative humidity/precipitation
+statistics and finite numerical warnings. The aggregate waits for all ten plus
+M1, uses one canonical GC denominator, and writes λ-labeled plots and paired
+date-block exact-loss intervals/contrasts. Spectral coordinates are descriptive
+in the automatic summary; per-date powers remain available for nonlinear
+spectral resampling. Additional seeds/AR horizons are not submitted.
+
+**Validation:** focused scalar loss/gradient, real tiny-GraphCast initialization
+and all-block gradients, streamed feedback, both-family native resume, manifest
+mutation rejection, smoothing identity/mean/harmonic/GC-weighted scoring and
+finite-warning behavior passed. Root data/rollout suite:47 passed,6 device-only
+skips; engine agent:94 distinct checks across its focused runs; orchestration10;
+smoothing12; aggregate report3 including a complete synthetic ten-arm fixture.
+These suite counts are reported separately and may overlap. The synthetic
+fixture is implementation evidence, not a scientific result. Cross-review fixed
+historical stage proofs to pin immutable metrics snapshots while validating live
+history before resume. Numerical drift/worsening remains advisory; nonfinite or
+integrity failures remain errors.
+
+**Next:** inspect real first-start logs and retained resource proofs. Successful
+full-GC execution will establish whether LoRA is unnecessary for this shape;
+resource failure requires diagnosis before changing the protocol. Scientific
+comparison waits for final checkpoints and matched evaluation. The development
+handoff gives monitoring and safe-resume details.
+
+<a id="e008-fresh-lr3em7-20261107"></a>
+### November 7 evening — Preserve pending λ0 job; start fresh at peak3e-7
+
+Execution: pending after activation. Outcome: pending for the new trajectory.
+The user explicitly authorized replacing the existing pending λ0 production
+resume with a fresh public-GC initialization, while retaining its scheduled
+job ID. This is an amendment within e008, not a new research direction.
+
+**Observed motivation:** completed full-GC500-update calibrations gave exact
+dev32 rollout losses12.3394641575 at peak1e-5 and16.4926026612 at3e-5. Their
+public-GC reference losses were10.833993 and10.832740 respectively, yielding
+13.8958% and52.2477% increases. The small finite reference difference remains
+measured numerical variation, not an error. Both calibrations completed on
+one80GB GPU; jobs17024647_0/1 took8h06m19s/8h04m07s for the resumed492 updates,
+after approximately20-minute eight-update profiles. Development jobs17024648_0/1
+took50m52s/50m09s. Steady p90 was59–60s/update. Full tuning therefore fits the
+tested shape; LoRA is unnecessary as a feasibility fallback.
+
+**Decision:** do not carry the earlier higher-LR500-update state into the new
+λ0 run. Use peak3e-7 provisionally, informed by original GraphCast's low-rate
+AR fine-tuning and the completed calibration evidence, without claiming a
+parameter-count scaling rule or a measured optimum. Keep100-update warmup,
+cosine decay to3e-8, seed22, batch4, K20/BPTT24 and the frozen2500-update data
+order. Original higher-LR calibrations remain immutable evidence. Finite loss
+increases do not automatically abort valid bounded training or its evaluation.
+
+**Concrete change:** active task0 in `selected_arms_full_gc.json` now names
+`gcft_s22_l000_lr3em7_fresh_20261107`, with `resume_step=0`. Training jobs
+17049162_0→17049163_0 retain their IDs, submission age and existing one80GB GPU,
+8CPU,384GiB,30-hour-per-part requests. The fresh first part reaches1250; second
+part resumes exactly to2500. Its approximately21-hour nominal first-part cost
+fits the existing30-hour request using the measured60s/update evidence.
+
+This narrow authorization changes onlyλ0. The other four GCFT arms remain
+peak1e-5; λ0.5 still resumes its original eight-update profile. The resulting
+comparison must not be described as fixed-LR λ-only. Additional fresh1e-6/3e-6
+pilots were discussed but were not submitted by this action.
+
+**Downstream repair:** new job17062379 evaluates the new run's saved step500
+checkpoint on the original32 development starts and40 leads after first-part
+completion. It calls the unchanged frozen evaluator and writes a new matching
+`calibration_evaluation/<new_id>/score.json`. Existing history job17049164_0
+now waits on both17049163_0 and17062379, allowing its original λ0 reuse branch
+to consume genuine fresh-run evidence. Final controller17049165 and smoothing
+dispatch use the revised active selected-arm mapping.
+
+**Provenance and validation:** [revision manifest](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/revisions/20261107_gcft_l000_fresh_lr3em7/manifest.json),
+[activation](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/revisions/20261107_gcft_l000_fresh_lr3em7/activation.json),
+[dispatch checks](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/revisions/20261107_gcft_l000_fresh_lr3em7/validation.json).
+Original and replacement mappings are archived and sealed. Only the new
+config's peak/end LR and output run name differ from the original. Frozen
+source digest and original manifest/initial configs remain unchanged; the
+small pinned evaluation helper lives outside that snapshot. Real frozen CLI
+dispatch was exercised without training, verifying fresh1250 and resumed2500
+paths; config loading, unchanged other task mappings, source/input hashes and
+wrapper syntax passed. No GPU qualification or repeated profile was added.
+
+<a id="e008-smoothing-spectra-20261109"></a>
+## 2026-11-09 — Completed GC/M1 smoothing spectra inspected
+
+Within e008, the user requested power spectra for the completed GC/M1 smoothing
+comparison. Reused the saved122-start2023,40-lead statistics; no forecasts or
+training were rerun. Both filters were independently fitted on32 development
+starts in2022 and applied to output fields without feedback of filtered fields.
+
+The [smoothing report](../../../artifacts/evaluations/v24_smoothing_m1_20261107/report.json)
+pins `annual_pooled.npz`; its SHA256 was rechecked. The analysis reproduces the
+saved macro power error exactly (maximum absolute difference0). The
+[reproducible report and tables](../../../plots/analyze_models/data/resolution_eval/v24_smoothing_m1_spectra_20261109/report.md)
+and [figures](../../../plots/analyze_models/images/resolution_eval/v24_smoothing_m1_spectra_20261109)
+were generated with
+[report_v24_smoothing_spectra.py](../../../scripts/analyze_models/report_v24_smoothing_spectra.py).
+
+| Model/filter | Exact GC rollout loss reduction vs raw GC (%) | Rollout mean relative power error (%) | Day10 relative power error (%) |
+| --- | ---: | ---: | ---: |
+| GC raw | 0.00 | 59.47 | 65.69 |
+| GC Gaussian | 8.87 | 79.17 | 92.45 |
+| GC band | 9.39 | 75.70 | 88.37 |
+| M1 raw | 14.38 | 67.57 | 84.35 |
+| M1 Gaussian | 14.95 | 77.23 | 91.00 |
+| M1 band | 15.33 | 73.90 | 86.18 |
+
+Power error is100 times the equal-weight mean of
+`abs(pooled_forecast_power / pooled_truth_power - 1)` over83 physical channels,
+degrees1–179 and40 leads. Powers are pooled over starts before ratios. Degree0
+is excluded, with no climatological-mean subtraction; no zero-truth bins occur.
+This diagnostic is distinct from GC-weighted grid loss. The displayed mean
+channel power ratio can cancel excesses and deficits, so the report also gives
+the absolute-error score and physical spectra for six fields at day10.
+
+**Interpretation:** raw M1 has better loss and better macro power matching than
+either filtered-GC baseline, but worse power matching than raw GC. Both filter
+families improve rollout loss while worsening the overall power score for each
+model. Intermediate-scale deficits coexist with high-degree excesses in some
+channels; no uniform-smoothing or physical-mechanism claim follows. The results
+are descriptive fixed-checkpoint estimates on the reused2023 cohort, without new
+spectral bootstrap intervals. Numerical diagnostics and reference bounds are
+preserved in `summary.json`; none are used as finite-variance acceptance gates.
+
+**Next:** incorporate these reference spectra into Ilya's λ tradeoff analysis
+when the new models' evaluations complete.
+
+<a id="e009"></a>
+## e009 — Full-GC AR horizons, checkpoint spectra and SWA
+
+Event date: 2026-11-09
+Recorded: 2026-11-09 (America/New_York)
+Execution: prepared; new jobs not submitted
+Outcome: pending
+
+**Question and change:** The user requested full-GC K8/K12/K16/K20 training,
+2500 updates, evaluations every500, possible SWA and power spectra for each.
+The fixed24-step window uses16/12/8/4 teacher-prefix steps respectively. K20
+is the existing `3e-7` run; K8/K12/K16 are fresh from public GC with the same
+seed, learning-rate schedule and frozen data order. Prefix length therefore
+changes with K and limits causal interpretation.
+
+**Existing evidence:** K20 update500 exact development rollout loss10.337334
+versus public GC10.840716, a4.6434% reduction on32 2022 starts; day10 loss
+reduction5.3090%. Its update1250 checkpoint exists; the continuation was
+pending at the queue check. The prior higher-LR500-update degradations remain
+recorded in e008. These are intermediate results, not conclusions about the
+new K8/K12/K16 models.
+
+**Prepared implementation:** [plan](../../../docs/experiments/v24_full_gc_ar_horizons_2026-11-09.md),
+[manifest](../../../artifacts/checkpoints/v24_Ilya/res1_full_gc_ar_k8_k12_k16_k20_20261109/manifest.json),
+[submission plan](../../../artifacts/checkpoints/v24_Ilya/res1_full_gc_ar_k8_k12_k16_k20_20261109/submission_plan.json).
+The design evaluates native500/1000/1500/2000/2500 and SWA1000–2500 for all
+four horizons on the32-start2022 cohort and saves spherical forecast/truth/error
+power at all40 leads and83 channels. Finite drift/loss degradation is advisory;
+all valid trajectories reach their planned endpoints. No 2023 confirmation or
+training-seed generalization is implied.
+
+**Validation:** horizon/configuration and dependency tests, real spherical
+observer and report tests, and existing scalar-campaign tests passed. Full-GC
+SWA was also built from the real K20 500/1000 checkpoints in a temporary
+directory; exact averaging of a parameter leaf and model-family identity were
+verified. K20 accounting supplies budget evidence, and `sbatch --test-only`
+accepted representative training/evaluation requests without submitting jobs.
+
+### Reviewer-comparison audit — 2026-11-09
+
+The user asked to wait before submission and check fairness relative to M1.
+The prepared report contains only full-GC horizons/public GC on32 development
+starts; it does not include M1 or a2023 evaluation. The 32 saved M1 development
+initialization times match the prepared manifest exactly (four shard metric
+hashes verified), and M1 raw power/loss statistics already exist for122 2023
+starts. Reuse these rather than duplicate forecasts where the saved statistics
+are sufficient. The M1 development calibration files do not contain raw spherical
+powers; those require separate extraction or evaluation. The repeated public-GC
+rollout loss across the32 shared development dates was10.822104 in the M1
+calibration versus10.840716 in the K20 evaluation, an absolute difference
+0.018612 or0.1720% relative to the former. Retain this finite difference as a
+warning, not a failure or selection gate, and report headline comparisons with
+one explicitly identified common baseline.
+
+M1 and the new full-GC recipe differ in gradient handling, optimizer stages,
+data ordering and trainable parameter count despite matching backbone, training
+years, K20 window, batch and total updates. Different K also changes the teacher
+prefix within the fixed24-step window. The draft saves error/cross powers but
+only plots forecast power, and a power spectrum alone does not resolve the
+reviewer's smoothing concern. The [audit and proposed revisions](../../../docs/experiments/v24_full_gc_ar_horizons_2026-11-09.md#reviewer-comparison-audit--before-submission)
+identify a common2023 comparison, paired uncertainty and filter controls.
+
+**Next:** revise the draft for M1/2023 and report the training differences; keep
+all valid trajectories and their evaluation regardless of finite metrics. Do
+not submit the current draft while this review hold remains in place.

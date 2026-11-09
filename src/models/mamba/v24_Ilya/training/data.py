@@ -125,6 +125,7 @@ class V24IlyaTrainingData:
     time_step: pd.Timedelta
     input_steps: int
     manifest_fingerprint: str
+    train_order: dict | None = field(default=None, compare=False, repr=False)
     frame_workspace: EndpointFrameWorkspace = field(
         default_factory=EndpointFrameWorkspace,
         compare=False,
@@ -198,11 +199,16 @@ class V24IlyaTrainingData:
     ) -> TrainingChunk:
         self.validate_cursor(cursor, config)
         batch_size = config.distributed.per_device_batch_size
+        if self.train_order is None:
+            segment_ids = tuple(cursor.segment_index + lane for lane in range(batch_size))
+        else:
+            from .segment_order import segment_ids_at_cursor
+            segment_ids = segment_ids_at_cursor(self.train_order, cursor)
         if batch_size > 1:
             if cursor.segment_index % batch_size or cursor.segment_index + batch_size > len(self.segments):
                 raise ValueError("Batched cursor must address a complete aligned segment group")
             lanes = tuple(self.load_segment_chunk(
-                self.segments[cursor.segment_index + lane], cursor.segment_offset,
+                self.segments[segment_ids[lane]], cursor.segment_offset,
                 config, task_config, workspace_slot=lane,
             ) for lane in range(batch_size))
             def combine(datasets):
@@ -223,7 +229,7 @@ class V24IlyaTrainingData:
                 next_cursor=advance_cursor(cursor, config, len(self.segments)),
             )
         loaded = self.load_segment_chunk(
-            self.segments[cursor.segment_index],
+            self.segments[segment_ids[0]],
             cursor.segment_offset,
             config,
             task_config,
@@ -463,6 +469,17 @@ def open_training_data(
             f"{anchor_indices.min()}..{anchor_indices.max()}"
         )
     segments = build_segments(train_split, config.segment_steps)
+    train_order = None
+    manifest_fingerprint = manifest_sha256(config.anchor_manifest_root)
+    if getattr(config, 'train_order_manifest', None) is not None:
+        from .segment_order import file_sha256, load_train_order_manifest
+        segments, train_order = load_train_order_manifest(
+            config.train_order_manifest, config=config, anchors=anchor_indices,
+            times=store.time.values, split=train_split,
+        )
+        manifest_fingerprint = hashlib.sha256(
+            (manifest_fingerprint + ':' + file_sha256(config.train_order_manifest)).encode()
+        ).hexdigest()
     validation_segments = build_segments(val_split, config.segment_steps)
     if not segments:
         raise ValueError(
@@ -518,5 +535,6 @@ def open_training_data(
         validation_subset_fingerprint=validation_subset_fingerprint,
         time_step=time_step,
         input_steps=input_steps,
-        manifest_fingerprint=manifest_sha256(config.anchor_manifest_root),
+        manifest_fingerprint=manifest_fingerprint,
+        train_order=train_order,
     )

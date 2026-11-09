@@ -116,10 +116,13 @@ def run_v24_Ilya_rollout(
     retain_predictions: bool = True,
     step_data: Iterable[RolloutStep] | None = None,
     skip_baseline_warmup: bool = False,
+    predictor_returns_full: bool = False,
 ) -> RolloutResult:
     """Run truth warmup followed by baseline- or full-feedback evaluation."""
 
     required_steps = warmup_steps + target_steps
+    if predictor_returns_full and (not full_feedback or warmup_steps or residual_alpha != 1.0):
+        raise ValueError("Direct full-field predictor requires cold full feedback and alpha=1")
     if target_steps <= 0:
         raise ValueError(f"target_steps must be positive, got {target_steps}")
     if warmup_steps < 0:
@@ -226,18 +229,17 @@ def run_v24_Ilya_rollout(
             )
             baseline_prediction = physical_fields_fp32(baseline_prediction)
             baseline_branch_state = state_boundary_fp32(baseline_branch_state)
-            full_baseline_prediction, full_branch_baseline_state = baseline_step(
-                baseline_params,
-                full_branch_baseline_state,
-                baseline_key,
-                full_inputs,
-                target,
-                forcing,
-            )
-            full_baseline_prediction = physical_fields_fp32(full_baseline_prediction)
-            full_branch_baseline_state = state_boundary_fp32(
-                full_branch_baseline_state
-            )
+            if not predictor_returns_full:
+                full_baseline_prediction, full_branch_baseline_state = baseline_step(
+                    baseline_params,
+                    full_branch_baseline_state,
+                    baseline_key,
+                    full_inputs,
+                    target,
+                    forcing,
+                )
+                full_baseline_prediction = physical_fields_fp32(full_baseline_prediction)
+                full_branch_baseline_state = state_boundary_fp32(full_branch_baseline_state)
             if reset_state_every_step:
                 full_branch_residual_state = residual_state_initial_fp32
             residual_prediction, full_branch_residual_state = residual_step(
@@ -252,11 +254,9 @@ def run_v24_Ilya_rollout(
             full_branch_residual_state = state_boundary_fp32(
                 full_branch_residual_state
             )
-            full_prediction = combine_predictions(
-                full_baseline_prediction,
-                residual_prediction,
-                residual_alpha,
-            )
+            full_prediction = (residual_prediction if predictor_returns_full else combine_predictions(
+                full_baseline_prediction, residual_prediction, residual_alpha,
+            ))
             if prediction_consumer is not None:
                 prediction_consumer(
                     metric_index,

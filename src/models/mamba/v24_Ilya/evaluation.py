@@ -250,6 +250,12 @@ def evaluate_v24_Ilya(
     if numerical_observer is not None and config.initialization_manifest is None:
         raise ValueError("Numerical observers require an initialization manifest")
 
+    checkpoint = load_v24_Ilya_checkpoint(config.ckpt)
+    family = getattr(checkpoint, "model_family", "gc_mamba")
+    if config.model_family not in ("auto", family):
+        raise ValueError("Requested model family differs from checkpoint model family")
+    config = dataclasses.replace(config, model_family=family)
+
     evaluation_started = time.monotonic()
     warmup_steps = config.effective_warmup_steps
     print(
@@ -266,7 +272,11 @@ def evaluate_v24_Ilya(
         task_config = dataclasses.replace(task_config, input_duration=config.input_duration)
     stats = load_stats(config.stats_dir)
     eval_data = open_eval_dataset(config, task_config)
-    predictors = build_predictors(
+    predictor_factory = build_predictors
+    if family == "full_gc":
+        from .full_gc_evaluation import build_full_gc_predictors
+        predictor_factory = build_full_gc_predictors
+    predictors = predictor_factory(
         baseline_checkpoint.model_config,
         task_config,
         stats,
@@ -353,7 +363,6 @@ def evaluate_v24_Ilya(
         )
     del sample_inputs, sample_targets, sample_forcings
 
-    checkpoint = load_v24_Ilya_checkpoint(config.ckpt)
     validate_param_tree_compatible(residual_params_init, checkpoint.residual_params)
     residual_params = checkpoint.residual_params
     residual_state_init, resolved_state_init = resolve_residual_state(
@@ -407,6 +416,7 @@ def evaluate_v24_Ilya(
     )
     base_output = {
         "architecture_id": ARCHITECTURE_ID,
+        "model_family": family,
         "schema_version": SCHEMA_VERSION,
         "checkpoint_format": checkpoint.checkpoint_format,
         "resolution": config.resolution,
@@ -573,6 +583,7 @@ def evaluate_v24_Ilya(
             retain_predictions=False,
             step_data=step_data,
             skip_baseline_warmup=True,
+            predictor_returns_full=family == "full_gc",
         )
         if initialization_records is not None:
             loss_records.append(build_initialization_loss_record(

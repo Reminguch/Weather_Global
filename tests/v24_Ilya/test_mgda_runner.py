@@ -154,3 +154,27 @@ def test_archive_handles_partial_uncommitted_json(tmp_path):
     archive = runner._archive_resume_tails(tmp_path, 1)
     assert path.read_text() == '{"step": 1}\n'
     assert (archive / path.name).read_text() == original
+
+
+def test_full_feedback_resume_in_new_directory_preserves_trajectory(tmp_path, monkeypatch):
+    import shutil
+    config = mock_run(tmp_path, monkeypatch, full_feedback=True)
+    expected_path = runner.run_training(V24IlyaTrainInvocation(config, tmp_path / "config.json"))
+    expected = load_v24_Ilya_training_checkpoint(expected_path)
+    original = {path: path.read_bytes() for path in config.run_dir.rglob("*") if path.is_file()}
+    relocated = replace(config, output_root=tmp_path / "continuation")
+    shutil.copytree(config.run_dir, relocated.run_dir)
+    resumed = runner.run_training(V24IlyaTrainInvocation(
+        relocated, tmp_path / "new_config.json",
+        resume=relocated.run_dir / "checkpoints/checkpoint_step00000002.pkl"))
+    actual = load_v24_Ilya_training_checkpoint(resumed)
+    for field in ("residual_params", "residual_state", "optimizer_state", "rng_key"):
+        for first, second in zip(jax.tree_util.tree_leaves(getattr(expected, field)),
+                                 jax.tree_util.tree_leaves(getattr(actual, field)), strict=True):
+            np.testing.assert_array_equal(first, second)
+    assert actual.training_cursor == expected.training_cursor
+    assert all(path.read_bytes() == contents for path, contents in original.items())
+    from src.models.mamba.v24_Ilya.training.config import validate_resume_config
+    with pytest.raises(ValueError, match="Resume configuration differs"):
+        validate_resume_config(replace(relocated, feedback_mode="closed_loop_sg"),
+                               expected.resolved_training_config, completed_step=2)

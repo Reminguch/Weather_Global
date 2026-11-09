@@ -61,35 +61,40 @@ def build_training_transforms(
         )(inputs, targets_template=targets, forcings=forcings)
 
     def residual_prediction(inputs, targets, forcings):
+        return trainable_predictor()(inputs, targets_template=targets, forcings=forcings)
+
+    def trainable_predictor():
+        # The historical residual_* slots hold the complete trainable model for
+        # full_gc. Parameter names/normalization match the public GC checkpoint.
+        if config.model_family == "full_gc":
+            return make_baseline_predictor(
+                model_configs.baseline, task_config, stats, use_bf16=use_bf16)
         return make_residual_predictor(
             model_configs.residual,
             task_config,
             stats,
             config.architecture,
             use_bf16=use_bf16,
-        )(inputs, targets_template=targets, forcings=forcings)
+        )
 
     def residual_loss_and_predictions(inputs, residual_targets, forcings):
-        return make_residual_predictor(
-            model_configs.residual,
-            task_config,
-            stats,
-            config.architecture,
-            use_bf16=use_bf16,
-        ).loss_and_predictions(inputs, residual_targets, forcings)
+        return trainable_predictor().loss_and_predictions(inputs, residual_targets, forcings)
 
     def residual_training_prediction(inputs, targets, forcings):
         # Match GraphCast.loss_and_predictions' training flag without computing
         # its BF16 residual-only loss. Unsupervised state steps retain their
         # original residual_prediction behavior.
-        return make_residual_predictor(
-            model_configs.residual, task_config, stats, config.architecture,
-            use_bf16=use_bf16,
-        )(inputs, targets_template=targets, forcings=forcings, is_training=True)
+        return trainable_predictor()(inputs, targets_template=targets, forcings=forcings, is_training=True)
 
     combined = hk.transform_with_state(residual_loss_and_predictions)
     full_field_loss = None
-    if config.loss_kind != "mse":
+    if config.loss_kind == "gc_mse_amse_excess":
+        from .scalar_excess_loss import build_gc_mse_amse_excess_loss
+
+        full_field_loss = build_gc_mse_amse_excess_loss(
+            stats, spectral_excess_weight=config.spectral_excess_weight,
+            lmax=config.amse_lmax, power_epsilon=config.amse_power_epsilon)
+    elif config.loss_kind != "mse":
         from .spectral_loss import build_full_field_loss
 
         full_field_loss = build_full_field_loss(
@@ -544,7 +549,7 @@ def memory_contract(
             "gradient_window_steps": config.bptt_steps,
             "weather_restart_every_steps": config.bptt_steps,
             "recurrent_gradient_truncation_steps": config.bptt_steps,
-            "graphcast_parameters_trainable": False,
+            "graphcast_parameters_trainable": config.model_family == "full_gc",
             "graphcast_input_gradients": True}
            if differentiable_weather else {}),
     }

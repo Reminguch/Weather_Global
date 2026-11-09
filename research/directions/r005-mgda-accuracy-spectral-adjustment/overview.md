@@ -2,7 +2,7 @@
 
 Category: training
 Status: active
-Updated: 2026-11-02 (America/New_York)
+Updated: 2026-11-09 (America/New_York)
 
 ## Question and hypothesis
 
@@ -31,6 +31,37 @@ the same pair-gradient RMS preconditioning rule, so the control does not change
 to a single-gradient second-moment estimator.
 
 ## Current understanding
+
+November9: the new full-GC K20 `3e-7` run reached1250 updates. Its update500
+checkpoint reduced exact rollout loss4.6434% and day10 loss5.3090% against
+public GC on the32-start2022 development cohort. The user requested K8/K12/K16/K20
+at2500 updates, evaluations every500, SWA and spectra. A fixed-window comparison
+has been technically prepared, reusing K20; new jobs are not yet submitted.
+On user request submission is on hold: the draft does not yet include principal
+M1 in its outputs or a matched2023 comparison. See the reviewer audit in the plan.
+See [e009](experiments.md#e009) and the
+[experiment plan](../../../docs/experiments/v24_full_gc_ar_horizons_2026-11-09.md).
+
+November9: the completed122-start GC/M1 smoothing comparison shows a clear
+accuracy/power-fidelity tradeoff. Raw GC, raw M1 and band-filtered GC have mean
+relative power errors59.47%,67.57% and75.70%, respectively; their exact rollout
+loss reductions versus raw GC are0%,14.38% and9.39%. Band-filtered M1 reaches
+15.33% loss reduction with73.90% power error. M1 therefore improves loss beyond
+these smoothing baselines, but does not improve the overall power score relative
+to raw GC. Physical spectra show scale/channel dependence, including high-degree
+excesses. See [the recorded analysis](experiments.md#e008-smoothing-spectra-20261109)
+and its figures; these are point estimates without new spectral bootstrap
+intervals. The full fresh λ-model comparison remains separate.
+
+November7 scalar follow-up: full-GC profiling and both500-update LR calibrations
+completed on one80GB GPU. Exact dev32 loss increased13.8958% at peak1e-5 and
+52.2477% at3e-5 relative to the corresponding public-GC forecasts. The user
+authorized a fresh public-GC λ0 run at provisional peak3e-7, retaining pending
+job17049162_0 and its continuation17049163_0. This replaces the λ0 production
+resume only; other λ arms remain1e-5, so the revision is not a fixed-LR λ-only
+comparison. See the newer lower-LR result above and the
+[dated e008 revision](experiments.md#e008-fresh-lr3em7-20261107) and
+[current handoff](devel.md). Older MGDA experiments below remain separate.
 
 The first qualification (15787947) failed on October18 after6m41s because
 finite repeatability noise exceeded a hard threshold; release15787948 was
@@ -85,15 +116,71 @@ development cohort; no statistical significance is claimed.
 
 ## Next decision
 
-Review the measured tradeoff before choosing another experiment; do not promote
-MGDA as a joint win or automatically extend training. Exact GC loss remains
-primary; power/coherence are secondary. Finite warnings did not block completion
-and are not evidence of scientific failure or improvement. No new submission,
-2,000-step extension, di32 arm or SWA is authorized by this completed pilot.
+On November2 the user explicitly approved two follow-ups: continue the existing
+MGDA and matched MSE-control trajectories to2000 total updates (e005), and train
+a fresh matched pair for2500 updates using DeepMind spatial initialization and
+the best setup's Mamba1/seed22/zero-output recipe (e006). Fresh MGDA starts at the
+first update, with its own warm-up/decay schedule; the continuation preserves
+the1e-6 schedule and optimizer state. Both retain full BPTT and the current
+exact-GC/AMSE-excess pair. These are training-strategy comparisons rather than
+an isolated initialization ablation. No new skill result is available yet.
+
+The user subsequently requested exactly two execution parts per arm to reduce
+repeated queue waits. The original pending chains were cancelled before any
+training, and replacements submitted: e005 stops at1100 then2000 total updates;
+e006 at1250 then2500. Optimization schedules and exact-resume state are unchanged.
+
+Inspect completion and matched evaluation before judging either strategy.
+Exact GC loss remains primary; spectral power/coherence are secondary. Finite
+warnings remain advisory. No further extension, di32 arm or SWA is included.
 
 ## Records
+
+November6: [e007](experiments.md#e007) extends relative-power MGDA SWA and
+main-text M1 to the full122-start/40-lead2023 set, with paired vanillaGC.
+Evaluation16982943 and dependent report16982944 are submitted. The requested
+diagnostic is absolute power mismatch divided by vanillaGC's absolute power
+mismatch, not forecast-error power. Exact GC MSE is reported alongside it.
+No annual MGDA result is available until completion.
+
+November6 saved-evaluation synthesis: relative-power MGDA SWA improves zonal
+power error14.02% relative to main-text M1, but has0.98% higher matched32 MSE.
+The full-BPTT200 pilot improves power error2.97% relative to its di16_joint
+parent while worsening MSE0.43%; its power error remains23.77% higher than
+original GC. Main-text M1 is di16_fast_mamba, not this pilot parent. Historical
+and newer evaluation cohorts differ, so the
+[comprehensive comparison](../../../plots/analyze_models/data/resolution_eval/mgda_comparison_20261106/comparison.md)
+keeps cohorts separate and does not claim a newer-pilot-versus-M1 ranking.
+
+November6 scalar-lambda follow-up: existing matched500-update spectral
+lambda0/0.25/0.5 continuations already demonstrate an accuracy–power tradeoff.
+Lambda0.5 gives9.786% exact-GC rollout MSE reduction on eight2023 starts,
+versus13.137% for its matched grid-MSE control, while reducing the power-error
+score from56.494% to53.405%. Earlier lambda0.1/1 have different training
+histories and are shown separately in the
+[retrieved comparison](../../../plots/analyze_models/images/resolution_eval/amse_lambda_comparison_20261106/mse_and_power_overview.png).
+These use spectral-MSE interpolation, not the new exact-grid-plus-excess loss;
+they do not constitute a full-GC fine-tuning comparison.
+
+November6 collaborator plan: [fresh scalar λ comparison and smoothing](../../../docs/experiments/v24_fresh_gc_mamba_gc_lambda_smoothing_plan_2026-11-06.md)
+now specifies fresh GC–Mamba and full-GC fine-tuning at λ=0/0.25/0.5/0.75/1,
+using exact grid MSE plus the stable AMSE excess, full weather BPTT and a common
+2,500-update budget. Independent development-fitted Gaussian and four-band
+attenuation baselines test how much skill comes from smoothing. This is a
+new matched comparison, not a reproduction of stopped-feedback M1. The original
+[dated decision](experiments.md#scalar-plan-20261106) records the proposal.
+
+November7: the user explicitly requested implementation and launch. The
+[e008 campaign](experiments.md#e008) is implemented and submitted: initial
+training profiles 17022621, family-independent controllers 17022622/17022623,
+and GC/M1 smoothing 17022624→17022625. All were queued at submission verification.
+Full-GC GPU memory feasibility and forecast outcomes remain pending. Automatic
+continuation covers LR calibration, all ten fresh trajectories, output-filter
+fitting and annual evaluation. Full fine-tuning is attempted before considering
+LoRA; no silent method substitution or finite-improvement gate is present.
 
 - [Original attempt](experiments.md#e001) and [warning-only recovery](experiments.md#e002)
 - [Advisory-decrease continuation](experiments.md#e003)
 - [Shared full-BPTT campaign](experiments.md#e004)
+- [Longer continuation](experiments.md#e005) and [fresh initialization](experiments.md#e006)
 - [Implementation and resumption](devel.md)

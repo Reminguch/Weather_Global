@@ -1,6 +1,175 @@
 # Development — MSE / AMSE-adjustment MGDA
 
-Updated: 2026-11-02 (America/New_York)
+Updated: 2026-11-09 (America/New_York)
+
+## Prepared full-GC horizon comparison — 2026-11-09
+
+The user requested K8/K12/K16/K20,2500 updates, exact/spectral evaluations
+every500, and SWA. The [plan](../../../docs/experiments/v24_full_gc_ar_horizons_2026-11-09.md)
+and [e009](experiments.md#e009) describe the fixed24-step window and the resulting
+16/12/8/4 teacher prefixes. K20 reuses the existing `3e-7` trajectory at1250;
+three new configurations share its fixed data order, seed and optimizer recipe.
+The new campaign is prepared at
+`artifacts/checkpoints/v24_Ilya/res1_full_gc_ar_k8_k12_k16_k20_20261109` with
+source digest `77f264914960a3bb471a8588b3594ad9dbe836d6267da8b6f76432bfb27903d3`.
+No new jobs are submitted. At the user's request the draft is on hold pending
+the [reviewer-comparison audit](../../../docs/experiments/v24_full_gc_ar_horizons_2026-11-09.md#reviewer-comparison-audit--before-submission).
+The sealed plan covers two training parts, development spectra, SWA and report,
+but omits M1 and matched2023 evaluation. A revised implementation must not
+modify the already frozen snapshot in place. Preserve the existing λ campaign.
+
+The first500-update K20 score is now available: rollout10.337334 versus public
+GC10.840716, a4.6434% reduction across32 development starts; day10 reduction
+5.3090%. Those are intermediate development results. Focused tests and
+`sbatch --test-only` passed; a real K20 checkpoint SWA was checked on CPU.
+
+## Pending GCFT λ0 redirected to fresh LR3e-7 — 2026-11-07 evening
+
+User authorized preserving pending training job17049162_0 while replacing its
+500-update continuation with a fresh public-GC run. Active mapping:
+`res1_fresh_gc_mamba_gc_lambda_20261107/selected_arms_full_gc.json`, task0 →
+`gcft_s22_l000_lr3em7_fresh_20261107`, `resume_step=0`, peak LR3e-7, end LR3e-8,
+warmup100, fixed2500-update schedule. Training IDs17049162_0→17049163_0 and their
+resource requests/submission age are preserved; endpoints remain1250/2500.
+The frozen source digest and original manifest/initial configs are unchanged.
+
+Revision folder: [20261107_gcft_l000_fresh_lr3em7](../../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/revisions/20261107_gcft_l000_fresh_lr3em7).
+It contains the original/new sealed selections, config/helper hashes, validation,
+activation and scheduler evidence. Do not regenerate the old `select` stage:
+the user-directed provisional production override supersedes its λ0 selection.
+The four positive-λ arms remain1e-5; this is not a fixed-LR λ-only comparison.
+Old500-update calibrations are retained as evidence, not resume parents.
+
+Step500 development evaluation17062379 waits for17049162_0 and uses the frozen
+evaluator through the revision's pinned helper. It writes the fresh run's
+`calibration_evaluation/<new_id>/score.json`. History17049164_0 now requires
+both17049163_0 and17062379, so the frozen λ0 score-reuse branch has genuine
+matching evidence. Final controller17049165 and its smoothing dispatch read
+the active mapping. Additional lower-LR pilots were discussed but not submitted
+as part of this narrow authorization. Check the current queue rather than
+treating its estimated start as a reservation.
+
+Full-GC eight-update profiles and both500-update calibrations have completed,
+demonstrating the one80GB configuration fits. LR1e-5/3e-5 exact dev32 loss
+increases were13.8958%/52.2477%. Finite worsening remains advisory; the fresh
+start is an explicit user revision. Focused dispatch/config/source checks passed.
+
+## Initial fresh scalar λ / full-GC / smoothing launch — 2026-11-07
+
+User explicitly authorized all three workstreams. The [plan](../../../docs/experiments/v24_fresh_gc_mamba_gc_lambda_smoothing_plan_2026-11-06.md)
+and [e008](experiments.md#e008) are authoritative for this new comparison;
+older MGDA campaigns below are separate and remain untouched.
+
+- Training: `artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/`.
+  Initial array17022621; full-GC controller17022622; Mamba controller17022623.
+  Indices0/1/4 are full GC,2/3/5 are fresh GC–Mamba. All initially queued.
+- Smoothing reference: `artifacts/evaluations/v24_smoothing_m1_20261107/`.
+  Retained first development start17022624, controller17022625; initially queued.
+  This fits/scores public GC and principal M1 in the same forecast pass.
+- Frozen source: training-root`source/`, digest
+  `ab39c404b062a55f2ee93883672442973fa4a2351699529ac11492a1a6b88475`.
+  Do not update this snapshot from the workspace after submission.
+
+`run_v24_scalar_lambda.py` implements independent per-family profiling,
+500-update λ0 LR calibration, development selection, five2,500-update trajectories,
+intermediate evaluation and per-family final smoothing dispatch. Eight-update
+profiles are retained; positive λ0.5 profile reuse requires the selected LR to
+match. `selected_arms_<family>.json` maps logical λ IDs to actual run directories;
+read that mapping rather than assuming the final directory is the logical ID.
+Production endpoints are1250/2500; the LR schedule remains2500 throughout.
+No trained Mamba checkpoint initializes a fresh arm. LoRA need remains unknown
+until full-GC GPU profiling finishes; no automated method/batch/horizon substitution.
+
+`run_v24_smoothing.py` implements first-start measurement → remaining development
+shards → frozen fit → first annual start → remaining annual shards → report.
+The aggregate report waits for all ten new models and the principal M1 reference.
+It computes paired exact-MSE block intervals; spectral coordinates remain
+descriptive with per-date powers retained. Baseline, mean, projection and finite
+optimizer warnings preserve measured values/reference bounds rather than stopping.
+
+Checkpoint payloads carry explicit `model_family`; full-GC parameters occupy the
+legacy `residual_params` storage slot but are interpreted as full predictions,
+with an empty recurrent state. Evaluation defaults to family auto-detection.
+New scalar config keys are `model_family`, objective`loss_kind=gc_mse_amse_excess`,
+objective`spectral_excess_weight`, and data`train_order_manifest`.
+The shared data fingerprint includes the frozen training-order manifest hash.
+Native step-zero snapshots, optimizer/RNG/cursor/state and immutable per-stage
+metric copies support reproducible continuation. Resume checks the live history
+against the previous stage snapshot before appending.
+
+Monitor:
+
+```bash
+squeue -j 17022621,17022622,17022623,17022624,17022625
+```
+
+Read each root's`submissions/` for automatically generated later job IDs,
+`checks/` for completed stage/resource proofs, and`logs/` for actual GPU startup.
+Future full-GC feasibility is recorded in `checks/profile_summary_full_gc.json`;
+do not treat submission or CPU tests as evidence of an80GB fit. Each native
+run writes`checkpoints/checkpoint_step00000000.pkl` before its first update.
+No restart is needed while jobs remain valid/queued. If an actual execution
+error occurs, diagnose it and retain checkpoints/proofs; never refresh a frozen
+runtime or silently repeat an already completed stage.
+
+## Authorized continuation and fresh training — 2026-11-02
+
+The user approved both strategies after discussing initialization. The new
+driver is `scripts/experiments/run_v24_mgda_initialization.py`; it creates
+separate frozen campaigns and preserves the completed e004 artifacts.
+
+- e005: `artifacts/checkpoints/v24_Ilya/res1_mgda_full_bptt_continuation_two_parts_20261102/`.
+  Extend both e004 MGDA and matched MSE-control checkpoints from200 to2000 total
+  updates, retaining parameters, paired-RMS state, RNG, recurrent memory and
+  cursor. LR remains1e-6. Two endpoints:1100/2000 (900 new updates each).
+- e006: `artifacts/checkpoints/v24_Ilya/res1_mgda_full_bptt_fresh_two_parts_20261102/`.
+  Train MGDA and matched MSE control for2500 updates from DeepMind spatial
+  overlays plus the best setup's Mamba1 initialization, seed22 and zero output
+  heads. No learned residual checkpoint or MSE-only pretraining is loaded.
+  Both use paired RMS,100-update warm-up from1e-6 to1e-5, cosine decay to3e-6
+  at update2000, then constant. Two endpoints:1250/2500 (1250 updates each).
+
+Both keep the current exact-GC/AMSE-excess objectives, full weather BPTT24/K20,
+segment96, batch4, architecture and BF16 compute. The old relative-power loss
+is not substituted. These compare two training strategies; differing rates and
+training histories prevent interpreting them as an initialization-only ablation.
+Final raw checkpoints are the endpoints; no SWA, fixed-sum arm, further seed,
+automatic retry or extension is included.
+
+Shared frozen source digest:
+`39f6cadbdf213f007497d796e483f9a61c772d04931606082426a2d7aa527d3b`.
+The proven e004 runtime is preserved except the new driver/wrapper and allowing
+output-location changes during exact resume. Copied checkpoints remain under
+their new run's `checkpoints/` directory; original tensors and histories are
+preserved by hashes.104 focused CPU cases passed, including a bitwise comparison
+of a relocated resumed trajectory against uninterrupted training. Frozen
+continuation preparation validated both real update200 checkpoint configs.
+
+Resources use completed full-feedback jobs16402493_0/1: maximum steady p90
+137.356s/update, historical host-RSS floor234.71GiB, startup allowance1664.78s.
+Both parts request384GiB,8 CPUs and one80GB GPU. Each continuation part uses
+2940min (49h); each fresh part4050min (67.5h), within gpu-medium's72h limit. `aftercorr`
+dependencies keep MGDA and MSE training independent between matching array
+indices. Final exact/spectral evaluations use16GiB/62min; reports12GiB/30min.
+The existing verified best-MSE reference evaluations are reused. New final
+forecasts use the same eight2022 origins and40 leads. Plain-GC and trained-MSE
+references are labeled separately. Finite variance, drift, increases and stalls
+remain warnings, with no resource/numerical qualification rerun.
+
+The user requested only two parts to reduce repeated queue waits. All original
+five/seven-stage jobs and their descendants were cancelled while pending at
+16:00:13EST on November2; no training progress was discarded. Their snapshots,
+configs and submission records remain preserved in the original roots.
+e005 replacements: training arrays16673752→16673753; exact16673754,
+spectral16673755, report16673756.
+e006 replacements: training arrays16673757→16673758; exact16673759,
+spectral16673760, report16673761. Monitor with `squeue -j 16673752,16673757`.
+The nine focused campaign cases passed for the two-part schedule; the prior
+numerical/resume evidence is reused. Both changed resource requests passed
+Slurm's test-only check before actual submission.
+Inspect each campaign's
+`submissions/`, `checks/*_phase*.json` and `complete.json`. Actual execution and
+forecast improvement remain pending until those artifacts establish them.
 
 ## Current implementation
 

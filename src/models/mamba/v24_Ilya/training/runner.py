@@ -334,6 +334,8 @@ def validate_input_paths(config: V24IlyaTrainConfig) -> None:
         config.stats_dir / "mean_by_level.nc",
         config.stats_dir / "diffs_stddev_by_level.nc",
     ]
+    if config.train_order_manifest is not None:
+        required_files.append(config.train_order_manifest)
     missing = [str(path) for path in required_files if not path.is_file()]
     if missing:
         raise FileNotFoundError(f"Missing v24_Ilya training inputs: {missing}")
@@ -626,13 +628,21 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
     zero_residual_state = cast_state_boundary_fp32(zero_residual_state)
     prediction_state = cast_state_boundary_fp32(prediction_state)
     _validate_tree_shapes(zero_residual_state, prediction_state, "residual state")
-    residual_params, residual_overlay = overlay_matching_params(
-        residual_params,
-        (baseline_checkpoint.params
-         if config.architecture.residual_initialization == "baseline_overlay"
-         else {}),
-        strict=False,
-    )
+    if config.model_family == "full_gc":
+        residual_params, trainable_overlay = overlay_frozen_baseline_params(
+            residual_params, baseline_checkpoint.params)
+        if jax.tree_util.tree_leaves(zero_residual_state):
+            raise ValueError("Full GraphCast initialization must have empty recurrent state")
+        trainable_copied, trainable_fresh = trainable_overlay.copied, 0
+    else:
+        residual_params, residual_overlay = overlay_matching_params(
+            residual_params,
+            (baseline_checkpoint.params
+             if config.architecture.residual_initialization == "baseline_overlay"
+             else {}),
+            strict=False,
+        )
+        trainable_copied, trainable_fresh = residual_overlay.copied, residual_overlay.initialized
 
     rng_key, baseline_init_key = jax.random.split(rng_key)
     baseline_params, baseline_state = transforms.baseline_predict.init(
@@ -656,14 +666,17 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
     completed_step = 0
     resume_checkpoint_was_final = False
     overlay_metadata = {
-        "residual_initialization": config.architecture.residual_initialization,
-        "residual_copied": residual_overlay.copied,
-        "residual_fresh": residual_overlay.initialized,
+        "residual_initialization": ("complete_public_graphcast" if config.model_family == "full_gc"
+                                    else config.architecture.residual_initialization),
+        "residual_copied": trainable_copied,
+        "residual_fresh": trainable_fresh,
         "baseline_copied": baseline_overlay.copied,
         "baseline_fresh": 0,
         "baseline_ignored_source_count": len(baseline_overlay.ignored_source),
         "baseline_ignored_source": list(baseline_overlay.ignored_source),
     }
+    if config.train_order_manifest is not None:
+        overlay_metadata["train_order_manifest_sha256"] = file_sha256(config.train_order_manifest)
 
     if invocation.resume is not None and data_parallel:
         checkpoint = load_v24_Ilya_data_parallel_training_checkpoint(invocation.resume)
@@ -715,6 +728,12 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         print(f"[v24_Ilya] exact resume from {invocation.resume} at step {completed_step}")
     elif invocation.resume is not None:
         checkpoint = load_v24_Ilya_training_checkpoint(invocation.resume)
+        if checkpoint.model_family != config.model_family:
+            raise ValueError("Resume checkpoint model_family differs from the requested model")
+        if config.train_order_manifest is not None and (
+                checkpoint.parameter_overlay_metadata.get("train_order_manifest_sha256")
+                != file_sha256(config.train_order_manifest)):
+            raise ValueError("Training order manifest fingerprint differs from resume checkpoint")
         validate_resume_config(
             config,
             checkpoint.resolved_training_config,
@@ -745,6 +764,8 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         print(f"[v24_Ilya] exact resume from {invocation.resume} at step {completed_step}")
     elif invocation.init_from is not None:
         checkpoint = load_v24_Ilya_checkpoint(invocation.init_from)
+        if checkpoint.model_family != config.model_family:
+            raise ValueError("Initialization checkpoint model_family differs from the requested model")
         if checkpoint.checkpoint_kind == "swa":
             # SWA is allowed as a warm start, never as exact resume.
             print(f"[v24_Ilya] warm-starting from SWA checkpoint {invocation.init_from}")
@@ -806,6 +827,8 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         comparison_checkpoint = load_v24_Ilya_checkpoint(
             invocation.validation_compare
         )
+        if comparison_checkpoint.model_family != config.model_family:
+            raise ValueError("Validation checkpoint model_family differs from the requested model")
         validate_param_tree_compatible(
             residual_params,
             comparison_checkpoint.residual_params,
@@ -872,14 +895,19 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
             "residual_parameters": n_residual_parameters,
             "mamba_parameters": mamba_parameter_count,
             "spatial_parameters": n_residual_parameters - mamba_parameter_count,
-            "baseline_parameters_frozen": n_baseline_parameters,
+            "baseline_parameters_frozen": (0 if config.model_family == "full_gc" else n_baseline_parameters),
+            "trainable_parameters": n_residual_parameters,
+            "public_reference_parameters": n_baseline_parameters,
             "baseline_checkpoint_fingerprint": baseline_fingerprint,
             "anchor_manifest_fingerprint": training_data.manifest_fingerprint,
             "parameter_overlay": overlay_metadata,
-            "residual_target": "truth_minus_live_frozen_baseline",
+            "residual_target": ("full_physical_truth" if config.model_family == "full_gc"
+                                else "truth_minus_live_frozen_baseline"),
+            "training_target": ("residual_truth" if config.loss_kind == "mse" else "full_physical_truth"),
             "loss_mode": config.loss_mode,
             "loss_kind": config.loss_kind,
             "scored_field": (
+                "full_graphcast" if config.model_family == "full_gc" else
                 "residual" if config.loss_kind == "mse"
                 else "live_frozen_baseline_plus_residual"
             ),
@@ -902,6 +930,17 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         atomic_json_dump(run_metadata, run_config_path)
     elif not run_config_path.is_file():
         raise FileNotFoundError(f"Resume run is missing {run_config_path}")
+
+    if (completed_step == 0 and invocation.resume is None
+            and config.loss_kind == "gc_mse_amse_excess"
+            and not invocation.baseline_validation_only and invocation.validation_compare is None):
+        initial_checkpoint = _save_checkpoint(
+            config=config, completed_step=0, residual_params=residual_params,
+            residual_state=residual_state, optimizer_state=optimizer_state,
+            rng_key=rng_key, cursor=cursor, baseline_fingerprint=baseline_fingerprint,
+            manifest_fingerprint=training_data.manifest_fingerprint,
+            overlay_metadata=overlay_metadata)
+        print(f"[v24_Ilya] saved initialization {initial_checkpoint}", flush=True)
 
     if data_parallel:
         assert devices is not None

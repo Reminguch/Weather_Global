@@ -144,10 +144,26 @@ class V24IlyaCheckpoint:
     residual_state: Mapping[str, Mapping[str, Any]] | None
     checkpoint_format: str
     checkpoint_kind: str
+    model_family: str = "gc_mamba"
 
     @property
     def has_residual_state(self) -> bool:
         return bool(self.residual_state)
+
+
+def _checkpoint_model_family(payload: Mapping[str, Any]) -> str:
+    resolved = payload.get("resolved_training_config", {})
+    if not isinstance(resolved, Mapping):
+        raise ValueError("Malformed resolved_training_config in checkpoint")
+    configured = resolved.get("model_family")
+    family = payload.get("model_family", configured or "gc_mamba")
+    if family not in ("gc_mamba", "full_gc"):
+        raise ValueError(f"Unknown checkpoint model_family={family!r}")
+    if configured is not None and configured != family:
+        raise ValueError("Checkpoint model_family differs from resolved_training_config")
+    if family == "full_gc" and jax.tree_util.tree_leaves(payload.get("residual_state", {})):
+        raise ValueError("full_gc checkpoint must have empty recurrent state")
+    return family
 
 
 def load_v24_Ilya_checkpoint(path: Path) -> V24IlyaCheckpoint:
@@ -205,6 +221,7 @@ def load_v24_Ilya_checkpoint(path: Path) -> V24IlyaCheckpoint:
         residual_state=residual_state,
         checkpoint_format=str(checkpoint_format),
         checkpoint_kind=str(checkpoint_kind),
+        model_family=_checkpoint_model_family(payload),
     )
 
 
@@ -221,6 +238,7 @@ class V24IlyaTrainingCheckpoint:
     baseline_checkpoint_fingerprint: str
     anchor_manifest_fingerprint: str
     parameter_overlay_metadata: Mapping[str, Any]
+    model_family: str = "gc_mamba"
 
 
 def load_v24_Ilya_training_checkpoint(path: Path) -> V24IlyaTrainingCheckpoint:
@@ -299,6 +317,7 @@ def load_v24_Ilya_training_checkpoint(path: Path) -> V24IlyaTrainingCheckpoint:
         baseline_checkpoint_fingerprint=str(payload["baseline_checkpoint_fingerprint"]),
         anchor_manifest_fingerprint=str(payload["anchor_manifest_fingerprint"]),
         parameter_overlay_metadata=overlay_metadata,
+        model_family=_checkpoint_model_family(payload),
     )
 
 
@@ -485,6 +504,7 @@ def training_checkpoint_payload(
         "schema_version": SCHEMA_VERSION,
         "checkpoint_format": TRAINING_CHECKPOINT_FORMAT,
         "checkpoint_kind": "training",
+        "model_family": resolved_training_config.get("model_family", "gc_mamba"),
         "completed_step": int(completed_step),
         "residual_params": residual_params,
         "residual_state": residual_state,

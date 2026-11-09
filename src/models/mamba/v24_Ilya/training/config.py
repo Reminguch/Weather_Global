@@ -22,7 +22,8 @@ FEEDBACK_MODES = ("baseline", "closed_loop_sg", "closed_loop")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
 LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
-LOSS_KINDS = ("mse", "mse_fp32", "amse")
+LOSS_KINDS = ("mse", "mse_fp32", "amse", "gc_mse_amse_excess")
+MODEL_FAMILIES = ("gc_mamba", "full_gc")
 LEARNING_RATE_SCHEDULES = ("constant", "cosine", "warmup_cosine_constant")
 OPTIMIZER_KINDS = ("adamw", "rms_mse", "mgda_rms")
 MGDA_DIRECTIONS = ("mgda", "mse_control", "fixed_sum")
@@ -122,6 +123,8 @@ class V24IlyaTrainConfig:
     output_root: Path
     run_name: str
     architecture: V24IlyaArchitectureConfig
+    model_family: str = "gc_mamba"
+    train_order_manifest: Path | None = None
     stats_dir: Path = Path(DEFAULT_STATS_DIR)
     input_duration: str = "12h"
     target_steps: int = 1
@@ -135,6 +138,7 @@ class V24IlyaTrainConfig:
     temporal_state_policy: str = "carry"
     loss_mode: str = "last_step"
     loss_kind: str = "mse"
+    spectral_excess_weight: float = 0.0
     power_calibration: Mapping[str, Any] | None = None
     objective_pair: str | None = None
     amse_split_calibration: Mapping[str, Any] | None = None
@@ -178,6 +182,34 @@ class V24IlyaTrainConfig:
     )
 
     def __post_init__(self) -> None:
+        if self.model_family not in MODEL_FAMILIES:
+            raise ValueError(f"model_family must be one of {MODEL_FAMILIES}")
+        if self.train_order_manifest is not None:
+            object.__setattr__(self, "train_order_manifest", Path(self.train_order_manifest))
+        if (isinstance(self.spectral_excess_weight, bool)
+                or not isinstance(self.spectral_excess_weight, (int, float))
+                or not math.isfinite(self.spectral_excess_weight)
+                or not 0 <= self.spectral_excess_weight <= 1):
+            raise ValueError("spectral_excess_weight must be finite and in [0, 1]")
+        if self.loss_kind == "gc_mse_amse_excess":
+            if (self.optimizer_kind != "adamw" or self.objective_pair is not None
+                    or self.power_calibration is not None or self.amse_split_calibration is not None):
+                raise ValueError("gc_mse_amse_excess requires ordinary scalar AdamW without calibration")
+            if (self.amse_lambda != 1.0 or self.amse_lambda_ramp_steps
+                    or self.amse_lambda_start or self.amse_variable_lambda_multipliers
+                    or self.amse_degree_lambda_multipliers):
+                raise ValueError("gc_mse_amse_excess fixes inner AMSE lambda=1; use spectral_excess_weight")
+            if self.feedback_mode != "closed_loop":
+                raise ValueError("gc_mse_amse_excess requires full weather feedback (closed_loop)")
+        elif self.spectral_excess_weight != 0:
+            raise ValueError("spectral_excess_weight requires loss_kind='gc_mse_amse_excess'")
+        if self.model_family == "full_gc":
+            if self.feedback_mode != "closed_loop" or self.loss_kind not in ("mse_fp32", "gc_mse_amse_excess"):
+                raise ValueError("full_gc requires closed_loop and a full-field scalar GC-MSE objective")
+            if self.optimizer_kind != "adamw" or self.objective_pair is not None:
+                raise ValueError("full_gc currently requires scalar AdamW")
+            if self.mamba_lr_multiplier != 1 or self.spatial_lr_multiplier != 1:
+                raise ValueError("full_gc requires unit parameter-group learning-rate multipliers")
         if self.optimizer_kind not in OPTIMIZER_KINDS:
             raise ValueError(f"optimizer_kind must be one of {OPTIMIZER_KINDS}")
         if self.mgda_direction not in MGDA_DIRECTIONS:
@@ -312,8 +344,8 @@ class V24IlyaTrainConfig:
                 )
             if self.distributed.mode != "single":
                 raise ValueError("closed_loop currently requires single-device training")
-            if self.loss_kind not in ("mse_fp32", "amse"):
-                raise ValueError("closed_loop requires a full-field mse_fp32 or amse objective")
+            if self.loss_kind not in ("mse_fp32", "amse", "gc_mse_amse_excess"):
+                raise ValueError("closed_loop requires a full-field objective")
         if self.temporal_state_policy not in TEMPORAL_STATE_POLICIES:
             raise ValueError(
                 "temporal_state_policy must be one of "
@@ -365,7 +397,7 @@ class V24IlyaTrainConfig:
                            dict(sorted(self.amse_variable_lambda_multipliers.items())))
         object.__setattr__(self, "amse_degree_lambda_multipliers",
                            tuple(self.amse_degree_lambda_multipliers))
-        if self.loss_kind != "amse" and (
+        if self.loss_kind not in ("amse", "gc_mse_amse_excess") and (
             self.amse_lmax is not None or self.amse_lambda != 1.0 or self.amse_power_epsilon != 1e-12
             or self.amse_lambda_ramp_steps or self.amse_lambda_start != 0
             or self.amse_variable_lambda_multipliers or self.amse_degree_lambda_multipliers
@@ -534,7 +566,9 @@ class V24IlyaTrainConfig:
             objective["objective_pair"] = self.objective_pair
         if self.amse_split_calibration is not None:
             objective["amse_split_calibration"] = json.loads(json.dumps(self.amse_split_calibration))
-        if self.loss_kind == "amse":
+        if self.loss_kind == "gc_mse_amse_excess":
+            objective["spectral_excess_weight"] = self.spectral_excess_weight
+        if self.loss_kind in ("amse", "gc_mse_amse_excess"):
             objective.update(
                 amse_lmax=self.amse_lmax,
                 amse_lambda=self.amse_lambda,
@@ -599,6 +633,8 @@ class V24IlyaTrainConfig:
         return {
             "architecture_id": ARCHITECTURE_ID,
             "schema_version": SCHEMA_VERSION,
+            **({"model_family": self.model_family}
+               if self.model_family != "gc_mamba" or self.loss_kind == "gc_mse_amse_excess" else {}),
             "data": {
                 "prepared_root": str(self.prepared_root),
                 "anchor_manifest_root": str(self.anchor_manifest_root),
@@ -609,6 +645,8 @@ class V24IlyaTrainConfig:
                 "time_start": self.time_start,
                 "time_end": self.time_end,
                 "allow_incomplete_prepared_store": self.allow_incomplete_prepared_store,
+                **({"train_order_manifest": str(self.train_order_manifest)}
+                   if self.train_order_manifest is not None else {}),
             },
             "architecture": dataclasses.asdict(self.architecture),
             "sequence": {
@@ -679,6 +717,7 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
         - {
             "architecture_id",
             "schema_version",
+            "model_family",
             "data",
             "architecture",
             "sequence",
@@ -710,6 +749,7 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
             "time_start",
             "time_end",
             "allow_incomplete_prepared_store",
+            "train_order_manifest",
         },
     )
     architecture_values = _section(
@@ -759,7 +799,7 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
     objective = _section(
         payload,
         "objective",
-        {"loss_mode", "loss_kind", "power_calibration", "objective_pair", "amse_split_calibration",
+        {"loss_mode", "loss_kind", "spectral_excess_weight", "power_calibration", "objective_pair", "amse_split_calibration",
          "amse_lmax", "amse_lambda", "amse_power_epsilon",
          "amse_lambda_ramp_steps", "amse_lambda_start", "amse_variable_lambda_multipliers",
          "amse_degree_lambda_multipliers",
@@ -813,9 +853,9 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
         if missing:
             raise ValueError(f"Missing required keys in {section_name}: {missing}")
 
-    path_keys = ("prepared_root", "anchor_manifest_root", "baseline_checkpoint", "stats_dir")
+    path_keys = ("prepared_root", "anchor_manifest_root", "baseline_checkpoint", "stats_dir", "train_order_manifest")
     for name in path_keys:
-        if name in data:
+        if name in data and data[name] is not None:
             data[name] = Path(data[name])
     output["output_root"] = Path(output["output_root"])
     for name in ("supervised_horizons", "supervised_weights", "amse_degree_lambda_multipliers"):
@@ -826,6 +866,7 @@ def load_training_config(path: Path) -> V24IlyaTrainConfig:
             objective[name] = tuple(value)
     return V24IlyaTrainConfig(
         **data,
+        model_family=payload.get("model_family", "gc_mamba"),
         architecture=V24IlyaArchitectureConfig(**architecture_values),
         distributed=V24IlyaDistributedConfig(**distributed_values),
         validation=V24IlyaValidationConfig(**validation_values),
@@ -874,6 +915,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-every", type=int)
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--run-name")
+    parser.add_argument("--train-order-manifest", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--baseline-validation-only",
@@ -906,6 +948,8 @@ def parse_cli(argv: Sequence[str] | None = None) -> V24IlyaTrainInvocation:
         output_root=args.output_root,
         run_name=args.run_name,
     )
+    if args.train_order_manifest is not None:
+        config = dataclasses.replace(config, train_order_manifest=args.train_order_manifest)
     return V24IlyaTrainInvocation(
         config=config,
         config_path=args.config,
@@ -954,18 +998,23 @@ def validate_resume_config(
         # used the legacy carry behavior.  For stateless architectures this
         # carried an empty Haiku state tree and was therefore a no-op.
         saved_sequence.setdefault("temporal_state_policy", "carry")
-    saved_optimizer = saved_copy.get("optimizer")
-    if isinstance(saved_optimizer, dict):
-        saved_optimizer.setdefault("weight_decay_policy", "all")
-        saved_optimizer.setdefault("learning_rate_schedule", "constant")
-        saved_optimizer.setdefault("end_learning_rate", None)
-        saved_optimizer.setdefault("adam_beta1", 0.9)
-        saved_optimizer.setdefault("adam_beta2", 0.999)
+    for normalized in (candidate, saved_copy):
+        optimizer = normalized.get("optimizer")
+        if isinstance(optimizer, dict):
+            optimizer.setdefault("weight_decay_policy", "all")
+            optimizer.setdefault("learning_rate_schedule", "constant")
+            optimizer.setdefault("end_learning_rate", None)
+            optimizer.setdefault("adam_beta1", 0.9)
+            optimizer.setdefault("adam_beta2", 0.999)
     # Validation is operational and must not perturb exact-resume training.
     # Older checkpoints predate this optional section, and resumed runs may
     # safely change its cadence or subset size.
     candidate.pop("validation", None)
     saved_copy.pop("validation", None)
+    # Relocating an exact continuation must not overwrite a completed campaign.
+    # Output paths do not participate in model, RNG, optimizer or data evolution.
+    candidate.pop("output", None)
+    saved_copy.pop("output", None)
     try:
         saved_max_steps = int(saved_copy["optimizer"]["max_steps"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -978,8 +1027,13 @@ def validate_resume_config(
         optimizer.pop("checkpoint_every", None)
     if candidate != saved_copy:
         raise ValueError(
-            "Resume configuration differs from the checkpoint. Only max_steps and "
-            "checkpoint_every may change."
+            "Resume configuration differs from the checkpoint. Only output location, "
+            "validation, max_steps and checkpoint_every may change."
+        )
+    if current.loss_kind == "gc_mse_amse_excess" and current.max_steps != saved_max_steps:
+        raise ValueError(
+            "Scalar-excess training keeps max_steps fixed on resume to preserve the LR schedule; "
+            "use --stop-after-steps for bounded calibration/profile runs"
         )
     if current.max_steps < saved_max_steps:
         raise ValueError(

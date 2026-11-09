@@ -2,12 +2,15 @@
 
 Unlike the legacy state-only reverse pass, this backend propagates cotangents
 through both previous weather frames, the residual recurrent state, and the
-frozen GraphCast's *inputs*. GraphCast parameters are explicitly stopped and
-never passed to the optimizer. One-step kernels are rematerialized in reverse;
+frozen GraphCast's *inputs*. For full_gc, the trainable predictor itself is
+GraphCast, with all its parameters differentiated and no added baseline.
+One-step kernels are rematerialized in reverse;
 the full weather rollout is not compiled into a single training executable.
 """
 
 from __future__ import annotations
+
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -16,6 +19,18 @@ import optax
 
 
 BACKEND = "explicit_weather_reverse_vjp"
+SCALAR_DIAGNOSTICS = ("grid_mse_fp32", "spectral_mse", "amse_excess",
+                      "weighted_amse_excess", "scalar_total")
+
+
+class ScalarTrainResult(NamedTuple):
+    params: Any
+    state: Any
+    optimizer_state: Any
+    loss: Any
+    gradient_norm: Any
+    loss_components: Any
+    diagnostics: dict[str, Any]
 
 
 def _helpers():
@@ -36,7 +51,7 @@ def _check(transforms, config, baseline_state, input_steps):
         raise ValueError("Differentiable weather feedback initially supports one device")
     if jax.tree_util.tree_leaves(baseline_state):
         raise ValueError("Frozen GraphCast must have empty recurrent state")
-    if config.loss_kind not in ("mse_fp32", "amse") or transforms.full_field_loss is None:
+    if config.loss_kind not in ("mse_fp32", "amse", "gc_mse_amse_excess") or transforms.full_field_loss is None:
         raise ValueError("Differentiable feedback requires a full physical-field mse_fp32 or amse loss")
     pair = getattr(config, "objective_pair", None)
     if pair not in (None, "mse_amse_excess"):
@@ -64,6 +79,9 @@ class _WeatherSteps:
         self.positions = {step: pos for pos, step in enumerate(config.supervised_step_indices)}
         self.weights = np.asarray(config.normalized_supervised_weights, np.float32)
         self.paired = getattr(config, "objective_pair", None) == "mse_amse_excess"
+        self.scalar_excess = config.loss_kind == "gc_mse_amse_excess"
+        self.full_gc = config.model_family == "full_gc"
+        self.latest_diagnostics = {}
         self.cache = {}
 
     def feeds_weather(self, index):
@@ -102,7 +120,7 @@ class _WeatherSteps:
 
         frame_definition = jax.tree_util.tree_structure(jax.eval_shape(frame_shape, *trees))
 
-        def step(params, state, prev, curr, baseline_params, key, fixed, target, force, optimizer_step):
+        def step_with_diagnostics(params, state, prev, curr, baseline_params, key, fixed, target, force, optimizer_step):
             previous, current, static, truth, forcing = (
                 _unpack(definition, leaves)
                 for definition, leaves in zip(definitions, (prev, curr, fixed, target, force), strict=True)
@@ -114,26 +132,38 @@ class _WeatherSteps:
             truth = ep._tree_stop(ep.cast_physical_boundary_fp32(truth))
             forcing = ep._tree_stop(ep.cast_physical_boundary_fp32(forcing))
             template = ep._template_like(truth, jnp.float32)
-            baseline, _ = self.transforms.baseline_predict.apply(
-                ep._tree_stop(baseline_params), self.baseline_state, key, inputs, template, forcing)
             state_in = ep._tree_zeros_like(state) if reset else state
             residual, next_state = predictor.apply(params, state_in, key, inputs, template, forcing)
             # Do not stop either forecast here: both depend on earlier weather.
-            full = ep._tree_add(ep.cast_physical_boundary_fp32(baseline),
-                                ep.cast_physical_boundary_fp32(residual))
+            if self.full_gc:
+                if jax.tree_util.tree_leaves(state) or jax.tree_util.tree_leaves(next_state):
+                    raise ValueError("full_gc must have empty recurrent state")
+                full = ep.cast_physical_boundary_fp32(residual)
+            else:
+                baseline, _ = self.transforms.baseline_predict.apply(
+                    ep._tree_stop(baseline_params), self.baseline_state, key, inputs, template, forcing)
+                full = ep._tree_add(ep.cast_physical_boundary_fp32(baseline),
+                                    ep.cast_physical_boundary_fp32(residual))
+            scalar_diagnostics = {}
             if supervised:
                 kwargs = ({"optimizer_step": optimizer_step}
                           if getattr(self.config, "amse_lambda_ramp_steps", 0) else {})
-                loss_values, _ = loss_fn(full, truth, **kwargs)
+                loss_values, diagnostics = loss_fn(full, truth, **kwargs)
                 loss_values = jnp.asarray(loss_values, jnp.float32)
                 loss = jnp.mean(loss_values, axis=1) if self.paired else jnp.mean(loss_values)
+                if self.scalar_excess:
+                    scalar_diagnostics = {name: jnp.mean(diagnostics[name])
+                                          for name in SCALAR_DIAGNOSTICS if name in diagnostics}
             else:
                 loss = jnp.zeros((2,), jnp.float32) if self.paired else jnp.asarray(0., jnp.float32)
             next_state = ep.cast_state_boundary_fp32(next_state)
             if reset:
                 next_state = ep._tree_zeros_like(next_state)
             next_frame = ep.next_dynamic_frame(inputs, full, forcing, time_step=self.time_step)
-            return loss, next_state, _pack(next_frame)
+            return (loss, next_state, _pack(next_frame)), scalar_diagnostics
+
+        def step(*args):
+            return step_with_diagnostics(*args)[0]
 
         @jax.jit
         def pullback(params, state, prev, curr, baseline_params, key, fixed, target, force,
@@ -143,7 +173,7 @@ class _WeatherSteps:
             _, reverse = jax.vjp(jax.checkpoint(differentiable), params, state, prev, curr)
             return reverse((loss_cotangent, state_cotangent, weather_cotangent))
 
-        result = (step, jax.jit(step), pullback, frame_definition)
+        result = (step, jax.jit(step_with_diagnostics), pullback, frame_definition)
         self.cache[cache_key] = result
         return result
 
@@ -158,7 +188,7 @@ class _WeatherSteps:
         truths = tuple(ep._host_cast_floating(value, np.float32) for value in truths)
         forcings = tuple(ep._host_cast_floating(value, np.float32) for value in forcings)
         keys = to_host(keys)
-        tape, components = [], []
+        tape, components, diagnostic_components = [], [], []
         for index in range(self.config.bptt_steps):
             truth = truths[self.positions[index]] if index in self.positions else truths[-1]
             raw, forward, reverse, frame_definition = self.kernel(
@@ -167,17 +197,29 @@ class _WeatherSteps:
             arguments = (params, state, _pack(frames[index]), _pack(frames[index + 1]),
                          self.baseline_params, keys[index], _pack(static), _pack(truth),
                          _pack(forcings[index]), step_index)
-            loss, next_state, next_frame = forward(*arguments)
+            (loss, next_state, next_frame), diagnostics = forward(*arguments)
             # Params stay on device; boundaries and staged data are host arrays.
             tape.append((reverse, arguments[1:], frame_definition))
             if index in self.positions:
                 components.append(np.asarray(jax.device_get(loss), np.float32))
+                if self.scalar_excess:
+                    diagnostic_components.append(jax.device_get(diagnostics))
             state = to_host(next_state)
             if self.feeds_weather(index):
                 frames.append(_unpack(frame_definition, to_host(next_frame)))
         if len(frames) != self.config.bptt_steps + 1:
             raise RuntimeError("Differentiable weather tape has incorrect length")
         components = np.asarray(components, np.float32)
+        if self.scalar_excess:
+            self.latest_diagnostics = {
+                name: np.tensordot(self.weights, np.asarray([item[name] for item in diagnostic_components]), axes=1)
+                for name in diagnostic_components[0]
+            }
+            # The zero-lambda fast path does not calculate either spectral term.
+            self.latest_diagnostics.setdefault("spectral_mse", None)
+            self.latest_diagnostics.setdefault("amse_excess", None)
+            self.latest_diagnostics["spectral_diagnostics_computed"] = bool(self.config.spectral_excess_weight)
+            self.latest_diagnostics["spectral_excess_weight"] = self.config.spectral_excess_weight
         return np.tensordot(self.weights, components, axes=1), state, components, frames, tape
 
     def reverse(self, params, initial_state, frames, tape, *, objective=None, scale=1.):
@@ -264,16 +306,33 @@ def make_weather_feedback_train_step(*, optimizer, **kwargs):
     @jax.jit
     def update(params, optimizer_state, gradients):
         updates, next_optimizer_state = optimizer.update(gradients, optimizer_state, params)
-        return optax.apply_updates(params, updates), next_optimizer_state, optax.global_norm(gradients)
+        next_params = optax.apply_updates(params, updates)
+        finite = jnp.all(jnp.stack([
+            jnp.all(jnp.isfinite(leaf))
+            for leaf in jax.tree_util.tree_leaves((next_params, next_optimizer_state))
+        ]))
+        return (next_params, next_optimizer_state,
+                optax.global_norm(gradients), optax.global_norm(updates), finite)
 
     def train_step(params, state, optimizer_state, keys, input_frames, static, truths, forcings,
                    optimizer_step=None):
         value, final_state, components, frames, tape = engine.forward(
             params, state, keys, input_frames, static, truths, forcings, optimizer_step=optimizer_step)
         parameter_cotangent = engine.reverse(params, state, frames, tape)
-        next_params, next_optimizer_state, gradient_norm = update(params, optimizer_state, parameter_cotangent)
-        return (next_params, jax.tree_util.tree_map(jnp.asarray, final_state), next_optimizer_state,
-                jnp.asarray(value, jnp.float32), gradient_norm, components)
+        next_params, next_optimizer_state, gradient_norm, update_norm, finite = update(
+            params, optimizer_state, parameter_cotangent)
+        # Finite increases and stalls remain valid scheduled updates. Only
+        # unusable numeric states abort this scalar AdamW backend.
+        if (not np.all(np.isfinite(value)) or not np.all(np.isfinite(components))
+                or not bool(jax.device_get(finite))
+                or not np.all(np.isfinite(jax.device_get((gradient_norm, update_norm))))
+                or any(not np.all(np.isfinite(leaf)) for leaf in jax.tree_util.tree_leaves(final_state))):
+            raise FloatingPointError("Nonfinite weather-feedback loss, gradient, update or state")
+        result = (next_params, jax.tree_util.tree_map(jnp.asarray, final_state), next_optimizer_state,
+                  jnp.asarray(value, jnp.float32), gradient_norm, components)
+        if engine.scalar_excess:
+            return ScalarTrainResult(*result, {**engine.latest_diagnostics, "update_norm": update_norm})
+        return result
 
     return train_step
 
