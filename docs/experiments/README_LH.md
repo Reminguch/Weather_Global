@@ -1,6 +1,13 @@
 # Lianghong (LH): reviewer-response experiment handoff
 
-Updated: **2026-11-09, America/New_York** (GC fine-tuning campaign review).
+Updated: **2026-11-12, America/New_York** (portable execution handoff).
+
+At the user's request, the [portable run README](README_LIANGHONG_PORTABLE_RUNS.md)
+provides code and exact commands for Lianghong to execute **both** the five-arm
+M1-matched GC–Mamba lambda sweep and four fresh full-GC K8/K12/K16/K20 runs on
+her cluster. It includes raw/SWA comparisons, M1/public-GC references, 2022/2023
+evaluation and smoothing. This is an execution handoff; existing Della jobs and
+the broader scientific ownership below are unchanged.
 
 Lianghong owns **original GraphCast fine-tuning, extreme-event analysis, and
 training-seed replication**. Ilya owns the MSE/spectral tradeoff and smoothing
@@ -15,7 +22,7 @@ seed repeats are straightforward but require additional GPU time.
 | Priority | Reviewer concern | Owner | Importance | Difficulty | Deliverable |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Lower MSE may reflect smoothing; power spectra and λ tradeoffs | **Ilya** | 4/5 | Moderate | MSE, power/error spectra, correlation and development-fitted smoothing comparisons for M1, public GC and both methods at λ = 0, 0.25, 0.5, 0.75 and 1. |
-| 2 | Further fine-tuning of the already fine-tuned GC baseline | **Lianghong** | 4/5 | Relatively easy | Assess standard-loss full-GC fine-tuning at K8/K12/K16/K20 through 2,500 updates, with checkpoint spectra and optional SWA. Compare with public GC and principal M1 on common evaluation dates; equal training budgets are not required. New submissions are on hold; see the [dedicated experiment README](README_FULL_GC_AR.md). |
+| 2 | Further fine-tuning of the already fine-tuned GC baseline | **Lianghong** | 4/5 | Relatively easy | Train four fresh standard-loss full-GC runs at K8/K12/K16/K20 from public GC through 2,500 updates, with checkpoint spectra and optional SWA. Ilya's K20 run supplies preliminary evidence only. Compare with public GC and principal M1; equal training budgets are not required. See the [dedicated experiment README](README_FULL_GC_AR.md). |
 | 3 | Extreme-event performance | **Lianghong** | 4/5 | Easy | Review the completed occurrence/intensity evaluation and prepare tables, figures and a short interpretation. |
 | 4 | Multiple training seeds | **Lianghong** | 4/5 | Easy; additional compute | Proposed first scope: principal M1 recipe and matched reset-trained control at seeds 23 and 24, alongside existing seed 22. |
 | 6 | Predicted-field maps and gradient diagnostics | **Unassigned** | 3/5 | Easy–moderate | Nobody is working on this so far. Whoever finishes their assigned work first could take it on, using the same forecast models without another training campaign. |
@@ -52,16 +59,26 @@ and active mappings for [full GC](../../artifacts/checkpoints/v24_Ilya/res1_fres
 and [GC–Mamba](../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/selected_arms_gc_mamba.json).
 Include principal M1 and public GC as references.
 
-The standard-loss GC result from item 2 also supplies the GC λ=0 point here.
-The current GC λ=0 run uses peak LR `3e-7`, while the four positive-λ GC runs use
-`1e-5`; disclose this difference when interpreting the sweep. The positive-λ
-runs and smoothing analysis belong to this workstream.
+Ilya's existing standard-loss GC run supplies the current GC λ=0 point here.
+It uses peak LR `3e-7`, while the four positive-λ GC runs use `1e-5`; disclose
+this difference when interpreting the sweep. Lianghong's four fresh runs in
+item 2 are a separate comparison, with results to share when completed. The
+positive-λ runs and smoothing analysis belong to this workstream.
 
 **November9 reference result:** the [completed GC/M1 power-spectrum report](../../plots/analyze_models/data/resolution_eval/v24_smoothing_m1_spectra_20261109/report.md)
 now includes raw/Gaussian/band-filtered spectra, figures and numeric tables.
 Raw M1 has better loss and macro power matching than filtered GC, while raw GC
 has the lowest overall power error. This supplies the historical references for
 item1; the new λ-model comparison remains pending.
+
+**November9 extension:** the user authorized a [smoothing-strength sweep](v24_smoothing_strength_sweep_2026-11-09.md)
+for public GC and principal M1: ten global Gaussian widths and eleven blend
+strengths toward each existing development-fitted Gaussian/band profile. It
+uses the same122 annual starts and saves exact loss and power-spectrum curves
+from one additional forecast pass. Ilya owns this analysis; it needs no new
+training and does not release the separate full-GC horizon proposal on hold.
+Evaluation array **17213596** and dependent report **17213597** are submitted;
+the initial queue check showed priority/dependency waits. Curves are pending.
 
 ## 2. Further GraphCast fine-tuning with the standard loss — Lianghong
 
@@ -76,17 +93,18 @@ requirement for this item. Document the full-GC settings actually tested, their
 training cost and the observed benefit or lack of benefit. The equal-budget
 adaptation comparison belongs to the **unassigned LoRA item 7** below.
 
-The implementation and training submissions already exist. Full-GC profiles and
-500-update learning-rate calibrations completed; the final comparison remains
-outstanding in the inspected records. Start by checking the existing campaign's
-submission records and outputs before deciding whether recovery is needed.
+**Assignment updated November 9:** Lianghong should train K8, K12, K16 and K20
+as four new fine-tuning runs from public GC, each with fresh optimizer state.
+Ilya's existing K20 run is preliminary evidence only; do not reuse or resume it
+as Lianghong's K20 arm. The earlier implementation assumes K20 reuse and needs
+revision for this assignment. The new runs have not been submitted.
 
 The completed 500-update λ=0 calibrations at peak learning rates `1e-5` and
 `3e-5` increased exact development rollout loss by **13.8958%** and **52.2477%**
 relative to their public-GC references. These runs support the bounded statement
 that **no further improvement was observed in those tested configurations**.
-The lower-rate `3e-7` run has since **improved** the 32-start 2022 development
-rollout loss by **4.6434%** at update 500 (day 10: **5.3090%**). It reached
+Ilya's lower-rate `3e-7` run has since **improved** the 32-start 2022 development
+rollout loss by **4.6434%** after just 500 updates (day 10: **5.3090%**). It reached
 update 1,250; its final checkpoint and 2023 evaluation remain pending. A general
 claim that further fine-tuning cannot help is therefore not supported.
 
@@ -102,32 +120,14 @@ response, including any improvements found by the remaining experiments.
 
 - [Existing campaign protocol and standard-loss GC revision](v24_fresh_gc_mamba_gc_lambda_smoothing_plan_2026-11-06.md).
 - [Training campaign](../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/manifest.json), [submission records](../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/submissions), and [execution handoff](../../research/directions/r005-mgda-accuracy-spectral-adjustment/devel.md).
-- [Active full-GC run mapping](../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/selected_arms_full_gc.json): use the task with `lambda: 0.0` and its actual `id`.
+- [Existing full-GC run mapping](../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/selected_arms_full_gc.json): the task with `lambda: 0.0` identifies Ilya's preliminary run, not one of Lianghong's new runs.
 
-Start from **public GC** and update all backbone parameters with the standard
-loss. The existing submitted standard-loss run uses training years
-2015–2021, batch four, 24-step BPTT/K20, 96-step segments, full weather-feedback
-gradients and 2,500 optimizer updates. These describe the existing run; item 2
-does not require matching GC–Mamba's training budget. Retain the submitted run's
-planned endpoint and evaluation.
-
-The current run's primary output, once completed, is its final native checkpoint:
-
-```text
-artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/
-  runs/gcft_s22_l000_lr3em7_fresh_20261107/checkpoints/checkpoint_step00002500.pkl
-```
-
-This is the **raw, unaveraged endpoint**. The SWA proposed in the
-[dedicated experiment README](README_FULL_GC_AR.md) is a separate checkpoint and
-result. Evaluate the fine-tuned GC against the unmodified public GC baseline.
-Include M1 as a separate correction reference; its historical training used
-stopped weather-feedback gradients and SWA.
-
-**Current GC λ=0 revision:** the active run is
-`gcft_s22_l000_lr3em7_fresh_20261107`, starting fresh at peak LR `3e-7`.
-Read the active mapping; the old 500-update calibration winner is not this run's
-production parent.
+Start every horizon from **public GC** and update all backbone parameters with
+the standard loss, peak LR `3e-7` and 2,500 optimizer updates. Evaluate each new
+run every 500 updates, including spectra, and assess its own SWA. Use separate
+output directories for all four runs. The [dedicated experiment README](README_FULL_GC_AR.md)
+specifies the complete training and evaluation protocol. Compare the new models
+with public GC and principal M1; leave Ilya's existing run intact.
 
 **Deliverable:** exact GC loss and reduction versus public GC, rollout/day-10
 results and paired intervals on the common 122-start 2023 evaluation, plus GPU
@@ -138,7 +138,7 @@ configuration and results to Ilya for reuse as the GC λ=0 reference in item 1.
 Use the 2022 development cohort for tuning decisions and the common 2023 cohort
 for evaluation, as specified in the protocol.
 
-The K8/K12/K16/K20 extension, checkpoint/SWA schedule, comparison with M1 and
+The four fresh K8/K12/K16/K20 runs, checkpoint/SWA schedule, comparison with M1 and
 remaining evaluation work are documented in the separate
 [full-GC experiment README](README_FULL_GC_AR.md).
 

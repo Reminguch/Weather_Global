@@ -1,0 +1,662 @@
+{
+  "schema_version": 1,
+  "metric": "Original GraphCast normalized weighted MSE in FP32 with pole-cell correction",
+  "scored_lead_hours": 240,
+  "status": "complete",
+  "manifest": {
+    "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2023_local/manifest.json",
+    "sha256": "0632ba66ff3d773f779517c3ac73dd789a29d2713e87b55305b52757324a4fc0"
+  },
+  "scope": "Fresh local lambda=0 full GraphCast-small fine-tuning at higher peak learning rates. The original Della step-500 calibration states and configs are unavailable.",
+  "schedule": "Keep the same 2500-update cosine timeline and terminal/peak ratio as the 3e-7 control, and stop the new arms at update 2000.",
+  "evaluation_mode": "2023_day10",
+  "initialization_times": [
+    "2023-01-01T00:00:00Z",
+    "2023-01-04T00:00:00Z",
+    "2023-01-07T00:00:00Z",
+    "2023-01-10T00:00:00Z",
+    "2023-01-13T00:00:00Z",
+    "2023-01-16T00:00:00Z",
+    "2023-01-19T00:00:00Z",
+    "2023-01-22T00:00:00Z",
+    "2023-01-25T00:00:00Z",
+    "2023-01-28T00:00:00Z",
+    "2023-01-31T00:00:00Z",
+    "2023-02-03T00:00:00Z",
+    "2023-02-06T00:00:00Z",
+    "2023-02-09T00:00:00Z",
+    "2023-02-12T00:00:00Z",
+    "2023-02-15T00:00:00Z",
+    "2023-02-18T00:00:00Z",
+    "2023-02-21T00:00:00Z",
+    "2023-02-24T00:00:00Z",
+    "2023-02-27T00:00:00Z",
+    "2023-03-02T00:00:00Z",
+    "2023-03-05T00:00:00Z",
+    "2023-03-08T00:00:00Z",
+    "2023-03-11T00:00:00Z",
+    "2023-03-14T00:00:00Z",
+    "2023-03-17T00:00:00Z",
+    "2023-03-20T00:00:00Z",
+    "2023-03-23T00:00:00Z",
+    "2023-03-26T00:00:00Z",
+    "2023-03-29T00:00:00Z",
+    "2023-04-01T00:00:00Z",
+    "2023-04-04T00:00:00Z",
+    "2023-04-07T00:00:00Z",
+    "2023-04-10T00:00:00Z",
+    "2023-04-13T00:00:00Z",
+    "2023-04-16T00:00:00Z",
+    "2023-04-19T00:00:00Z",
+    "2023-04-22T00:00:00Z",
+    "2023-04-25T00:00:00Z",
+    "2023-04-28T00:00:00Z",
+    "2023-05-01T00:00:00Z",
+    "2023-05-04T00:00:00Z",
+    "2023-05-07T00:00:00Z",
+    "2023-05-10T00:00:00Z",
+    "2023-05-13T00:00:00Z",
+    "2023-05-16T00:00:00Z",
+    "2023-05-19T00:00:00Z",
+    "2023-05-22T00:00:00Z",
+    "2023-05-25T00:00:00Z",
+    "2023-05-28T00:00:00Z",
+    "2023-05-31T00:00:00Z",
+    "2023-06-03T00:00:00Z",
+    "2023-06-06T00:00:00Z",
+    "2023-06-09T00:00:00Z",
+    "2023-06-12T00:00:00Z",
+    "2023-06-15T00:00:00Z",
+    "2023-06-18T00:00:00Z",
+    "2023-06-21T00:00:00Z",
+    "2023-06-24T00:00:00Z",
+    "2023-06-27T00:00:00Z",
+    "2023-06-30T00:00:00Z",
+    "2023-07-03T00:00:00Z",
+    "2023-07-06T00:00:00Z",
+    "2023-07-09T00:00:00Z",
+    "2023-07-12T00:00:00Z",
+    "2023-07-15T00:00:00Z",
+    "2023-07-18T00:00:00Z",
+    "2023-07-21T00:00:00Z",
+    "2023-07-24T00:00:00Z",
+    "2023-07-27T00:00:00Z",
+    "2023-07-30T00:00:00Z",
+    "2023-08-02T00:00:00Z",
+    "2023-08-05T00:00:00Z",
+    "2023-08-08T00:00:00Z",
+    "2023-08-11T00:00:00Z",
+    "2023-08-14T00:00:00Z",
+    "2023-08-17T00:00:00Z",
+    "2023-08-20T00:00:00Z",
+    "2023-08-23T00:00:00Z",
+    "2023-08-26T00:00:00Z",
+    "2023-08-29T00:00:00Z",
+    "2023-09-01T00:00:00Z",
+    "2023-09-04T00:00:00Z",
+    "2023-09-07T00:00:00Z",
+    "2023-09-10T00:00:00Z",
+    "2023-09-13T00:00:00Z",
+    "2023-09-16T00:00:00Z",
+    "2023-09-19T00:00:00Z",
+    "2023-09-22T00:00:00Z",
+    "2023-09-25T00:00:00Z",
+    "2023-09-28T00:00:00Z",
+    "2023-10-01T00:00:00Z",
+    "2023-10-04T00:00:00Z",
+    "2023-10-07T00:00:00Z",
+    "2023-10-10T00:00:00Z",
+    "2023-10-13T00:00:00Z",
+    "2023-10-16T00:00:00Z",
+    "2023-10-19T00:00:00Z",
+    "2023-10-22T00:00:00Z",
+    "2023-10-25T00:00:00Z",
+    "2023-10-28T00:00:00Z",
+    "2023-10-31T00:00:00Z",
+    "2023-11-03T00:00:00Z",
+    "2023-11-06T00:00:00Z",
+    "2023-11-09T00:00:00Z",
+    "2023-11-12T00:00:00Z",
+    "2023-11-15T00:00:00Z",
+    "2023-11-18T00:00:00Z",
+    "2023-11-21T00:00:00Z",
+    "2023-11-24T00:00:00Z",
+    "2023-11-27T00:00:00Z",
+    "2023-11-30T00:00:00Z",
+    "2023-12-03T00:00:00Z",
+    "2023-12-06T00:00:00Z",
+    "2023-12-09T00:00:00Z",
+    "2023-12-12T00:00:00Z",
+    "2023-12-15T00:00:00Z",
+    "2023-12-18T00:00:00Z",
+    "2023-12-21T00:00:00Z",
+    "2023-12-24T00:00:00Z",
+    "2023-12-27T00:00:00Z",
+    "2023-12-30T00:00:00Z"
+  ],
+  "evaluation_identity": {
+    "evaluation_data_metadata": {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/arco_res1_levels13_2023_eval_ncar_qc.zarr/.zmetadata",
+      "sha256": "885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27"
+    },
+    "evaluation_precision": "bf16_network_fp32_physical_fields_and_loss",
+    "initializations": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/initializations_2023_stride3.json",
+      "sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49"
+    },
+    "mode": "2023_day10",
+    "public_gc": {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+      "sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29"
+    },
+    "rng_seed": 0,
+    "scored_lead_hours": 240,
+    "statistics": {
+      "diffs_stddev_by_level": {
+        "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/diffs_stddev_by_level.nc",
+        "sha256": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce"
+      },
+      "mean_by_level": {
+        "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/mean_by_level.nc",
+        "sha256": "e6e724b94cd27707903cdc5cf5784d420bab306f722e631f4455e25c96da9931"
+      },
+      "stddev_by_level": {
+        "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/stddev_by_level.nc",
+        "sha256": "29f941d8c34906b87a1745f93b2308d1e169ec9bbdc4c5491479c771fe92c3cb"
+      }
+    }
+  },
+  "bootstrap": {
+    "stride_days": 3,
+    "block_starts": 5,
+    "replicates": 10000,
+    "seed": 20260916,
+    "method": "paired non-wrapping moving-block percentile bootstrap",
+    "uncertainty_scope": "forecast dates conditional on the fixed trained checkpoints",
+    "intervals": "pointwise 95%"
+  },
+  "optimization_convergence": "These paired contrasts track forecast skill across saved checkpoints. Date intervals do not measure training-seed variability or establish optimization convergence.",
+  "arms": {
+    "control": {
+      "label": "Peak LR 3e-07 (previously completed local control)",
+      "training_origin": "previously completed local control",
+      "peak_learning_rate": 3e-07,
+      "configuration": {
+        "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/config.json",
+        "sha256": "5990aa6be8cd6bd82e96b7a5faf615f5a07c9ec5b8b61ab48f3fe22b44f2a7ba"
+      },
+      "expected_steps": [
+        500,
+        1000,
+        1500,
+        2000,
+        2500
+      ],
+      "evaluation_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2023_local/lr3em7_day10_2023.json",
+      "evaluation_status": "complete",
+      "public_gc_loss": 29.540951259800647,
+      "day10_by_completed_step": {
+        "500": {
+          "model_loss": 28.045009112748943,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00000500.pkl",
+            "sha256": "34fb610a1e604b683985d4b431241d73dba6d9ec641c9a57a5e0990dddb69c39"
+          },
+          "loss_reduction": 1.4959421470517036,
+          "loss_reduction_pointwise_ci95": [
+            1.222531582097541,
+            1.7463455106391286
+          ],
+          "improvement_pct": 5.063960648712701,
+          "improvement_pct_pointwise_ci95": [
+            4.176628712636709,
+            5.856371435125005
+          ]
+        },
+        "1000": {
+          "model_loss": 28.239058103717742,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00001000.pkl",
+            "sha256": "914724846899917a903b1d992d2e8b3a93e633eddc7ebad3fb39685023e42eaf"
+          },
+          "loss_reduction": 1.3018931560829046,
+          "loss_reduction_pointwise_ci95": [
+            0.8497904441395744,
+            1.6553142168482808
+          ],
+          "improvement_pct": 4.407079327382805,
+          "improvement_pct_pointwise_ci95": [
+            2.884936437167317,
+            5.575497191713894
+          ]
+        },
+        "1500": {
+          "model_loss": 28.1765597921903,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00001500.pkl",
+            "sha256": "4196c80740c2406afc494f0450f6399e780d5c006ed9979f273097f3b5d2218b"
+          },
+          "loss_reduction": 1.3643914676103464,
+          "loss_reduction_pointwise_ci95": [
+            0.9308420544765037,
+            1.6897319191791946
+          ],
+          "improvement_pct": 4.618644320594413,
+          "improvement_pct_pointwise_ci95": [
+            3.164118248369002,
+            5.683989850019016
+          ]
+        },
+        "2000": {
+          "model_loss": 28.164927294996918,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00002000.pkl",
+            "sha256": "b049f97e7a718b00d4cd6cec702ef4ecb56501d710b833d3fbe524169a4ac8ac"
+          },
+          "loss_reduction": 1.3760239648037285,
+          "loss_reduction_pointwise_ci95": [
+            0.9148678580268488,
+            1.7173357240489269
+          ],
+          "improvement_pct": 4.658021851436528,
+          "improvement_pct_pointwise_ci95": [
+            3.1091173553624527,
+            5.7925813427364075
+          ]
+        },
+        "2500": {
+          "model_loss": 28.134919838827166,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00002500.pkl",
+            "sha256": "1a2dd2785fc7aef1e2ad09576a325cb9d24fdd94f90e18627c7437c7a170b52e"
+          },
+          "loss_reduction": 1.4060314209734806,
+          "loss_reduction_pointwise_ci95": [
+            0.9595208953638534,
+            1.7287687012406638
+          ],
+          "improvement_pct": 4.7596010318286845,
+          "improvement_pct_pointwise_ci95": [
+            3.263109957991748,
+            5.830973777579263
+          ]
+        }
+      },
+      "paired_changes_between_checkpoints": [
+        {
+          "from_step": 500,
+          "to_step": 1000,
+          "loss_reduction": -0.19404899096879902,
+          "loss_reduction_pointwise_ci95": [
+            -0.5682089195876818,
+            0.10641232396735333
+          ],
+          "improvement_pct": -0.6919198713349198,
+          "improvement_pct_pointwise_ci95": [
+            -2.022164115866656,
+            0.3780685615910254
+          ],
+          "change_in_public_gc_improvement_pp": -0.656881321329896,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -1.919660446352601,
+            0.3607392084374623
+          ]
+        },
+        {
+          "from_step": 1000,
+          "to_step": 1500,
+          "loss_reduction": 0.062498311527441786,
+          "loss_reduction_pointwise_ci95": [
+            -0.20204257300642636,
+            0.28894209705415186
+          ],
+          "improvement_pct": 0.22131868314408734,
+          "improvement_pct_pointwise_ci95": [
+            -0.7165102016420226,
+            1.0135082607183286
+          ],
+          "change_in_public_gc_improvement_pp": 0.2115649932116084,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -0.6824422705858695,
+            0.9758702418178805
+          ]
+        },
+        {
+          "from_step": 1500,
+          "to_step": 2000,
+          "loss_reduction": 0.011632497193382108,
+          "loss_reduction_pointwise_ci95": [
+            -0.1631160013011236,
+            0.18227669176508204
+          ],
+          "improvement_pct": 0.04128430610115252,
+          "improvement_pct_pointwise_ci95": [
+            -0.5812255250188422,
+            0.6424314975816293
+          ],
+          "change_in_public_gc_improvement_pp": 0.03937753084211482,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -0.5552160073330132,
+            0.614422056840916
+          ]
+        },
+        {
+          "from_step": 2000,
+          "to_step": 2500,
+          "loss_reduction": 0.03000745616975209,
+          "loss_reduction_pointwise_ci95": [
+            -0.0705136091982725,
+            0.12204257269374637
+          ],
+          "improvement_pct": 0.10654192661481668,
+          "improvement_pct_pointwise_ci95": [
+            -0.25112372706014263,
+            0.4313369856246261
+          ],
+          "change_in_public_gc_improvement_pp": 0.10157918039215705,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -0.23876184807819167,
+            0.4156921100498354
+          ]
+        }
+      ],
+      "evaluation_sha256": "b19691af4e6e35496123566b8661e2dd4a8bd86ddb0100bdb28bc1c958334638"
+    },
+    "lr1em5": {
+      "label": "Peak LR 1e-05 (fresh local run from public GraphCast-small)",
+      "training_origin": "fresh local run from public GraphCast-small",
+      "peak_learning_rate": 1e-05,
+      "configuration": {
+        "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/configs/lr1em5.json",
+        "sha256": "e53df1908421dee174ceb2c148f181f1d6455a8c9016c3188451e0c8ab8d1f0d"
+      },
+      "expected_steps": [
+        500,
+        1000,
+        1500,
+        2000
+      ],
+      "evaluation_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2023_local/lr1em5_day10_2023.json",
+      "evaluation_status": "complete",
+      "public_gc_loss": 29.512051973186555,
+      "day10_by_completed_step": {
+        "500": {
+          "model_loss": 29.117316042790648,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr1em5/checkpoints/checkpoint_step00000500.pkl",
+            "sha256": "797b89f78aebabe1ef945664f54042c3497a00b40634e0235b8441448ddc0b65"
+          },
+          "loss_reduction": 0.3947359303959068,
+          "loss_reduction_pointwise_ci95": [
+            -0.4663511139447545,
+            1.0785967037325996
+          ],
+          "improvement_pct": 1.3375414585015903,
+          "improvement_pct_pointwise_ci95": [
+            -1.5984517737418387,
+            3.630782472092628
+          ]
+        },
+        "1000": {
+          "model_loss": 27.18451671913022,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr1em5/checkpoints/checkpoint_step00001000.pkl",
+            "sha256": "326a59c26ce126e66e073487b1f57e9b19e6fce171e50bb2e44ad1ec3307a83e"
+          },
+          "loss_reduction": 2.327535254056336,
+          "loss_reduction_pointwise_ci95": [
+            1.5215922250122327,
+            2.9569603775368347
+          ],
+          "improvement_pct": 7.886727958364398,
+          "improvement_pct_pointwise_ci95": [
+            5.196026169502552,
+            9.908980357442227
+          ]
+        },
+        "1500": {
+          "model_loss": 27.314360008865105,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr1em5/checkpoints/checkpoint_step00001500.pkl",
+            "sha256": "ec55cd5bdfb98e1f9121e79717951fd2aff957d6410c2eba4ee7794dc99f8b34"
+          },
+          "loss_reduction": 2.19769196432145,
+          "loss_reduction_pointwise_ci95": [
+            1.4023350352146613,
+            2.8212078508783565
+          ],
+          "improvement_pct": 7.44676095826269,
+          "improvement_pct_pointwise_ci95": [
+            4.806546049518485,
+            9.441301552813965
+          ]
+        },
+        "2000": {
+          "model_loss": 27.491549710758395,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr1em5/checkpoints/checkpoint_step00002000.pkl",
+            "sha256": "a87f33ccdd6e3a0d14355f3ec124e83c7bb0d8fdc5164a8e97ceb160bc2991f7"
+          },
+          "loss_reduction": 2.0205022624281597,
+          "loss_reduction_pointwise_ci95": [
+            1.3879933970873473,
+            2.4222895684789463
+          ],
+          "improvement_pct": 6.846363188381159,
+          "improvement_pct_pointwise_ci95": [
+            4.748205722679639,
+            8.138798464663036
+          ]
+        }
+      },
+      "paired_changes_between_checkpoints": [
+        {
+          "from_step": 500,
+          "to_step": 1000,
+          "loss_reduction": 1.9327993236604293,
+          "loss_reduction_pointwise_ci95": [
+            1.3124015557961382,
+            2.5252263792225556
+          ],
+          "improvement_pct": 6.637972129093211,
+          "improvement_pct_pointwise_ci95": [
+            4.555776185205349,
+            8.547082237164561
+          ],
+          "change_in_public_gc_improvement_pp": 6.549186499862809,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            4.446939650222982,
+            8.558921705707348
+          ]
+        },
+        {
+          "from_step": 1000,
+          "to_step": 1500,
+          "loss_reduction": -0.129843289734886,
+          "loss_reduction_pointwise_ci95": [
+            -0.718722691692291,
+            0.4787109754124651
+          ],
+          "improvement_pct": -0.4776369250055971,
+          "improvement_pct_pointwise_ci95": [
+            -2.675007837727533,
+            1.7331070749154678
+          ],
+          "change_in_public_gc_improvement_pp": -0.4399670001017087,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -2.4439211367018876,
+            1.6188548529748705
+          ]
+        },
+        {
+          "from_step": 1500,
+          "to_step": 2000,
+          "loss_reduction": -0.17718970189329042,
+          "loss_reduction_pointwise_ci95": [
+            -0.7309811846154645,
+            0.30425796352449014
+          ],
+          "improvement_pct": -0.6487053031291307,
+          "improvement_pct_pointwise_ci95": [
+            -2.7008447460217173,
+            1.098652975192554
+          ],
+          "change_in_public_gc_improvement_pp": -0.6003977698815309,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -2.4641598023129676,
+            1.035363083227248
+          ]
+        }
+      ],
+      "evaluation_sha256": "415e4097d0b49d4d8ffc2e0fbf5c511a84cbc2988a5fed40c6c01c949e159c0f"
+    },
+    "lr3em5": {
+      "label": "Peak LR 3e-05 (fresh local run from public GraphCast-small)",
+      "training_origin": "fresh local run from public GraphCast-small",
+      "peak_learning_rate": 3e-05,
+      "configuration": {
+        "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/configs/lr3em5.json",
+        "sha256": "d9bcd789abed766170ce459a405df7893cd8d4d5bfc658c67ea03b4fb7683ce5"
+      },
+      "expected_steps": [
+        500,
+        1000,
+        1500,
+        2000
+      ],
+      "evaluation_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2023_local/lr3em5_day10_2023.json",
+      "evaluation_status": "complete",
+      "public_gc_loss": 29.563569944412983,
+      "day10_by_completed_step": {
+        "500": {
+          "model_loss": 31.897653313933827,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr3em5/checkpoints/checkpoint_step00000500.pkl",
+            "sha256": "5d009cb534d66bdb2e5b2d8ad94409ac8d12f548a55f49f04136abbd8a659d75"
+          },
+          "loss_reduction": -2.334083369520844,
+          "loss_reduction_pointwise_ci95": [
+            -3.7029268933124193,
+            -1.1460387503514522
+          ],
+          "improvement_pct": -7.8951336861871315,
+          "improvement_pct_pointwise_ci95": [
+            -12.566422710406432,
+            -3.8623764499019604
+          ]
+        },
+        "1000": {
+          "model_loss": 29.284785989855155,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr3em5/checkpoints/checkpoint_step00001000.pkl",
+            "sha256": "2f9a9467e78c624a04200933ab9c878c70abf845661de66ee1317054e3fc38e3"
+          },
+          "loss_reduction": 0.27878395455782723,
+          "loss_reduction_pointwise_ci95": [
+            -0.6094992778340332,
+            0.8929898269840933
+          ],
+          "improvement_pct": 0.9429982748430309,
+          "improvement_pct_pointwise_ci95": [
+            -2.076446732990803,
+            3.0109464713734937
+          ]
+        },
+        "1500": {
+          "model_loss": 29.113723364032683,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr3em5/checkpoints/checkpoint_step00001500.pkl",
+            "sha256": "9ab404e6ba17f9a5c1ae34443055ad63f5c341feb4c28b559420f76c53c90e95"
+          },
+          "loss_reduction": 0.44984658038029934,
+          "loss_reduction_pointwise_ci95": [
+            -0.5895036400341611,
+            1.3031717734258668
+          ],
+          "improvement_pct": 1.5216246929113268,
+          "improvement_pct_pointwise_ci95": [
+            -2.0058518919064814,
+            4.36369877300939
+          ]
+        },
+        "2000": {
+          "model_loss": 29.52627146048624,
+          "checkpoint": {
+            "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr3em5/checkpoints/checkpoint_step00002000.pkl",
+            "sha256": "44d2d7e3c7f73856f54e483e9d5f71c312603d84d92d9920322f7b21e0fdecd0"
+          },
+          "loss_reduction": 0.03729848392674384,
+          "loss_reduction_pointwise_ci95": [
+            -0.8045904245532925,
+            0.6028928674635317
+          ],
+          "improvement_pct": 0.12616366696198889,
+          "improvement_pct_pointwise_ci95": [
+            -2.750006586272928,
+            2.010999645555941
+          ]
+        }
+      },
+      "paired_changes_between_checkpoints": [
+        {
+          "from_step": 500,
+          "to_step": 1000,
+          "loss_reduction": 2.612867324078671,
+          "loss_reduction_pointwise_ci95": [
+            1.3277921117720082,
+            3.7345230649729264
+          ],
+          "improvement_pct": 8.191409249962895,
+          "improvement_pct_pointwise_ci95": [
+            4.282764370018996,
+            11.319795638350191
+          ],
+          "change_in_public_gc_improvement_pp": 8.838131961030165,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            4.480953350482164,
+            12.599162268666477
+          ]
+        },
+        {
+          "from_step": 1000,
+          "to_step": 1500,
+          "loss_reduction": 0.17106262582247211,
+          "loss_reduction_pointwise_ci95": [
+            -0.5599112717831717,
+            0.9991034484300434
+          ],
+          "improvement_pct": 0.5841347991470099,
+          "improvement_pct_pointwise_ci95": [
+            -1.9259297682556897,
+            3.3557806351839066
+          ],
+          "change_in_public_gc_improvement_pp": 0.5786264180682958,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -1.8958853822151414,
+            3.3494229988777406
+          ]
+        },
+        {
+          "from_step": 1500,
+          "to_step": 2000,
+          "loss_reduction": -0.4125480964535555,
+          "loss_reduction_pointwise_ci95": [
+            -1.1278581204961555,
+            0.2539736188826009
+          ],
+          "improvement_pct": -1.4170227946976393,
+          "improvement_pct_pointwise_ci95": [
+            -3.932889145053221,
+            0.8571453441183501
+          ],
+          "change_in_public_gc_improvement_pp": -1.3954610259493379,
+          "change_in_public_gc_improvement_pp_pointwise_ci95": [
+            -3.7980569110919116,
+            0.8641112430785076
+          ]
+        }
+      ],
+      "evaluation_sha256": "f1d37b2b9f7c0bfe39e9fccc91f639b93a00b92589f3e6e2fa096af1bde5ec46"
+    }
+  }
+}

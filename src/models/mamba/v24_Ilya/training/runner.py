@@ -903,7 +903,9 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
             "parameter_overlay": overlay_metadata,
             "residual_target": ("full_physical_truth" if config.model_family == "full_gc"
                                 else "truth_minus_live_frozen_baseline"),
-            "training_target": ("residual_truth" if config.loss_kind == "mse" else "full_physical_truth"),
+            "training_target": ("residual_truth_with_full_field_excess"
+                                if config.loss_kind == "native_mse_amse_excess" else
+                                "residual_truth" if config.loss_kind == "mse" else "full_physical_truth"),
             "loss_mode": config.loss_mode,
             "loss_kind": config.loss_kind,
             "scored_field": (
@@ -911,7 +913,9 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
                 "residual" if config.loss_kind == "mse"
                 else "live_frozen_baseline_plus_residual"
             ),
-            "loss_precision": "predictor" if config.loss_kind == "mse" else "fp32",
+            "loss_precision": ("predictor_grid_plus_fp32_spectral_excess"
+                               if config.loss_kind == "native_mse_amse_excess" else
+                               "predictor" if config.loss_kind == "mse" else "fp32"),
             "memory_contract": memory_metadata,
             "batch_size": config.distributed.global_batch_size,
             "global_batch_size": config.distributed.global_batch_size,
@@ -932,7 +936,8 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
         raise FileNotFoundError(f"Resume run is missing {run_config_path}")
 
     if (completed_step == 0 and invocation.resume is None
-            and config.loss_kind == "gc_mse_amse_excess"
+            and config.loss_kind in ("mse", "gc_mse_amse_excess", "native_mse_amse_excess")
+            and config.distributed.mode == "single"
             and not invocation.baseline_validation_only and invocation.validation_compare is None):
         initial_checkpoint = _save_checkpoint(
             config=config, completed_step=0, residual_params=residual_params,
@@ -1446,6 +1451,9 @@ def run_training(invocation: V24IlyaTrainInvocation, *, validation_callback=None
             "spatial_learning_rate": _learning_rate_value(learning_rate, step - 1) * config.spatial_lr_multiplier,
         }
         record.update({name: np.asarray(value).item() for name, value in objective_diagnostics.items()})
+        if config.loss_kind == "mse":
+            record.update(native_grid_mse=loss_value, weighted_amse_excess=0.,
+                          scalar_total=loss_value, spectral_diagnostics_computed=False)
         acceptance_record = getattr(train_step, "last_acceptance_record", None)
         if acceptance_record is not None:
             _append_jsonl(config.run_dir / "backtracking_trials.jsonl",

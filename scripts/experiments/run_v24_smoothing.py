@@ -117,7 +117,7 @@ def verify(root, *, frozen=True):
     return manifest
 
 
-def run_worker(root, manifest, stage, task):
+def run_worker(root, manifest, stage, task, *, observer_class=None):
     import jax
     from src.analysis.smoothing_observer import SmoothingObserver
     from src.models.graphcast.training.core.model import load_stats
@@ -134,7 +134,8 @@ def run_worker(root, manifest, stage, task):
     identity = {"campaign_hash": manifest["record_hash"], "model_id": manifest["model_id"],
                 "checkpoint_sha256": manifest["checkpoint"]["sha256"],
                 "protocol_hash": shard["manifest"]["sha256"], "source_digest": manifest["source_digest"]}
-    observer = SmoothingObserver(directory / "statistics",
+    observer_type = SmoothingObserver if observer_class is None else observer_class
+    observer = observer_type(directory / "statistics",
         load_stats(Path(manifest["stats_dir"]))["diffs_stddev_by_level"], identity, mode=stage,
         filters=filters, branches=("GC", manifest["model_id"]))
     allowed = {field.name for field in fields(V24IlyaEvalConfig)}

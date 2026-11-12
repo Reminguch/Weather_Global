@@ -1,6 +1,6 @@
 # Research
 
-Updated: 2026-11-09 (America/New_York)
+Updated: 2026-11-12 (America/New_York)
 
 This index starts with the current matched memory-training comparison. Earlier
 experiments remain in the existing records; this is not a historical migration.
@@ -11,11 +11,16 @@ experiments remain in the existing records; this is not a historical migration.
 | r002 | [How does the selected correction compare with higher-resolution GraphCast?](directions/r002-common-grid-forecast-comparison/overview.md) | evaluation | active | Approved ENS-relative Figures 5/9 incorporated (e010); official GC025 checksum verification passed (e011). Figure 2a pilot passed 480 score checks: days 1/2/3/5 within 0.8% of digitized paper, day 10 −4.45% (e012). Full 730-start run active on existing native 2018 data. | Inspect annual array15870083, report15870088 and plot15870456 before claiming paper parity. Archive provenance and native-loss repair remain separate. |
 | r003 | [Fresh residual width comparison](directions/r003-fresh-residual-width/overview.md) | training | closed | Unexecuted proposal superseded: the user clarified that the question is the benefit of larger data. | Follow r004. |
 | r004 | [Does more cached training data improve each residual width?](directions/r004-cached-training-data-scale/overview.md) | data | active | Oct28:20y replacement submitted; verification16392462 passed, prepare16392486 queued; new-arm startup16392467/68 waits on cache. Both7y controls reused; obsolete pending40y chain cancelled. No data-size result. | Inspect new2002–2022 preparation/cache progression, then two20k-open/2k-closed lineages and common2023 evaluation. |
-| r005 | [Can MGDA improve spectral fidelity while preserving exact GC accuracy?](directions/r005-mgda-accuracy-spectral-adjustment/overview.md) | training | active | Nov9 GC/M1 smoothing analysis: raw M1 beats filtered GC on loss and macro power error, but raw GC has the lowest power error. Raw GC/M1/band-GC power errors59.47/67.57/75.70%; M1 and band-GC loss reductions14.38/9.39%. | Integrate the completed reference spectra into the fresh λ-model comparison when its evaluations finish; retain the separate MGDA attempt history. |
+| r005 | [Can MGDA improve spectral fidelity while preserving exact GC accuracy?](directions/r005-mgda-accuracy-spectral-adjustment/overview.md) | training | active | Nov12 e012: user approved GC–Mamba-only restart. Fresh M1-recipe arrays17406861→17406862, history17406863 and finish17406864 submitted; full-GC17049163/64/65 unchanged. Mixed final raw/SWA chain17406897→17406898→17406899 submitted. No new training/evaluation result yet. | Inspect new training and mixed MSE/spectrum completion records. Preserve old checkpoints, diagnostic17404694→17404732 and the separate horizon-training hold. Full GC retains its different training recipe. |
 | r006 | [Do the principal and spectral-adjusted corrections preserve extreme-event skill?](directions/r006-extreme-event-evaluation/overview.md) | evaluation | active | Nov7 handoff inspection: completed report for 122 starts/40 leads is present and its checksum matches the completion record; scientific interpretation remains pending. | Lianghong: review occurrence/intensity scores and paired intervals, then prepare figures and interpretation using the existing outputs. |
 
 Earlier records: [experiment index](../current_experiments.md),
 [2023 memory evaluation](../docs/experiments/v24_2023_stride3_memory_2026-10-04.md).
+
+November 12 cross-cluster handoff: [exact commands and portable code for Lianghong](../docs/experiments/README_LIANGHONG_PORTABLE_RUNS.md)
+cover both the new M1-matched GC–Mamba lambda sweep and four fresh full-GC
+horizons, with raw/SWA MSE, spectra, annual evaluation and smoothing. Existing
+Della jobs remain unchanged; no remote job or new scientific result is claimed.
 
 Prepared 2026-11-09: [full-GC K8/K12/K16/K20 horizons, checkpoint spectra and
 SWA](../docs/experiments/v24_full_gc_ar_horizons_2026-11-09.md). K20 update500

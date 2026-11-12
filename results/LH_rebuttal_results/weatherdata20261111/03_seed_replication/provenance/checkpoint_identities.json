@@ -1,0 +1,163 @@
+{
+  "records": {
+    "s22_carry_swa": {
+      "group": "five_seed_swa",
+      "training_seed": 22,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "swa",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/swa/swa_step00500-02000.pkl",
+      "checkpoint_sha256": "15029014975ecd92ae4f08f7dd872ec8a875f8d9ec09a3eff7935c5788ee7866",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/eval/2023_stride3.json",
+      "evaluation_sha256": "cfe21a40b16b65ba9150966e9e0423a0d00d3b0e2c11f8e1583b231e63450ca2",
+      "forecast_memory_reset_every_step": false
+    },
+    "s22_carry_raw2000": {
+      "group": "fig6_comparison",
+      "training_seed": 22,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "bbfd7f59fb86ecad777e46685b8a39fe7186347aff555026ba20a12662a96623",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_day10_2k_lead_comparison_local/results/s22_carry.json",
+      "evaluation_sha256": "ae6878de5023bd1b71dcd4addb80a7b5d2554d3db51e67641f7d6d41b4d0188d",
+      "forecast_memory_reset_every_step": false
+    },
+    "s23_carry_swa": {
+      "group": "five_seed_swa",
+      "training_seed": 23,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "swa",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s23_carry/swa/swa_step00500-02000.pkl",
+      "checkpoint_sha256": "b5ffa67fcfd2800f496d1b2803034c9dfdc81ea086ada00dc02f193c22490786",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s23_carry/eval/2023_stride3.json",
+      "evaluation_sha256": "8515a1315cd8c96d3c6b01569186ca17655b0ec5a1aceb2a8315cbafdea04976",
+      "forecast_memory_reset_every_step": false
+    },
+    "s23_carry_raw2000": {
+      "group": "fig6_comparison",
+      "training_seed": 23,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s23_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "39abe4668b9774243f37e73eb607649ab51a6834f12fab4977af71383f8bf460",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_day10_2k_lead_comparison_local/results/s23_carry.json",
+      "evaluation_sha256": "26f248ab6ed88680b9e3d59848b90a6d162573ceec8b149b9adda4b45b741755",
+      "forecast_memory_reset_every_step": false
+    },
+    "s24_carry_swa": {
+      "group": "five_seed_swa",
+      "training_seed": 24,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "swa",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry/swa/swa_step00500-02000.pkl",
+      "checkpoint_sha256": "7eafc0cce5af8ac5e04302f5116c2bf76f65abb786c2c6ac8ca975a6d35696ea",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry/eval/2023_stride3.json",
+      "evaluation_sha256": "e81c5ed649ee44f8407cf3392edc5431ff82734e4cfb388802cbc629bbc407d5",
+      "forecast_memory_reset_every_step": false
+    },
+    "s24_carry_raw2000": {
+      "group": "fig6_comparison",
+      "training_seed": 24,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "17bf486bfdf1feba8c39dcdd902e83d5023cc48a4b865e1f496aa2a6e8336fe5",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_day10_2k_lead_comparison_local/results/s24_carry.json",
+      "evaluation_sha256": "16c79031ca0b73b07a280d156d4e6368a919c451647f1ff89fa25ac23f5f3516",
+      "forecast_memory_reset_every_step": false
+    },
+    "s25_carry_swa": {
+      "group": "five_seed_swa",
+      "training_seed": 25,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "swa",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s25_carry/swa/swa_step00500-02000.pkl",
+      "checkpoint_sha256": "a10efd293673745cf39bfbf43a086c87151e5fff66e650961a6dd14393f6349b",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s25_carry/eval/2023_stride3.json",
+      "evaluation_sha256": "e3840bab9ab440ab4f1cb9caef464d3ccf675eda6ee8b0fd252817a17657bc48",
+      "forecast_memory_reset_every_step": false
+    },
+    "s25_carry_raw2000": {
+      "group": "fig6_comparison",
+      "training_seed": 25,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s25_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "c4fbec96abbda1be43c49014d88eb7d76aeed0f30326e33fc6b931eaad8f34fb",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_day10_2k_lead_comparison_local/results/s25_carry.json",
+      "evaluation_sha256": "92d6e15ba53b99459c771a5eb69264db6388a3912e264b32a821be0c18e79b28",
+      "forecast_memory_reset_every_step": false
+    },
+    "s26_carry_swa": {
+      "group": "five_seed_swa",
+      "training_seed": 26,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "swa",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s26_carry/swa/swa_step00500-02000.pkl",
+      "checkpoint_sha256": "c6871cba654ab3dbaba74c56889fd1093152d90919ef7112747466a7d1c5b10b",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s26_carry/eval/2023_stride3.json",
+      "evaluation_sha256": "3ce01c6f9a272b025a579210727a78da2265e369bf9eef9e5be49e6bf1c6ea00",
+      "forecast_memory_reset_every_step": false
+    },
+    "s26_carry_raw2000": {
+      "group": "fig6_comparison",
+      "training_seed": 26,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s26_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "60e010185287b6f19fc267981537b707b838a274fa9866d22a69432fd7456399",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_day10_2k_lead_comparison_local/results/s26_carry.json",
+      "evaluation_sha256": "2826a4d8ccbe137643c8302f33f379ad51655a6d158e49dc3d90aff975e0e004",
+      "forecast_memory_reset_every_step": false
+    },
+    "s22_carry_reset": {
+      "group": "fig6_comparison",
+      "training_seed": 22,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "bbfd7f59fb86ecad777e46685b8a39fe7186347aff555026ba20a12662a96623",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/results/s22_carry_reset.json",
+      "evaluation_sha256": "3f56917aad32764f1cee1c4da8799c2bf3a803d715cc7b4035f76b608c852104",
+      "forecast_memory_reset_every_step": true
+    },
+    "s22_reset_reset": {
+      "group": "fig6_comparison",
+      "training_seed": 22,
+      "main_or_full_updates": 2000,
+      "warmup_updates": 500,
+      "checkpoint_kind": "training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/runs/s22_reset_reset/main/checkpoints/checkpoint_step00002000.pkl",
+      "checkpoint_sha256": "e04fb775dec737e107aa56059bb3f5afb57c7cea976a453e47245d0e74eaa5b1",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/results/s22_reset_reset.json",
+      "evaluation_sha256": "c1f7b48770429a364bd2122f3c1101dcfdb8d81404dd8a3adeda88c983e62d7d",
+      "forecast_memory_reset_every_step": true
+    },
+    "gcft_3e-7_raw2500": {
+      "group": "fig6_comparison",
+      "training_seed": 22,
+      "main_or_full_updates": 2500,
+      "warmup_updates": 0,
+      "checkpoint_kind": "full_graphcast_training",
+      "checkpoint_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00002500.pkl",
+      "checkpoint_sha256": "1a2dd2785fc7aef1e2ad09576a325cb9d24fdd94f90e18627c7437c7a170b52e",
+      "evaluation_original_path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/evaluation.json",
+      "evaluation_sha256": "3fceabd8fb596fa79dc3dcb9e47f05743855ed52ee514216e83fe58e03cae5c6",
+      "forecast_memory_reset_every_step": null
+    }
+  },
+  "initialization_manifest_sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49",
+  "evaluation_zmetadata_sha256": "885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27",
+  "truth_audit_sha256": "f331cf80baf2ee4d4cd5190999d9e96ca11cd0cbd099c51363a1e16a5f196cb4"
+}

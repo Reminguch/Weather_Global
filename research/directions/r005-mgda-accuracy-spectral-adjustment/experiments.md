@@ -1080,3 +1080,451 @@ identify a common2023 comparison, paired uncertainty and filter controls.
 **Next:** revise the draft for M1/2023 and report the training differences; keep
 all valid trajectories and their evaluation regardless of finite metrics. Do
 not submit the current draft while this review hold remains in place.
+
+<a id="e010"></a>
+## e010 — GC/M1 output-smoothing strength tradeoff
+
+Event date: 2026-11-09
+Recorded: 2026-11-09 (America/New_York)
+Execution: submitted; initially pending for priority/dependency
+Outcome: pending
+
+**Question and authorization:** Following the completed GC/M1 smoothing spectra
+(e008), the user asked for a series of different smoothers to explore MSE versus
+spectrum and explicitly authorized implementation/submission. This is distinct
+from e009's full-GC horizon proposal, which remains on hold.
+
+**Fixed design:** Public GC and principal M1, same122 starts in2023,40 leads,
+83 channels. Global Gaussian σ=0,.25,.5,.75,1,1.5,2,3,4,8 degrees; blends
+α=0,.1,…,1 toward independently development-fitted Gaussian and four-band
+profiles. The existing32-start2022 fits are reused unchanged. Shared identity
+gives30 distinct points/model. No training, refitting or selection on2023.
+Show all points and retain the disclosed prior exposure of2023.
+
+**Implementation and evidence:** [protocol](../../../docs/experiments/v24_smoothing_strength_sweep_2026-11-09.md),
+[manifest](../../../artifacts/evaluations/v24_smoothing_sweep_m1_20261109/manifest.json),
+[validation](../../../artifacts/evaluations/v24_smoothing_sweep_m1_20261109/checks/pre_submission_validation.json).
+One forecast pass saves exact native-grid E0/q/Q and spectral moments of actual
+synthesized corrections for11 bases. This avoids incorrectly substituting a
+continuous spherical norm for GC's native-grid loss and supports later α
+refinement without another forecast pass. Filters preserve the discrete mean
+and unrepresented residual and are never fed back into forecasting.
+
+All15 focused tests passed, including direct-field polynomial equivalence,
+original endpoint equivalence, native/spherical norm distinction, pool-before-ratio,
+provenance checks, finite-warning behavior and Slurm dependencies. Both plot
+layouts rendered and were inspected using synthetic data; previews are not
+scientific evidence. Source inherits the parent's forecast implementation plus
+five explicit extensions; digest
+`22d780d97df6119954c3ca1f4349cf107ecdca26892ae271bd71f9f63780f5e9`.
+M1 checkpoint SHA256 is
+`b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0`.
+
+**Submission:** evaluation array17213596 (eight15/16-start shards) and dependent
+report17213597. Initial queue check: all evaluation tasks pending for priority;
+report pending on dependency. Per GPU shard:4CPUs,20GiB host RAM,180min,1×80GB
+GPU, no throttle. Completed parent array17028677 used43–46.5min and≤10.3GiB
+for17/18 starts; new resources allow11 rather than2 corrections and additional
+moments without redundant qualification. Statistics are about41GB uncompressed.
+
+**Interpretation and next action:** No new forecast result yet. Inspect completion
+proofs and report before claiming a tradeoff. Main metric is exact GC rollout
+loss versus mean absolute relative power error, with date powers pooled before
+ratios and equal weighting over channels/positive degrees/leads. Save day10
+degree curves, error-power/correlation summaries and per-start exact losses.
+Initial plots have no confidence intervals. Repeated endpoint/mean drift is
+recorded with reference bounds as warnings, never a finite-metric stop rule.
+
+<a id="e011"></a>
+## e011 — Fast raw-M1 and fresh lambda checkpoint MSE/spectrum pilot
+
+**Date:** 2026-11-10 (America/New_York). **Execution:** running (submitted,
+initially pending). **Outcome:** pending.
+
+User requested M1 without SWA, corresponding existing lambda checkpoints, and
+a fast pilot showing MSE and power spectra. Use the predetermined final M1
+main-stage raw2000 checkpoint (2500 total updates including warm-up) and all ten
+fresh GC–Mamba/full-GC scalar-λ arms at their latest common saved raw1250
+endpoint. Include historical M1 SWA separately. Existing fresh continuation
+jobs remain unchanged; the four-new-horizon training hold remains intact.
+No answer to the optional historical-versus-fresh clarification arrived before
+preparation, so the latest fresh campaign was used as the stated default.
+
+Four starts are the first development32 date in each quarter: Jan2 00Z,
+Apr3 06Z, Jul7 18Z, Oct7 06Z in2022. All models forecast40 six-hour leads with
+cold zero recurrent state/full weather feedback. Save exact GC grid MSE and
+physical T179 truth/forecast/error/cross powers for all83 channels/leads.
+Report MSE curves, T2m/Z500/U850 day5/day10 powers/ratios, and pooled MSE/power
+tradeoffs. This is interim four-date evidence, not annual skill or a search for
+the best checkpoint. GCFT λ0 uses peak LR3e-7 versus1e-5 for positiveλ, so it is
+not a fixed-LR λ-only experiment.
+
+Reused32-start2022 evidence: raw M1 rollout MSE9.167232 versus paired public
+GC10.818541 (15.2637% reduction); SWA9.064574 versus10.835462 (16.3434%). Retain
+the finite repeated-baseline difference as a warning. The new pilot uses one
+common GC denominator and records decreases versus measured baseline spread
+without any acceptance gate. Missing/corrupt inputs, source/checkpoint mismatch
+and nonfinite computation remain errors.
+
+Evidence: [protocol/checkpoint table](../../../docs/experiments/v24_raw_checkpoint_pilot_2026-11-10.md),
+[manifest](../../../artifacts/evaluations/v24_raw_checkpoint_pilot_20261110/manifest.json),
+[submission records](../../../artifacts/evaluations/v24_raw_checkpoint_pilot_20261110/submissions).
+Runtime digest `8203142838c3c60027df2f816a15ab11cb1da0cfb1e57f2e23ec2fe09d1b5324`.
+Twelve focused driver tests passed; synthetic report rendering and provenance
+validation passed. Evaluation array17249273 has12 unthrottled elements,
+1×80GB GPU/4CPUs/16GiB/62min each. Report17249274 is CPU2/8GiB/15min with
+afterok dependency. Measured references17022624/17024230_1 justify memory and
+roughly10–20min/model runtime;62min avoids≤1h gputest routing limits. Queue
+time is unknown. Submission is not scientific completion evidence.
+
+Next: inspect complete records and the report under
+`plots/analyze_models/data/resolution_eval/v24_raw_checkpoint_pilot_20261110/`;
+PNG/PDF figures go in the matching `images/resolution_eval/` directory.
+
+### e011 scope clarification: both lambda sets — 2026-11-10
+
+The delayed clarification explicitly requests **both fresh and historical AMSE
+sets**. The original12-task pilot remains intact. Added eight historical raw
+evaluations on the identical four2022 starts/40leads: September24 λ0.1 and its
+MSE control at2000; September19 λ1/control at2000; October4 spectralλ0,
+λ0.25,λ0.5 and exact-grid MSE control at500. October evaluated endpoints are
+unaveraged, but their training initializer was September MSE SWA. These are
+three histories with an older spectral-interpolation objective, not a single
+controlled lambda sweep or the fresh objective. M1 raw/SWA forecasts are reused
+from original tasks0/1 after validating parent/cohort/checkpoint/source identity.
+
+Historical extension campaign:
+`artifacts/evaluations/v24_legacy_raw_checkpoint_pilot_20261110/`.
+Array17250938 runs indices2–9, oneGPU/4CPU/16GiB/62min each, no throttle.
+Report17250939 waits for that array and17249273_0/1. Runtime inherits all
+computational source from the original frozen pilot, with three orchestration/
+report overlays; digest
+`5c714cfb5e73c34f5c43a32ce93c3cfcff5892a46b070c4810b01e27cb9061c5`.
+15 driver/preparation and6 reused-report tests passed; grouped plots rendered
+and inspected with synthetic input. New four-date scientific results pending.
+
+**Completed cached evidence:** [report](../../../plots/analyze_models/data/resolution_eval/amse_lambda_raw_cached_20261110/report.md)
+and [overview](../../../plots/analyze_models/images/resolution_eval/amse_lambda_raw_cached_20261110/mse_and_power_overview.png)
+reuse all eight raw endpoints on the same eight2023 starts/40leads. Main exact
+MSE and zonal powers use identical forecast samples; development32 losses are
+separate. Sources/checkpoint hashes and coverage verified (97 pinned inputs);
+ten finite reference warnings retained. No new inference for this report.
+
+Within October, spectralλ0→λ0.25→λ0.5 gives exact MSE9.774562→9.888138→10.132798
+and aggregate zonal power mismatch56.8131%→55.0899%→53.3911%. September24
+λ0.1 gives MSE10.060745 versus control9.958371, power55.3268% versus57.2455%.
+September19 λ1 gives MSE12.258391 versus control9.914750/publicGC11.212183,
+but power27.5748% versus control57.2108%/GC49.5065%. Thus power matching
+improves at an accuracy cost within each history. This is descriptive8-date
+evidence without intervals or training-seed variation. Zonal scores pool powers
+across dates, then average absolute relative errors across nine primitive fields,
+modes1–180, leads and30–60°N/S bands; they are not the spherical83-channel score.
+Finite baseline differences/bounds and decreases exceeding observed baseline
+spread are saved as advisory diagnostics. Follow both sets through the new
+matched spherical evaluation before comparing them to raw M1.
+
+### e011 completion inspected — 2026-11-11
+
+**Execution:** completed. **Outcome:** descriptive/inconclusive beyond the
+four-date pilot; removing M1 SWA is unsupported as an improvement here.
+All20 unique evaluations and both reports completed with exit0. Sealed reports
+and all referenced checkpoint/output hashes verified, with4dates/40leads and
+byte-identical M1 reuse. [Full results](../../../docs/experiments/v24_raw_checkpoint_pilot_2026-11-10.md)
+link both tables and spectrum figures. No new jobs or training changes.
+
+Canonical public-GC rollout MSE11.133143. M1 raw2000 gives9.424010
+(15.3518% reduction) and spherical power error75.9431%; SWA gives9.171727
+(17.6178%) and71.8861%. SWA lowers raw M1 MSE2.6770% and power mismatch4.057pp.
+Raw/SWA day10 MSE22.180490/21.857055; day10 power error106.5706%/93.6930%.
+
+Fresh GC–Mamba λ0/.25/.5/.75/1 at1250: MSE10.8511/10.9865/11.0667/11.0064/
+11.0951, spherical power error64.321/63.440/62.843/63.112/64.801%. All have
+higher MSE than M1 but lower aggregate power mismatch. Fresh full-GC λ0
+improves MSE4.6934%; positiveλ worsens MSE9.28–17.35%. λ1 full-GC power
+error58.539% improves over GC61.571% at12.608% worse MSE. Retain the λ0
+peakLR3e-7 versus positiveλ1e-5 caveat; these are interim1250 checkpoints.
+
+Historical Octoberλ0/.25/.5: MSE9.187175/9.260470/9.462377 and power error
+73.5976/72.0097/71.0146%. λ0.25 improves both versus raw M1 (MSE1.7354%
+lower), while M1 SWA is slightly better on both. λ0.5 improves power further
+but has higher MSE. Septemberλ0.1/control: MSE9.580461/9.379569 and power
+76.9957/74.8652%; Septemberλ1/control:10.781693/9.436260 and76.7759/76.2668%.
+Unlike the cached2023 zonal score, the September positiveλ arms do not improve
+the new spherical aggregate. Different dates/domain/channels/operator mean
+the earlier blanket spectral interpretation must remain confined to its
+eight2023-start zonal setting. Plots show scale dependence: M1 attenuates U850
+intermediate/fine scales, while Z500 has excess at the highest degrees.
+
+Observed repeated-GC rollout spread0.0793851 (0.71305% of canonical loss),
+day10 spread0.471028 fresh/0.294249 historical. Raw→SWA MSE decrease0.252283
+exceeds the baseline spread, whereas fresh GC–Mamba λ0.5/λ1 decreases do not.
+These are only baseline-repeat diagnostics, not model repeatability or CIs.
+All finite warnings remain advisory (22 fresh/18 historical); zero excluded
+truth-power bins. Tiny differences such as rawM1 versus Octoberλ0.5 MSE
+(0.03837) are below this observed spread and should not be ranked strongly.
+
+Resource evidence from sacct:20 GPU tasks took14m44s–15m46s each, totaling
+5.0644 GPU-hours; maximum batch RSS8.7528GiB. Reports49/52s. Keep16GiB host
+RAM for this shape;62min allocation avoids documented short-partition routing.
+Scientific next step is broader matched evaluation if requested; this report
+does not authorize new seeds, training or removal of the full-GC horizon hold.
+
+### e011 final2500 raw/SWA follow-up — 2026-11-11
+
+**Execution:** submitted, waiting for training. **Outcome:** pending for the
+fresh models. The user explicitly requested2500 updates and comparison of MSE
+and power spectra both with and without SWA. The1250 points were intermediate
+operational boundaries, not the intended final training budget. All ten fresh
+scalar-lambda runs retain their existing2500 schedules and queued second halves
+(fullGC17049163, GC–Mamba17062358); no training job was replaced or restarted.
+
+[Protocol](../../../docs/experiments/v24_final_checkpoint_comparison_2026-11-11.md)
+and [sealed plan](../../../artifacts/evaluations/v24_final_checkpoint_comparison_20261111/plan.json).
+CPU materialization17353172 waits for both training arrays, validates each
+final2500 completion proof and hashes actual source checkpoints, then builds
+ten equal-weight SWAs at1000/1500/2000/2500 with zero recurrent memory.
+Evaluation17353173_2–21 supplies20 new four-start/40-lead exact-MSE and spherical
+forecast comparisons; report17353174 follows. Principal M1 raw/SWA outputs are
+reused after cohort/checkpoint/source checks, yielding22 model rows plus GC.
+The SWA window matches M1's total-update1000–2500 window; training recipes still
+differ. GCFTλ0 peak3e-7 versus positiveλ1e-5 remains an explicit limitation.
+
+Frozen runtime digest:
+`90ccacb212e0ba60c7e9e428f94cda3480c8086e371c58120a79546a6471df52`.
+The source inherits the completed pilot computation with only preparation,
+wrapper, evaluation orchestration and reporter overlays. Eight focused driver
+tests and15 report/reuse tests passed; three resource test-only submissions
+passed. Existing pilot timing/memory evidence sizes20 new GPU tasks at16GiB,
+4CPUs,62min each (about5GPUh execution total), plus8GiB/30min CPU preparation
+and4GiB/15min reporting. No extra numerical qualification or finite-skill gate.
+Synthetic full-size plots and real reused M1 figures were inspected.
+
+The [completed M1-only report](../../../plots/analyze_models/data/resolution_eval/v24_m1_raw_swa_20261111/report.md)
+reformats the existing evidence without new inference: raw/SWA rollout MSE
+9.424010/9.171727 and spherical power mismatch75.9431%/71.8861%; SWA lowers raw
+MSE2.6770% and mismatch4.0570pp. Day10 MSE reduction versus raw is1.4582% and
+power mismatch reduction12.8777pp. MSE decreases exceed observed baseline
+repeat spread, retained as advisory rather than a full model-noise estimate.
+Both M1 variants still worsen aggregate power matching versus GC61.5708%.
+Finite warnings remain preserved; no annual or training-seed claim is made.
+
+### e011 matched-budget setup audit and comparison — 2026-11-12
+
+**Execution:** setup audit completed; four new forecast evaluations submitted.
+**Outcome:** pending at1000/1250. The user questioned full-GC lambda0 raw1250
+MSE10.610624 versus historical M1 and requested accessible1000/1500 checkpoints.
+M1 main-step counters exclude500 preceding updates. November1500 does not yet
+exist; matched total1000 uses M1 main500 and November step1000. Matched total1250
+uses M1 main750 and November step1250. This is a saved-checkpoint comparison;
+no training schedule was changed or started.
+
+Array17404694_2–5 evaluates M1 total1000/1250 and November GC–Mamba/full-GC
+lambda0 total1000. Report17404732 reuses both completed November1250 forecasts
+and M1 final raw/SWA. All new tasks were pending for priority; the report was
+pending its dependency at submission inspection. The common four2022 starts,
+40leads, cold_full/zero-state protocol, public baseline, exact GC loss and T179
+spectra are inherited from the completed pilot. Computational-source parity
+and serialized checkpoint step/family/config/backbone checks passed.
+
+The audit found no mismatched evaluation dates, metric, state policy or full-GC
+weight loading. Full-GC's fine-tuned tree differs from public GC in256/262 leaves
+and is used independently of the public reference. Training is not identical:
+M1 trains correction parameters with stopped weather gradients and a500+2000
+schedule/reset, whereas November full GC trains all backbone parameters with
+full weather gradients and one2500 schedule. Peak rates differ; M1's original
+normalized residual loss runs inside BF16 casting while November lambda0 uses
+full-field FP32 grid MSE. Mathematical weights match but arithmetic and
+backward paths do not. M1/NovemberGCM preclip median gradient norms0.333/19.948
+also demonstrate a changed optimization regime, not an isolated causal proof.
+All1250 NovemberGCMlambda0 logged spectral contributions are zero.
+
+Existing32-start/40lead raw results at500 total updates are M1 MSE9.819859,
+NovemberGCM10.314396 and fullGC10.337334. Using common publicGC10.844687,
+reductions are9.4500%,4.8899%,4.6784%; original paired reductions remain in
+the saved JSONs. Baseline repeat spread0.0251871 is smaller than both gaps to
+M1, but is not model noise or a confidence interval. Physical dates match,
+although older evaluators used their respective source versions; the new
+comparison fixes this. The budget mismatch alone is not a sufficient account
+of the available evidence; which training change matters remains unisolated.
+
+[Protocol and sources](../../../docs/experiments/v24_matched_budget_comparison_2026-11-12.md).
+Campaign `artifacts/evaluations/v24_matched_budget_comparison_20261112/` has
+manifest hash `2ee6bb4c9e351ea6f03c24e2393bdb76b14079d6d29e1523d99177c9f14aed1f`
+and source digest `04e82e3820ecb955e7ecd5a21fed1b91c58a252a6b443a36ef58c7d03b595d3d`.
+Four focused preparation tests and15 report/reuse tests passed. Four GPU tasks
+use16GiB/62min each, expected about1GPUh total from the completed pilot;
+CPU report uses4GiB/15min. Finite differences remain warnings. The final2500
+raw/SWA dependency chain and separate four-horizon training hold are preserved.
+
+<a id="e012"></a>
+## e012 — Fresh GC–Mamba lambda sweep matched to M1's training recipe
+
+Event date: 2026-11-12 (America/New_York).
+Execution: running (submitted; initially pending in Slurm).
+Outcome: pending.
+
+**Current scope:** after reviewing the proposal, the user authorized restarting
+GC–Mamba only and explicitly preserving full GC/DeepMind. The five-arm new
+campaign and mixed downstream comparison were submitted on November12; no new
+training or evaluation result is available. The original two-family review is
+preserved below and is superseded by the narrower activation entry.
+
+### Original review, before activation
+
+**Question and change:** the user rejects the unintended training-recipe
+differences between M1 and November GC–Mamba lambda0. They request the same LR,
+schedule, loss calculation and other settings for all GC–Mamba lambda arms,
+and the corresponding full-GC recipe with its current learning rates retained.
+They request two allocations of1,250 updates and a report for checking first.
+
+**Proposed setup:** five lambdas per family (0/.25/.5/.75/1), fresh public-GC
+initialization with seed22 and fresh Mamba/zero heads where applicable.
+Historical M1 initial500 uses constant1e-4 after50-update ramp and all LR
+multipliers1; main2000 uses cosine1e-4→1e-5 with50-update ramp and Mamba3×.
+The initial/main boundary transfers parameters only and resets optimizer, RNG,
+cursor and recurrent state. Restore stopped weather-feedback gradients, native
+BF16 MSE, batch4/BPTT24/K20/segment96 and deterministic contiguous segment groups.
+Source and segment-array inspection confirmed all106 historical/current eligible
+segments match; the old November order shuffled these segments by epoch.
+
+Each arm applies its lambda during both stages. Positive lambda adds the existing
+FP32 stable spectral AMSE excess to the native base loss; lambda0 retains M1's
+original native loss path without a spherical transform. Full GC uses its native
+GraphCast BF16 loss and complete forecast, with weather gradients stopped.
+Its initial/main peak remains3e-7 for lambda0 and1e-5 for positive lambda;
+main cosine ends atone-tenth of the peak. The full-GC LR/lambda confound remains
+explicitly preserved by the user's instruction to retain current rates.
+
+**Allocation mapping:** first part initial500 + main750 =1,250 total; second part
+exactly resumes main750 through2000 =another1,250. No reset occurs at the
+allocation boundary, which falls midsegment. Final SWA uses main500/1000/1500/2000,
+the same total1000/1500/2000/2500 positions as historical M1.
+
+**Implementation state:** the [review plan](../../../docs/experiments/v24_m1_matched_lambda_restart_2026-11-12.md)
+and [machine-readable specification](../../../artifacts/plans/v24_m1_matched_lambda_restart_20261112/review_plan.json)
+are prepared, with10 arms/20 stage specifications and pinned reference inputs.
+These are not executable training configurations. Current validation requires
+full weather gradients for scalar excess and full GC. Native-loss-plus-excess,
+full-GC stopped-feedback prediction semantics, step-zero recording and stage
+orchestration need implementation and focused checks before activation.
+Full GC's state-increment target and M1's correction target have matching
+mathematical weights but inherently different BF16 rounding representations.
+
+**Scheduler finding:** current continuation arrays17062358/17049163 have spooled
+phase1 arguments that force old resume1250→2500. Unlike the November7 phase0
+revision, mutable selected-arm mappings cannot redirect them to a fresh start.
+Installed Slurm26.05.5 has no documented user-level spooled-command replacement;
+do not rewrite frozen source to bypass it. The clean proposal replaces these
+arrays and old downstream history/controllers/final raw-SWA plans with new IDs
+and new queue age. Preserve all completed evidence and independent diagnostic
+17404694→17404732. Rebuild final plans rather than merely changing dependencies,
+because old plans pin old configurations, checkpoint paths, proofs and sources.
+
+**Validation and decision:** ten arms, twenty stages, per-arm rates and2,500 total
+updates were checked; pinned active reference inputs remained unchanged. No
+training code, active mapping, job or frozen source was changed. Existing
+384GiB/one80GB-GPU/8CPU/about30h requests provide conservative provisional
+budgets from measured old p90 costs near59–60s/update. Await the requested review,
+then implement/check the declared paths before activation. Finite drift, clipping
+and worsening remain warnings; no new numerical qualification or descent gate.
+
+### 2026-11-12 — User approval narrowed to GC–Mamba; replacement submitted
+
+The user's authorization was: cancel and submit fresh **only GC–Mamba**, keeping
+DeepMind/full GC. Consequently no full-GC configuration, training trajectory,
+source snapshot or queued training/history/finish job was changed.
+
+**Implemented recipe:** GC–Mamba lambda0 uses M1's original native loss path;
+positive lambda adds the existing FP32 stable spectral excess to the same native
+BF16 base loss through the new `native_mse_amse_excess` mode. All five arms use
+M1's stopped weather-feedback gradients, retained memory gradients, historical
+deterministic segment order, batch4/BPTT24/K20/segment96, seed22 and AdamW settings.
+Initial500 uses constant1e-4 after50-update ramp and Mamba multiplier1. Main2000
+uses cosine1e-4→1e-5 with50-update ramp and Mamba multiplier3. The initial/main
+transition transfers parameters only and resets optimizer, RNG, data cursor and
+recurrent state. Lambda applies during both stages. Finite worsening and drift
+remain recorded warnings rather than stopping or acceptance conditions.
+
+**Jobs submitted:** first-part array **17406861_0–4** runs initial500+main750.
+Second-part array **17406862_0–4** depends with `aftercorr:17406861` and exactly
+resumes main750→2000, another1,250 updates and2,500 total. The allocation split
+does not reset any state. Development history array **17406863_0–4** follows
+each completed second part and evaluates total500/1000/1500/2000. Finish
+**17406864** follows the full second-part array and dispatches development
+fitting and annual smoothing using the actual main-step2000 endpoint.
+
+The superseded GC–Mamba chain **17062358/17062359/17062360** and obsolete joint
+final-comparison chain **17353172/17353173/17353174** were cancelled. Full-GC
+**17049163/17049164/17049165** and saved-checkpoint diagnostic
+**17404694→17404732** remain unchanged. All completed old checkpoints,
+evaluations, configurations and frozen sources are preserved.
+The [activation verification](../../../artifacts/plans/v24_m1_matched_lambda_restart_20261112/activation_gcm_only/activation.json)
+at14:18 Eastern confirms all seven new job roots pending with their prescribed
+dependencies, all six obsolete roots cancelled, and the five protected roots
+unchanged.
+
+**Mixed final raw/SWA comparison:** materialization **17406897** depends on
+unchanged full-GC array17049163 and new GC–Mamba array17406862. Evaluation
+**17406898_2–21** and report **17406899** follow. The twenty new evaluations
+cover raw and SWA weights for five arms per family; M1 raw/SWA forecasts are
+reused. All use the same four2022 starts and40 leads, exact GC MSE and spherical
+spectra. GC–Mamba SWA stored steps500/1000/1500/2000 and full-GC steps
+1000/1500/2000/2500 represent the same total-update positions. Source/weight
+identities are checked, and future weights receive hashes only after completion.
+
+The new finish hook retains independently development-fitted smoothing and
+122-start annual evaluation. Its dependency-based annual join uses actual
+submission records from new GC–Mamba and unchanged full GC; it does not wait
+for cancelled old GC–Mamba completion. The combined report uses the completed
+M1 reference, one common public-GC denominator and explicit training-recipe
+limitations. Annual jobs beyond the submitted finish hook have not yet been
+assigned IDs or produced results.
+
+**Provenance:** [new training manifest](../../../artifacts/checkpoints/v24_Ilya/res1_m1_matched_gcm_lambda_20261112/manifest.json),
+record hash `f75dbbdec1e1af4147e822bfe8a639e4775589d1abebdf26fbb1b13b29ce739c`,
+frozen source `a6a1c4e7ae895eb788227924146b3da84e5542bb10b7f5e294ebbe15943abd7f`.
+[Mixed final plan](../../../artifacts/evaluations/v24_mixed_final_comparison_20261112/plan.json),
+record hash `f6d00da5679d73c3285435ba0d71a6dddd800c956b19e00b35a8da1d05ff4f10`,
+frozen evaluator `8a5f9c9a8b02995e333de37a68d626ea5aaf940294b9c8a20ea21e7fa1935150`.
+The evaluator inherits the original pilot's forecast/metric computation;
+training implementation changes do not alter reused reference forecasts.
+
+**Validation and resources:**116 native-loss/reset/resume tests,8 campaign
+tests and18 mixed comparison/SWA/annual-report tests passed. All ten stage
+configs validated. Training requests one80GB GPU,8CPUs,384GiB and30hours per
+part; history uses20GiB/4hours and finish8GiB/30min. Mixed materialization uses
+8GiB/30min, each four-date forecast16GiB/62min, and report4GiB/15min. These
+submissions establish execution plans, not scientific improvement.
+
+**Interpretation and next step:** inspect actual completion records and the
+new MSE/power reports. GC–Mamba now follows M1's recipe; full GC deliberately
+retains full weather gradients, FP32 grid loss, its original data order and
+continuous schedule, with lambda0 peak3e-7 and positive-lambda peak1e-5. The
+mixed comparison therefore does not isolate architecture under identical
+training conditions. The separate four-fresh-horizon full-GC hold remains.
+
+### 2026-11-12 — Portable execution handoff for both studies
+
+The user requested runnable code and a README for Lianghong's cluster and
+explicitly selected both the M1-matched GC–Mamba lambda sweep and the separate
+four-fresh-horizon full-GC study. This is a preparation milestone, not a new
+training result or a remote submission. Existing Della jobs were unchanged.
+
+The [handoff README](../../../docs/experiments/README_LIANGHONG_PORTABLE_RUNS.md)
+provides exact setup, two-part training, raw/SWA comparison, development-only
+selection, annual evaluation and fitted-filter/strength commands. The
+[code archive](../../../artifacts/handoffs/lianghong_weather_20261112/lianghong_weather_20261112_code.tar.gz)
+contains the submitted computation unchanged plus portable adapters. Separate
+public-GC/M1 reference weights and checksums are in the same handoff directory.
+Large prepared arrays and evaluation truth remain external inputs with recorded
+locators/inventories; the README distinguishes historical truth from Lianghong's
+revised truth and records the runtime difference in her earlier package.
+
+All31 packaged CPU tests passed. Real-input preparation validated all five
+GC–Mamba arms, all four fresh full-GC horizons, relocated full-GC sample replay,
+and M1 smoothing with fixed development32/annual122 cohorts. Evidence is in
+`artifacts/handoffs/lianghong_weather_20261112/validation/`. The portable source
+digest is `8b363120bf494948770ecfa90c460391057600401edd4690eed23d3e70d01f1e`.
+No remote installation, GPU run or scientific improvement is claimed. Next:
+Lianghong supplies local data/scheduler paths and returns job records and
+completion artifacts; keep this execution distinct from the active Della runs.

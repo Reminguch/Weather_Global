@@ -1,0 +1,186 @@
+{
+  "architecture": {
+    "baseline_msg_steps": 16,
+    "mesh_size": 5,
+    "residual_initialization": "baseline_overlay",
+    "residual_msg_steps": 2,
+    "residual_width": null,
+    "resolution": 1.0,
+    "temporal_bc_groups": 1,
+    "temporal_bias": false,
+    "temporal_conv_bias": true,
+    "temporal_d_conv": 4,
+    "temporal_d_inner": 16,
+    "temporal_d_state": 16,
+    "temporal_dropout": 0.0,
+    "temporal_dt_init": "random",
+    "temporal_dt_init_floor": 0.0001,
+    "temporal_dt_max": 0.1,
+    "temporal_dt_min": 0.001,
+    "temporal_dt_rank": "auto",
+    "temporal_dt_scale": 1.0,
+    "temporal_init_scheme": "mamba1",
+    "temporal_layers": 2,
+    "temporal_location": "mesh_processor_interleaved",
+    "temporal_stateful": true,
+    "temporal_zero_init_out": true,
+    "width": 512
+  },
+  "architecture_id": "v24_Ilya",
+  "config_source": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s24_carry_main.json",
+  "data": {
+    "allow_incomplete_prepared_store": false,
+    "anchor_manifest_root": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/anchor_manifests/v24_Ilya_res1",
+    "baseline_checkpoint": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "input_duration": "12h",
+    "prepared_root": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream/res1",
+    "stats_dir": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats",
+    "target_steps": 1,
+    "time_end": null,
+    "time_start": null
+  },
+  "derived": {
+    "anchor_manifest_fingerprint": "e8d9187e1dfd849fbb7a9e990c16eb0b1bd8a69a2061e6319c7258fd275a2696",
+    "anchors_per_update": 96,
+    "baseline_checkpoint_fingerprint": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29",
+    "baseline_parameters_frozen": 35979347,
+    "batch_size": 4,
+    "chunks_per_segment": 4,
+    "dropped_replica_segments": 2,
+    "global_batch_size": 4,
+    "input_steps": 2,
+    "loss_kind": "mse",
+    "loss_mode": "all_steps",
+    "loss_precision": "predictor",
+    "mamba_parameters": 110016,
+    "memory_contract": {
+      "bptt_backend": "explicit_reverse_vjp",
+      "frozen_baseline_target_bytes": 0,
+      "graphcast_backward_calls": 0,
+      "observed_device_profile": {
+        "devices": [
+          {
+            "bytes_in_use": 1077136640,
+            "bytes_limit": 112590962688,
+            "bytes_reserved": 0,
+            "device": "cuda:0",
+            "largest_alloc_size": 21485225728,
+            "largest_free_block_bytes": 0,
+            "num_allocs": 35564,
+            "peak_bytes_in_use": 23625040128,
+            "peak_bytes_reserved": 0,
+            "peak_pool_bytes": 51554287616,
+            "platform": "gpu",
+            "pool_bytes": 51554287616
+          }
+        ],
+        "max_peak_bytes_in_use": 23625040128,
+        "reference_peak_limit_bytes": 28991029248,
+        "within_reference_peak_limit": true
+      },
+      "selective_data": {
+        "bytes_loaded": 2542096288,
+        "forcing_steps": 96,
+        "teacher_input_windows": 16,
+        "truth_target_steps": 96,
+        "unique_teacher_frames": 20
+      },
+      "state_tape_boundaries": 24,
+      "state_tape_bytes": 4782440448,
+      "static_input_bytes": 2085120,
+      "teacher_input_windows": 4,
+      "truth_target_bytes": 2076779520,
+      "truth_target_logical_bytes": 2076779520,
+      "truth_target_retained_copies": 1,
+      "truth_target_staging_bytes": 86532480,
+      "truth_target_staging_frames": 1,
+      "truth_target_storage": "reuse_owned_fp32_truth_buffer",
+      "truth_targets_loaded": 24,
+      "unique_weather_tape_frames": 25,
+      "weather_tape_bytes": 2189664800,
+      "weather_tape_precision": "fp32"
+    },
+    "parameter_overlay": {
+      "baseline_copied": 262,
+      "baseline_fresh": 0,
+      "baseline_ignored_source": [],
+      "baseline_ignored_source_count": 0,
+      "init_from": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry/warmup/checkpoints/checkpoint_step00000500.pkl",
+      "init_from_sha256": "99e641fc6fb23641a03b6c9b27baed21995aca6b2a7105d6e83bbf387bbf2737",
+      "init_state_policy": "zero",
+      "residual_copied": 94,
+      "residual_fresh": 46,
+      "residual_initialization": "baseline_overlay",
+      "zero_state_on_init": true
+    },
+    "per_device_batch_size": 4,
+    "prepared_store_selection": {
+      "allow_incomplete": false,
+      "build_manifest": null,
+      "completed_months": {},
+      "selected_time_steps": 11688,
+      "source_incomplete": false,
+      "time_end": "2022-12-31T18:00:00.000000000",
+      "time_start": "2015-01-01T00:00:00.000000000"
+    },
+    "replica_group_count": null,
+    "residual_parameters": 10348879,
+    "residual_target": "truth_minus_live_frozen_baseline",
+    "scored_field": "residual",
+    "segments": 106,
+    "spatial_parameters": 10238863,
+    "startup_seconds": 42.30301524698734,
+    "train_anchors": 10226,
+    "validation_anchors": 1458,
+    "validation_complete_segments": 15,
+    "validation_fixed_subset": null
+  },
+  "distributed": {
+    "drop_incomplete_replica_group": true,
+    "mode": "single",
+    "num_devices": 1,
+    "per_device_batch_size": 4
+  },
+  "memory": {
+    "bptt_backend": "explicit_reverse_vjp",
+    "weather_tape_precision": "fp32"
+  },
+  "objective": {
+    "loss_mode": "all_steps"
+  },
+  "optimizer": {
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "checkpoint_every": 500,
+    "end_learning_rate": 1e-05,
+    "grad_clip": 1.0,
+    "learning_rate": 0.0001,
+    "learning_rate_schedule": "cosine",
+    "mamba_lr_multiplier": 3.0,
+    "max_steps": 2000,
+    "precision": "bf16",
+    "seed": 24,
+    "spatial_lr_multiplier": 1.0,
+    "warmup_steps": 50,
+    "weight_decay": 0.0001,
+    "weight_decay_policy": "all"
+  },
+  "output": {
+    "output_root": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry",
+    "run_name": "main"
+  },
+  "schema_version": 1,
+  "sequence": {
+    "ar_tail_k": 20,
+    "bptt_steps": 24,
+    "feedback_mode": "closed_loop_sg",
+    "segment_steps": 96,
+    "temporal_state_policy": "carry"
+  },
+  "validation": {
+    "enabled": false,
+    "every_steps": 2000,
+    "final_num_segments": null,
+    "num_segments": 16
+  }
+}

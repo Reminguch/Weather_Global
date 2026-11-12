@@ -1,0 +1,3697 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-11-09T04:46:40.795661+00:00",
+  "source": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/arco_res1_levels13_2023_eval.zarr",
+  "script_sha256": "08ebdf101f032e421178a9dced2a8ccb847802320a87431df6f07d25a8ad44a2",
+  "method": "point subsample NCAR to native coordinates",
+  "source_stage_report_sha256": "6b7fe944a6d13417a4cebc2e34f6c1ab21fc63c144981a578076432196f1db9b",
+  "source_zmetadata_sha256": "5f4596d8b36866117fd02e2d0bdfb3cb0391acc33727bb209372ce324ce0dfd1",
+  "cohort": {
+    "starts": 122,
+    "leads": 40,
+    "overlapping_input_frames": 0,
+    "suspect_loss_cells": [
+      {
+        "start": "2023-11-03T00:00:00Z",
+        "lead_hours": 174
+      },
+      {
+        "start": "2023-11-03T00:00:00Z",
+        "lead_hours": 180
+      },
+      {
+        "start": "2023-11-03T00:00:00Z",
+        "lead_hours": 186
+      },
+      {
+        "start": "2023-11-06T00:00:00Z",
+        "lead_hours": 102
+      },
+      {
+        "start": "2023-11-06T00:00:00Z",
+        "lead_hours": 108
+      },
+      {
+        "start": "2023-11-06T00:00:00Z",
+        "lead_hours": 114
+      },
+      {
+        "start": "2023-11-09T00:00:00Z",
+        "lead_hours": 30
+      },
+      {
+        "start": "2023-11-09T00:00:00Z",
+        "lead_hours": 36
+      },
+      {
+        "start": "2023-11-09T00:00:00Z",
+        "lead_hours": 42
+      }
+    ]
+  },
+  "source_timestamp_sha256": {
+    "2023-11-10T00:00:00Z": "8a7c4e3cfa959dc3b8a8829b216e0277dbd43cc726446332a69697d7b2171b1a",
+    "2023-11-10T06:00:00Z": "da459e8b9441a109b80a490fc8860d0223bea21affe5627ddc7826006911f829",
+    "2023-11-10T12:00:00Z": "84822deaf2ef5fce7c81dd649582c300e57d73f689dbbbcf1aacdbcfd2334955",
+    "2023-11-10T18:00:00Z": "4697e1f90f5b19524a53c2e3b4fec42c6c99771621c247f3c0aed46db511d52c"
+  },
+  "repeat_signatures": [
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "identical_valid_times": [
+        "2023-11-10T12:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T18:00:00Z"
+      ]
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "identical_valid_times": [
+        "2023-11-10T06:00:00Z",
+        "2023-11-10T12:00:00Z"
+      ]
+    }
+  ],
+  "ncar_coordinates_sha256": "52c065af443e581bb5b273fff8599eecb97235febfa77e112c9e7f4999728f4a",
+  "ncar_sources": [
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T000000Z_geopotential.npy",
+      "sha256": "37731147bf503b9b431dd66956a9a9d81e21756c0b68ff9bbeb74589e08ffa39",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_129_z.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "PsjhhoRFjSKod85yf36KZvX3p3KETTKqZcLs4y+hLO1Yy6BPS1UDTQFa3J+xyPzqPcl4iTAo6FM=",
+        "x-amz-request-id": "YVVNC32GC3CD13TZ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:46:43 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:38:42 GMT",
+        "ETag": "\"b88a0a3e5a79ded0fcc80298eb28311a-127\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1061042202",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "geopotential",
+      "valid_time": "2023-11-10T00:00:00Z",
+      "array_sha256": "25c10efa5eda039f771c08acfbd710038ec9b5994802098a8a92781382b02026",
+      "level_sha256": {
+        "1": "133e5145e90765812f0ed9a732273f4b38a9f8ef5befbfe40bee1359fc1388a9",
+        "2": "da42a25a1f36b3af5aeeebe9a6d470899648a166157634081275fb8092f29a2b",
+        "3": "f213e0cada0825956f6b68a5cd90bf51f54e1cca1085dbad7200f541f0135871",
+        "5": "1a92cd37ec475a39555ce6bba7fb8f20dfac8d0b0d008f6111d5b05c9b586130",
+        "7": "82c62a3610e08db1cfec1eb62d384f9863bb48bea1017ea9a57bd74d15c77210",
+        "10": "959972b2fa24af09f90f580786cd319113cbfe36bf3f11e3b8a97b14035caebf",
+        "20": "618a1b23fe62e41dcdf993ae98fd58ed48ffd3dd962472584f0b1dab72b0bcc1",
+        "30": "6b4b870d56e0b5f258462a24b625386b8b8fffdd463e342c63c9952f199eea8b",
+        "50": "023e7fd3ae60384600ca57b212b4f48cb33b81b5d27aeac07e9e6ae263bc9a5a",
+        "70": "06d20f034d6469c58bb88ecb84a35fa12553ecfb550fac70a710eb4f13347169",
+        "100": "0c388fdb58aaf5c024020b5f65b37e99f978a9e2c4beba5694e1b2f80b76922d",
+        "125": "66392198a64c1c79ba6fc9de4451e69381413b8a3519e0ff69d4f80a382343ef",
+        "150": "a6f2301a7f191e3148c65ee198c8f74b7adf7eada785ccab89128e55cd2330c6",
+        "175": "6ce72741bd273754148437f5f8a730c8f6cdcf7ce5a0d731dbbebecea90ead8f",
+        "200": "3cecf0dcf229c0a5c8926ab20c733bed22c30e203de5ed8db48d780f9e658614",
+        "225": "96eb3560ba3b4723319baaef2b060314e1070a0134b1f82528b71bdb774b5364",
+        "250": "490b213beac3d06bc76bf8e71a5ca2eb72bb50f0f780fbacf2d11a62c159270c",
+        "300": "d4d96fce4eff57beab3731aa4ef7b2065e684577689b9f50fd9678a0338d0ce8",
+        "350": "1b74771eb89979a67e445470e83b4a5dfc62e7cd02b0de6f726c445475c97681",
+        "400": "efb73b0f72dc1571c76336f4a27319f206af27a26e0a509ff8c4fc525270b92d",
+        "450": "2cfb6c6bfd6b03a167ca75975a38e0f7e05bfddb54ea6fdd429e4066f6885692",
+        "500": "c3286302500cece05b3c45ffe59b32c0d37b221913b602c7e803b1d975f03f29",
+        "550": "33e7329fa75e99120b1ddb3d543b5b24e53554582c456f682dd7c3940e97fb9e",
+        "600": "625d328eb3160e689baa4c3f23610db6b2ace4c0bab3eba60e8718687b23c9fd",
+        "650": "3b18d5e44bfed039a63dfbd80fc31b175673ac32be749207b1f12b857d8bdbe5",
+        "700": "42724a7f5a3b75ff53d0491d1ece99b98c6653cf36788005b46fbe74a30f9687",
+        "750": "609531c162f5884fe47df12eb7fdea84fd8332a6134ac977f955a5a67729e891",
+        "775": "42a3e60441825781150767fdba8efad49d2a7b4829a565049a587e3de3541f73",
+        "800": "16f13e2a48ad8dc23873389cc88c883edefc702394b0afb6ac846a79db19b08d",
+        "825": "b843cb3cb77381892cd51f4e50c30cd69e800aab21bfa0728da35e65c4c81503",
+        "850": "903bcad1ef8d02e64a8cd154c2eaaf5d32a037a75f0c4fdaffcc0b935ad953fc",
+        "875": "907336b2e586c15367654c8e075df9e4a430b394a7d19cea91d379a735e4d97a",
+        "900": "e214cb613c2f8b916acab90b81d42b55be07430423e6a06656843ca6e8f33837",
+        "925": "67efd1ae6ab42ead025a16f7d3b3e3b438fbcf6a65284624bccad84cbb1fe12c",
+        "950": "cdbff606188a834d861b5b1b423a4152275edd75748e38ec1acc9f6404d316b8",
+        "975": "66e69b47372c765706273cfdbdcc89c6b4d5aeaf68d30ae10349b8b0528ebfe2",
+        "1000": "5d0043dfd09d0e61961d71092b2fcb711dc937f60669dfbb09cbc46b5f845e91"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "m**2 s**-2",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T000000Z_geopotential.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T060000Z_geopotential.npy",
+      "sha256": "794ad10de1ff386072e30a3d607479010d9636b8b5443f18d73b9fe3158f31b3",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_129_z.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "PsjhhoRFjSKod85yf36KZvX3p3KETTKqZcLs4y+hLO1Yy6BPS1UDTQFa3J+xyPzqPcl4iTAo6FM=",
+        "x-amz-request-id": "YVVNC32GC3CD13TZ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:46:43 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:38:42 GMT",
+        "ETag": "\"b88a0a3e5a79ded0fcc80298eb28311a-127\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1061042202",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "geopotential",
+      "valid_time": "2023-11-10T06:00:00Z",
+      "array_sha256": "f494da49281fac358fc769b1d0b6a5e3efcb48c6377bcd3a79e8bb80638467c6",
+      "level_sha256": {
+        "1": "e9b01160cf569de3681b8b3ceffca7aa379506b2aa2a8a3c9e610d8df74bf8a6",
+        "2": "f3aef4db1113ca3aa63b8ca2d482f4595681da38e529c6f48e4a491b7e0c4e21",
+        "3": "160587bcf7edf887932eb95b70fba100c025a6284717eb95f6e8113e56413903",
+        "5": "d4aced9904291df979f89f936299088e182cb0c1ad0e8bc94b61f48e785c83ce",
+        "7": "484d810d2f4eda64b6bb9614a977b4f2d1985b2cb91049a252ee1af4852978c4",
+        "10": "1a04bc9c3e7c988b7629b0c8308d816a9fc4d49e886db78dafe631978f4268ca",
+        "20": "62f9424166db70584a977a49bdb4ca959678c7d43e44d81a34b41f8427bab348",
+        "30": "030b180ad6a37fc59746ce22cc8e6000e10430f0f765f93d0778d528b1c11ee7",
+        "50": "0d15505a55f808dcf2d365518a89d0de9781f601fa702458ca8fb5ccb1cd0360",
+        "70": "a66903e78dd489184742f3f8708fd6aaade2e04bcc7ec6bf77acd866fb22c737",
+        "100": "b06e0d8c040e9312324e3e30dc1d806a79d3397218e3aa1e81fc7f2bf91096e4",
+        "125": "0c79d8db22344c7e921aeedd88e82e0c465744f44eac806ceb324b0bc00b0047",
+        "150": "875bf6a476eafbdde40f78fc80381ae55654e5d0b323abd3cf8ecc2781ed77c9",
+        "175": "a4847312704bb38f1b2b022c61b2f456666097426192cfb36f3bb3db1551acfa",
+        "200": "235a43ff767bee37f54405c5a027e814b7721d2c8b90d9ee23d3359f3a6f3973",
+        "225": "cce3ac45e0b5775d5b0b03ab8bcd10a38315cb10c7e5cb2d02fc2565f5fd8a56",
+        "250": "916203faded0e658e318004a7651934a1770df401c9794d9a7a7c6c725483f90",
+        "300": "1f0441c56f3e6bb5dc160cbbadd6919b5d0a7c3152b37b4ba77d1780010d2c3d",
+        "350": "df87572da762954eece3a716ebaa4db0889ea6a849d89a45a355ef9d79eda9cd",
+        "400": "5ec2d60b220611f678de87b985f2d9ba8bd93dec2129847c03af9f5a1f1b484a",
+        "450": "d12f841c2275df47aeace4289e100911f060acd364fde38ece881a470c7102e4",
+        "500": "b1808784c86c1170622ec450b736e06ffdaa93d874e95299ad22f332103fa352",
+        "550": "7b4e0b9bba4857f67fcd04f319ec11a5780b4c1ccfc7a8035e0329ef7c30ca45",
+        "600": "09ae3c56cac5782a8b2caab7e46be5b9a132090ccafbbde2459a8c865c9f452c",
+        "650": "1642501fdf62dc9cb1b3339220294d07e627d10d8b8f05f60ebfbeaa6d1fd48e",
+        "700": "c236a509e7fab60764cf2be55c243562d15021db51ffdd6518524145c70bd65b",
+        "750": "3f7300e1d0bd6229f88304beadd3e2902a860542a8bf33f8b0cabddf07f31143",
+        "775": "4e0d2cccff891d9b86bc3216e4082acba80cd4a3cf82dc2c24ad7234e7c7c571",
+        "800": "e77aba12875c155c25a230c64685abad0161e133823a8668c0be3c13f9c9b540",
+        "825": "cfc2688a4a1be831a5c46cea28598618c8910f3d60fa7e90931301d001fabbac",
+        "850": "bbab833739a2111bf9bf1d32c27e181ffd234b5fba4c236a112a0d1a51bf977f",
+        "875": "78933c76ad576a8f5d9a0d91da8f3c8ab6d028c8eeef074a57804959ae6ccc3a",
+        "900": "73f78cdc8d69109f1ade91ddfc2f6b91de8dc94e74be03d4f4ddcdb42ced8e4d",
+        "925": "e290050a1d710a4d75c5da50b050a957202846ac01d79b82c94d9340c5ec10e1",
+        "950": "34218835ea1d464d020b6e86ff446c08d1f6c47aab198879c56b08ec58993a8b",
+        "975": "21fb1e14e7e4f87dd2ffc0ead0e3539c51855c265d5f22c1587c4682db36dde9",
+        "1000": "f0ec12c6fff053aebe16c816a2e004da7b99382feaa866e4582be5bf27b2ec77"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "m**2 s**-2",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T060000Z_geopotential.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T120000Z_geopotential.npy",
+      "sha256": "1481fc9497e3f40c826a0265da62f3228f1a9dfa300b5fec8899dd8a5a36b400",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_129_z.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "PsjhhoRFjSKod85yf36KZvX3p3KETTKqZcLs4y+hLO1Yy6BPS1UDTQFa3J+xyPzqPcl4iTAo6FM=",
+        "x-amz-request-id": "YVVNC32GC3CD13TZ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:46:43 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:38:42 GMT",
+        "ETag": "\"b88a0a3e5a79ded0fcc80298eb28311a-127\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1061042202",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "geopotential",
+      "valid_time": "2023-11-10T12:00:00Z",
+      "array_sha256": "f0a135fa0857565e2a48d79ff52937c167c8a941bee876aee3828d3c91419d24",
+      "level_sha256": {
+        "1": "94c2d404969ab561b871146f4bc2252bb7938e7a57e35468879349ac0267b8b0",
+        "2": "0109a7bee5950e5c54f130c42402d32459104ea6aea0f90d59a89f9e3837172a",
+        "3": "379e20b602e0638c7cb3abfbe9c0293d62d998f727f5650dc409f623aa772e26",
+        "5": "311de6c1ded3bc336023bfe4bbb87852f3ad5e6004d1bd03a3a63df7339b3534",
+        "7": "dd9634d1f7570956728c2ae4ba2fa6c554a2f65c9692a22f4310dc00b125b4e8",
+        "10": "8845163119a1d90df302d77e01ef2ed8fccaae96783f60091c94b492fb7d1239",
+        "20": "82895c0861c13b05694b2c507d25943cc2f27daea6c3d69a46777115dc1ce6af",
+        "30": "50ce1dc48e75a6d1bc6ef09bbab77cf2039e472b51ff09a305790436f8a5f156",
+        "50": "71bee2701fd43f3386a6be950dfae3adf5476d6c31883c9ab91e3e6aa2442897",
+        "70": "181d19d2e229359e846c0b183d7e967aac09db04fa124469cd8f4e3a75247f57",
+        "100": "f9db22ec20956f64a39ca8184284c00b8d3cadb4ba391db61cefb22d379ec275",
+        "125": "7776d0c72579eb61a022c0f8939287ff705e6cde4a79d7d00a67fa33378d9f74",
+        "150": "1bc1dc0dab71d717016037a4fe6a441e5e1013cbfdf462b6b5972e79c8f8f97f",
+        "175": "50f1a6edd6a8336393834dda43db52ddc83c51a6fce39d5522a56287f91c3cb7",
+        "200": "72c8205995d9bb5314fcc6e5a495d91aea4dd31d237f0d5243d80b18050c7a4a",
+        "225": "ad2386ce9e0fdce114bf9420f77f95803d614c2f24ba6b4689ef2ca6e35db9ac",
+        "250": "a2032b25f4717cdf35f681f215d0e230abf20f905fb66401df0b397c34fe5471",
+        "300": "5edf79b9cc1703636b14acdf2e22ef77dfe6bd8b2697c0995c956e19c852edff",
+        "350": "abb6893c7c1122439573f8bd022ad40af975a2b93dad31ad067452e9fef14704",
+        "400": "fedc6076949043044e791e5b9102f3ec9616db82686f57b44b909a775f24a278",
+        "450": "a3b0d0a1a8239fb2a194927902246f61167d9d4e185580465156918fcee750c5",
+        "500": "330abf39fb1c6e7742290ee06d3069a53b93aba2537e85c5a01b89f25109428f",
+        "550": "ebaa879751abacd35cdb87998c42f49d74fef5c773e7763d2f243da7023460f3",
+        "600": "8af3987319fabdb40463d412a90fcd81fefa799bf68e7017f2dc77bae8661ecb",
+        "650": "3be584690d981469c9471f55e97c7378410035ca4f95671df90d9f180e24325b",
+        "700": "7f08ff862d198f9411a44b0d38f6078ce38e8c806e6bca810b3f35aa1151d799",
+        "750": "a4fa2cb419ad72aa63859d7d668e89da920177ef41e0be2e6931505ee7ca93c3",
+        "775": "4da6ea6895781874477fb9fb018744c5d7963867d9d50b153a4a3f7b95422674",
+        "800": "c669709f256971dfc6be22c720468b00828c3d2d7a40568aea5318bca1086c7d",
+        "825": "e9510610ebf7d18e319a8bcf77ced169fe1fd0184afbf214427e25aef85aaeef",
+        "850": "379ab33780baac266eca37e0a05c7aa937cae8f00d012f946d6ccfe61123c5dd",
+        "875": "b6bfa6ef19595f9d026f75d50ada45c25c21f9545dcb5f92ce74dbca495dba73",
+        "900": "921a12d2ee28578d33b539b954860098b9fb430cf171f83e779dc072bcadef4e",
+        "925": "5a959ce284ac8c357e4a976d9dcca94256eed90e921f24678d231cd40e047e0f",
+        "950": "1f2339dd63d67d673908530c1ed93a1d899bb3f34fbac5d81c34f1dd935cfffb",
+        "975": "909bd15159ee4248d74d79cabf6b5fbc934db553ceee1394455efa1e9dd31b29",
+        "1000": "7bbd45a7ed3f86f3df466e485f7bc1b3aeb354776058e696f560072098aab946"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "m**2 s**-2",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T120000Z_geopotential.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T180000Z_geopotential.npy",
+      "sha256": "f68483051296f73fd2783a899f67234503a915e470ece2bb815c016e9c887c0a",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_129_z.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "PsjhhoRFjSKod85yf36KZvX3p3KETTKqZcLs4y+hLO1Yy6BPS1UDTQFa3J+xyPzqPcl4iTAo6FM=",
+        "x-amz-request-id": "YVVNC32GC3CD13TZ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:46:43 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:38:42 GMT",
+        "ETag": "\"b88a0a3e5a79ded0fcc80298eb28311a-127\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1061042202",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "geopotential",
+      "valid_time": "2023-11-10T18:00:00Z",
+      "array_sha256": "ce56487eb03c27540e640f1ffd173f4d34267a67b82531855d699c4bd7a645b2",
+      "level_sha256": {
+        "1": "02ca393a9415bb37ec46286cbe3799b42c030083ab43d83aee7af0cb74283a0f",
+        "2": "c1e23be29ed72179e5ea4b265966d001b45963a0e3cb8b0afb860244da8e37bc",
+        "3": "f46132656fb4bba04e5cdfc363e1fe4c1ae9d352ae5490bab80a0cd3fcec4ee2",
+        "5": "40facf642a5391462a6f67d60d56f81eeeccb14b2a47a47d968b023d4713f22e",
+        "7": "50c39da069a112bd2b24e7b84ed00407bce67e8b6038eb60dc629b1494c836dd",
+        "10": "974b1da848d2b15efd2e37e41089edb897a2914051f85ce43527918b3f23a765",
+        "20": "8f2b1d1c692781f7ed3c9b0729f11adfda0820c76076e1942bddcdc703a7421e",
+        "30": "a4fb6ee702b6b82be8c8bedff08cb00ec3ddb476323e88f58d0b89b89641e782",
+        "50": "d219d03bc40fe11ec13777ac68c6d4b95498f02a5a1dc152fb7f9a7f11377e5b",
+        "70": "890883d5a8c540d8852460fc36b452c770775ffebffbe4c9932c6cf12bd37d9e",
+        "100": "12a966de0f90a28e41f0c3a03a06245e89c621deee8a92c3fbc5d6bd63c3e2cd",
+        "125": "d55a2e7f6ab4158fea6ebce63d3c848dc801934ba205c59971c1bb1fcb862e11",
+        "150": "da1743e7eb9448c4a82e4fb225edeeee7136f445b35f9b3c3e3e0fed925e1bec",
+        "175": "714fd04eda0dbe62f39c0c355ba9878256f575100561c6fbf9b350bb7de66d62",
+        "200": "18adfe749cc2dec4a3f24b8ae75fe5f9612da10dd08773c09bfd2801fdfe72dc",
+        "225": "fb8aa660d2ddd5a7501f9412853c6adfbedfd71cf119a5ae6ac4e11567f8f3f1",
+        "250": "40f03e4697315fb2a89f0ef0b383dd571763c8a44228885a2b7e46c3e4addf4d",
+        "300": "1d9b9b04411079b1589c80ab7d11ab5735dc5f737bc276d4b7e4e88cb24cea41",
+        "350": "70b67f2479961eac8e7dc38ab2a546529cff76406a4b272d37a0a498bd026a37",
+        "400": "392f51e2fffe10946b8fc419a3ed10acb7e2ed4427ce0860cfbc5b78a315ab7f",
+        "450": "f8496221500da68388209cecd5f272d1477ff283186c42ffa79c50d74f7f5da9",
+        "500": "04439cd7267908729ce94399141396ea7f6b010cad3627d2e2dc575f7f587417",
+        "550": "2c6e67858289355a3a918224236b2ff59906c0e9db10f0f458a50d3c51d94977",
+        "600": "3567771c238d84634fc4f917e57bf9bd80afb5f9fbabf3188ceba3d644cc49d1",
+        "650": "f6a398a3987e3580d1e1ead28d1b82931beac8659d32c1a69d7f51eb3f403232",
+        "700": "5e71c98b7b34eb9b16b26d4e3cb089a614154daf32970331f107bf907d93c08b",
+        "750": "873bdc9a05867985f015e368b5dcde8a2c898141dff8a38211601c0ab06882d2",
+        "775": "3222bd94d43ed5efb1f0efc9083ff62da495270dd4977437d1bb5c6b09662e99",
+        "800": "b39af2fb6f446cc3c226b123d69339de43d1f83cd3646a7145b4e06a96b90192",
+        "825": "0f5120ce24f119c6d9f494a7d8798191e723033785f3eb4e3935972f90254d27",
+        "850": "48d8c0ee26838dfe5dc1ba560d0479a38c22b76baf0508ccada37f99e296afc9",
+        "875": "464244427cd2b8e8093321cf4da5cb368a0624a60249fb3c339d0eec45827b73",
+        "900": "f9acfd3c6b97ed02b6eb2a6b8ee2483cbadb2f93a739b39957ff38ad41bb5619",
+        "925": "55a29cdc406bee20c3d9b8976b162a4db662d0b0116152c9980ddda95eab730f",
+        "950": "123eee0b5db04aa922f27997d4814587ede512a372aef1db8efebb5fb3a5a7c5",
+        "975": "fefe735af67a93b7a12c53c7da85b03705dc458bfce1848a38dd6608a7822a28",
+        "1000": "5906836816ea03cd5a94a1cda65367852a2f92fa1eb706d87df93a3c2800efbf"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "m**2 s**-2",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T180000Z_geopotential.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T000000Z_temperature.npy",
+      "sha256": "1fc723fa320ef85fe1e66ba10d5aa572a35216c74ade73f3e7016a674ce3b6de",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_130_t.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "ud11UO3gtoWhDJq0+vBETjYqKmVQtZ35v5LfqV+Qsosq2GiXGIvEBKv7Fnxgtk/IiHIsFVd1Gf48ILr4d6aaU4uhsJapAK4h",
+        "x-amz-request-id": "13HPHR15A1TQ1KCJ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:06 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:41:00 GMT",
+        "ETag": "\"07da25491efe60c0afc38ff316201c44-153\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1278909561",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "temperature",
+      "valid_time": "2023-11-10T00:00:00Z",
+      "array_sha256": "335447bf85630a1c9072d0a0795574def80c5c8d10ae04155e493eccd57c6968",
+      "level_sha256": {
+        "1": "d53b6f56a0e5646d42c20d117030156ca2363a80b98a29b6a7390a4f0f4ed473",
+        "2": "642a02a0fdde98faa1ff129ccdb0ef81204926b54378ace742ba276a4abe9233",
+        "3": "3c1052923ee13a2f23704b9d44b21532012578b8ea01c3374d3ce90e6c0d635b",
+        "5": "674a9a202f33b8b0266c19471eecd35a1b513bff9dd58269231a5e1a4aa3b05b",
+        "7": "f8af7a400c9c2399739b0adfdadf1acb17d2a17282c5a4b627d2a023471d149c",
+        "10": "d503857f811efd29ae2ee1687d3c1562402e8fa3e7bdf73c0f5358fe3f8cb211",
+        "20": "3a7ccc4eed3ae4e5b80aff0df5c0719f1d8afa05cbd27d47ac4fc4f6102a1ab1",
+        "30": "4efb0272ae6979a623e2073b5cd1a611ad5f00061668c5e1557b3ae15a710003",
+        "50": "bb5ceaa8c9029199b2e2402b6994feac5df7a0f144a59442657cbdb630eead91",
+        "70": "8b9257c4632d623ac54eda6f14bb7b440b8a6d12787a099ec867ec44bed8e649",
+        "100": "c169fe0eb75e775713e170e39ce6eba5b952cbeae43c7e7029b50dcc47aea752",
+        "125": "475669467474aa75bbe46ddc6e79af8fca8c92136f08a37e0bdba6c5d08a7749",
+        "150": "7aa64e65e1aa1a062d06d29d3e9f951ab44ad410208bed7fc427ed0750616a8f",
+        "175": "c9e4e12fb8b379e1c4a1b6f92726d0b8cde95c9cb51ac8eee0c10e0bd2b1e6d4",
+        "200": "0070060a2fdf85d9f724adf90a912d90d0329bcb8d7ea6eb50411a83c9eb321a",
+        "225": "d58e28d62d28d33a81cf1ac04efaf19d23645ae6bbcba0f1f6b2e9f200829e86",
+        "250": "c23904881ba46787f59bcfd254a7fc1ec401bc91e5e0d20961517cd78bd99174",
+        "300": "0a088f46edfa6ac3a5bf86284a2663a9a8469a2ba923eaaba981039b18a129f4",
+        "350": "2fec49cb5667d70a043bbb1b58019be6554e09270708dea6781359b8fb4714a5",
+        "400": "a9a2f8a14ab7fb12ccc8e81f0725c804e091b5653e30ba0bbbac1c5a7a684acd",
+        "450": "c8e92d1bf9869dc322f3ac0ef36fce62060a5aba84756179c72df6635de55a57",
+        "500": "9bd697f16c49f4d1e9e2c6f95d290f46ae9abc2ea783c8dff6853a38bca2c79c",
+        "550": "96e01990e19a27b83a1ffd2096bc9f4d8cd8dedd81bcc67d54964e07bee9f20a",
+        "600": "40a37637ffb67dbcb850b81da8f6bf0cfc93923298914cd63bd4935a15978d50",
+        "650": "ac5b9fa2fafeaf0b369b231c18dee022b2bc923532784c52b5994cbc6976ed6f",
+        "700": "536cd8f28eb4b29147df98db05e182301076ff5db43fdbd80022b3fbac9434b2",
+        "750": "8e3afcdae167bfb0dbd601568e3eaf9160eebb65246fe7887819ee181748d52f",
+        "775": "3ad40bd060fac347a213f804e2e260d9cb874e0e2f331050b39e6b5ced12c104",
+        "800": "765afe67ef9155d70378ef7d61ef649cd83b1e0f48cd11fbc4eb5f940cc4ddd3",
+        "825": "25d93c50d680fe257122915b93b7e2cda293313e6abf50ee0880f737a3d187a2",
+        "850": "283f8817f3cc0806e12be7b9d3a261bc2adaa1b2192c3c2c987b7e703a132852",
+        "875": "09af111d573488c7f2eb187d17296a691259b8b4b5788888b1e23f2ff8dd82d0",
+        "900": "72ebb991aebafeba852a3c57cc710a3945d08a8b015f857b5e8903854587c83f",
+        "925": "62d826cbda3078e22fae94651471ce1d073fffc254b33b2f2c0bb7f23f6423a3",
+        "950": "fba3fb9e93eabf75ce8d44e123c334b8c057d1ef5989650d635056e6ac2d063b",
+        "975": "22de3855e4eb7eba2c20316237867b7f9a5ad5d41339154168630e2358243fe8",
+        "1000": "b3e0336e1cbb2217bb6cf5bc6747f38357628fe84f7fae74a9924c93ce91d75b"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "K",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T000000Z_temperature.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T060000Z_temperature.npy",
+      "sha256": "5a5edbbcaf578dd7084c68322c14d4ab7a8889e2696f55f1d6c4f8ca3704f0f2",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_130_t.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "ud11UO3gtoWhDJq0+vBETjYqKmVQtZ35v5LfqV+Qsosq2GiXGIvEBKv7Fnxgtk/IiHIsFVd1Gf48ILr4d6aaU4uhsJapAK4h",
+        "x-amz-request-id": "13HPHR15A1TQ1KCJ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:06 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:41:00 GMT",
+        "ETag": "\"07da25491efe60c0afc38ff316201c44-153\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1278909561",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "temperature",
+      "valid_time": "2023-11-10T06:00:00Z",
+      "array_sha256": "becaf205a90d62af95050b9139226cc55d201896b8c213255cf84f778f46cc8a",
+      "level_sha256": {
+        "1": "84abd0bcc580680e8096d7917548d363be96ddbae7883db88806751378b7ad98",
+        "2": "471d699a30c97058a998acf9e723823fbf299f0a018bf222d67ea070ffa5441a",
+        "3": "4f7e702cb85b03a7a5dbea6c5869cdb1bb20961434b79a0bd2d2a6893de34adb",
+        "5": "8eaaf057052eba094f03d439cc0767da568720c70c140f19f979d1012a891f01",
+        "7": "b4fc2cb3b32b6f0fb52c5dda52bf4b911813b0fa806a170a5eef4d67196f1122",
+        "10": "4be6b775e4d47bb2a99a3c7bbaa918d4c7cec0b3afd8768d2851e56fb6479f9d",
+        "20": "548a8518c498c5161d37a76fab189211b5e2bc886ab7f6a6230099233aaeef5d",
+        "30": "5fa50537f0ccf6443b94a46e0e3f216511b3e3e6e079c39924bed3d7eb0de9c7",
+        "50": "21e0f44255de437f0168fae4d6c507de9a412a3f10fa26803f2033fb67e2fee5",
+        "70": "37c4da27444b0b44759fb5408416365f6920bfff10a860c8f372e312306be4f8",
+        "100": "64e799ff0604042a98fb531b6f86499b7c7d544c8b590239d23b4f99faeab722",
+        "125": "dd6244133ca8b830ba89991f4449cccebd03be8ff35997c746351fbe1c7cc20f",
+        "150": "29876b4cc15ee5f66c1ce8bf7b81f2376859805182e56d937de707f93b8e954e",
+        "175": "ef8e0261cff876f53c671ad8f490e58cf1a4d984e00cb4cae542eafef02b5781",
+        "200": "819bd7691f5dfbf78cfa3930288cd3e87b98b819b92746d0998e2401b94aac16",
+        "225": "affb30506f095a21b91f741a9c86b5d4c08ee869264efb68ca16e54475190a85",
+        "250": "93d16856e5c7afdb59e3aa470f987f6f99cb5bb2ff98ff57b9ee4db96bf295ba",
+        "300": "ecc381bb55a285ad5dfe4853a0b9149776504be13d391a6809686247e69a2bed",
+        "350": "95102523f114726291856987508c5e568759ee1ba0fad9589ee2f82122b05e55",
+        "400": "a5be85ce791b19e167d4f26add3fd77846ec62946cb405ee78d64176914c6054",
+        "450": "2e4eceffaa42ce90582f619b83c2c18fe9d4e539957b7f0313cf0842bb6b7fdf",
+        "500": "c43a973e6438fd73f615efbfa4442b6916057718218333500c25f0cd8a76c7c8",
+        "550": "d4f4746c2f4eddc4a97f31678a1e16521e515fefc223577a34de02c6ce2a084b",
+        "600": "99e71cf7b6d893bc1eb8cbdd933e24f41a7a85068557d57bdd74606e2221dbab",
+        "650": "6c69002635804398a01a56716d856afcc8dccfa870be4c7a49163c723d695d3d",
+        "700": "56e10a32f4b60a3a83d3d12a98ec3314f68872b16a1584533cc0fd039ebad4c5",
+        "750": "eaaf6ecb25fb0f845c75e8b509efba4153ec5c333c243b9fd8cba709aa87bc25",
+        "775": "8f01908de0498bd6a035c93e1b34bc4f7e1f37e315aa3509c891480a6f183e16",
+        "800": "ea4febfe13e331eeed54ee39cb1e447524a3d9396e0278ccb8abc6a46f7b787d",
+        "825": "e931ce0e450745ca2ddb8662f4f42bbfbf8fab3b68585c5be311ed9adfaf6bc5",
+        "850": "535144e95a03d3f9273d0db441e65d6ca763b72a55051143449debba8b4127fe",
+        "875": "5eb84e13106e62b7b632b4e05bbf6ec05b79c6eff5986accb42778327bdb4b56",
+        "900": "c429a5d08ca156e328fd95430f5b1a46be92e156dbe98c6871c9497d925b291d",
+        "925": "460e2e53b303e30ae23b41d457443aa5fd7d40899d2a856c6093e5b6a45a7397",
+        "950": "ae5981b3972d480d5f794b97b7f78c66611824ab679db6df72c9907dbbb19320",
+        "975": "9fab225cfefe92f262d8ef653fd46874b74f53631125bf4c23b31c7dea51da46",
+        "1000": "1dec432dc4551f7bbc1e83c113d00abba736f2acebeab8b04afc5cbe3d4b51e0"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "K",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T060000Z_temperature.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T120000Z_temperature.npy",
+      "sha256": "fc86be61485215c0813804178650642dc7409c5ab00e852ce755a57da14273da",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_130_t.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "ud11UO3gtoWhDJq0+vBETjYqKmVQtZ35v5LfqV+Qsosq2GiXGIvEBKv7Fnxgtk/IiHIsFVd1Gf48ILr4d6aaU4uhsJapAK4h",
+        "x-amz-request-id": "13HPHR15A1TQ1KCJ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:06 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:41:00 GMT",
+        "ETag": "\"07da25491efe60c0afc38ff316201c44-153\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1278909561",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "temperature",
+      "valid_time": "2023-11-10T12:00:00Z",
+      "array_sha256": "3c65af831b41bf53c79dac8e109899fe327a6cb1be345b93208fa041c2ea77ec",
+      "level_sha256": {
+        "1": "40f8e1a00170e62c8291e283f1f8920362ab2f1f1976555280d2f23171968fbe",
+        "2": "d1448e841ac6d5ca22129296efa13cbee43224761fca55052617915956ecc722",
+        "3": "1186d6e79f6c21d14348fdcf7c1f5de6831e7c418c1e8e03fffcd0289e5cf163",
+        "5": "ec23a2d0fa29ae37ac78b553b8737f8ff027513d181b0a0ecf4c25199b19ac9d",
+        "7": "56472bc5578c83276ac6a3b35d681d49bed7ed95205362f43a07e6376bb547b9",
+        "10": "bd2da95514b7b25bcaa1c9f8b548f6b0397d4cedd1143896689db78300c395fb",
+        "20": "1609b97c27bfd69261ee75f13f0269fab8f60c5f3eb09df3d8061abd3b574d8d",
+        "30": "5b1821a7f306afd19e4257bb562144e522b64692408eb08916937203b2aa93c7",
+        "50": "5681753ef9d5f0b6a7670c1f6e5c7ba12b4b68178d44aff52ecea72199078b52",
+        "70": "1a0b2c676a4984825fb32354f8a360e8082ba9e8462384a91cabb01fffa837c8",
+        "100": "7cb4755bcc6d0212d0058d84c1b1883149e08724a4a40adac39f2d96b327198e",
+        "125": "9a4fd71a8cf29b4148fc64803e5403f530bf16246e51fc49e349300f3fddaacf",
+        "150": "84d402f367ea70dff0efa726378888c7900ff59af8b25c21de7100f8f2098093",
+        "175": "3fc9285fc2b59604756776debff644bc9091fe80ad9bac3263584edad1e76cb9",
+        "200": "999d024939f16d37c5e8c06a2ec302f952918db9667df1939323165d51a8a7a9",
+        "225": "bdd7816d356f31fc9f8ce70e583b5e79d1c2f9ab09934224b6f8a01a178d2071",
+        "250": "f0915f83f5fb17689d5f9b3a8757b156b9ad04f1f9123d19cd785edb6a2d746d",
+        "300": "a9e16b0ac6324045d19abc164d26634aa84a05d45cbecfb87df110d532ca4f23",
+        "350": "97388b04c380601da18d34208d5988d3336f9916811d8a08b3f26a565a650e43",
+        "400": "64efdde4d3e271850729c47f8b74ed08508af9f668924a6fc7d99c576bb12a08",
+        "450": "d4d71b6f31bb11a209b427da73ead5caf817b3b93c4f89f37a30eb067fad2060",
+        "500": "9c73fcd1213e5412ff0e8cd766e8729b974b3b7c316bcef5d8479d6a41e9a20b",
+        "550": "4c79c00de3dd9133a6ed940e36aa7d5fe0f3f05946c6cbed6269662f67d2e2a2",
+        "600": "106a7e0e921b4d5635969480d0cf5c78f6c94e7d8a6f2875c6c339000d4933a9",
+        "650": "54ddc80f8239f8cf13c02937c9cb253fc5a5fb98c7c8a1894e4d554375aadb15",
+        "700": "d5d14f31da46b52f9ea7137dca44e4fd4c31ae41c1920c2c5acf3f1f5c6b0881",
+        "750": "806629a7f8139be7397d8e2b1e8b2d3dd7d2e313617511d1d35813ec94d1d45e",
+        "775": "cd2fc5254086e0c912102dc89c43019ca15e837f183b6f251518c9b8e163cc8c",
+        "800": "2907775f0d70c6d9d8120e797bd4f0e1bf8b737de96370c1c36e0aaa3cc1b2b0",
+        "825": "4ef20888674f31d2a43e1c4912d66bdf371f79959af43e497964f76a1383a084",
+        "850": "a9568f787e19a87affb1e45d9df26619a38c54315b43c5319e252daaa11aa11c",
+        "875": "e055aa832068894bd16d05b0a20b866ff3617a24b6cfe6ba655c63b11107dc07",
+        "900": "f5a1ce1bc4fc42011b3d1f25e0e8330e14a3507d4e4c2b313d68ca5ff6bbcf5d",
+        "925": "48ebd73f3d48693d13c845d7cd5f171f360588a89fe6825d51ff8e04ddcb4b34",
+        "950": "75d028ebe5d771f81279788d647ae5054919840bf83cce9cfea96590af63c1fe",
+        "975": "55a3dd6611ed521974dbe035a271bd788b433447c184cefed71188a2e8b78a9a",
+        "1000": "12d06f6106d3f71f4ae2b5b01dde1d0f54e345f8dbea9884a4cdd40980244981"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "K",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T120000Z_temperature.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T180000Z_temperature.npy",
+      "sha256": "357f4a9dfb25e2548da3d5ac6a01d9c216705584bf7d4d7d0a37afbd823bc614",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_130_t.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "ud11UO3gtoWhDJq0+vBETjYqKmVQtZ35v5LfqV+Qsosq2GiXGIvEBKv7Fnxgtk/IiHIsFVd1Gf48ILr4d6aaU4uhsJapAK4h",
+        "x-amz-request-id": "13HPHR15A1TQ1KCJ",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:06 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:41:00 GMT",
+        "ETag": "\"07da25491efe60c0afc38ff316201c44-153\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1278909561",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "temperature",
+      "valid_time": "2023-11-10T18:00:00Z",
+      "array_sha256": "264a66917bdb005b7fdd700e94b0ae2c8f3f024720f32b9c119c43977d720918",
+      "level_sha256": {
+        "1": "96fe0faf4820f194012e9e1f5265a6074db3425472ce6ba82b8313e8d50539a5",
+        "2": "edd6e43bcdc4d72e9f11009959bd9a3b1a51c5723c34a2d0f768e612aa4c95dc",
+        "3": "993ea81e58073def1061811152b618c913ed9d22bb73d3072920d08ddc2359ea",
+        "5": "08d1e2cfe4204669d496862c21e99a1f2f8618ff3a5ae9823216e4436de26cfc",
+        "7": "7613135ee1d999f9cbfb035c684dbfdebf381e3157317de2ba9995f2c9257926",
+        "10": "602bd7f3966e3baacfacf7dc637a16d6c0a35e758174ccddd32377c1ef1b3c21",
+        "20": "dba104a23b3a4bd51364a21a9dee8ed2fabedee308d0b4bce49046b740f82b36",
+        "30": "6fa55d1f023318b78142494fa415d3f2a8b87da5404a983c314e702306baff01",
+        "50": "1666e8d2f98ada407ccc95aac25583e1c6474709d03c694932db025ce84fa3ec",
+        "70": "6b04c3c7f792ea76370220bdc90e263de978f67ef7df63126b6dd59313622305",
+        "100": "3da1066600776722a83c91ce25cb7bb4085d775334fe18554ab16b371594f0c4",
+        "125": "72182719098f3068f1de3fd13a17082525b999bdbbcf3c397a5dfca4401d5ec7",
+        "150": "a56390eac7e2932a71f05262239d9697506ce11320e85c74e7c482050b3203f4",
+        "175": "9f29c95ab72c9a341cd9d04b131686da192ba317958db1f0b48ab6bbb822ae97",
+        "200": "339100184e270ed7a12c77e880405c8579c5abab3f48c954503edf6fa8ca33fd",
+        "225": "c20b8a224ca0b509b1e56aee7d14d6406b7701eab8636031da5a392b6c323d68",
+        "250": "a79fb88fa1a7a3b049a0fc887f404a2a36da1976b5f4e32940d68c485a58a760",
+        "300": "7f0ca5d4892b11d5cec07a96c4f2a4181638fadd80b350728278f8cd4c434bbc",
+        "350": "298e7669f57377f4749de45174454c8ed1dcf986758b91066f4656e1b2ff34a4",
+        "400": "8d7c89f5be68729bd4ae2b0c57718fe8c96dc5a7a5c4147fffc147347e0a5692",
+        "450": "a2e05b41ed522aaa88ddbbb9b8063886be4d0fb62ea51c40fa2684908679f76e",
+        "500": "17a4ef097fce62939f6b80c0562b61a4758151a79dc995359729539d7878be33",
+        "550": "84d6e74a006006ff43f39e2d115781327cce01787790c4be31b23bbbba73f70d",
+        "600": "af82b67887bd7c954c4dfd301f3cf841be9a53ec63af2b7cc98c4cdf476515b6",
+        "650": "aacbde64d122c48d976d7e002fd77579431ca77554770fedea88c9a130defe56",
+        "700": "887d84c87497edcb76304ffee638ca9edf0f66fe7ddae418c5d3e59be90b9efe",
+        "750": "bb710a48f08e165a4aeb277ac06954cf9c04d2c315592915d3e1b5d7d90abfbd",
+        "775": "5166c16dd9d99bca4af76b492774af03c45c766a17f897b0e06c64a1e9c4eaf2",
+        "800": "56c3d841901163d20ab66a8ae8fc948b804907b76b874956e8ef7bc4a9273684",
+        "825": "e9ddc088d12c6f6ed8f4daabe56714d4c89bb2aea32435fc9e2dc4b88ea2d443",
+        "850": "0e4582238470a1da3ae9a1696547cfd188fab6821154afa523812d7dd2db81da",
+        "875": "a1ee81e282e78141b87604998fb4e31632b90553120da48488de5d190f6dda6c",
+        "900": "6681e6e5d6afde2bf8e434c8857952084f872d7fd0ab709a9d797b470d748f57",
+        "925": "84e6f1bc7c779623498593a00b953f0bcfa8fa043fb5610bcb5811bbfec0c8cd",
+        "950": "92148e0e5fe6ca7ce36f3aab205fd2483e1816ea8d8927bce7ae4f6ec390aa99",
+        "975": "5e139c6eaf48c59fa59e6406325d72dfb40a286d3fd9cf8d21b17bf082792e58",
+        "1000": "7adf7b4c6841d38fef808c4452191a678f53303fed44963ce00f8cb5d3647bc3"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "K",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T180000Z_temperature.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T000000Z_specific_humidity.npy",
+      "sha256": "5565bf2e08131b7fd51f62bbb9c8753002551bdda409e775595555f4fb04d06f",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_133_q.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "hqCjKbfpJCE5niBUVJ3gl75DVf7XDJ3O34R2DaLdrl1u+uZMkod7K4GIN2nMcY2iYKefFqHxOwsIWfyzo7NKmKIWMnyq99Wu",
+        "x-amz-request-id": "W12ZP0G8ZCJE6NMS",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:30 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:50:25 GMT",
+        "ETag": "\"c8d22f9710e5ced729773341e2da5145-165\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1381514957",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "specific_humidity",
+      "valid_time": "2023-11-10T00:00:00Z",
+      "array_sha256": "9dbd01e94eff49fdf8ed59c750753e3c17b7e22831a6dad268c25959331655f5",
+      "level_sha256": {
+        "1": "238e6e8f145f2b7ba78777dd746cca56989c2bdd0b74527b4d215cfb7adfbdfe",
+        "2": "d414dbf475f0e3290607e1f2796b8f77ad38f46e61ebb02ce686cdc0cd5b2be6",
+        "3": "326c8c7a0298a0960c40e60c8d70d4c236266c0202686d2636ed881994bb18d8",
+        "5": "45beabc8a279a1040a697f1fa67c6d7eb81234ff91a9250151aef93581f30c08",
+        "7": "73539492229753c8411b2e3b3c14b2b613a45c733c26d320bdf5fd942a530abe",
+        "10": "e16bfcb42381853e126f043a83e6b0c3bacba5c8df7a42d808789a9534d196a0",
+        "20": "1f043b49c8476b2e15ba712279e2702d8b228e2e279018f202db89a19993366a",
+        "30": "feebd9e6c36dd7f4d4cf6f2d0f3d00ddb19775323804b88cdae81fcedde538fc",
+        "50": "ea5693cd9b5105d40c451edbad712edcbdd60ba67236f8625c79873f85180e6a",
+        "70": "469bef008196abe734aa8d526b18a68a0024856197729127b032c7c7d29ba38c",
+        "100": "ecd4ddde48de3e9843fba97bcaadd4792fd948ce1b7d88e9e0f74fdfbb20a821",
+        "125": "0fbe00b18f246cb925e33b6eb8c523895a88dc416bdd6b083c4f5f66f3c9c237",
+        "150": "d8adcfa1965b149b18092b12f8744944f006cb327e0dee352ca10885de78387c",
+        "175": "1e614510d0c396483e5a9c12d3e5c1153f8c4f969ee6cff5a9ff085660e8dd7f",
+        "200": "949f986f9e950370d2e060f609de92b24656d60311efab9013ad293d0e41708a",
+        "225": "91752c82e2cccc89d9489ab26b65a13658d068495ba356704a6d51d1c0277203",
+        "250": "6887600e880711fc52644b6d9bb4387072ab9e67c5d8b09e658e63058f1676a2",
+        "300": "32b2743991bb798181366353673e11301673dd1ac70005b194a8b2ce157a3a63",
+        "350": "fc2813a992619b4b8b59a3e8e8f19601f3435b4b92a1d64c77d24ad971abad83",
+        "400": "d83e685b0717c21f197cf60656dd45d4cc23631429934ad2af62c5658095c135",
+        "450": "15647ed4383bc2a514b20c3b6e19a3b742868f4bd35f104e0e8f9dc1ea71e032",
+        "500": "2b1cdd5a3332fa878796f4d4783afa9839c7fcda5e8dd40481c7e5a1013be402",
+        "550": "fce277e2ae5e7f45f5330eb23f1914cc66a64aeadb6b993d82c1b17873d78909",
+        "600": "eaeb4d7c75d0d27f66a56a92174b0c2e2d726a4915bd46b8b470024526803de0",
+        "650": "3fcdaa5e0de04e9084e5b9bce386985ee491d41ff5492aba05b2778eb342e53b",
+        "700": "c176dc5c42b31dcbff29c6a558021acc7b9cc3c5f7671b53b574e3fb4815fa24",
+        "750": "0819ebc4686e209e37e606bf73f2647c20c50f7a8f8deca6437c7b04e9ece461",
+        "775": "37a0b347b59632d47fc0329c2caedb16dc0265b007accea8bba6228f541d84af",
+        "800": "5b949d149720920322b39971f586a951429143833f55f2ea0e9f0dcd00efc1f3",
+        "825": "cd2a4e7d381aee1cb46bf4619944ce00f967a7c5eb57d1b9ae52e60a3e0e5dcf",
+        "850": "b30dc326e093e5dd0344ce50cc4d9ba63d2482b4402c173facfd21df6167b67f",
+        "875": "f3f623f77bbed28d314d7d93281acdb8a1f2fe3776a1b3bba54553b66de465ed",
+        "900": "d97fadb04e18c5b53c7e72bc0d5e106aef23fa502b6f09d0f61acf2859893f37",
+        "925": "0a49c4b508cd3c9b1d60beb2a0e8084863411dfffb794e3166c071d4447a8012",
+        "950": "ae107d07fc5512d6ff7f3d8afe2f6e9d1f1ccf750728c2a819acbc0e831aad1d",
+        "975": "b558230a9423238ce3f7bc4e909ad00eae43ced9d684d1ceee279949d6275179",
+        "1000": "cbaeece2e74e75bb616b98a97820293e3d75dda3343df7f18904c000f0210ab3"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "kg kg**-1",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T000000Z_specific_humidity.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T060000Z_specific_humidity.npy",
+      "sha256": "e7866a2da355a1c25234c2b2d24d67c9a0de094820e3b294f7df0882e8a918f7",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_133_q.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "hqCjKbfpJCE5niBUVJ3gl75DVf7XDJ3O34R2DaLdrl1u+uZMkod7K4GIN2nMcY2iYKefFqHxOwsIWfyzo7NKmKIWMnyq99Wu",
+        "x-amz-request-id": "W12ZP0G8ZCJE6NMS",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:30 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:50:25 GMT",
+        "ETag": "\"c8d22f9710e5ced729773341e2da5145-165\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1381514957",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "specific_humidity",
+      "valid_time": "2023-11-10T06:00:00Z",
+      "array_sha256": "ecbd8ccfc7b5b340ed5730a87c9896b1aaffe0fa005b43160d86063bdb93b28a",
+      "level_sha256": {
+        "1": "1165737f8537eb23ad8ec39f107f480fa98516003609816f7bec72f5d0642254",
+        "2": "500aade4fb03e6eb5d526750b9874b217575d0851a726c2fdb7a654505698711",
+        "3": "10d70d4f8477b9ca6729f0c73fd0cdb507968f42f6ae01d6bcfad72510573a4b",
+        "5": "c434b2143dab9fd685853bc7997d381d129d1bd6cb2c1a7f7e9d5a8728e4caa1",
+        "7": "63ebe0a1186990631a801756f468b44a6ec331336db811012a98e6f29a329bee",
+        "10": "543ef733dc0af1c8969154240c4df4e09323817d064f7e4f389934d0c928a93a",
+        "20": "012379208a53e7f8db9115947f30e92831bbdae6d28223528a1a49cd78e55a12",
+        "30": "4fafb3605ecacd1e1abafd954ec8e8d9cf00b8b05a73652002b3b6155918b4f9",
+        "50": "ead7f8da7e3bd6475807ecf209705c22f0af90d0cf653e0d1cc94fba68ed7848",
+        "70": "dfe4778979466ae829fa83d0484b62d7c3348734b8ce7942ab7a98915586e222",
+        "100": "38cddc41fb4c36e8ab88ce6bc421438f99180614788153844c9cb87d1aa15ba2",
+        "125": "d160604aa74858fc36b7e38cf11aff6632c97de65d75da7f352856f3db8672e0",
+        "150": "72205f4eb0f7b18b316c1e35d25c1d046fbae9f1e0958d0d97b8e42b48af2edd",
+        "175": "7c0cd3545cfdd6d289659fe2424d6f2b635c94868c1b6bdcc6914a5af1ff34d3",
+        "200": "e7a201f517cd2bb47919e59be2404ff5306dd08991cac134de48ac907318e306",
+        "225": "c21ef9582212550d6950b44ae9c55de7c022f08f6e273c605a4699186ae5b691",
+        "250": "f186a63fdbaa2c2f707bdfb55de1cf3a5b4d7fc69ad0bb03d05ee575e34e2e8a",
+        "300": "87cdfb8a72325fb813d59a9fa99ab78857d1a6c2e4d71074b305d6e98a66a7e6",
+        "350": "5dde7a63618670733e501fe2c118b8be25b677be8b5d9d020517ee3e7e291def",
+        "400": "1b1d26e5767e88cef72c650df45d52519486ae7dbac1b31d157947554920ec53",
+        "450": "94079b30d9df38a4f04ddbf9b57576537aa01dad0ed630660d53f40ed39fd66e",
+        "500": "7e2fc4781a43e237606fc6a3db5541e529646d8834b71a94c22722880d053a2b",
+        "550": "21eda2589a3596aafe5acd024728b5281802bf15cebcf5b17b2aa1dff4e37c1b",
+        "600": "cb5796e32b3db328566b95d53592f2751591649331df7ca7d921f25bd61007da",
+        "650": "0aa9a2ea14eba17de1203d31981c58ad6e36a6921c26a522b7ebc5f0ab21f585",
+        "700": "8f09bafc4d4b3937cab0efdb947b5d95793242cdddb1c153ff21dea64371c1b3",
+        "750": "ebd701ede52395d6a612c21d2456fccf62e2ec87654279ab6ecca860c80eee3e",
+        "775": "7160343f83a5fa8afc029c84fcf33c098fc53a2bb7bf26daad1da27c56c744fd",
+        "800": "003704196a54e1bb7ef03e6160f2727585d5e0226489658adc3f6afac19651c0",
+        "825": "cefc63e9891d8f87991ae7d5acfb3f422c54d109696735eb7735c77ccfa24603",
+        "850": "2b1cb492cd34e07688263d9c945950f074ac89f4a515bf3e74a63246074b71eb",
+        "875": "d7f1cb8e299d97fcba9be7e11d3ac00086319492b4b180b46cbec8eada4afabd",
+        "900": "8dd9c7f4f266ba42ae4cd234b1848ba40b08f6d7e7164c19e9170fdf9b0d081f",
+        "925": "430accab64b14d52a0aa888198a1e00b9c7438b4096bf6d221396cbdd2201bfa",
+        "950": "3f90facfa42abcb29b6e9c2a607b9b3e13d0f6c4561b73a4623363fc48ce5fe2",
+        "975": "d87516706766196a10c14bb2fef746a8a583e75b3e127440bf115f187ae0c03e",
+        "1000": "63e208938688904f4d9539c9a8897354e8f0de1e13af30334d5a782de46b3737"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "kg kg**-1",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T060000Z_specific_humidity.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T120000Z_specific_humidity.npy",
+      "sha256": "b152e204edf9944584f5d3b80f824c2ac02512dad23a3ef940de2a99f6a011a8",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_133_q.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "hqCjKbfpJCE5niBUVJ3gl75DVf7XDJ3O34R2DaLdrl1u+uZMkod7K4GIN2nMcY2iYKefFqHxOwsIWfyzo7NKmKIWMnyq99Wu",
+        "x-amz-request-id": "W12ZP0G8ZCJE6NMS",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:30 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:50:25 GMT",
+        "ETag": "\"c8d22f9710e5ced729773341e2da5145-165\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1381514957",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "specific_humidity",
+      "valid_time": "2023-11-10T12:00:00Z",
+      "array_sha256": "c4fc853e8257d206239ee5cb95a1cf113ae6386e41f28070a621da798d20a732",
+      "level_sha256": {
+        "1": "d06e10006378e197645b4d608ae870c1bd5d56233a21c85200ab842f97d16f9f",
+        "2": "08094377dbc25d56c5f813415c6be95296ac92f5b553584e9c9284030bb0becd",
+        "3": "499762dbfeed04058e18e36f172a69879903e2fa146b69beab0607f7aa80d964",
+        "5": "7d4e8eccb71c9a1471db431639a7fff58f60b86c4e3d153f2ff3fea4b55e99e7",
+        "7": "7ac5dee0780fd3fe0995823fe6c42d8b5873718f17078f3da1fcce3bf0c178cd",
+        "10": "00ae82303b0d4abdb1d0d5759fbc0e171768affd4d1d3cb76b3b04827d4a478f",
+        "20": "b7a99cd7c715dd648dce4f804dc7bd02ffdf8c9ad4db7d88b836041fe6c76c27",
+        "30": "cb655245800b99255fe42c723b3be682732b6be396179377ee123684874e973b",
+        "50": "b8f69cb289627f96943ccd91336ac1cbcc95c9397813d32e2ae79891a40a0fda",
+        "70": "923e3211bf61a33446496f1fbaf0cd0c886f882f32ec00070572c1238ff60ab5",
+        "100": "9ff339560c8e210c178699b6f16e68eee5525686f2b0b1d841ee4eba1d41fca3",
+        "125": "4e64074127534964688f9b14808b5bb4c25035fe4caaa4633ffea6d0a79ad1f0",
+        "150": "fb4da6d78769c8acc1e445c32e5ad77052fb613614ccc2bfd1136144b19332e3",
+        "175": "44df1191962d50eeaf9b913b1d3de35bd81d1cc3b00b20e934e5b99b815e0b61",
+        "200": "36c2d093fb2c22f24bf6fe39203866fb3cf48ad990395bee23ba0df9c8f4a087",
+        "225": "b8d16a999df4176a5c45d36cb16211b74f215e0389765505b51eecbd5f951083",
+        "250": "92551e49f4a789c5a1252492a8e59107e0fd6cadd263788d67a0d17e388a5389",
+        "300": "4a1895e8a3f87cd2f1f314edd388908e1130df48e2317da8376b91e260c69625",
+        "350": "48cdd4c5130d411ba5d29dc447cd69eb2442b189e206ff265cb253137913d1b9",
+        "400": "2a9b0fcee3eecdbd467694039ea8bf84f882b309c2c0166134b911ac90d1d0d0",
+        "450": "a3f30f7267650fd7cedca016add15bce1d0586b80c03bab599503943fb230056",
+        "500": "9f8bf3983a966df164bec9d2a9097c69cebcb8032f9f1a9aee4dd33de0992677",
+        "550": "ae573923c2368348619e6da5adff12e8831325a057f915db703727c0b40391ab",
+        "600": "287571874f5e91ace92d961f95ad07b01563b0907fc5b4d64253925bf22e5708",
+        "650": "caee63e40476fb6f3fc39a0709d66c4efb0237e6b6c9049f190e868f8e22a75e",
+        "700": "d63aaf35656837f43650a5123f03218d466f139b949eb255455c8c17e8f30be1",
+        "750": "52091d607d20be2e89e5b47189eeba9c20ed78de6562612d12660d3193b8bafc",
+        "775": "af7d765582fcfead49a0c24db18c87ab615e8f5642d019d29a89c6aea7a02b5a",
+        "800": "bc8916ffde4e5acb936230d35a9c9dca71f7fa88b6e8539af01a78948bf22aa0",
+        "825": "d062e8fd855f7c937d29dbb5d528c67488f6fa77caa5ed0ce6f3ab94d3c87694",
+        "850": "106a4f6c186f852de4b7e17ba15ba5d5e4cda668f4dbeac7cf510619e92044b1",
+        "875": "e20666e770ac43edf7849c992a98c107e038913d3f54adbf0f86a89add964866",
+        "900": "ac11fc514d0f42bab7ee54ef68971244da332be9b963d63edce3d65f25fa9352",
+        "925": "3d8071d6f787805c0ae52652c5c5ea92a87bccafe2ab12dbf6ceb2df08b24ca6",
+        "950": "30fbdde16e3d1c49430a89bd76239b9343e36271217c0f4a90fb5f677c5e627b",
+        "975": "9fe0fb0999f33bc92c1dbf1f574a3d6588f67d5cfe1d7df363a44395b97fa931",
+        "1000": "0c2fbd2f13988c2ab4f6574b6090e99bf30810dfe29021f40abcb4a7cc0b7c22"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "kg kg**-1",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T120000Z_specific_humidity.npy"
+    },
+    {
+      "path": "/tmp/weather_ncar_truth_lyze3lb6/20231110T180000Z_specific_humidity.npy",
+      "sha256": "5ab0466b30c1111b69194ce6bcd6b59c10eb9a46bcf03953645b0b84702c4091",
+      "size_bytes": 153659648,
+      "url": "https://nsf-ncar-era5.s3.amazonaws.com/e5.oper.an.pl/202311/e5.oper.an.pl.128_133_q.ll025sc.2023111000_2023111023.nc",
+      "source_headers": {
+        "x-amz-id-2": "hqCjKbfpJCE5niBUVJ3gl75DVf7XDJ3O34R2DaLdrl1u+uZMkod7K4GIN2nMcY2iYKefFqHxOwsIWfyzo7NKmKIWMnyq99Wu",
+        "x-amz-request-id": "W12ZP0G8ZCJE6NMS",
+        "Server": "AmazonS3",
+        "Date": "Mon, 09 Nov 2026 04:47:30 GMT",
+        "Last-Modified": "Sat, 15 Jun 2024 01:50:25 GMT",
+        "ETag": "\"c8d22f9710e5ced729773341e2da5145-165\"",
+        "x-amz-storage-class": "INTELLIGENT_TIERING",
+        "x-amz-server-side-encryption": "AES256",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "1381514957",
+        "Content-Type": "application/x-netcdf",
+        "Connection": "close"
+      },
+      "variable": "specific_humidity",
+      "valid_time": "2023-11-10T18:00:00Z",
+      "array_sha256": "4a928c386405bf49b9f5083e3dc35373eab6078e6fef1623e758c7b534f362eb",
+      "level_sha256": {
+        "1": "6fd45585ba14273b6005258574147671eee06fed103c45f5507bef29abb6fc83",
+        "2": "d9effb1058a9f6197ea0fb24f9d59fb13e943b925bb0cb1b7e0ad42f1d384045",
+        "3": "f29173381f1ecfe705219bbf628d5ff072bf95b9287f008abc0567c579826656",
+        "5": "98124ec748b9c7141c50f43ab0b928e41adfc8a7afd54de28c1216f20db065b4",
+        "7": "fcc0df01fa206849173ad3aa5df04ad5ced9d6d547679cb3831768b353c27d33",
+        "10": "bed63af0200ae57ced742b6929aeb05a535a52b623c0caf2d506e32b7a77a7b9",
+        "20": "cccb7b13ccd8796a3f1d10b7abe27ff79d2737be08859400e54dff72dff967b1",
+        "30": "c820ea5c59a97941a78e48856eeaef440eea8df240ae2b4b1f69e51621d1eb28",
+        "50": "c86649384d03e3d37b023176840af98f6b469776df6a56b9db21e7c12976225f",
+        "70": "0d6e48fed01017ab836432bddfe5c8f0b1e47f7be41a6aaa6a2020ff5d98f26f",
+        "100": "dd764c96b615adcf705ec8e67ce52741d4933971fbe52f8703c10b14c3ebae0b",
+        "125": "6aad9cd1e8bd4e4eaf916d85f7096cbb52b183f8ef7a8c10b93032c7021eeb27",
+        "150": "329675a8b649ef07271d3339232467f4163e5977bd2c91e36633d1089beabf96",
+        "175": "892d577eee0e122fca73498aac98773e6105c7720c672fa655cd3d9aec0e59ca",
+        "200": "52dab561885c0de2b60d03e0620691eedd9d473e93dade8ad26dd326ee6a4d0c",
+        "225": "43ab5fe5b675ffa58f22258f449829660afef664c0b587dc3a6477e6443a4238",
+        "250": "c27d819da0b12ba20230984db5113b999f9c61a8fb09d6986a25a00321b829ac",
+        "300": "af80bc72e03022c939c43f2e0f708449f48d7904313611b242d70d0c5ee0b755",
+        "350": "902d0751faed297072d6e7c1ffb618562638467e0fc4f2c76c3303f83dec9bfe",
+        "400": "30b805db42e91a4dd6b8e19fa0570d45cfd5258068f3e319f7dafb421d6bca7e",
+        "450": "f8c73ba93cc1abaa5547a900003600edac7b490f5052a70abb746d72e2840e84",
+        "500": "a104fc349c163aa40ca1c65d0c5e3a9d63d25d8de1437d011b1f29cbded6e05d",
+        "550": "d44bb3e776bb436ab6dd33ecc4dc82e2d6de38f32104cb6eebb61ff3bf7ad9d4",
+        "600": "4a4aa539d205d7eecfada780eb24d6edbceae78e80045ec4e4d9f821a93c5aaa",
+        "650": "ae8ee0c07adce4bf9e2de151cd2040be0c4a1266c5e506168c59aa7f75b6788a",
+        "700": "512e81b40fc9238bd1587d64bce3ea02f4924cc9ada4a9d04d6ae8f463a167ea",
+        "750": "14fb783af84befe2ba7e0533eb4132940a42622d4dcc242c88364ab22cdd7abd",
+        "775": "0cf72fe10e49164176647ca062ce6b88c27d5dade59d16bb6cb2517c17ffb3e4",
+        "800": "a989a5c38b5c17824454eb0ec5897d081f1e3bb8d531a514854679acbc5cde0a",
+        "825": "9e68955b05224c93ad5fd6f862c56153a8451b5a4b5e7889522e006562dc6cc7",
+        "850": "171783aa183cb7ec2621d140a81cb557a7d04bdc52c5987b5ce7ac233f1f6662",
+        "875": "418198ff1b6dbb12c72152810b64850d380cc47ffcbc018edf80b1a993a6c0eb",
+        "900": "615c2be86674696c8581737df5669c86f9f13c6d6190a935a0ef5eb592a37ab0",
+        "925": "f1d5c0b3fb348f80dd7649ef4811d6fdfbab0ceaf9096677830b2c6bd5bd0521",
+        "950": "6a3448fe111b573d47ad7a5812e6a4996cea6ff27b16c750fe222774ab5bb3e4",
+        "975": "29cce761e7250a9e492ab2acae1daa50e9162e230dfae54c60842ee74d8a34e4",
+        "1000": "83d345c7eade568f8bc9211cac8afd0b9a7f399dd81af17fcd42e1893d0a3cd8"
+      },
+      "shape": [
+        37,
+        721,
+        1440
+      ],
+      "dtype": "float32",
+      "units": "kg kg**-1",
+      "local_file": "/tmp/weather_ncar_truth_lyze3lb6/20231110T180000Z_specific_humidity.npy"
+    }
+  ],
+  "cross_source_comparisons": [
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 50,
+      "rmse": 0.08149653106572687,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ac7db83d5b3ae1aed4393b6d9b5f827a726e3139f9c51eeaf55caed095222a96",
+      "independent_sha256": "bfed33ffc8eb8711bc3810e3eb7dba11af68f429987316f44ef7144b4769f3e6"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "rmse": 0.08241523686976227,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "c59bae2b717eb1afc5faefbf0a15ce2768e26ca4a8b4177aeb9706a8a4463da6",
+      "independent_sha256": "5e9b8fdea401549efd49b8d64f628bee9449dce4436aa1ebc1261d7cfcd49416"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "rmse": 0.08436572588948499,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "834ec6489ba2fdfb815c6e0ea1ba52c5aabae6f54585224f9b19c629ec61877f",
+      "independent_sha256": "9846aa8c8e14d85c0ed16c3ce0b5ca1f209b8179fa9e6b96802daafbfad745a9"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "rmse": 0.08198669421872726,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "41f4f3ed1cacf66edcec83f32682a9d5f3be286a687629ce2bd271e5b5081ac2",
+      "independent_sha256": "af5cb2c26170f5a144d4c2747605424335d64b04345c4e72a0e338cf35eee9d5"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "rmse": 0.07759183901565736,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "b55ccaa405827cbe7533172b4df6c3d65312cf822d9b8ea72fad97f15ca73717",
+      "independent_sha256": "7232d7b276394a87e10a7c8b7698c4b223c8bded1f539bfdf31da75a491a3edf"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "rmse": 0.07309134235503197,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "e04c60480ddd98e30b4de8206eb6de2ac14b1983b61ddcd29f37f30c9f3550c9",
+      "independent_sha256": "b3e0db515667b9783b2977e54d1011651fddd560f5963fe57fabd50e087c3aaa"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "rmse": 0.06281822152677952,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ba3d4162047bbdbabf5ec1d3edf40e31ac9e51c445a5b86dc1bef36173a719a5",
+      "independent_sha256": "0cf16c34dae6a6620f779f985c96fd9eff5d57ee343c7543a9a45e5a22d40499"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "rmse": 0.05372457941459347,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ae6bf66bb5d23d9140a168922eb6840bf833fce7d2a3fa2e0bb33e6cfb00dcaf",
+      "independent_sha256": "71e9f45074724f8e71be238f4cd04c591a594cdfa8dee76c174f481c44339aad"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "rmse": 0.046221173063224236,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "8e93cd647aa07d2654ce75077778e817d9c6b71206312cdfdb716ab971402628",
+      "independent_sha256": "defc1d71361299e47423c3e9b5693c286b7c321e3730e3676392cdabe4d7fece"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "rmse": 0.04059772908339524,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "a66fc501e35fb8674caa5c93761e05bfb5ff8997ca72449d40492f2e65026dd7",
+      "independent_sha256": "3d28d66271a80e067e7968529e4c865d39993c476e8b0c3c291e4ae5582fb6be"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "rmse": 0.037037514563213886,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "51497b64cf21cdead0cc5aa1ba733df6039766cd925b01d3f11898cfb34365f2",
+      "independent_sha256": "b4803fad10a91ac0ebcdea097f36684059bbcb9c18f2d8ba8d455040d04ef5cf"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "rmse": 0.035848523825091794,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "9ab1667a4ba7e6dab0c49be753f1359d60f09c56e3ad16361ab0d9330a811aa0",
+      "independent_sha256": "4ca6cd78f67cd844f3aaa5aee473d12aa80cbda2f6f8864c5fd51877343d015f"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "rmse": 0.035737035090926704,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "b4610c0304632008918ddff0aadcd0ec073b1d51284632c10e2956d37ec46784",
+      "independent_sha256": "aa08bca1701911995687d12479c293ab58598d3f714081a80d9567273bdfe824"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 50,
+      "rmse": 0.08177673185014779,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ae029895ac510dc689bb129c9695cde0399375ab9bbcd0de45053d58c911fecd",
+      "independent_sha256": "f1e1820c442afdba959083411b52c9dd3c6056e5513f544b7827d637b865b52d"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "rmse": 187.6911488193019,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "af2342f1b37ff285679b0cc7946d8863859ffb34179cbefb1561a84da99f5953",
+      "independent_sha256": "68ed964440be68438fc9cb82d334a8e788cf2bb615ab5cb146429d34e6042479"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "rmse": 210.60138379278303,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "15efd2b01102093dd1ce2d4005a95da3ee6815078434e515dc98480c3ed423f9",
+      "independent_sha256": "09611a165824dba1a4c40fe1b01cc252d13ba6452572689376efa1ffe2bb2ca1"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "rmse": 252.0856856166483,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "39e4129e52096f029ef3147a40ac95444d476dd0eca0858a768fd01cda29ff4c",
+      "independent_sha256": "d604931afafdc1a7780a402b8ea487b362d91e7d2ed1fe62c961d81147eb4984"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "rmse": 287.298177977982,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "21ac80a0442dcde064d7c4213f998232840a4825b0788a1ff72bd49110186c32",
+      "independent_sha256": "f6aaa0a33fe9784bace395ac196d28d60255cfdfba1812af7de5db45c191f02e"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "rmse": 290.4634104274593,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "5003aa47f348eb4987893346c2b644fca04745be63aaed20e6cb2755fa3bd9c8",
+      "independent_sha256": "776257add9554ae180219b899fa2bf4422715282e54e8b350ed88071becdad36"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "rmse": 255.4156479077159,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "afdbddf605247a52d22d43dc2ea8dd3c9f47eb40154051ac616f588f7cff7a2e",
+      "independent_sha256": "a126b5793f23e6329d405be10e74cbe0c9d916739bc14fe507358cc8d9a06971"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "rmse": 216.08819354082837,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "157e2e77a4c2aa181e40add9c84f46ef50b4f2fe3bce442fbddb493a447dfe18",
+      "independent_sha256": "c7a9155dfb4152748432492fed45039016cc805227ad75030998be35e412e986"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "rmse": 189.5743481922559,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "fd9fe106e575ee3eb7c95d19b91f59824e39670c47940ae6f37fadee0543492d",
+      "independent_sha256": "bebe03721a77c145224ea56d89c48cccfccb39182584a6965d2c3bf5d79a041b"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "rmse": 176.48707698362293,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "477e807b7829ecd0aa92de7027d74fa6d6b0492361335a8014bccf1d9e22b42a",
+      "independent_sha256": "0fad9c87157341871159c32251bddaff73d69d6e68d3a8147d5f863eb0dd8c00"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "rmse": 176.4574279814182,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6b8bb0de69009cecec8c6c2a735a73a238d07245a43ce2db2f9b2363c76456aa",
+      "independent_sha256": "2b6664d27f6c8e69ddeb5376354331c14aaa0c8f3a6e9b41e3d85fd047b9bad7"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "rmse": 184.0375037110177,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6b52fb942d07a681cb8b79fd869f94f9b59a26e1613a1fbf891e8fe4423f8b15",
+      "independent_sha256": "68e0d53691963c1b2723444be5166c51be63b33704b7d673e0d7e87e7e66cfcb"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "rmse": 192.5447207498462,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "dec62249e355939da4b7a54fe582a978e5aac0a534dcf23cb73c14bfcc02a5f8",
+      "independent_sha256": "3bc29ad8417019a04ec3ca662470553b26ad6464c449b959e10b81ee723061bf"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 50,
+      "rmse": 0.08179410342833109,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "5c12c46ec9a21a83e122c6d2125fecfdcaf25f5876cfa8edb95d648bb7d05c58",
+      "independent_sha256": "778a473262b0d325122b953342731ca53ad571d4a3a50bf25dd332bb43a4c125"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "rmse": 259.13482365280976,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "af2342f1b37ff285679b0cc7946d8863859ffb34179cbefb1561a84da99f5953",
+      "independent_sha256": "9cedb268dcb93c9e801993af900e957aa3f64d7e4691f3488d89360cfce6aa6c"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "rmse": 341.5225960491464,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "15efd2b01102093dd1ce2d4005a95da3ee6815078434e515dc98480c3ed423f9",
+      "independent_sha256": "fe8a9695a0136360b1f32229e1a0d88069f28b46c16b96fc3e8a8ad42a2f8bb9"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "rmse": 445.77652803374895,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "39e4129e52096f029ef3147a40ac95444d476dd0eca0858a768fd01cda29ff4c",
+      "independent_sha256": "7b90aae311399d18c7266a3801db0d40407cdfaef8c9ebcfc60b3c6431111478"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "rmse": 525.9008634183832,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "21ac80a0442dcde064d7c4213f998232840a4825b0788a1ff72bd49110186c32",
+      "independent_sha256": "10f30f7775ac4d5bf38a6bf2a2b8eb3f191b027e9dfbc7108129414ac243f1a5"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "rmse": 531.1815813048817,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "5003aa47f348eb4987893346c2b644fca04745be63aaed20e6cb2755fa3bd9c8",
+      "independent_sha256": "e51b143a05eee244976f39eebf937523644fd9dea36eb1c42809306a1516238b"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "rmse": 450.73723153218157,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "afdbddf605247a52d22d43dc2ea8dd3c9f47eb40154051ac616f588f7cff7a2e",
+      "independent_sha256": "eed9afa0fec098f2022ca4d6bb26ca2052bb0293b90cddca02cf92d81dbcf811"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "rmse": 361.05703474302993,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "157e2e77a4c2aa181e40add9c84f46ef50b4f2fe3bce442fbddb493a447dfe18",
+      "independent_sha256": "e0653f50230a3717f51d42e47b593644a263822c8ab66f40016cf8d34683eb8d"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "rmse": 297.60066618055856,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "fd9fe106e575ee3eb7c95d19b91f59824e39670c47940ae6f37fadee0543492d",
+      "independent_sha256": "dc1318a66ca83c31cb5d3d33d35e2bcd509472cd7659d2cc93044ac70de77815"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "rmse": 261.91683626677536,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "477e807b7829ecd0aa92de7027d74fa6d6b0492361335a8014bccf1d9e22b42a",
+      "independent_sha256": "0f79a1d97b87b6fcf266100c48e0d1523f501451b38d7b5673a0010dac40dc22"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "rmse": 254.54355679888653,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6b8bb0de69009cecec8c6c2a735a73a238d07245a43ce2db2f9b2363c76456aa",
+      "independent_sha256": "46ca9fae6d21281e7ba2cbbdff6c8380a9ae95df4c7017b2ca2896348da3c3bf"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "rmse": 269.4668926591297,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6b52fb942d07a681cb8b79fd869f94f9b59a26e1613a1fbf891e8fe4423f8b15",
+      "independent_sha256": "fcc8dbc88adc0bee338c2b40eb5c32b6e3f5cd15b89de6947893c5789713d9ff"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "rmse": 286.6387973282564,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "dec62249e355939da4b7a54fe582a978e5aac0a534dcf23cb73c14bfcc02a5f8",
+      "independent_sha256": "35b07cb4af677c6ef461a09d5ffac2fb4c8218f27ad143a0a35e7a378b872b0c"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 50,
+      "rmse": 0.08191591363983868,
+      "rmse_limit": 1.0,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "600787e4f297ce557fba8d6ca0de4cdbbf532e3a4f547b6dd350fe8138a613d2",
+      "independent_sha256": "7b02f9543a041d89b74db859d3ada51d563c4380003e96e00762ba215065a5fb"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 100,
+      "rmse": 354.38269668445923,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "af2342f1b37ff285679b0cc7946d8863859ffb34179cbefb1561a84da99f5953",
+      "independent_sha256": "72fabf6650c319a28ed4fdd8a5ab998b4687cde97d414c67c427bfee546987f4"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 150,
+      "rmse": 476.8426851311427,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "15efd2b01102093dd1ce2d4005a95da3ee6815078434e515dc98480c3ed423f9",
+      "independent_sha256": "5b5e7e84d3bb0fb5fd34c95e862122b1bc9c0521f7b080675be1e2f98e9e0938"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 200,
+      "rmse": 625.1824438778782,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "39e4129e52096f029ef3147a40ac95444d476dd0eca0858a768fd01cda29ff4c",
+      "independent_sha256": "3a4c431a0acfc263b8a8d5ba01285f4f793d097d3419491b8bf5a6e366683d74"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 250,
+      "rmse": 735.8479281447546,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "21ac80a0442dcde064d7c4213f998232840a4825b0788a1ff72bd49110186c32",
+      "independent_sha256": "aad34a2d1a40afce2abf1df7982f2db357bdf09b0ec1c6418e7c6043b6316e6d"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 300,
+      "rmse": 743.3214786430432,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "5003aa47f348eb4987893346c2b644fca04745be63aaed20e6cb2755fa3bd9c8",
+      "independent_sha256": "4a1cecc245500f3ebec00c4f4a396c63371afdb9b586afc9bd501cf5db6b421c"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 400,
+      "rmse": 633.163840463646,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "afdbddf605247a52d22d43dc2ea8dd3c9f47eb40154051ac616f588f7cff7a2e",
+      "independent_sha256": "6000abe5afd5eb2654a182405b6b3a7dde20cdc7ff2094f9dbc88d221ce670b6"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 500,
+      "rmse": 511.7691752996937,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "157e2e77a4c2aa181e40add9c84f46ef50b4f2fe3bce442fbddb493a447dfe18",
+      "independent_sha256": "0da1edae89f2b50b919261451f055a012a81abe270a70291f7ac8574af3eaac8"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 600,
+      "rmse": 425.54249386993644,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "fd9fe106e575ee3eb7c95d19b91f59824e39670c47940ae6f37fadee0543492d",
+      "independent_sha256": "d390af6f391898152d8f0e6963e1c14e65d4b7c7bf0ba275fcf99bf94e56ad41"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 700,
+      "rmse": 375.29091749666384,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "477e807b7829ecd0aa92de7027d74fa6d6b0492361335a8014bccf1d9e22b42a",
+      "independent_sha256": "74e6d51539524de843c465127a8af760d5729defcbbecfdf6eeb21dd1c9853a9"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 850,
+      "rmse": 359.16730764786524,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6b8bb0de69009cecec8c6c2a735a73a238d07245a43ce2db2f9b2363c76456aa",
+      "independent_sha256": "2470d94136ec36353e5dd435c82560bf3028fd1282b165c03cd0689814546182"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 925,
+      "rmse": 376.5378718630839,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6b52fb942d07a681cb8b79fd869f94f9b59a26e1613a1fbf891e8fe4423f8b15",
+      "independent_sha256": "d2cec3dc013dc710ed0be2009d0dbe683be8b74d3804f0dd51d6c27469ee3809"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "geopotential",
+      "level_hpa": 1000,
+      "rmse": 396.1958910503868,
+      "rmse_limit": 1.0,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "dec62249e355939da4b7a54fe582a978e5aac0a534dcf23cb73c14bfcc02a5f8",
+      "independent_sha256": "2e80ae1a8ebf134f151f54e1c89ecf1b26d2fd7878b2d98ff40bbbe7017465c2"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "rmse": 0.00019320703826348985,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "a7aaab5e2218f0371be4cc397cb5800bf2a7ea079e0e576c966e75b744b61764",
+      "independent_sha256": "706992198eb931e33f6a0c6092ce5132ff8a73b4a2468e17b5f08464706b0de4"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "rmse": 0.00022109688828298617,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "e14d6548c9fefa23e1de219741e5174a65dbe90fc0f2d5036ffd08c1e736e675",
+      "independent_sha256": "b93a4373bffa9f433160f78e9c821fbcdeb75c901093a0b5e6cd61fbcbdf16c3"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "rmse": 0.00015473923326776435,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "601bdbf3fe1bc7a700e02718e97fc02edae1446c93295d21eb8b5255db7c8d80",
+      "independent_sha256": "22e2224242bd8f66b0e2aaebec5c87987c0b7b2497da770794272bea9c8a29f1"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 200,
+      "rmse": 0.00015810406349454141,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "f736fb008a6b63afc884a0eb59dcc000d0e8ce5b2e32609888809ddc83a08bb8",
+      "independent_sha256": "367cc07b3fb91fe8b6ec6d35c570ad7351f7cf386d7105c2c126f8cb97a439a7"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "rmse": 0.00016782248495703076,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "b73fdacfc6f2c946e0c8718dd508db9b51673a1dc5ac923ed96f2dcd0a7a095d",
+      "independent_sha256": "1f764295e9d9872e702d0418c0d99defe3eda3fc10a6b057eb57e33a73425da1"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "rmse": 0.00017851822047419585,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "e43811eaf5fee890348bb108cc506da7484f646230926fd08bbd48a9fc8572fb",
+      "independent_sha256": "208fec027510cd5c56a1c38f76caf0cdbab1edfe3b59320ae26859fbd5874961"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "rmse": 0.0001931236657977466,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ed38209908263a11eaf791b9ba37c36853ab4cfe359911841d5317c6884733c8",
+      "independent_sha256": "001dca7ebea8b3e7245dc0805792b7a6b33fa5cfbd4b5e985c0dcd1eeb094d69"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "rmse": 0.00021489423849042438,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "031991e4b0e3993f6e251a674546ce6098e59508e53e225c444e22e805c0cabe",
+      "independent_sha256": "4f22a1c4abf95fbe2aa8e35d9b046d713c6ed45273fb5ed2b194b41079397ece"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 600,
+      "rmse": 0.00028867951084141997,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "71f070223fe7dd20cec46dd5e41e00c02351db41095268160e32ffcf2f78f1ad",
+      "independent_sha256": "005793e55c3cdba9ff8a224f3764f4e99172fa8c0fe92fe18f8afe52fe09795d"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "rmse": 0.00029212578397107075,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ad36eba4f777c50af663703131ca05e06bd789d530e710e1364f83963f9e0f23",
+      "independent_sha256": "82522b619a0799b0ac3e78c6a240034b49df13b3b05ff789e5a672983e150fec"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 850,
+      "rmse": 0.0003089095982686636,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "22768ec7dcbbd1ddd6914e6ada9323db13c06dcbe54f51a076127b4e70a048d5",
+      "independent_sha256": "a01934e972e05fe887073340704f56a9fd7b8bab6bb7d74f090a839127fccb97"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 925,
+      "rmse": 0.0003505634524542199,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "541a989cbd58712490dfa7dfadae60ed7235dcb01a179c4450cd7544cf76ca81",
+      "independent_sha256": "cc650f1eac60ddada5736bdfd503de6ec53915414b5ac5a572a8c995efc86eb2"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 1000,
+      "rmse": 0.0003619846603252746,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "8289954c32be3e97eb7e9ea166c0707209a9997300ec62d697406177a5e4f0c9",
+      "independent_sha256": "bb2b9d318957700b5bfc32d3f83727b0c1fd72072ce060b56edcd8d9a795f4b0"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "rmse": 1.3836535538347696,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "fedb214898a8f829c451cf9c1aace85d101a7085e714365ae30eb45b8615d3f0",
+      "independent_sha256": "fbc9c3a0dd4ceb3caad42fcb3c50635a15f141c6d99101aae07f5edb6beae161"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "rmse": 1.1432666965533171,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "daf2de54d7c308d0092e07bf56ced9df972dbc70d3fb5fdf81e46663017a299f",
+      "independent_sha256": "aeea5f4b9d590e87e1133e2bb7bb956dbb2581d6ceee3b4cda27bc299f2fe8d2"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "rmse": 1.1111978979442472,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "9ad487dfddd11347abeac49a3579aa4f817cb6ef871a2b111ebeb069c6f185ba",
+      "independent_sha256": "557e496bbd520b5ab07ead9d0d71279bc55d567822bc34cb5d031024d87b1ef7"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 200,
+      "rmse": 0.00015762764667088904,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "547eff12743fa819f6107a5c925c9606aa4acb1d9f9ae6016bef4e4154830d8f",
+      "independent_sha256": "106194c970fa48c130f32d6d8810f58836c9e10bcf2d541a149a86077f2ebecb"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "rmse": 1.1923392844208696,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "b33d9f65fd3c1c8e2d020709ef791278dc00bd99609c1f80f7ae799fc3e206da",
+      "independent_sha256": "d7f31e4598840985829565d31741a8812433e6df6bd4b51971f471b938fa3229"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "rmse": 1.0676836457297434,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "5edbf905868a6863d7dff60ac3f03c67b240bacc4555425b326590eb21d78044",
+      "independent_sha256": "558cee86dec79609415baffed48ae06f1d0fb6f9cb1ae0c6e41191db599f6010"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "rmse": 1.197999108583095,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6197b43b3b848f6e1698efe3acdd1a4a893b08552943a3daf1365988e4c6b448",
+      "independent_sha256": "72c0bb637f9dc918469db3dcddbf715886d39396571f2730274a3892240dc7f5"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "rmse": 1.2375280426218735,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "eb722211542e2606f2f3d6550da61acba937821b1581484a74b5137809a97e36",
+      "independent_sha256": "ee35a2fa61be972293ab4fde45b0ae4abeaadedf2fcab5ec084b98d54c8b6fa2"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 600,
+      "rmse": 0.0002895148922728885,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "629e0fc7ce8126dfe922465bb000beab8562e2d1f9de4aa8ffff34958e7629a0",
+      "independent_sha256": "7fdece03006cd5bf166236e18fe7a2d521e16fe72ba736060ab57e4a08631a00"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "rmse": 1.1788862582622148,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "56a2b22d31d974ca66cee0151e5894775507c0152745efcb30e321c170e51849",
+      "independent_sha256": "abead34a9864c583d9e11291efd311702d6a04e8145d1c94eac929f86604a696"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 850,
+      "rmse": 0.00030978383785969834,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ebe2909975001af3428bb2930ccb1baf5e48d65e7102484bf9b57a30fc86e3f1",
+      "independent_sha256": "58977fd3d266e16e9f6c210e97d297adb28f602f84e8dd4072e8e9e66928cf29"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 925,
+      "rmse": 0.0003498652377532534,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "54d51ad8c8705892fa0dada49fdc32688913bd7d803e2ed50a2a6838ef897994",
+      "independent_sha256": "54cf14bbf3a4fefe3892c06dbcbe223b06289f9e7be35427a8b8865f308d0010"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 1000,
+      "rmse": 0.0003632887539865195,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "7a7f92982070b85192f974a2f8c5557c1182f37e5943a7ee1cdc35e7982e8323",
+      "independent_sha256": "693a6ce4b22995fab0ab280bd605646ba7564046ad58ac04fb077aeafc9ab3d4"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "rmse": 1.6880892099567228,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "fedb214898a8f829c451cf9c1aace85d101a7085e714365ae30eb45b8615d3f0",
+      "independent_sha256": "60eebddfb63b7aeaa8d068f72fda5473ca342b30350af0726406cf2ed65112b3"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "rmse": 1.6275853374617828,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "daf2de54d7c308d0092e07bf56ced9df972dbc70d3fb5fdf81e46663017a299f",
+      "independent_sha256": "1c77e23d625b19a97fbaef3487737b9e39cff930e2db0f527eed346756fdaa7d"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "rmse": 1.7949139363301916,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "9ad487dfddd11347abeac49a3579aa4f817cb6ef871a2b111ebeb069c6f185ba",
+      "independent_sha256": "e63c677a140ceba1b63b5446673e4eaae2fe1e605962e00cc18e5af211aaa2bb"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 200,
+      "rmse": 0.00015837887670479663,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "ac165075335468760cf84832df83ebd8e7b1599e51162d890d79b073aed00773",
+      "independent_sha256": "2d8324fe2c2107f1eb6ea375c8092a18f251b4dd14ffcbe27fe94643faf651b0"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "rmse": 1.986169132903429,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "b33d9f65fd3c1c8e2d020709ef791278dc00bd99609c1f80f7ae799fc3e206da",
+      "independent_sha256": "2bf3797d4aafe97bdb24e1689d203efb14011c33f0439bcf34b5c5d30b7fd027"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "rmse": 1.7006498299840296,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "5edbf905868a6863d7dff60ac3f03c67b240bacc4555425b326590eb21d78044",
+      "independent_sha256": "0b4376fb7d153fe9d38a76cf6d641f533d65df77a98a5ebf0c21d611de5ba225"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "rmse": 2.059325396004629,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6197b43b3b848f6e1698efe3acdd1a4a893b08552943a3daf1365988e4c6b448",
+      "independent_sha256": "d708d14e31e699f3942ea51777760bb98f84b7702d021cd52b2de6aa424eaa31"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "rmse": 2.1570833479681104,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "eb722211542e2606f2f3d6550da61acba937821b1581484a74b5137809a97e36",
+      "independent_sha256": "c95d4e058b70ccadb2584751929b16ed5163464a7cce066dc02cd11c1015bfe2"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 600,
+      "rmse": 0.00028919507640467036,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "a61bb5b7ee1455194105bba7eb624256f848f5ff222e7975ef3cef69630b6416",
+      "independent_sha256": "c4e8f3b95fd0a8a7d4e66369adcfca67efe8779825f46bfcb9fcadbb7e0536c0"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "rmse": 2.039079798788473,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "56a2b22d31d974ca66cee0151e5894775507c0152745efcb30e321c170e51849",
+      "independent_sha256": "e73ec201ceb0b77de68d3d12739fc58bb11802a1f9759b2e63d0d7b0d75228cb"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 850,
+      "rmse": 0.00031082542926750813,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "92d5e94924d80880247c878a54722b3de2986ce834b703573cfde60bf6cb0f3c",
+      "independent_sha256": "73376fc96d73de630fe06d3c8446ff4ac7e3e5f8e5ee3fa185626ac4247632af"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 925,
+      "rmse": 0.00035039788078043655,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "51b1956a67730a88852b8030f57d277f131e9b50ae90f93e39421e4b114aad09",
+      "independent_sha256": "dbe393fe27c24c656cd99852a739261ee48aa98769dfb690781b84178b41176d"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 1000,
+      "rmse": 0.0003623579891923258,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "cec273d48f57645ed4266ae1eb9decdfece6232636abb1f18c89764275cc711c",
+      "independent_sha256": "86b4790991361409d22566016e2283138642dbfd3af61507e76df0a073ba3dcf"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 50,
+      "rmse": 1.8546111066300375,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "fedb214898a8f829c451cf9c1aace85d101a7085e714365ae30eb45b8615d3f0",
+      "independent_sha256": "4bc4a930cde8e3323c8fb79c863e8d69bfa8ba23ee6d2dcf1cac81ad940f66da"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 100,
+      "rmse": 2.059680135443667,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "daf2de54d7c308d0092e07bf56ced9df972dbc70d3fb5fdf81e46663017a299f",
+      "independent_sha256": "8dc44b243b122e6593b8cb7348b7769325226393f6ea4820f892e375b1449977"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 150,
+      "rmse": 2.3072859348230303,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "9ad487dfddd11347abeac49a3579aa4f817cb6ef871a2b111ebeb069c6f185ba",
+      "independent_sha256": "31d5cf3cacae3f12696c386a0956c1fc9494d2dd4734b5f9217799071331220b"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 200,
+      "rmse": 0.0001580923146565139,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "f5dab4ad86a26207a514965eba1f5135829159f508f0497b9fa35d709c095302",
+      "independent_sha256": "c3978806e56c99203843a2aa497259df4990dd5d1ea64d2904d8ee498e016e82"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 250,
+      "rmse": 2.4732782987584425,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "b33d9f65fd3c1c8e2d020709ef791278dc00bd99609c1f80f7ae799fc3e206da",
+      "independent_sha256": "6c29e0c9568b8b6a18f50c844668c22102fbb728353dcbeabf3db0bc3283e01c"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 300,
+      "rmse": 2.0733461611928585,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "5edbf905868a6863d7dff60ac3f03c67b240bacc4555425b326590eb21d78044",
+      "independent_sha256": "e5f8c966e8f6c563ea936097d73857897cecbc819e3937e6613a6e375ce86ca6"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 400,
+      "rmse": 2.6387682596263238,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "6197b43b3b848f6e1698efe3acdd1a4a893b08552943a3daf1365988e4c6b448",
+      "independent_sha256": "c583b9d189ee129c6202d20d85b19e9e76d76363b7dc0f7573c02d9f3313e242"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 500,
+      "rmse": 2.7950456287394156,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "eb722211542e2606f2f3d6550da61acba937821b1581484a74b5137809a97e36",
+      "independent_sha256": "4c6811e98a2a260d65505804f4e49a4e95813c2d05c8af8eeb40fb64c7efe425"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 600,
+      "rmse": 0.00028841336494107584,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "297536dc96632b39f0a5649632358d3bd217d383d1c30b6d1b95aae592669f70",
+      "independent_sha256": "2dea576920983644c945141d8389b3833a00d1dd10e9e78d2c3b62ee5af445c1"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 700,
+      "rmse": 2.64180466448556,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "56a2b22d31d974ca66cee0151e5894775507c0152745efcb30e321c170e51849",
+      "independent_sha256": "7d221763a1069f532486d753b8638c19df2f37641d216b6f67a57127137d7eec"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 850,
+      "rmse": 0.00031056107565164673,
+      "rmse_limit": 0.01,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "83224cf7335c05106164021091eadbfb90789a42e06263ef1e87f1dab6ae38aa",
+      "independent_sha256": "d07abbb15a6a58495ad4c57738a4a735abb2f703e850b62947539a0c7c4a2e2f"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 925,
+      "rmse": 0.00035086309740116356,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "6098be49d8fbe20b9884b13dd451ee79ab09d0417b678cbfef183eb8e7a044fc",
+      "independent_sha256": "e78fa03d69c07821ed941c9934a86f3018a0d5251d4b51b00262975eb7de16f2"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "temperature",
+      "level_hpa": 1000,
+      "rmse": 0.0003615410554255404,
+      "rmse_limit": 0.01,
+      "control": false,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "12201ab002f35041900823bbc504f326c15aa77beb97949961e1f5ef267589b0",
+      "independent_sha256": "a2e63e0380d9cb0ed28b66e5c0e7e3a98efb3e5013825212ba6e69f3c2fe8a0b"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "rmse": 9.208889408134061e-12,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "b78eadf6f1c54d27a4c1478f650f8a1efb2b169c71f51a463492f689b8714023",
+      "independent_sha256": "c31b21be597bc7f26d3bfe221cfd48a4ff4a1789c3371b6c62db313a98692543"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "rmse": 2.0422345435909654e-11,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "823328ff0086730acc8ac5e87c9bdad798ba826b4ce96057c3300284614b31ef",
+      "independent_sha256": "08c22a78a8ced95ea9bcb54d188b0280cdf7193c1325092b66c8140684c621ba"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "rmse": 1.207256403777142e-10,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "034c1f4900fbb9b9e8068cd39726f6979715de0ef3051dea00182620b6e72e86",
+      "independent_sha256": "39c63e713795b4b935d51189091d1cc7d65d59713c410b5ff721e364576e3d06"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "rmse": 7.802134415027243e-10,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "58e28e731897af080e01c954d2c576eb0e629368a49ba1344da558ef847148c1",
+      "independent_sha256": "692312021a361e140e31d5d44d65c6415f99962d84eb4ccf38fafc960298d5fb"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "rmse": 2.7086439518543246e-09,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "aaca5be6c8b0ce02b058768cd3df977694d7109e93796c794746c4b19b4bf90b",
+      "independent_sha256": "f6a63b6607348f7e9bdf8c1afecf4b04fc9cb04b2ed0208795e7262ce6012d55"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "rmse": 6.331744207475912e-09,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "2602461ce8edd761699b839c79fd257509c4f71548194e427e238bcc201ddfb1",
+      "independent_sha256": "682d88441d8e531ce34777a1bcaae627e60a9da29535383b3fe359dde1aa29b8"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "rmse": 1.7097259340115258e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "56880647e5f6e600aabc4adbf01ace587be699d1f53641b408a2eff568fd3dbb",
+      "independent_sha256": "3b3ebc3eb433f77efac7ef83e74d4a5d726497d1111f9bdec87443c796b91a5e"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 500,
+      "rmse": 4.022297104270499e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "b21c7a7ff16125f595e55717a765dd7230e5722d18b6a7a1b18a728018ed209c",
+      "independent_sha256": "0cde57b4452573e3346b8e19e52481cf02cdd25f0a19c380059afa74b0de5b46"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "rmse": 4.24155606758965e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "f6afa55cf3b3560bbd5937021a82917e9f02dfa800d91bccef0656c333800953",
+      "independent_sha256": "8d9a526cb5788c5762fe72f2682e1be862bbd45ce9b615ea60e8deb14dc74803"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "rmse": 5.73160886208984e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "99e36a6764b3413f5f200282be2c4a09a823231ba08ad94c9169abaa02ff7530",
+      "independent_sha256": "68901b09721b7fe1e60c0decf34d6d7b6b2b755f4b11932b5a7c51e1acb31786"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "rmse": 7.264575846958017e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "b606e5b9a715aa7332e6d5f109fa942bd538a5604b2229266a043a97f59376f8",
+      "independent_sha256": "28ca44e4f0d5e8d998fc3c1398d5a8137057ef716928a5dd4018350ebd2e5c02"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "rmse": 9.03775860613167e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "4f3d5f885bf452d89d5e46810e564254594f98a183f431bc23ddf031f026faae",
+      "independent_sha256": "10643a7be0eaf01dfe541b3026f942899520386ab32d5a45e284e49a4f6dcf9e"
+    },
+    {
+      "valid_time": "2023-11-10T00:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "rmse": 1.016257256261167e-07,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "d675d9a25d68d6ac22ef3d634d1d5248f7e3e5cf5fd23d35ef4f83c5b5c1de81",
+      "independent_sha256": "4a8d59cd0dac2e96c7ca1ea3e29c80916eb94747dedc0e365a273180992844db"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "rmse": 3.521681543210165e-08,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": false,
+      "original_sha256": "de0340404fa11b0a075824f6bea3286a10bcd46b16f7975acc39923d8f6b6273",
+      "independent_sha256": "b05e679266d6499b8aaba8f258eeb2658fd190da6daae9531399ae57166efead"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "rmse": 1.8617104344406783e-07,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": false,
+      "original_sha256": "635b658e4749b772e8e8aa5aff82029e8bc47a4a0ae410fb7031f5bfa3ea416b",
+      "independent_sha256": "1cff952dfff8719f4c17671f1856081d68ac7a6d3a986e9d2218c8bcecb2a11a"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "rmse": 1.889134393450953e-06,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "ea7633f7372a27e3f8c8552f75315c7fceb7c838673699d164e954cf6ab7f8ff",
+      "independent_sha256": "e839a26a1ba188099407228d3512c958ce368fa8700f5f8f5f682d3c86b00edb"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "rmse": 1.3436057729494926e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "4311c0814a26d7b163ae654604a8c9133a4615dc3589ab41de6ef298b037fc0e",
+      "independent_sha256": "033a29f604f168bee964c3d0d34b5180cdb7bda88bfcae2fe206bf0e6a20de50"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "rmse": 4.2679491360364745e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "7dbbe5ba0e4afe9da5e61810bc092bb12349a21624f9ee58c06a1ec26029127e",
+      "independent_sha256": "abfbe3cb5497986df8a0910c6dd31ce5d2610f6de2f9910cfd124f1fe7f2dac2"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "rmse": 9.105594406561827e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "d0b29aa777118a6508ac94ef08da45f22ed1d6d00b13cc4e1c4da2c80cc24a66",
+      "independent_sha256": "83b9beb065449a90b8fbb397ff4a88bcca485d1cc6d077c74b76bec414c5978e"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "rmse": 0.0002538092030577488,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "73f9333539e0538b19529089cbbeba05b46bcade01fd48cb9c1b8eb7436eb16a",
+      "independent_sha256": "f20bed114cf8e5db64ad7f7410cc5ee92b5f0a1f6dc3c6204462f7266ddb81f1"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 500,
+      "rmse": 3.996955741928383e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "fe2e4c87d1cd81fa935b67983038c0d9095d09ee219518a49b3f6fca6936f33f",
+      "independent_sha256": "a19520bcdd930e26e78c32f85ad3a8faf4a01ea16f91b8ff0060b5668847f461"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "rmse": 0.0006714877846544689,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "4b96e311b1b48ac8805336c9c7046a89aa516b23cbfb7d07c76ef7a0b968927c",
+      "independent_sha256": "896c90794d8de2c05428aa475e253e0016be56c8f149de38211a9e851e9cbe55"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "rmse": 0.0009420511190230133,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "62fd2f0a293332dc8d3fc82a67bb3cae22b64d33d69aa438c9505fc2364e0b00",
+      "independent_sha256": "79cee582fd9bd49e3cbab7caadf9aa93dbc98427450ef8058de91b0e590e7a7a"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "rmse": 0.0012036708166353973,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "7d5f925657cb6dda5e9936fddf91db21159ec3b50ef798c5fca42c33fdf6b538",
+      "independent_sha256": "dabe8b45d88e8b4dc8276ed6f42966fb8a318f43f0fea59833fa35c33289312d"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "rmse": 0.0009394481487484749,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "a87ec87460a2d9f841cfafaa610482a3b908d37dabda0850d13358d31c016312",
+      "independent_sha256": "a2baa6836561b0caae9071a50c07903293511192f9862fdf29994e4dc6a7a290"
+    },
+    {
+      "valid_time": "2023-11-10T06:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "rmse": 0.0007289223719130287,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "902b1362f4925a0a881d11760f050436747f8411946931291265d89f72ad4ac9",
+      "independent_sha256": "fb36248b3cac8ee8b1caf6d2e339f9d336c52ee14367b8a4691a01840345e38c"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "rmse": 5.399391322412181e-08,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": false,
+      "original_sha256": "de0340404fa11b0a075824f6bea3286a10bcd46b16f7975acc39923d8f6b6273",
+      "independent_sha256": "7df2c83f931ae994c6f07f3f46447f77105b77066b8dbbcbace6a16efa71c851"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "rmse": 2.76377254082802e-07,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": false,
+      "original_sha256": "635b658e4749b772e8e8aa5aff82029e8bc47a4a0ae410fb7031f5bfa3ea416b",
+      "independent_sha256": "538c3af56a367e48a41565dbf26aad4972e51408471f67a61db0605a3481e1da"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "rmse": 2.4675851965281843e-06,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "ea7633f7372a27e3f8c8552f75315c7fceb7c838673699d164e954cf6ab7f8ff",
+      "independent_sha256": "cb0f1a52d3ba9a1c8cd66cea2f4f31274c24da46b19f5b3599b7a3019607d768"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "rmse": 1.786667607360275e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "4311c0814a26d7b163ae654604a8c9133a4615dc3589ab41de6ef298b037fc0e",
+      "independent_sha256": "d4e42354ed7bd306201bdd84f6e9819ff9fdf7560dfcf5b29b23421702c01275"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "rmse": 6.037666185132552e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "7dbbe5ba0e4afe9da5e61810bc092bb12349a21624f9ee58c06a1ec26029127e",
+      "independent_sha256": "b86c3e668f9c179824d39abd02eced683559f66ba782e7dfcc9f199e0fd94b07"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "rmse": 0.0001333080801318518,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "d0b29aa777118a6508ac94ef08da45f22ed1d6d00b13cc4e1c4da2c80cc24a66",
+      "independent_sha256": "2bc9c19fad3dff8ac9e351ab6100e7d1f4725c43557e3b90b83c819ddf409767"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "rmse": 0.0003808376472489688,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "73f9333539e0538b19529089cbbeba05b46bcade01fd48cb9c1b8eb7436eb16a",
+      "independent_sha256": "17c7b946bd883fd053deac2d9f0b5557b1677fbe9a7c5996826464a28406006a"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 500,
+      "rmse": 4.005253029744089e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "1c4611918fa21d5cc9d931872708c23faed32416f72d7a08009ace89c04855ea",
+      "independent_sha256": "516ecd6ba369c601c9061c6024c2db2baa433571f14bf11cb1ddb7c047a1dbef"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "rmse": 0.0010113283981852648,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "4b96e311b1b48ac8805336c9c7046a89aa516b23cbfb7d07c76ef7a0b968927c",
+      "independent_sha256": "43e0d9340e32810238bee380b334ebb435859eb6a34010761a4b36623251eebe"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "rmse": 0.00139016266294656,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "62fd2f0a293332dc8d3fc82a67bb3cae22b64d33d69aa438c9505fc2364e0b00",
+      "independent_sha256": "5112a6a56aaea3f6ee242023a295ae3d7ef5ece613304421119b7b628dcf90b7"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "rmse": 0.0017168245435711512,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "7d5f925657cb6dda5e9936fddf91db21159ec3b50ef798c5fca42c33fdf6b538",
+      "independent_sha256": "a188d2b866389f463b4af5477c58f443f4e157971d53dc8eb7a99f85abaeaf52"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "rmse": 0.0013368376750500423,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "a87ec87460a2d9f841cfafaa610482a3b908d37dabda0850d13358d31c016312",
+      "independent_sha256": "7480758648bcd01f2d7aa7df138c8f8759129c01a263ae1d04b866716dd86e96"
+    },
+    {
+      "valid_time": "2023-11-10T12:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "rmse": 0.0011535869733165943,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "902b1362f4925a0a881d11760f050436747f8411946931291265d89f72ad4ac9",
+      "independent_sha256": "ec928bdbb1659e40290472ca8f8d2763abf1beec6b1eda9b85e50a15fd7b1103"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 50,
+      "rmse": 6.649957977441928e-08,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": false,
+      "original_sha256": "de0340404fa11b0a075824f6bea3286a10bcd46b16f7975acc39923d8f6b6273",
+      "independent_sha256": "0397b6abc583cc8d787790f6fcfc31b27056626d2dddf2c8b5355bb75f93d0f8"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 100,
+      "rmse": 3.2325680239889613e-07,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": false,
+      "original_sha256": "635b658e4749b772e8e8aa5aff82029e8bc47a4a0ae410fb7031f5bfa3ea416b",
+      "independent_sha256": "ec6721fe4350e988483c6f6924fbd933dec34e9a4ecd9604fd1e83158889a967"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 150,
+      "rmse": 2.6819779695852637e-06,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "ea7633f7372a27e3f8c8552f75315c7fceb7c838673699d164e954cf6ab7f8ff",
+      "independent_sha256": "2f399bcff0bbfb89c05eca3560ab7972def9ad1ede1f2c346334e4ee1fe0cd92"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 200,
+      "rmse": 1.965340358244831e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "4311c0814a26d7b163ae654604a8c9133a4615dc3589ab41de6ef298b037fc0e",
+      "independent_sha256": "74439c6a46eb40344b6d91387ee35ce6629a4b52e80cd8f4107342974d7978fb"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 250,
+      "rmse": 6.972793744061411e-05,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "7dbbe5ba0e4afe9da5e61810bc092bb12349a21624f9ee58c06a1ec26029127e",
+      "independent_sha256": "72ebd75ca3c104e4c1d0152994cf599f91fa5e966efaf0f552085a17ee715f47"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 300,
+      "rmse": 0.00015412414729474306,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "d0b29aa777118a6508ac94ef08da45f22ed1d6d00b13cc4e1c4da2c80cc24a66",
+      "independent_sha256": "3b3efc5c7ae77ccb77d85ff0989573555f9779e526c251f7c3379154f18d2dbf"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 400,
+      "rmse": 0.0004525689877954966,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "73f9333539e0538b19529089cbbeba05b46bcade01fd48cb9c1b8eb7436eb16a",
+      "independent_sha256": "f1de4f11520a3e702a3d5823150c6baeea2706e0d3a222d9429f9c26d817209a"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 500,
+      "rmse": 4.001796404740244e-08,
+      "rmse_limit": 1e-06,
+      "control": true,
+      "repeated": false,
+      "replaced": false,
+      "original_sha256": "03e34594e64f712c09a37df33d9b4212a77945b01f8eeef0d8b27f771fb3b29c",
+      "independent_sha256": "13687a0bebfebbf37b724d744ee1ae84adec56864b34bca09cfe2224699f1592"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 600,
+      "rmse": 0.0012067153855769798,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "4b96e311b1b48ac8805336c9c7046a89aa516b23cbfb7d07c76ef7a0b968927c",
+      "independent_sha256": "a98ccb39a1572bfd9eae0cd1d9b77d1072cf03d0368d6a5cd64ff46c78b56417"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 700,
+      "rmse": 0.0016126024540220505,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "62fd2f0a293332dc8d3fc82a67bb3cae22b64d33d69aa438c9505fc2364e0b00",
+      "independent_sha256": "6117083ec6675db0f8b16e158f3eca644410f62f9bf1385fb2f7cac808391f65"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 850,
+      "rmse": 0.0019415648781490468,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "7d5f925657cb6dda5e9936fddf91db21159ec3b50ef798c5fca42c33fdf6b538",
+      "independent_sha256": "1a3a24442970a6aff6acc067beba65131ba0ff13c2912ba8c04a27d409c696e2"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 925,
+      "rmse": 0.0014992771834650821,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "a87ec87460a2d9f841cfafaa610482a3b908d37dabda0850d13358d31c016312",
+      "independent_sha256": "d6c29ccb2dac9e79903402c93f2a237d0fa562f49c14e96486136b83437e2ed5"
+    },
+    {
+      "valid_time": "2023-11-10T18:00:00Z",
+      "variable": "specific_humidity",
+      "level_hpa": 1000,
+      "rmse": 0.0013821281182180999,
+      "rmse_limit": 1e-06,
+      "control": false,
+      "repeated": true,
+      "replaced": true,
+      "original_sha256": "902b1362f4925a0a881d11760f050436747f8411946931291265d89f72ad4ac9",
+      "independent_sha256": "e04c085658a1af78ffdbbec667b7f4390802654f95285038f0ecfb606dde640c"
+    }
+  ],
+  "changed_chunks": [
+    {
+      "path": "geopotential/1255.0.0.0",
+      "original_sha256": "46dc562eec1d37ac5148436c70548280260d3d3c291bc14004c28d0ca9255f9e",
+      "output_sha256": "c1c9987bfd52de1fa462b2d26c192f67fa8bec89f960236b5e138f96a7ef1dc7"
+    },
+    {
+      "path": "geopotential/1256.0.0.0",
+      "original_sha256": "80315152fa1e1d6e64ea9e5f7529a869d8e98456e803e2f259a1932f5ecb7ff6",
+      "output_sha256": "c6d1e004245c8a7e4555334dda7e3258b1516f4aeb9b19fe53c58f9203b60174"
+    },
+    {
+      "path": "geopotential/1257.0.0.0",
+      "original_sha256": "a2970ce12f152e28e24a71f4545d2ca0e5bb35fbf85d9cd9e3bcf71b6e449eff",
+      "output_sha256": "d81a5385bb575391fa4033daac4584057d69f924cf6b4a413858f50b0074860d"
+    },
+    {
+      "path": "temperature/1255.0.0.0",
+      "original_sha256": "8994b469b154763e0d27f898ab1d47e0e32bd12e6628a99345e61623824a7e05",
+      "output_sha256": "e52a7eea5d2933a53544e89d845bcbea8ab8f873d1702df361ced06141eeaa3e"
+    },
+    {
+      "path": "temperature/1256.0.0.0",
+      "original_sha256": "8852b09c3c63a293da868a7690445fd8fbe4e24498858b7dd807b7341da6ed98",
+      "output_sha256": "1d04a11a785fcfc5fc70d668f66b11d9f71b7b3fc4d20b5246f389a9aa904edb"
+    },
+    {
+      "path": "temperature/1257.0.0.0",
+      "original_sha256": "a63ea5945d311a542624c337a1c1bf0f8486570331b40b2254c76e850a0a3e8a",
+      "output_sha256": "ac8d31cb88a5f1b3d143c06d742e6124c58ea523913e279d6747eb7bd72887c5"
+    },
+    {
+      "path": "specific_humidity/1255.0.0.0",
+      "original_sha256": "3dcaab6a97edf4685f4a8e182204c8ecf909575c1173fc7699c38ee42a2f57f1",
+      "output_sha256": "01c67a34d1a56362dba960ff9469df1fe2ff686a813038f4747ecf4119db75e7"
+    },
+    {
+      "path": "specific_humidity/1256.0.0.0",
+      "original_sha256": "a3088ef791cbb30fd5f356f15cba53470352a5cc7aa465ca9e3512175a27a52b",
+      "output_sha256": "9879c5bc02723ec02d825767594e1d1a71943085c43d83ef2a94a5ea91e14594"
+    },
+    {
+      "path": "specific_humidity/1257.0.0.0",
+      "original_sha256": "1665221fa78048b6a7a437086f1c7684fb7235eed5843d237ed735c187c0282d",
+      "output_sha256": "c98c12d7373b410e4abf6b67f140b16c93fd65a72ac60fb3ce7bf2cb798f75dc"
+    }
+  ],
+  "output_timestamp_sha256": {
+    "2023-11-10T00:00:00Z": "8a7c4e3cfa959dc3b8a8829b216e0277dbd43cc726446332a69697d7b2171b1a",
+    "2023-11-10T06:00:00Z": "824113c705ded19bd9ad9e39cccf6fccaa470aa4fe2ed1cae26d6037c8ca787d",
+    "2023-11-10T12:00:00Z": "abe3ad76f032462b1c48bf5e51a68fb8b68eca9eef7274a799581d408fe5f93a",
+    "2023-11-10T18:00:00Z": "d8d40828789b52314e0b48aaeca3ff9e9744dbf6f01dba7b53a75a2b77acedf9"
+  },
+  "status": "repaired",
+  "output": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/arco_res1_levels13_2023_eval_ncar_qc.zarr",
+  "output_zmetadata_sha256": "885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27"
+}

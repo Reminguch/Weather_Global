@@ -22,7 +22,7 @@ FEEDBACK_MODES = ("baseline", "closed_loop_sg", "closed_loop")
 PRECISIONS = ("bf16", "fp32")
 TEMPORAL_STATE_POLICIES = ("carry", "reset_every_anchor")
 LOSS_MODES = ("last_step", "all_steps", "sparse_steps")
-LOSS_KINDS = ("mse", "mse_fp32", "amse", "gc_mse_amse_excess")
+LOSS_KINDS = ("mse", "mse_fp32", "amse", "gc_mse_amse_excess", "native_mse_amse_excess")
 MODEL_FAMILIES = ("gc_mamba", "full_gc")
 LEARNING_RATE_SCHEDULES = ("constant", "cosine", "warmup_cosine_constant")
 OPTIMIZER_KINDS = ("adamw", "rms_mse", "mgda_rms")
@@ -191,18 +191,22 @@ class V24IlyaTrainConfig:
                 or not math.isfinite(self.spectral_excess_weight)
                 or not 0 <= self.spectral_excess_weight <= 1):
             raise ValueError("spectral_excess_weight must be finite and in [0, 1]")
-        if self.loss_kind == "gc_mse_amse_excess":
+        if self.loss_kind in ("gc_mse_amse_excess", "native_mse_amse_excess"):
             if (self.optimizer_kind != "adamw" or self.objective_pair is not None
                     or self.power_calibration is not None or self.amse_split_calibration is not None):
-                raise ValueError("gc_mse_amse_excess requires ordinary scalar AdamW without calibration")
+                raise ValueError("Scalar AMSE excess requires ordinary scalar AdamW without calibration")
             if (self.amse_lambda != 1.0 or self.amse_lambda_ramp_steps
                     or self.amse_lambda_start or self.amse_variable_lambda_multipliers
                     or self.amse_degree_lambda_multipliers):
-                raise ValueError("gc_mse_amse_excess fixes inner AMSE lambda=1; use spectral_excess_weight")
-            if self.feedback_mode != "closed_loop":
+                raise ValueError("Scalar AMSE excess fixes inner AMSE lambda=1; use spectral_excess_weight")
+            if self.loss_kind == "gc_mse_amse_excess" and self.feedback_mode != "closed_loop":
                 raise ValueError("gc_mse_amse_excess requires full weather feedback (closed_loop)")
+            if self.loss_kind == "native_mse_amse_excess" and (
+                    self.model_family != "gc_mamba" or self.feedback_mode != "closed_loop_sg"
+                    or self.distributed.mode != "single"):
+                raise ValueError("native_mse_amse_excess requires single-device GC-Mamba closed_loop_sg")
         elif self.spectral_excess_weight != 0:
-            raise ValueError("spectral_excess_weight requires loss_kind='gc_mse_amse_excess'")
+            raise ValueError("spectral_excess_weight requires a scalar AMSE-excess loss_kind")
         if self.model_family == "full_gc":
             if self.feedback_mode != "closed_loop" or self.loss_kind not in ("mse_fp32", "gc_mse_amse_excess"):
                 raise ValueError("full_gc requires closed_loop and a full-field scalar GC-MSE objective")
@@ -397,7 +401,7 @@ class V24IlyaTrainConfig:
                            dict(sorted(self.amse_variable_lambda_multipliers.items())))
         object.__setattr__(self, "amse_degree_lambda_multipliers",
                            tuple(self.amse_degree_lambda_multipliers))
-        if self.loss_kind not in ("amse", "gc_mse_amse_excess") and (
+        if self.loss_kind not in ("amse", "gc_mse_amse_excess", "native_mse_amse_excess") and (
             self.amse_lmax is not None or self.amse_lambda != 1.0 or self.amse_power_epsilon != 1e-12
             or self.amse_lambda_ramp_steps or self.amse_lambda_start != 0
             or self.amse_variable_lambda_multipliers or self.amse_degree_lambda_multipliers
@@ -566,9 +570,9 @@ class V24IlyaTrainConfig:
             objective["objective_pair"] = self.objective_pair
         if self.amse_split_calibration is not None:
             objective["amse_split_calibration"] = json.loads(json.dumps(self.amse_split_calibration))
-        if self.loss_kind == "gc_mse_amse_excess":
+        if self.loss_kind in ("gc_mse_amse_excess", "native_mse_amse_excess"):
             objective["spectral_excess_weight"] = self.spectral_excess_weight
-        if self.loss_kind in ("amse", "gc_mse_amse_excess"):
+        if self.loss_kind in ("amse", "gc_mse_amse_excess", "native_mse_amse_excess"):
             objective.update(
                 amse_lmax=self.amse_lmax,
                 amse_lambda=self.amse_lambda,
@@ -634,7 +638,8 @@ class V24IlyaTrainConfig:
             "architecture_id": ARCHITECTURE_ID,
             "schema_version": SCHEMA_VERSION,
             **({"model_family": self.model_family}
-               if self.model_family != "gc_mamba" or self.loss_kind == "gc_mse_amse_excess" else {}),
+               if self.model_family != "gc_mamba" or self.loss_kind in
+               ("gc_mse_amse_excess", "native_mse_amse_excess") else {}),
             "data": {
                 "prepared_root": str(self.prepared_root),
                 "anchor_manifest_root": str(self.anchor_manifest_root),
@@ -1030,7 +1035,7 @@ def validate_resume_config(
             "Resume configuration differs from the checkpoint. Only output location, "
             "validation, max_steps and checkpoint_every may change."
         )
-    if current.loss_kind == "gc_mse_amse_excess" and current.max_steps != saved_max_steps:
+    if current.loss_kind in ("gc_mse_amse_excess", "native_mse_amse_excess") and current.max_steps != saved_max_steps:
         raise ValueError(
             "Scalar-excess training keeps max_steps fixed on resume to preserve the LR schedule; "
             "use --stop-after-steps for bounded calibration/profile runs"

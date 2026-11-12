@@ -1,0 +1,141 @@
+{
+  "source_manifest_sha256": "c05414f1cd7abe640a92d643111f99fc74ede35884d0fee92cd514bca5c2cfda",
+  "config_sha256": "0e2340c214eeda9aa9769cb6f152221f8c7fc7af0d4c355e270f16779b55ee6b",
+  "parent_checkpoint_sha256": "bbfd7f59fb86ecad777e46685b8a39fe7186347aff555026ba20a12662a96623",
+  "resolved_config": {
+    "architecture_id": "v24_Ilya",
+    "schema_version": 1,
+    "data": {
+      "prepared_root": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/prepared_stream/res1",
+      "anchor_manifest_root": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/anchor_manifests/v24_Ilya_res1",
+      "baseline_checkpoint": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+      "stats_dir": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats",
+      "input_duration": "12h",
+      "target_steps": 1,
+      "time_start": null,
+      "time_end": null,
+      "allow_incomplete_prepared_store": false
+    },
+    "architecture": {
+      "resolution": 1.0,
+      "mesh_size": 5,
+      "width": 512,
+      "residual_width": null,
+      "residual_initialization": "baseline_overlay",
+      "baseline_msg_steps": 16,
+      "residual_msg_steps": 2,
+      "temporal_location": "mesh_processor_interleaved",
+      "temporal_d_inner": 16,
+      "temporal_bc_groups": 1,
+      "temporal_d_state": 16,
+      "temporal_d_conv": 4,
+      "temporal_dt_rank": "auto",
+      "temporal_init_scheme": "mamba1",
+      "temporal_dt_init": "random",
+      "temporal_dt_min": 0.001,
+      "temporal_dt_max": 0.1,
+      "temporal_dt_scale": 1.0,
+      "temporal_dt_init_floor": 0.0001,
+      "temporal_layers": 2,
+      "temporal_conv_bias": true,
+      "temporal_stateful": true,
+      "temporal_zero_init_out": true,
+      "temporal_bias": false,
+      "temporal_dropout": 0.0
+    },
+    "sequence": {
+      "segment_steps": 96,
+      "bptt_steps": 24,
+      "ar_tail_k": 20,
+      "feedback_mode": "closed_loop_sg",
+      "temporal_state_policy": "carry"
+    },
+    "objective": {
+      "loss_mode": "all_steps"
+    },
+    "memory": {
+      "weather_tape_precision": "fp32",
+      "bptt_backend": "explicit_reverse_vjp"
+    },
+    "optimizer": {
+      "max_steps": 3000,
+      "checkpoint_every": 250,
+      "learning_rate": 0.0001,
+      "weight_decay": 0.0001,
+      "weight_decay_policy": "all",
+      "warmup_steps": 50,
+      "grad_clip": 1.0,
+      "seed": 22,
+      "precision": "bf16",
+      "mamba_lr_multiplier": 3.0,
+      "spatial_lr_multiplier": 1.0,
+      "learning_rate_schedule": "cosine",
+      "end_learning_rate": 1e-05,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.98
+    },
+    "distributed": {
+      "mode": "single",
+      "num_devices": 1,
+      "per_device_batch_size": 4,
+      "drop_incomplete_replica_group": true
+    },
+    "validation": {
+      "enabled": false,
+      "every_steps": 2000,
+      "num_segments": 16,
+      "final_num_segments": null
+    },
+    "output": {
+      "output_root": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry",
+      "run_name": "main"
+    }
+  },
+  "public_asset_sha256": {
+    "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29",
+    "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/mean_by_level.nc": "e6e724b94cd27707903cdc5cf5784d420bab306f722e631f4455e25c96da9931",
+    "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/stddev_by_level.nc": "29f941d8c34906b87a1745f93b2308d1e169ec9bbdc4c5491479c771fe92c3cb",
+    "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/diffs_stddev_by_level.nc": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce"
+  },
+  "xla_flags": "",
+  "original_history": {
+    "files": {
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/run_config.json": "65f416c0f5ec4c122b45a6dccb69278863691b4f6a6066f4665545b54e8e536e",
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00000500.pkl": "2db97cb0fe7b2a716f8013d2ee768157a46dcc697aefca99dc98d91bcd07fd95",
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00001000.pkl": "b3d42697e0606e1cc8c6b369ff38b852a3494ebc8f6997cc2b25ab2f63c1c21a",
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00001500.pkl": "3cfcbdbd8fcb0b3cbde4c26ecfdb987ac8f6fb5f951cb9c949da60fa6c5a9ccc",
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00002000.pkl": "bbfd7f59fb86ecad777e46685b8a39fe7186347aff555026ba20a12662a96623"
+    },
+    "log_prefixes": {
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/train_metrics.jsonl": {
+        "prefix_bytes": 1809610,
+        "sha256": "6785369f038d451f730cc4812d37d408853359e1f3f66046d447b2a716c3b85b"
+      },
+      "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoint_metrics.jsonl": {
+        "prefix_bytes": 926,
+        "sha256": "9ec3a47ef0b868cb823ec16efb6a333c7c3b587e1e34b0cc7ee39ec5cddb3468"
+      }
+    }
+  },
+  "latest_at_original_boundary": {
+    "completed_step": 2000,
+    "checkpoint": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00002000.pkl"
+  },
+  "schedule": "Stock cosine is recomputed with a 3,000-update horizon for updates 2,001\u20133,000. The first 2,000 updates retain the original 2,000-update schedule.",
+  "spatial_learning_rates": {
+    "2001": 3.319520692457445e-05,
+    "2250": 2.3640926883672364e-05,
+    "2500": 1.625441655050963e-05,
+    "2750": 1.159807561634807e-05,
+    "3000": 1.0000027032219805e-05,
+    "2000": 1.0000058864534367e-05
+  },
+  "mamba_learning_rates": {
+    "2001": 9.958562077372335e-05,
+    "2250": 7.092278065101709e-05,
+    "2500": 4.8763249651528895e-05,
+    "2750": 3.479422684904421e-05,
+    "3000": 3.0000081096659414e-05,
+    "2000": 3.00001765936031e-05
+  }
+}

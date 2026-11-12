@@ -1,0 +1,116 @@
+{
+  "cohort": {
+    "initialization_manifest": "initializations_2023_stride3.json",
+    "sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49",
+    "count": 122,
+    "first": "2023-01-01T00:00:00Z",
+    "last": "2023-12-30T00:00:00Z",
+    "cadence_days": 3,
+    "lead_hours": [
+      6,
+      12,
+      18,
+      24,
+      30,
+      36,
+      42,
+      48,
+      54,
+      60,
+      66,
+      72,
+      78,
+      84,
+      90,
+      96,
+      102,
+      108,
+      114,
+      120,
+      126,
+      132,
+      138,
+      144,
+      150,
+      156,
+      162,
+      168,
+      174,
+      180,
+      186,
+      192,
+      198,
+      204,
+      210,
+      216,
+      222,
+      228,
+      234,
+      240
+    ]
+  },
+  "grid": {
+    "resolution_degrees": 1,
+    "latitude_count": 181,
+    "longitude_count": 360,
+    "pressure_levels": 13
+  },
+  "verification": {
+    "dataset": "Locally staged ARCO ERA5 with NCAR-verified repairs to 9 source chunks",
+    "zarr_metadata": {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/arco_res1_levels13_2023_eval_ncar_qc.zarr/.zmetadata",
+      "sha256": "885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27"
+    },
+    "repair_receipt": "native_truth_audit.json",
+    "repair_receipt_sha256": "f331cf80baf2ee4d4cd5190999d9e96ca11cd0cbd099c51363a1e16a5f196cb4",
+    "required_time_range_utc": [
+      "2022-12-31T18:00:00Z",
+      "2024-01-09T00:00:00Z"
+    ]
+  },
+  "public_graphcast": {
+    "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29"
+  },
+  "normalization_statistics": [
+    {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/mean_by_level.nc",
+      "sha256": "e6e724b94cd27707903cdc5cf5784d420bab306f722e631f4455e25c96da9931"
+    },
+    {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/stddev_by_level.nc",
+      "sha256": "29f941d8c34906b87a1745f93b2308d1e169ec9bbdc4c5491479c771fe92c3cb"
+    },
+    {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/diffs_stddev_by_level.nc",
+      "sha256": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce"
+    }
+  ],
+  "forecast": {
+    "feedback": "Independent autoregressive trajectories. GC\u2013Mamba feeds back its corrected forecast.",
+    "m1_initial_memory": "Zero SSM state and convolution cache at each initialization",
+    "m1_memory_policy": "Carry between forecast steps unless the Fig. 6 control explicitly resets",
+    "evaluation_rng_seed": 0,
+    "precision": "bf16_network_fp32_physical_fields_and_loss"
+  },
+  "exact_loss": {
+    "definition": "Original GraphCast normalized weighted MSE in FP32 with pole-cell correction",
+    "reduction_percent": "100 * (1 - pooled_model_loss / pooled_public_gc_loss)",
+    "rollout_pool": "All 122 starts and 40 six-hour leads",
+    "day10_pool": "All 122 starts at 240 hours",
+    "bootstrap": {
+      "block_starts": 5,
+      "method": "paired non-wrapping moving blocks; pointwise percentile 95% intervals",
+      "replicates": 10000,
+      "seed": 20260916,
+      "stride_days": 3,
+      "uncertainty_scope": "forecast dates conditional on the fixed trained checkpoint"
+    }
+  },
+  "historical_reference": {
+    "local_protocol_document": "docs/experiments/v24_2023_stride3_memory_2026-10-04.md",
+    "historical_della_campaign": "artifacts/evaluations/v24_res1_2023_stride3_memory_recovery_20261009",
+    "historical_protocol_sha256_as_recorded": "51bee2021076fffeabb58ca8bc86c9c08d951a43879e1b75cd62e6da431fe065",
+    "comparison": "Documented cohort, leads, native grid, reference model and loss convention matched. Della archive/runtime byte parity unverified."
+  }
+}

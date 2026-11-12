@@ -1,0 +1,14 @@
+series,training_seed,initializations,lead_count,mean_exact_graphcast_loss_over_4880_cells,sample_sd_across_m1_seeds
+Local GraphCast baseline mean,,122,40,11.350785777813098,
+Published M1,,122,40,9.759506478001837,
+Local M1 mean,,122,40,9.742567636678453,0.045232360678320045
+Local M1,22,122,40,9.751151938431088,
+Local paired GraphCast baseline,22,122,40,11.357309821614477,
+Local M1,23,122,40,9.67248247086269,
+Local paired GraphCast baseline,23,122,40,11.357394508748758,
+Local M1,24,122,40,9.792903378581414,
+Local paired GraphCast baseline,24,122,40,11.346728844036821,
+Local M1,25,122,40,9.730797557948065,
+Local paired GraphCast baseline,25,122,40,11.350027625006241,
+Local M1,26,122,40,9.76550283756901,
+Local paired GraphCast baseline,26,122,40,11.342468089659194,

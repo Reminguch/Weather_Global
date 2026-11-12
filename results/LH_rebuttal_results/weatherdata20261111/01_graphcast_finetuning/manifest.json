@@ -1,0 +1,334 @@
+{
+  "scope": "Item 2, standard-loss full GraphCast fine-tuning, local reproduction on the 2023 evaluation cohort",
+  "arms": {
+    "lr3em7": {
+      "peak_learning_rate": 3e-07,
+      "config_file": "configs/lr3em7.json",
+      "full_2023_report_file": "evaluations/lr3em7_step2500_2023.json",
+      "checkpoint": {
+        "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/checkpoints/checkpoint_step00002500.pkl",
+        "sha256": "1a2dd2785fc7aef1e2ad09576a325cb9d24fdd94f90e18627c7437c7a170b52e",
+        "size_bytes": 431790969
+      },
+      "training_resources": {
+        "completed_step": 2500,
+        "device": "cuda:0",
+        "elapsed_seconds": 33993.899430163205,
+        "gpu_hours": 9.442749841712,
+        "peak_gpu_bytes": 54679938304,
+        "peak_gpu_measurement": "JAX allocator high-water mark",
+        "peak_host_rss_bytes": 239778103296,
+        "source": {
+          "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/runs/gcft_s22_l000_lr3em7_local/training_resources.json",
+          "sha256": "9f8473ee6da8d7d54366ecb495e769182607710cfc4b03c925a94d04a09f7aec",
+          "size_bytes": 195
+        }
+      },
+      "eval_seconds": 793.1002224609256
+    },
+    "lr1em5": {
+      "peak_learning_rate": 1e-05,
+      "config_file": "configs/lr1em5.json",
+      "full_2023_report_file": "evaluations/lr1em5_step2500_2023.json",
+      "checkpoint": {
+        "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr1em5/checkpoints/checkpoint_step00002500.pkl",
+        "sha256": "6cf52a9a55958b59fc7bce1696cff864ca3181dff2cecc9a38b0d74656ff90b5",
+        "size_bytes": 431790944
+      },
+      "training_resources": {
+        "completed_step": 2500,
+        "device": "cuda:0",
+        "elapsed_seconds": 31793.894027747214,
+        "gpu_hours": 8.831637229929783,
+        "peak_gpu_bytes": 54680937728,
+        "peak_gpu_measurement": "JAX allocator high-water mark",
+        "peak_host_rss_bytes": 239786201088,
+        "source": {
+          "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr1em5/training_resources.json",
+          "sha256": "208b8ebf7a696881012c2957d43ed4f10c35280ca0b1a55c550bc9c28e245c9e",
+          "size_bytes": 198
+        }
+      },
+      "eval_seconds": 774.5081504955888
+    },
+    "lr3em5": {
+      "peak_learning_rate": 3e-05,
+      "config_file": "configs/lr3em5.json",
+      "full_2023_report_file": "evaluations/lr3em5_step2500_2023.json",
+      "checkpoint": {
+        "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr3em5/checkpoints/checkpoint_step00002500.pkl",
+        "sha256": "c6e0eb33cae0d2a068606dc985457e6e00c20fa9bdc7989c607e11a9706625c8",
+        "size_bytes": 431790944
+      },
+      "training_resources": {
+        "completed_step": 2500,
+        "device": "cuda:0",
+        "elapsed_seconds": 31758.757730215788,
+        "gpu_hours": 8.821877147282162,
+        "peak_gpu_bytes": 54680460288,
+        "peak_gpu_measurement": "JAX allocator high-water mark",
+        "peak_host_rss_bytes": 239784484864,
+        "source": {
+          "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/runs/lr3em5/training_resources.json",
+          "sha256": "d181171e1e5bbdc5b01b75c77cfe297bcc19f1b7a7094402215392a61ca5601f",
+          "size_bytes": 198
+        }
+      },
+      "eval_seconds": 801.3918691501021
+    }
+  },
+  "evaluation": {
+    "year_of_initializations": 2023,
+    "starts": 122,
+    "lead_hours": [
+      6,
+      12,
+      18,
+      24,
+      30,
+      36,
+      42,
+      48,
+      54,
+      60,
+      66,
+      72,
+      78,
+      84,
+      90,
+      96,
+      102,
+      108,
+      114,
+      120,
+      126,
+      132,
+      138,
+      144,
+      150,
+      156,
+      162,
+      168,
+      174,
+      180,
+      186,
+      192,
+      198,
+      204,
+      210,
+      216,
+      222,
+      228,
+      234,
+      240
+    ],
+    "forecast_seed": 0,
+    "precision": "bf16_network_fp32_physical_fields_and_loss",
+    "metric": "Original GraphCast normalized weighted MSE in FP32 with pole-cell correction",
+    "bootstrap": {
+      "block_starts": 5,
+      "method": "paired non-wrapping moving blocks; pointwise percentile 95% intervals",
+      "replicates": 10000,
+      "seed": 20260916,
+      "stride_days": 3,
+      "uncertainty_scope": "forecast dates conditional on the fixed trained checkpoint"
+    },
+    "public_gc": {
+      "repository_path": "data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+      "sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29",
+      "size_bytes": 144041078
+    },
+    "statistics": {
+      "diffs_stddev_by_level": {
+        "repository_path": "data/graphcast/graphcast/stats/diffs_stddev_by_level.nc",
+        "sha256": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce",
+        "size_bytes": 4416
+      },
+      "mean_by_level": {
+        "repository_path": "data/graphcast/graphcast/stats/mean_by_level.nc",
+        "sha256": "e6e724b94cd27707903cdc5cf5784d420bab306f722e631f4455e25c96da9931",
+        "size_bytes": 5776
+      },
+      "stddev_by_level": {
+        "repository_path": "data/graphcast/graphcast/stats/stddev_by_level.nc",
+        "sha256": "29f941d8c34906b87a1745f93b2308d1e169ec9bbdc4c5491479c771fe92c3cb",
+        "size_bytes": 5776
+      }
+    },
+    "initialization_manifest": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/initializations_2023_stride3.json",
+      "sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49",
+      "size_bytes": 7983
+    },
+    "truth_metadata": {
+      "repository_path": "data/graphcast/graphcast/dataset/arco_res1_levels13_2023_eval_ncar_qc.zarr/.zmetadata",
+      "sha256": "885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27",
+      "size_bytes": 12758
+    },
+    "truth_repair_audit": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/native_truth_audit.json",
+      "sha256": "f331cf80baf2ee4d4cd5190999d9e96ca11cd0cbd099c51363a1e16a5f196cb4",
+      "size_bytes": 147985
+    },
+    "truth_repair_affected_forecast_cells": [
+      {
+        "start": "2023-11-03T00:00:00Z",
+        "lead_hours": 174
+      },
+      {
+        "start": "2023-11-03T00:00:00Z",
+        "lead_hours": 180
+      },
+      {
+        "start": "2023-11-03T00:00:00Z",
+        "lead_hours": 186
+      },
+      {
+        "start": "2023-11-06T00:00:00Z",
+        "lead_hours": 102
+      },
+      {
+        "start": "2023-11-06T00:00:00Z",
+        "lead_hours": 108
+      },
+      {
+        "start": "2023-11-06T00:00:00Z",
+        "lead_hours": 114
+      },
+      {
+        "start": "2023-11-09T00:00:00Z",
+        "lead_hours": 30
+      },
+      {
+        "start": "2023-11-09T00:00:00Z",
+        "lead_hours": 36
+      },
+      {
+        "start": "2023-11-09T00:00:00Z",
+        "lead_hours": 42
+      }
+    ],
+    "truth_repair_input_overlap": 0
+  },
+  "training": {
+    "reference_config_reconstruction": {
+      "basis": "public neighboring v24/M1 configuration; original Della full-GC config and runtime unavailable",
+      "optimizer": "AdamW beta=(0.9,0.98), weight decay 1e-4, clip global gradient norm at 1",
+      "schedule": "50-update linear warm-up to 3e-7 followed by cosine decay to 3e-8",
+      "precision": "BF16 neural compute with FP32 parameters, physical fields and exact loss",
+      "sampling": "PCG64 SeedSequence([seed, epoch]) permutation of whole 96-step segments, ordered steps within each segment",
+      "inline_validation": false
+    },
+    "frozen_training_snapshot": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/source/snapshot.json",
+      "sha256": "cb65612fbe1c78c4dcd10e065234be595f669bd3f4c26945b842dff3dfe2b50d",
+      "size_bytes": 80075
+    },
+    "frozen_evaluation_snapshot": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/evaluation_source/snapshot.json",
+      "sha256": "3700f4b5a9dc6c4cd9c071baf61fd6abc2fa8b43c522bd5510b45c1c98c815f7",
+      "size_bytes": 80205
+    },
+    "high_lr_resume_manifest": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_2500_extensions_local/manifest.json",
+      "sha256": "3decf96c6e34b787e4221c02b539f3bd88aa72f4e5c7ea3c3303a1f6d55ed6a0",
+      "size_bytes": 9338
+    },
+    "repository_base_commit": "fc6a306c32d8ea4a84abd117c5663bd933367638",
+    "reference_protocol": {
+      "architecture": "public GraphCast-small, 1 degree, 13 pressure levels, all pretrained parameters updated",
+      "lambda": 0,
+      "loss": "exact original GC grid weighted MSE in FP32",
+      "seed": 22,
+      "train_years": [
+        2015,
+        2021
+      ],
+      "development_year": 2022,
+      "batch_size": 4,
+      "bptt_steps": 24,
+      "autoregressive_tail": 20,
+      "segment_steps": 96,
+      "feedback_gradient": "full",
+      "updates": 2500,
+      "peak_learning_rate": 3e-07,
+      "checkpoint": "final native step 2500, no SWA"
+    }
+  },
+  "historical_2022_development": {
+    "della_reported_500_update_rollout_loss_increase_pct": {
+      "lr1em5": 13.8958,
+      "lr3em5": 52.2477
+    },
+    "della_artifact": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107",
+    "della_source_and_calibration_checkpoints_available_locally": false,
+    "local_development_status": "Superseded by the 2023 evaluation after 42 of 119 starts for the low-rate arm",
+    "local_status_source": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/evaluation_status.json",
+      "sha256": "39097083676825446d095ceae1d6c94cc47b115ced87be6b1c96667d95da7c10",
+      "size_bytes": 1392
+    }
+  },
+  "files": {
+    "final_2500_summary.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_2500_extensions_local/summary.json",
+      "sha256": "948a4902d94a1c082bafea61c284bb3a313502553f141b1bce28d5da3dc2b514",
+      "size_bytes": 1906
+    },
+    "intermediate_day10_2023_summary.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2023_local/day10_summary.json",
+      "sha256": "f8a2fabb01ffdf28e02ed18abc88313c004838f6eba3c9881e4de4644be73219",
+      "size_bytes": 25016
+    },
+    "initializations_2023_stride3.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/initializations_2023_stride3.json",
+      "sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49",
+      "size_bytes": 7983
+    },
+    "gcft_vs_m1_seeds_2500_total_lead_time.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_vs_m1_2500_total_local/gcft_vs_m1_seeds_2500_total_lead_time.json",
+      "sha256": "f8ce844d32bc521421ae042deb096fe5395139a561eb94b546cf22108de7cd7c",
+      "size_bytes": 9962
+    },
+    "gcft_vs_m1_seeds_2500_total_lead_time.png": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_vs_m1_2500_total_local/gcft_vs_m1_seeds_2500_total_lead_time.png",
+      "sha256": "91166e8de0e9bf036d93a65e08de29ef9733204cde2140f8f3f310462aa7a332",
+      "size_bytes": 122579
+    },
+    "gcft_vs_m1_seeds_2500_total_lead_time.pdf": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_vs_m1_2500_total_local/gcft_vs_m1_seeds_2500_total_lead_time.pdf",
+      "sha256": "3d00b82f1e633a95d6ac94cd2a84583980311838650c49093788b048abab4616",
+      "size_bytes": 15768
+    },
+    "configs/lr3em7.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/config.json",
+      "sha256": "5990aa6be8cd6bd82e96b7a5faf615f5a07c9ec5b8b61ab48f3fe22b44f2a7ba",
+      "size_bytes": 2741
+    },
+    "evaluations/lr3em7_step2500_2023.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/evaluation.json",
+      "sha256": "3fceabd8fb596fa79dc3dcb9e47f05743855ed52ee514216e83fe58e03cae5c6",
+      "size_bytes": 630292
+    },
+    "configs/lr1em5.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/configs/lr1em5.json",
+      "sha256": "e53df1908421dee174ceb2c148f181f1d6455a8c9016c3188451e0c8ab8d1f0d",
+      "size_bytes": 2733
+    },
+    "evaluations/lr1em5_step2500_2023.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_2500_extensions_local/results/lr1em5_step2500.json",
+      "sha256": "4342b120e9d03c3cb4355e82a51a0cf77dc8c736eccb636663cfd327a485013f",
+      "size_bytes": 629273
+    },
+    "configs/lr3em5.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_day10_2k_local/configs/lr3em5.json",
+      "sha256": "d9bcd789abed766170ce459a405df7893cd8d4d5bfc658c67ea03b4fb7683ce5",
+      "size_bytes": 2716
+    },
+    "evaluations/lr3em5_step2500_2023.json": {
+      "repository_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_2500_extensions_local/results/lr3em5_step2500.json",
+      "sha256": "c4dd32f0ec6bb87bd186b48b31051cb6bb5855b2453fe7cf2dee4664aec85947",
+      "size_bytes": 629290
+    }
+  }
+}

@@ -65,7 +65,7 @@ def build_if_complete(training_campaign):
         return _build(root, destination, selected, expected)
 
 
-def _build(root, destination, selected, expected):
+def _build(root, destination, selected, expected, *, extra_metadata=None):
     records, losses, sources, warnings = [], [], [], []
     canonical, initialization_ids, canonical_power, canonical_layout = None, None, None, None
     variants = ('raw', 'gaussian', 'band')
@@ -127,8 +127,14 @@ def _build(root, destination, selected, expected):
         if task is None:
             row['training_stage_elapsed_gpu_hours'] = None
         else:
-            proofs = [unseal(p) for p in sorted((root / 'checks').glob(f"{task['id']}_step*.json"))]
-            row['training_stage_elapsed_gpu_hours'] = sum(p['elapsed_seconds'] for p in proofs) / 3600
+            proof_root = Path(task.get('training_proof_root', root / 'checks'))
+            proof_pattern = task.get('training_proof_pattern', f"{task['id']}_step*.json")
+            proof_paths = sorted(proof_root.glob(proof_pattern))
+            proofs = [unseal(p) for p in proof_paths]
+            sources.extend(pinned(p) for p in proof_paths)
+            elapsed_field = task.get('training_elapsed_field', 'elapsed_seconds')
+            row['training_stage_elapsed_gpu_hours'] = (
+                sum(p[elapsed_field] for p in proofs) / 3600 if proofs else None)
     contrasts = []
     for weight in (0., .25, .5, .75, 1.):
         for variant in variants:
@@ -155,7 +161,8 @@ def _build(root, destination, selected, expected):
         'bootstrap': {'replicates': 10000, 'seed': 20260916, 'block_starts': 5,
                       'method': 'paired non-wrapping moving-block percentile', 'coverage': 'pointwise exact MSE'},
         'spectral_uncertainty': 'descriptive pooled-power coordinates; per-date sufficient statistics retained for nonlinear resampling',
-        'training_seed': 22, 'scientific_improvement_required': False})
+        'training_seed': 22, 'scientific_improvement_required': False,
+        **(extra_metadata or {})})
     (destination / 'pending.json').unlink(missing_ok=True)
     return result
 

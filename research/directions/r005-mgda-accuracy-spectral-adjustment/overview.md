@@ -2,7 +2,7 @@
 
 Category: training
 Status: active
-Updated: 2026-11-09 (America/New_York)
+Updated: 2026-11-12 (America/New_York)
 
 ## Question and hypothesis
 
@@ -31,6 +31,94 @@ the same pair-gradient RMS preconditioning rule, so the control does not change
 to a single-gradient second-moment estimator.
 
 ## Current understanding
+
+November12 activation, superseding the earlier two-family review: the user
+approved restarting **GC–Mamba only**, leaving full GC/DeepMind unchanged.
+All five fresh GC–Mamba lambda arms now use M1's LR, two-stage schedule, native
+BF16 base loss, stopped weather gradients and historical deterministic order.
+Array17406861 runs initial500 plus main750; array17406862 exactly resumes
+main750→2000, totaling2,500 updates. History17406863 and finish17406864 follow.
+These jobs are submitted/pending; no new scientific result is available.
+
+Old GC–Mamba17062358/59/60 and obsolete joint final17353172/73/74 were cancelled.
+Full-GC17049163/64/65 and saved-checkpoint diagnostic17404694→17404732 remain
+unchanged. New mixed final chain17406897→17406898→17406899 compares the new
+GC–Mamba endpoints with unchanged full-GC endpoints, raw and SWA, on the same
+four development dates. Its materialization waits for17049163 and17406862.
+The new finish hook also retains development fitting and annual smoothing,
+with a separate join controller combining the two campaigns' actual reports.
+
+This is a comparison of two documented training recipes, not an
+identical-training-protocol architecture experiment: full GC retains full
+weather gradients, FP32 grid loss, its continuous schedule and original rates.
+The prior review is preserved in [e012](experiments.md#e012); the
+[protocol](../../../docs/experiments/v24_m1_matched_lambda_restart_2026-11-12.md)
+records the narrower authorization and actual activation. The separate
+full-GC horizon-training hold remains in place.
+
+November12: the user requests M1 versus November lambda0 at accessible matched
+intermediate budgets. Four new forecasts17404694_2–5 and report17404732 compare
+all three methods at1000 and1250 total updates, reusing completed1250/reference
+forecasts. M1 main500/750 correspond to total1000/1250. Evaluation settings and
+full-GC weight loading passed inspection; training recipes differ in weather
+gradients, schedule, loss arithmetic and order. Existing32-start results at500
+total updates give M1/full-GC/GC–Mamba MSE9.8199/10.3373/10.3144, so the earlier
+gap is already present at equal budgets, though those saved evaluations used
+their respective source versions. The new frozen-runtime comparison is pending.
+[Protocol and audit](../../../docs/experiments/v24_matched_budget_comparison_2026-11-12.md).
+The diagnostic remains unchanged; its previously queued final2500 production
+chain was replaced by the later GC–Mamba-only activation above.
+
+Historical November11 follow-up, superseded for future production by the
+November12 mixed chain above: the user requests the final2500-update comparison,
+including raw and SWA weights, MSE and actual power spectra. The ten existing
+continuations are still queued; dependent materialization17353172 →
+evaluation17353173 → report17353174 is now submitted. Fixed SWA source steps
+are1000/1500/2000/2500, aligned with M1's total-update window. The same four
+development dates and completed M1 references are retained. Final fresh-model
+results remain pending; [protocol and completed M1-only comparison](../../../docs/experiments/v24_final_checkpoint_comparison_2026-11-11.md).
+
+November11: both e011 pilots completed and were verified. On the matched
+four2022 starts/40leads, M1 raw/SWA MSE is9.4240/9.1717 (15.35%/17.62%
+reduction versus publicGC11.1331), and spherical power error75.94%/71.89%.
+Thus removing SWA worsens both aggregate metrics here. Fresh1250 models have
+higher MSE than M1; fullGCλ1 reduces power error to58.54% versus GC61.57%
+at12.61% worse MSE. Historical Octoberλ0.25 improves both metrics versus raw
+M1, but M1 SWA remains slightly better on both. Septemberλ0.1/λ1 do not improve
+the spherical aggregate versus their controls, unlike the earlier2023 zonal
+result: metric/domain/cohort differences limit that earlier conclusion.
+Observed baseline rollout spread0.079385 is advisory; small freshGC–Mamba
+λ0.5/λ1 decreases do not exceed it. See [full completed results and figures](../../../docs/experiments/v24_raw_checkpoint_pilot_2026-11-10.md).
+This four-date diagnostic does not establish annual/seed robustness or release
+the separate full-GC horizon training hold. Dated submission history follows.
+
+November10: [e011](experiments.md#e011) submits a fast MSE/power pilot for
+principal M1 without SWA and all ten existing fresh scalarλ checkpoints.
+M1 uses final raw main-step2000 (2500 total); the fresh arms share raw1250.
+Historical M1 SWA is a separate reference. Four quarterly2022 starts ×40leads
+keep evaluation bounded; array17249273 and report17249274 are initially pending.
+Existing32-start M1 raw/SWA exact rollout reductions are15.2637%/16.3434%
+against their respective saved GC baselines, with finite baseline drift noted.
+New spectra and lambda skill are pending. This does not release the separate
+full-GC horizon training hold. See the [checkpoint/protocol record](../../../docs/experiments/v24_raw_checkpoint_pilot_2026-11-10.md).
+
+November10 follow-up includes both lambda sets. Historical extension17250938
+adds eight raw endpoints, with report17250939 reusing the original M1 tasks.
+Cached eight2023-start non-SWA results are already [plotted](../../../plots/analyze_models/data/resolution_eval/amse_lambda_raw_cached_20261110/report.md):
+within October, λ0→0.5 changes exact MSE9.7746→10.1328 and zonal power error
+56.81%→53.39%. Separate September λ1 substantially improves power matching
+but worsens MSE versus public GC. The histories/objectives differ; those zonal
+figures do not substitute for the pending matched four-date spherical comparison.
+
+November9 smoothing extension: the user authorized three prespecified strength
+series for public GC and principal M1 on the same122 annual starts. Gaussian
+widths0–8° and blends α=0:0.1:1 toward the existing development-fitted Gaussian
+and four-band profiles will expose the MSE/power tradeoff. Evaluation array
+17213596 and report17213597 are submitted, initially pending. No new scientific
+result yet. Exact native-grid and actual-correction spectral moments allow
+offline strength refinement; no refitting or winner selection uses2023. See
+[e010](experiments.md#e010) and the
+[sweep protocol](../../../docs/experiments/v24_smoothing_strength_sweep_2026-11-09.md).
 
 November9: the new full-GC K20 `3e-7` run reached1250 updates. Its update500
 checkpoint reduced exact rollout loss4.6434% and day10 loss5.3090% against

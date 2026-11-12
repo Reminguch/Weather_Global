@@ -1,0 +1,64 @@
+{
+  "status": "complete",
+  "inputs": {
+    "step": 2500,
+    "checkpoint": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00002500.pkl",
+      "sha256": "7ea70ac74f972fef4e1a540f7b6de3725dd368a0184fd37e8e5951250e52b5e3"
+    },
+    "comparison_manifest": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_raw_swa_lead_comparison_local/manifest.json",
+      "sha256": "2a989d644526d9991cda88c05450d8d9300e09c02235761f3fd2a6de5b197e4a"
+    },
+    "continuation_manifest": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/manifest.json",
+      "sha256": "cbdd7af311a3ab002785a32b8a02872e833a1664844b1c12a3ea1298128720fb"
+    },
+    "parent_checkpoint": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/checkpoints/checkpoint_step00002000.pkl",
+      "sha256": "bbfd7f59fb86ecad777e46685b8a39fe7186347aff555026ba20a12662a96623"
+    },
+    "public_graphcast_checkpoint": {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+      "sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29"
+    },
+    "statistics": [
+      {
+        "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/mean_by_level.nc",
+        "sha256": "e6e724b94cd27707903cdc5cf5784d420bab306f722e631f4455e25c96da9931"
+      },
+      {
+        "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/stddev_by_level.nc",
+        "sha256": "29f941d8c34906b87a1745f93b2308d1e169ec9bbdc4c5491479c771fe92c3cb"
+      },
+      {
+        "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/stats/diffs_stddev_by_level.nc",
+        "sha256": "e688fc51fe72e1dc897678ef5ce9889add64e28e13f3cec4758d8e47d429c1ce"
+      }
+    ],
+    "source_snapshot": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/source/snapshot.json",
+      "sha256": "c05414f1cd7abe640a92d643111f99fc74ede35884d0fee92cd514bca5c2cfda"
+    },
+    "evaluation_data_metadata": {
+      "path": "/ossfs/workspace/weather/Weather_Global/data/graphcast/graphcast/dataset/arco_res1_levels13_2023_eval_ncar_qc.zarr/.zmetadata",
+      "sha256": "885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27"
+    },
+    "initializations": {
+      "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/initializations_2023_stride3.json",
+      "sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49"
+    }
+  },
+  "evaluation": {
+    "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/results/s22_carry_step2500.json",
+    "sha256": "0ce5b237c9c99f39e340196d1a151ec77d2f1bc41b41dc8fff0dc7d0977eea6a"
+  },
+  "training_provenance": {
+    "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/training_provenance.json",
+    "sha256": "ec5db23af97f8742856a4f1bc096141ab3bc39d07183e4a2b11bd3d9472a5528"
+  },
+  "worker": {
+    "path": "/ossfs/workspace/weather/Weather_Global/artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/eval_worker.py",
+    "sha256": "715f3fbd86a143ee9ac8ef1232b61883806c5432c592fa6825d586f42ba7baea"
+  }
+}

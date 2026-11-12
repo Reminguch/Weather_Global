@@ -1,0 +1,242 @@
+{
+  "seed_summary.csv": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/seed_summary.csv",
+    "sha256": "f6bc54bc58be6bedce975f5ece35f3979377fdba04b0c967c1d9be2719d4f59d"
+  },
+  "seed_summary.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/seed_summary.json",
+    "sha256": "07382cb18b3de5bdcfda6b0cb665192a4c219f2efe20af7965b1400540ac7468"
+  },
+  "forecast_skill_seed_replication_paper.pdf": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_paper.pdf",
+    "sha256": "6349f7863cc56cb8e345bd1a9a81bb7b4a524b896ed5c957b042a6e97ec6f80c"
+  },
+  "forecast_skill_seed_replication_paper.png": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_paper.png",
+    "sha256": "366faf69864c054539d82376c73049e6240f806d6ab68e8049633648806ae5e5"
+  },
+  "forecast_skill_seed_replication_bd_std.pdf": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_bd_std.pdf",
+    "sha256": "46e2378053bb137f1267581f4997590f85fd5a32a482f937769d85fa0e38f44c"
+  },
+  "forecast_skill_seed_replication_bd_std.png": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_bd_std.png",
+    "sha256": "b2f76bb7fe907f5090de28a422ead510189e64886f4d56c97ae4d4cb5fc237c2"
+  },
+  "forecast_skill_seed_replication_bd_std_leads.csv": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_bd_std_leads.csv",
+    "sha256": "228013025794eb7b21e0b4eef0220c8b0d8854171678f8b90c261088798feade"
+  },
+  "forecast_skill_seed_replication_bd_std_pooled_loss.csv": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_bd_std_pooled_loss.csv",
+    "sha256": "bffe060e454c31de4817e2ab56067e3d09e0d9ea8e8e72755c327a47164831dc"
+  },
+  "forecast_skill_seed_replication_data/data.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_data/data.json",
+    "sha256": "2664d524f14a6bfaed3131ba699fc1caca9e5cea2f9c164d23eb2954861325d4"
+  },
+  "forecast_skill_seed_replication_data/README.md": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/forecast_skill_seed_replication_data/README.md",
+    "sha256": "121397233da7bdadce7063c15fffed21948bb939c2b6e06276ee764851b8b3c7"
+  },
+  "fig6_controls/gcft_vs_m1_2500_total_fig6_controls.pdf": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/gcft_vs_m1_2500_total_fig6_controls.pdf",
+    "sha256": "32237f06cf10a16585d70c085c223698f79a921e72ff75ce4e054a74f11c7d59"
+  },
+  "fig6_controls/gcft_vs_m1_2500_total_fig6_controls.png": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/gcft_vs_m1_2500_total_fig6_controls.png",
+    "sha256": "8fada26715d0f1edcc7f32ac4420be8a39b4295050bcd5646bbee432caac18a8"
+  },
+  "fig6_controls/gcft_vs_m1_2500_total_fig6_controls.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/gcft_vs_m1_2500_total_fig6_controls.json",
+    "sha256": "ca717532ac88b3aad7230026e151fc63cd551b6e8fda0969b6c7a2a3cf3c77ca"
+  },
+  "extras/raw_vs_swa/m1_raw_vs_final_swa_lead_time.pdf": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_raw_swa_lead_comparison_local/m1_raw_vs_final_swa_lead_time.pdf",
+    "sha256": "ab82ee231c21d599ca25e39332b0ca149387e3fcbe2883dc560498bca393da80"
+  },
+  "extras/raw_vs_swa/m1_raw_vs_final_swa_lead_time.png": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_raw_swa_lead_comparison_local/m1_raw_vs_final_swa_lead_time.png",
+    "sha256": "39c86663fb157a9e86789d1e5b0bca3d7f2643a9cc2e897cef787c998df1a2ee"
+  },
+  "extras/raw_vs_swa/m1_raw_vs_final_swa_lead_time.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_raw_swa_lead_comparison_local/m1_raw_vs_final_swa_lead_time.json",
+    "sha256": "455ef0c7f97ec766a0f4836635c7f8dd293c696174afd1c39d821062a905605e"
+  },
+  "extras/seed22_3k_continuation/summary.csv": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/summary.csv",
+    "sha256": "192f3370f6f2d84060bac7f049e60f3c6975043eba4ebf321352568a1546c779"
+  },
+  "extras/seed22_3k_continuation/summary.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/summary.json",
+    "sha256": "be839c4c49d09175d85eec488814bcddcf51f03ebb5bdffc3ac8bdfbc937f5fa"
+  },
+  "extras/seed22_3k_continuation/training_provenance.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/training_provenance.json",
+    "sha256": "ec5db23af97f8742856a4f1bc096141ab3bc39d07183e4a2b11bd3d9472a5528"
+  },
+  "extras/seed22_3k_continuation/training_complete.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/training_complete.json",
+    "sha256": "90cff8432fef52bb8f6d4de1de8c87a786cc9b34fc833556505f03114839facf"
+  },
+  "extras/seed22_3k_continuation/s22_carry_step2250.complete.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/results/s22_carry_step2250.complete.json",
+    "sha256": "f49e73376f945f5fe03aed85a7290eb295b17cac87f5e31ab6fc7cb402027443"
+  },
+  "extras/seed22_3k_continuation/s22_carry_step2500.complete.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/results/s22_carry_step2500.complete.json",
+    "sha256": "cd75b290243a427a779f141513b63468e0256c1a359a48ee44dea9da90592287"
+  },
+  "extras/seed22_3k_continuation/s22_carry_step2750.complete.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/results/s22_carry_step2750.complete.json",
+    "sha256": "f6163b999cae38232f0182a87534945d99476d4cb64d532af1ef621a59befdde"
+  },
+  "extras/seed22_3k_continuation/s22_carry_step3000.complete.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/results/s22_carry_step3000.complete.json",
+    "sha256": "644c81b932a04d04d9f78598caa417a4fb96ab19d38f40e1ab9cecaa320a6164"
+  },
+  "provenance/evaluation_job.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/evaluation_job.json",
+    "sha256": "4424f69d285587d8eb72ef28430426f941cbf520584a1bc97e55385bdcc32711"
+  },
+  "provenance/initializations_2023_stride3.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/initializations_2023_stride3.json",
+    "sha256": "eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49"
+  },
+  "provenance/requirements-training.lock.txt": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/requirements-training.lock.txt",
+    "sha256": "e2bea9275814978fe741253151f815a46af856cea76a88ccf261b8a860b10f4b"
+  },
+  "provenance/configs/s22_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s22_carry_warmup.json",
+    "sha256": "edb971738fa6990732635545ddcd2b7b02c1b65af4db7a7878d4f355515e8dbe"
+  },
+  "provenance/configs/s22_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s22_carry_main.json",
+    "sha256": "0e2340c214eeda9aa9769cb6f152221f8c7fc7af0d4c355e270f16779b55ee6b"
+  },
+  "provenance/configs/s23_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s23_carry_warmup.json",
+    "sha256": "5e82c773596b413a7a96afb41b91716b020d664b15121da7fb9c067c772ff63a"
+  },
+  "provenance/configs/s23_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s23_carry_main.json",
+    "sha256": "6a41569c3fae7f3fb10cf9ecf7a97eb0a3c2b6a2033f5e88d74448f351134b89"
+  },
+  "provenance/configs/s24_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s24_carry_warmup.json",
+    "sha256": "b051bcaf9d81362dc7571d5e2054ac007c750e1e268e77b47e650a68a0ccdc3d"
+  },
+  "provenance/configs/s24_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s24_carry_main.json",
+    "sha256": "982385291df56a8ef9c398569acc901a578a9f0611de364eb168d798a6b4ca53"
+  },
+  "provenance/configs/s25_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s25_carry_warmup.json",
+    "sha256": "8d050e1c39e341b6636d219460351ff3c14731de75cf384d46b5f5bc05acde04"
+  },
+  "provenance/configs/s25_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s25_carry_main.json",
+    "sha256": "a4034627e7e7ff0d6bf3906d62806cdcb0fd8e9bcf1ee7a6359d833d93710ee6"
+  },
+  "provenance/configs/s26_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s26_carry_warmup.json",
+    "sha256": "0d4ecba856ed3b91d173ec998ffa2361bf20a0ba0b1ebbcff3d104d202bd5a4a"
+  },
+  "provenance/configs/s26_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/configs/s26_carry_main.json",
+    "sha256": "8e1eddd3dda6d79d91229bf5c8aa05aec17ba3a763f9ba9f82689234cbf53240"
+  },
+  "provenance/seed_training_manifest.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/manifest.json",
+    "sha256": "0037e2f16db6c01b98fa36a65b0635a2fe6d41b5222e0363e183c00990cc6412"
+  },
+  "provenance/seed_source_snapshot.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/source/snapshot.json",
+    "sha256": "c05414f1cd7abe640a92d643111f99fc74ede35884d0fee92cd514bca5c2cfda"
+  },
+  "provenance/m1_raw2k_manifest.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_day10_2k_lead_comparison_local/manifest.json",
+    "sha256": "defc1ea232d7b456d350a876efa390cefda580ad25ed0eba85d6e654bfd8aa51"
+  },
+  "provenance/fig6_reset_manifest.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/manifest.json",
+    "sha256": "a3b286a24c33c7fa5cd06400598832de2c80153951de70a7c76df3576f6b4548"
+  },
+  "provenance/fig6_2500_total_manifest.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_vs_m1_2500_total_local/manifest.json",
+    "sha256": "04c7347fb62ca70b8a41f0c72524a55d9997ccc52af7f7a99eaf3c529b1fbf01"
+  },
+  "provenance/raw_vs_swa_manifest.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_raw_swa_lead_comparison_local/manifest.json",
+    "sha256": "2a989d644526d9991cda88c05450d8d9300e09c02235761f3fd2a6de5b197e4a"
+  },
+  "provenance/seed22_3k_continuation_manifest.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_s22_raw3k_continuation_local/manifest.json",
+    "sha256": "cbdd7af311a3ab002785a32b8a02872e833a1664844b1c12a3ea1298128720fb"
+  },
+  "provenance/gcft_3e-7_config.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/config.json",
+    "sha256": "5990aa6be8cd6bd82e96b7a5faf615f5a07c9ec5b8b61ab48f3fe22b44f2a7ba"
+  },
+  "provenance/native_truth_audit.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_gcft_standard_loss_local/native_truth_audit.json",
+    "sha256": "f331cf80baf2ee4d4cd5190999d9e96ca11cd0cbd099c51363a1e16a5f196cb4"
+  },
+  "provenance/resolved_configs/s22_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/warmup/run_config.json",
+    "sha256": "396d6f5eb45c4fbd2c778eab34541ebac5167af6eb9421307b485e94777bf51c"
+  },
+  "provenance/resolved_configs/s22_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s22_carry/main/run_config.json",
+    "sha256": "65f416c0f5ec4c122b45a6dccb69278863691b4f6a6066f4665545b54e8e536e"
+  },
+  "provenance/resolved_configs/s23_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s23_carry/warmup/run_config.json",
+    "sha256": "3db84408db706130e46614c987ff1a965c84af138dc80662fe9276901115914a"
+  },
+  "provenance/resolved_configs/s23_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s23_carry/main/run_config.json",
+    "sha256": "29728cee5c4454f9bb8fa114377a7dbfd46b6c9ffdeb15a3e2ef0f8d05104533"
+  },
+  "provenance/resolved_configs/s24_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry/warmup/run_config.json",
+    "sha256": "49534591f9ab75c150fdf4e8ed620f1264a0c3359799d53429e2c0b815c158e7"
+  },
+  "provenance/resolved_configs/s24_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s24_carry/main/run_config.json",
+    "sha256": "af736801b63e2248655decf0e04a6b0744a005837b58f74a598be90b75d05528"
+  },
+  "provenance/resolved_configs/s25_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s25_carry/warmup/run_config.json",
+    "sha256": "180417f90473e7794e9c04415e7569d2947572b8157482f0e17eb3fee3239f59"
+  },
+  "provenance/resolved_configs/s25_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s25_carry/main/run_config.json",
+    "sha256": "695853f7cd77d628ff9f0c357734b1a4cf669bcca333727734b9cdf5f4584f01"
+  },
+  "provenance/resolved_configs/s26_carry_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s26_carry/warmup/run_config.json",
+    "sha256": "f8bc43488080839c239bf38ef5d9dd0e84429dcfbac47fa8921e59ae03e44b2f"
+  },
+  "provenance/resolved_configs/s26_carry_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_seed_repeats_local/runs/s26_carry/main/run_config.json",
+    "sha256": "f87379d4bd8d766114bfb954c40bba3d6c65c162c6df13bbbe0bdb92cfcf6fa2"
+  },
+  "provenance/configs/s22_reset_reset_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/configs/warmup.json",
+    "sha256": "05263ba635019be9afee28285ea1fa2f50138f630e5719342608c7acf4dacc27"
+  },
+  "provenance/resolved_configs/s22_reset_reset_warmup.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/runs/s22_reset_reset/warmup/run_config.json",
+    "sha256": "a0ee4c89f2633555f102be9e58e6ebf2b9a9537882ded1ee0028849a19554f86"
+  },
+  "provenance/configs/s22_reset_reset_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/configs/main.json",
+    "sha256": "902e30bfeb9b20fcb0b437e2b5f177b86003b7088d514684cce0f76346e44ed5"
+  },
+  "provenance/resolved_configs/s22_reset_reset_main.json": {
+    "original_path": "artifacts/checkpoints/v24_Ilya/res1_m1_fig6_reset_2k_local/runs/s22_reset_reset/main/run_config.json",
+    "sha256": "037fd86037bed5ea74a9253bf5d9964e05b56fd8dd1644eebc5c7cc90a95207e"
+  }
+}

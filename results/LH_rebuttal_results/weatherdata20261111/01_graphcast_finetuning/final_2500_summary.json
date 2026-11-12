@@ -1,0 +1,74 @@
+{
+  "completed_updates": 2500,
+  "initializations": 122,
+  "lead_count": 40,
+  "evaluation_year": 2023,
+  "arms": {
+    "lr3em7": {
+      "rollout": {
+        "improvement_pct": 4.1868307112505,
+        "model_loss": 10.870719216128842,
+        "pointwise_ci95": [
+          3.0663934662412564,
+          5.0164968252488125
+        ],
+        "public_gc_loss": 11.345746411297654,
+        "scored_cells": 4880
+      },
+      "day10": {
+        "improvement_pct": 4.785845899813723,
+        "model_loss": 28.122808237544827,
+        "pointwise_ci95": [
+          3.1818984735856444,
+          5.978318485929896
+        ],
+        "public_gc_loss": 29.536373560545876,
+        "scored_cells": 122
+      }
+    },
+    "lr1em5": {
+      "rollout": {
+        "improvement_pct": 3.615874107389261,
+        "model_loss": 10.939346308139015,
+        "pointwise_ci95": [
+          2.206862611697641,
+          4.584300660134329
+        ],
+        "public_gc_loss": 11.349738566211013,
+        "scored_cells": 4880
+      },
+      "day10": {
+        "improvement_pct": 6.852121674333289,
+        "model_loss": 27.502575014458326,
+        "pointwise_ci95": [
+          4.746884449881691,
+          8.51261112496869
+        ],
+        "public_gc_loss": 29.525712779310883,
+        "scored_cells": 122
+      }
+    },
+    "lr3em5": {
+      "rollout": {
+        "improvement_pct": -2.902646028381861,
+        "model_loss": 11.68109532580024,
+        "pointwise_ci95": [
+          -4.877990693168844,
+          -1.6560494824506073
+        ],
+        "public_gc_loss": 11.351598599882887,
+        "scored_cells": 4880
+      },
+      "day10": {
+        "improvement_pct": 2.5239205621020555,
+        "model_loss": 28.83628438730709,
+        "pointwise_ci95": [
+          -0.24099699689545837,
+          4.445928713060519
+        ],
+        "public_gc_loss": 29.582934145067558,
+        "scored_cells": 122
+      }
+    }
+  }
+}

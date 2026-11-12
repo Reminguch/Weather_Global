@@ -42,6 +42,9 @@ class V24IlyaTrainingTransforms:
     residual_supervised_predict: hk.TransformedWithState | None = None
     # Raw FP32 pair ordered by config: GC/power, amplitude/pattern or GC/excess.
     full_field_objectives: Callable | None = None
+    # The full-field hook supplies a penalty only; grid MSE comes from the
+    # historical native loss_and_predictions call, including its BF16 arithmetic.
+    native_grid_with_excess: bool = False
 
 
 def build_training_transforms(
@@ -88,7 +91,13 @@ def build_training_transforms(
 
     combined = hk.transform_with_state(residual_loss_and_predictions)
     full_field_loss = None
-    if config.loss_kind == "gc_mse_amse_excess":
+    if config.loss_kind == "native_mse_amse_excess":
+        from .scalar_excess_loss import build_native_mse_excess_penalty
+
+        full_field_loss = build_native_mse_excess_penalty(
+            stats, spectral_excess_weight=config.spectral_excess_weight,
+            lmax=config.amse_lmax, power_epsilon=config.amse_power_epsilon)
+    elif config.loss_kind == "gc_mse_amse_excess":
         from .scalar_excess_loss import build_gc_mse_amse_excess_loss
 
         full_field_loss = build_gc_mse_amse_excess_loss(
@@ -138,6 +147,7 @@ def build_training_transforms(
             if full_field_loss is not None else None
         ),
         full_field_objectives=full_field_objectives,
+        native_grid_with_excess=config.loss_kind == "native_mse_amse_excess",
     )
 
 
@@ -392,7 +402,9 @@ def supervision_target(transforms, truth, baseline_prediction):
             _tree_stop(_cast_floating(baseline_prediction, jnp.float32)))
 
 
-def supervised_step(transforms, params, state, key, inputs, target, forcing, *, optimizer_step=None):
+def supervised_step(transforms, params, state, key, inputs, target, forcing, *,
+                    optimizer_step=None, return_diagnostics=False):
+    diagnostics = {}
     if transforms.full_field_loss is None:
         output, next_state = transforms.residual_loss_and_predictions.apply(
             params, state, key, inputs, target, forcing,
@@ -401,10 +413,17 @@ def supervised_step(transforms, params, state, key, inputs, target, forcing, *, 
         loss = scalarize_loss(loss_array)
     else:
         truth, baseline = target
-        predictor = transforms.residual_supervised_predict or transforms.residual_predict
-        prediction, next_state = predictor.apply(
-            params, state, key, inputs, _template_like(truth, jnp.float32), forcing,
-        )
+        if transforms.native_grid_with_excess:
+            output, next_state = transforms.residual_loss_and_predictions.apply(
+                params, state, key, inputs, residual_target(truth, baseline), forcing,
+            )
+            (native_array, _native_diagnostics), prediction = output
+            native_loss = scalarize_loss(native_array)
+        else:
+            predictor = transforms.residual_supervised_predict or transforms.residual_predict
+            prediction, next_state = predictor.apply(
+                params, state, key, inputs, _template_like(truth, jnp.float32), forcing,
+            )
         full_prediction = jax.tree_util.tree_map(
             lambda base, residual: jax.lax.stop_gradient(base) + residual,
             _cast_floating(baseline, jnp.float32),
@@ -415,12 +434,21 @@ def supervised_step(transforms, params, state, key, inputs, target, forcing, *, 
             **({"optimizer_step": optimizer_step} if optimizer_step is not None else {}),
         )
         loss = jnp.mean(loss_array)
-    return loss, prediction, cast_state_boundary_fp32(next_state)
+        if transforms.native_grid_with_excess:
+            loss = native_loss + loss
+            diagnostics = {"native_grid_mse": native_loss,
+                           "amse_excess": jnp.mean(_diagnostics["amse_excess"]),
+                           "weighted_amse_excess": jnp.mean(_diagnostics["weighted_amse_excess"]),
+                           "scalar_total": loss}
+    result = (loss, prediction, cast_state_boundary_fp32(next_state))
+    return (*result, diagnostics) if return_diagnostics else result
 
 
 def _validate_loss_hook(transforms, config):
     if (config.loss_kind != "mse") != (transforms.full_field_loss is not None):
         raise ValueError("loss_kind and full_field_loss hook disagree; rebuild training transforms")
+    if (config.loss_kind == "native_mse_amse_excess") != transforms.native_grid_with_excess:
+        raise ValueError("Native grid loss mode and training transforms disagree")
 
 
 def feedback_field(mode: str, baseline_prediction, residual_prediction):
@@ -1134,6 +1162,14 @@ def make_train_step(
         )
 
     @jax.jit
+    def supervised_forward_diagnostics(params, state, key, inputs, target, forcing, optimizer_step):
+        return supervised_step(
+            transforms, params, state, key, inputs, target, forcing,
+            optimizer_step=optimizer_step if config.amse_lambda_ramp_steps else None,
+            return_diagnostics=True,
+        )
+
+    @jax.jit
     def state_pullback(
         params,
         state,
@@ -1255,6 +1291,7 @@ def make_train_step(
 
         state_tape = []
         host_losses = []
+        host_objective_terms = []
         host_targets = list(host_truths)
         template_truth = host_truths[-1]
 
@@ -1290,7 +1327,9 @@ def make_train_step(
                     forcing,
                 )
                 target = supervision_target(transforms, truth, baseline_prediction)
-                loss, residual_prediction, next_state = supervised_forward(
+                forward = (supervised_forward_diagnostics if transforms.native_grid_with_excess
+                           else supervised_forward)
+                result = forward(
                     residual_params,
                     state_in_host,
                     key,
@@ -1299,6 +1338,9 @@ def make_train_step(
                     forcing,
                     optimizer_step,
                 )
+                loss, residual_prediction, next_state = result[:3]
+                if transforms.native_grid_with_excess:
+                    host_objective_terms.append(jax.device_get(result[3]))
                 host_losses.append(np.asarray(jax.device_get(loss)))
                 if transforms.full_field_loss is None:
                     _overwrite_host_tree(truth, target)
@@ -1415,7 +1457,7 @@ def make_train_step(
         jax.block_until_ready(next_params)
         loss_components = np.asarray(host_losses, dtype=np.float32)
         loss_value = np.sum(loss_components * supervised_weights)
-        return (
+        result = (
             next_params,
             jax.tree_util.tree_map(jnp.asarray, state_host),
             next_optimizer_state,
@@ -1423,6 +1465,17 @@ def make_train_step(
             gradient_norm,
             loss_components,
         )
+        if transforms.native_grid_with_excess:
+            from .weather_feedback_step import ScalarTrainResult
+
+            diagnostics = {
+                name: float(np.sum(np.asarray([terms[name] for terms in host_objective_terms],
+                                              dtype=np.float32) * supervised_weights))
+                for name in ("native_grid_mse", "amse_excess", "weighted_amse_excess", "scalar_total")
+            }
+            diagnostics["spectral_diagnostics_computed"] = config.spectral_excess_weight > 0
+            return ScalarTrainResult(*result, diagnostics)
+        return result
 
     return train_step
 
