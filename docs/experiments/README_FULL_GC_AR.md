@@ -2,6 +2,14 @@
 
 Updated: **2026-11-12, America/New_York**.
 
+**Latest schedule correction:** use **constant `3e-7` from the first update,
+without warmup or decay**, for all four fresh full-GC horizons. The revised
+portable handoff has suffix `constant_lr3em7`; the previous package is archival.
+The Della five-lambda full-GC sweep is also being replaced with five fresh
+constant-rate arms; see the [current protocol](v24_full_gc_constant_lr3em7_2026-11-12.md).
+Earlier job-status paragraphs below describe historical activations and are
+superseded by that protocol. GC–Mamba's M1 recipe remains unchanged.
+
 **Runnable handoff for Lianghong:** [portable code, setup and exact commands](README_LIANGHONG_PORTABLE_RUNS.md)
 now cover both the M1-matched GC–Mamba lambda sweep and this four-fresh-horizon
 full-GC study, including raw/SWA MSE and spectra, 2022 selection, 2023 evaluation
@@ -89,10 +97,10 @@ smoothing comparisons also contribute to R1/R3's forecast-structure concern.
 Equal training budgets with M1 are not a requirement for this experiment.
 
 **Preliminary result from Ilya:** after just **500 fine-tuning updates**, the K20
-run at peak learning rate `3e-7` reduced exact GraphCast rollout loss by
+run at peak learning rate `3e-7` **with cosine decay and warmup** reduced exact GraphCast rollout loss by
 **4.6434%** on **32 development starts in 2022**; the day-10 reduction was
 **5.3090%**. This motivates the new four-run study. Ilya's run is background
-evidence only, not Lianghong's K20 arm. Higher-rate 500-update calibrations worsened loss.
+evidence only, not a constant-rate result or Lianghong's K20 arm.
 Consequently, a general claim that further fine-tuning cannot help is unsupported.
 These are intermediate development results. See the [saved K20 development result](../../artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107/calibration_evaluation/gcft_s22_l000_lr3em7_fresh_20261107/evaluation.json).
 
@@ -117,7 +125,7 @@ in its own directory. Each horizon should produce its own raw
 Use the **standard GraphCast loss (λ=0)**, 2015–2021 training data, seed 22,
 batch four, 96-step segments and the same frozen training-window order. Update
 all GC parameters with full weather-feedback gradients (`closed_loop`). Use
-AdamW with a 100-update warm-up, peak LR `3e-7`, cosine decay to `3e-8`, and
+AdamW with constant LR `3e-7`, no warmup or decay, and
 **2,500 optimizer updates**. The positive-λ sweep is a separate experiment.
 
 | Horizon | Total training window | Teacher-forced prefix | Feedback-conditioned tail | Action |

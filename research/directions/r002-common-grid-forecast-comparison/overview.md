@@ -2,7 +2,7 @@
 
 Category: evaluation
 Status: active
-Updated: 2026-10-19 (America/New_York)
+Updated: 2026-11-13 (America/New_York)
 Related: [matched memory training](../r001-matched-memory-training/overview.md)
 
 ## Question and hypothesis
@@ -13,6 +13,23 @@ paired 1° backbone are evaluated on identical 2023 initializations against
 the same 1.5° verification truth?
 
 ## Current understanding
+
+**November 13 v4 uncertainty update ([e013](experiments.md#e013)):** Existing
+ENS-matched 2023 scores now have paired pointwise 95% date-bootstrap intervals
+on their actual availability masks (91–108 starts per diagnostic/lead).
+Point estimates are unchanged. Day-10 M1 RMSE reductions relative to public
+GC025 are Q700 7.7035% [6.9320, 8.4506], T2m 10.5782% [8.8165, 11.5457],
+and U850 9.8273% [8.6746, 10.8028]. All twelve day-10 paired intervals have
+positive lower bounds. These are conditional fixed-checkpoint/date intervals,
+not seed variability, simultaneous bands or evidence of skill beyond ENS.
+The separate five-seed native-grid replication is [r001/e003](../r001-matched-memory-training/experiments.md#e003).
+New Figure 5/9 assets are prepared for v4 using saved scores and CPU resampling;
+no training, forecast generation or scheduler job was launched. The original
+arXiv manuscript/assets remain unchanged. Checked v4 (10 main pages, 24
+total), figures, data and response draft were pushed to
+Non-Markovian-Weather/main as `a5df67a`; no OpenReview or arXiv upload was made.
+This update did not recheck the separate 2018 annual campaign in e012; its
+completion remains unverified.
 
 **October 19 paper verification (e011):** Fresh hashes of the current GC025
 checkpoint and all three normalization files match live official DeepMind
@@ -199,12 +216,19 @@ Results do not answer the matched memory-training question in r001.
 
 ## Next decision
 
+Finish the v4 build/review and record publication separately. Interpret the
+new ENS-matched bands as pointwise date uncertainty and use the directly paired
+M1-versus-GC025 contrast table for comparisons; marginal band overlap is not a
+paired test. Five-seed variability is available only for the separate native-grid
+carry-model replication, not for these common-grid checkpoints.
+
 Figure 2a's 24-start reproduction passed all 480 independent score checks
 (e012), using existing native 0.25°/37-level 2018–2019 ERA5, the verified
 public checkpoint and upstream inference. At days 1/2/3/5, mean spatial RMSE
 is within 0.8% of the approximate digitized paper curve; day 10 is 4.45% lower.
 This is a sampled check, not annual parity. Full 730-start array `15870083`
-is running; report `15870088` and corrected plot `15870456` are dependent.
+was recorded running on October 19; report `15870088` and corrected plot
+`15870456` were dependent. Their final state was not rechecked on November 13.
 Inspect the full-year campaign's summary and plot after completion before
 concluding agreement with the paper.
 

@@ -21,7 +21,8 @@ REFERENCE = "artifacts/evaluations/v24_raw_checkpoint_pilot_20261110"
 DEFAULT = "artifacts/evaluations/v24_matched_budget_comparison_20261112"
 DRIVER = "scripts/experiments/prepare_v24_matched_budget_comparison.py"
 OVERLAYS = (DRIVER, "scripts/experiments/run_v24_raw_checkpoint_pilot.py",
-            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py")
+            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py",
+            "scripts/analyze_models/comparison_policy.py")
 GROUP = "Matched training updates"
 LIMITS = (
     "Four matched 2022 development starts and 40 six-hour leads, not annual skill "

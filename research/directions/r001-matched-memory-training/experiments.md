@@ -217,3 +217,140 @@ The27-page output replaces `Overleaf/arxiv_versoin.pdf`. The only remaining
 LaTeX overfull-box diagnostic is1.60pt in the unchanged architecture caption.
 Build outputs are in `Overleaf/build/arxiv_matched_reset_20261018/`.
 No new training, forecast inference, submission, or publication was performed.
+
+<a id="e003"></a>
+## e003 — 2026-11-13: five fresh M1 seeds and separate raw memory controls in v4
+
+Event date: 2026-11-13 (existing-evidence inspection and figure preparation)
+Recorded: 2026-11-13 (America/New_York)
+Execution: completed (score validation, aggregation and figures; manuscript
+build/publication pending separately)
+Outcome: supported for carry-model replication under the reconstructed recipe;
+multi-seed matched memory-training effects remain unmeasured
+
+**Question and scope:** Address seed variability using Lianghong's already
+completed replication export, while retaining the original matched memory
+comparison. No new training, forecast generation, Slurm job or bootstrap
+resampling was performed for this seed-figure update. Existing per-seed date
+intervals and original memory intervals are reused, not relabeled seed intervals.
+
+**Setup:** Five fresh carry/carry runs, seeds 22–26, frozen public GraphCast-small,
+ERA5 2015–2021, batch four, width 512, Mamba inner/state dimension 16, one B/C
+group, two spatial message-passing steps, BPTT 24, K=20 and 96-step segments.
+All use 500 warm-up updates (50-step ramp to 1e-4, then constant), followed by
+2,000 main updates (50-step ramp, cosine spatial LR 1e-4 to 1e-5, Mamba LR ×3).
+SWA averages main steps 500/1000/1500/2000. The resolved configs agree in these
+settings and in backbone/anchor fingerprints. Evaluation uses the same 122
+every-third-day 00 UTC starts in 2023, all 40 six-hour leads, cold zero memory
+and full corrected forecast feedback. Every one of the 12 whitelisted SWA/raw/
+control models has 4,880 unique finite start/lead records and valid timestamps.
+Losses pool before division; T2m MSE pools before the square root.
+
+**Observed SWA results (exact GraphCast loss reduction):**
+
+| Local training seed | Ten-day rollout | Day 10 |
+| --- | ---: | ---: |
+| 22 | 14.1421% | 21.1878% |
+| 23 | 14.8354% | 22.1537% |
+| 24 | 13.6940% | 20.0831% |
+| 25 | 14.2663% | 20.7941% |
+| 26 | 13.9032% | 20.9226% |
+| Mean ± sample SD | 14.1682% ± 0.4332 pp | 21.0283% ± 0.7502 pp |
+
+Each SWA uses its own paired public GraphCast trajectory. Figure 4's dashed
+absolute-error baseline is the arithmetic mean of the five paired baseline
+curves; its reductions average the five independently computed ratios. The
+band is ±1 sample SD across training seeds, not a confidence interval or an
+ensemble forecast. The existing date intervals use 10,000 paired non-wrapping
+bootstrap draws with five-start blocks and seed 20260916, conditional on each
+trained model; they remain distinct from seed variability.
+
+**Raw memory controls:** For the separate local Figure 6 panel, all curves use
+the raw local seed-22 run's public GraphCast trajectory as a common denominator.
+Five raw carry checkpoints at main step 2,000 give mean reductions
+13.5094% ± 0.4224 pp (rollout) and 20.1877% ± 0.7070 pp (day 10).
+The same raw seed-22 weights give carry/carry 13.5836% / 20.3820% and
+carry/reset 1.5077% / 8.6014%. The separately reset-trained seed-22 raw control
+gives 9.2097% / 13.0950%. Both control curves have n=1; these are not SWA
+comparisons and do not yield a five-seed matched memory contrast. Inference
+reset still introduces training/forecasting mismatch. The original SWA panel
+retains e002's 5.2614 pp rollout advantage and its paired date interval unchanged.
+Negative early-lead reset results are displayed in full, not clipped.
+
+**Provenance and verification differences:** The local training recipe was
+reconstructed from Appendix A.1, public repository configs and the Lianghong
+handoff because original Della configs and the frozen training environment
+were unavailable. Local seed 22 is fresh retraining, not the historical selected
+checkpoint. Source host is the Lianghong OSS workspace
+`/ossfs/workspace/weather/Weather_Global`; retained local provenance files are
+authoritative locators/hashes, not a claim that all remote files were re-read.
+The training manifest records source commit
+`fc6a306c32d8ea4a84abd117c5663bd933367638`, with exact source snapshot digest
+`e1b04cad8ec370a928cf2388bd1cbe7a666da547247ae5568a64050ed989ddde`.
+Manifest SHA256 is
+`0037e2f16db6c01b98fa36a65b0635a2fe6d41b5222e0363e183c00990cc6412`.
+The 2023 initialization manifest SHA256 is
+`eca49e6da7005d6731b7e947055fc498b943d3907c2773a4be15f8e1bb51ab49`.
+
+Local verification replaces stale pressure temperature/geopotential/humidity
+fields at 2023-11-10 06/12/18 UTC using independent NCAR ERA5. The audit records
+nine changed chunks, nine affected start/lead cells and no initialization-input
+overlap. The repaired store metadata SHA256 is
+`885f52678add0a90f88aac338d9c047d1d14a750cfb674ec5e169ba63606db27`;
+truth-audit SHA256 is
+`f331cf80baf2ee4d4cd5190999d9e96ca11cd0cbd099c51363a1e16a5f196cb4`.
+Historical paper curves retain their historical evaluation; they are not added
+as a sixth exchangeable seed. Finite between-run baseline differences remain
+measured variations, not failure criteria.
+
+**Evidence and reproducibility:**
+
+- [Local seed export and qualifications](../../../results/LH_rebuttal_results/weatherdata20261111/03_seed_replication/README.md),
+  [training manifest](../../../results/LH_rebuttal_results/weatherdata20261111/03_seed_replication/provenance/seed_training_manifest.json),
+  [source snapshot](../../../results/LH_rebuttal_results/weatherdata20261111/03_seed_replication/provenance/seed_source_snapshot.json),
+  [truth audit](../../../results/LH_rebuttal_results/weatherdata20261111/03_seed_replication/provenance/native_truth_audit.json).
+- [Plot script](../../../scripts/analyze_models/plot_v4_seed_replication.py), SHA256
+  `d37d1216c84816a0c689037b0ce0e0a247b1e5166ad19e70096893dc257e5aa6`;
+  [summary, per-model checks and 23 source hashes](../../../plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/summary.json).
+  An explicit whitelist removes all full-GC fine-tuning rows before numerical
+  parsing; none enter these figures or conclusions.
+- [SWA endpoint table](../../../plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/swa_seed_endpoints.csv),
+  [raw/control endpoint table](../../../plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/raw_memory_endpoints.csv),
+  [Figure 4](../../../Overleaf/arxiv_pics/fig4_forecast_skill_v4_seeds.pdf),
+  [Figure 6](../../../Overleaf/arxiv_pics/fig6_memory_policies_v4_seeds.pdf).
+
+Both 6-inch figures use 10-point text and were visually inspected. Main means
+and SDs exactly reproduce the independent supplied summary; original paired
+contrasts reproduce differences of the archived common-baseline reductions.
+CSV/JSON outputs retain individual-seed curves, aggregates, checkpoints and
+original intervals. The original `arxiv_versoin.tex` and figure assets were not
+modified; the new assets are prepared for [v4](../../../Overleaf/v4.tex).
+The final v4 build was checked on November 13: 10 main-text pages and 24
+total, with no unresolved references/citations or overfull boxes. Source, new
+figures, numerical exports, response draft and compiled PDF were pushed to
+Non-Markovian-Weather/main as `a5df67a`. The PDF is
+[`Overleaf/v4.pdf`](../../../Overleaf/v4.pdf); build hashes and checks are in the
+[validation receipt](../../../artifacts/manuscripts/iclr2027_v4/seed_revision_validation.json).
+No OpenReview or arXiv upload was performed. The inherited AI-use statement
+retains an explicit author-correction TODO for the new analytical assistance.
+
+**Next decision:** Present measured carry-seed variation and single-seed reset
+limitations explicitly. Additional matched reset seeds would be needed to
+estimate training-seed variation of the memory-policy contrast; no such new
+training has been authorized or launched by this existing-data update.
+
+<a id="pilot-selection-clarification"></a>
+### 2026-11-13 — User clarification on the earlier 2023 pilot
+
+The user confirms that the earlier eight-start 2023 forecast/spectral pilot was
+not used for principal model selection or similar decisions. The recorded
+principal model-selection comparison used the 2022 development sample; the
+frozen 2023 protocol had recorded pilot selection influence as `none_reported`.
+This is a user-confirmed clarification, not a retrospective claim that the
+pilot was never run or that its dates did not overlap the annual evaluation.
+
+For the response to Reviewer Jvjy, the user asks not to raise the pilot results.
+Do not present prior pilot inspection as evidence of model selection on 2023.
+Keep the historical pilot outputs, frozen protocols, and existing provenance
+disclosures intact. No manuscript or experiment artifacts were changed by this
+clarification.

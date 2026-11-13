@@ -45,9 +45,9 @@ def make_config(template, experiment, horizon, input_paths, order_path):
             and config["distributed"]["per_device_batch_size"] == 4
             and config["optimizer"]["max_steps"] == 2500
             and config["optimizer"]["learning_rate"] == 3e-7
-            and config["optimizer"]["end_learning_rate"] == 3e-8
-            and config["optimizer"]["learning_rate_schedule"] == "cosine"
-            and config["optimizer"]["warmup_steps"] == 100
+            and config["optimizer"].get("end_learning_rate") is None
+            and config["optimizer"]["learning_rate_schedule"] == "constant"
+            and config["optimizer"]["warmup_steps"] == 0
             and config["optimizer"]["seed"] == 22
             and config["objective"]["loss_kind"] == "gc_mse_amse_excess"
             and config["objective"]["spectral_excess_weight"] == 0,
@@ -57,7 +57,7 @@ def make_config(template, experiment, horizon, input_paths, order_path):
     config["data"]["train_order_manifest"] = str(Path(order_path).resolve())
     config["sequence"]["ar_tail_k"] = horizon
     config["output"] = {"output_root": str(experiment / "runs"),
-                        "run_name": f"gcft_s22_k{horizon:02d}_lr3em7"}
+                        "run_name": f"gcft_s22_k{horizon:02d}_lr3em7_constant"}
     return config
 
 
@@ -121,6 +121,8 @@ def prepare(package_root, experiment, input_paths):
         "policy": {"fresh_horizons": list(HORIZONS), "seed": 22,
                    "allocation_endpoints_total": [1250, 2500], "total_updates_per_arm": 2500,
                    "initialization": "public GraphCast only; fresh optimizer for each horizon",
+                   "learning_rate": 3e-7, "learning_rate_schedule": "constant",
+                   "warmup_steps": 0,
                    "allocation_resume": "exact optimizer/RNG/data continuation; no reset",
                    "swa_steps": [1000, 1500, 2000, 2500],
                    "finite_diagnostics": "warning", "scientific_improvement_required": False,

@@ -16,6 +16,9 @@ from scripts.experiments.frozen_runtime import file_sha256, verify_source
 
 CAMPAIGN = ROOT / "artifacts/checkpoints/v24_Ilya/res1_m1_matched_gcm_lambda_20261112"
 NOVEMBER = ROOT / "artifacts/checkpoints/v24_Ilya/res1_fresh_gc_mamba_gc_lambda_20261107"
+CONSTANT_GC = ROOT / "artifacts/checkpoints/v24_Ilya/res1_full_gc_constant_lr3em7_20261112"
+PACKAGE_NAME = "lianghong_weather_20261112_constant_lr3em7"
+WEIGHTS_DOWNLOAD = ROOT / "artifacts/handoffs" / PACKAGE_NAME / f"{PACKAGE_NAME}_weights.tar.gz"
 PILOT = ROOT / "artifacts/evaluations/v24_raw_checkpoint_pilot_20261110"
 README = ROOT / "docs/experiments/README_LIANGHONG_PORTABLE_RUNS.md"
 
@@ -76,7 +79,7 @@ def build(destination, *, weights=True):
     upstream = CAMPAIGN / 'source'
     original = verify_source(upstream)
     destination.mkdir(parents=True)
-    package = destination / 'lianghong_weather_20261112'
+    package = destination / PACKAGE_NAME
     package.mkdir()
     for relative in original['files']:
         copy(upstream / relative, package / relative)
@@ -96,7 +99,13 @@ def build(destination, *, weights=True):
     for stage in ('initial', 'main'):
         copy(CAMPAIGN / f'configs/gcm_m1matched_s22_l000_{stage}.json',
              package / f'templates/{stage}.json')
-    full_config = NOVEMBER / 'configs/gcft_s22_l000_lr3em7_fresh_20261107.json'
+    full_config = CONSTANT_GC / 'configs/gcft_s22_l000_lr3em7_constant_20261112.json'
+    optimizer = read(full_config)['optimizer']
+    if not (optimizer['learning_rate'] == 3e-7
+            and optimizer['learning_rate_schedule'] == 'constant'
+            and optimizer['warmup_steps'] == 0
+            and optimizer.get('end_learning_rate') is None):
+        raise ValueError('Full-GC handoff requires constant3e-7 from the first update')
     copy(full_config, package / 'templates/full_gc.json')
     copy(NOVEMBER / 'manifests/train_order_seed22.json', package / 'portable/train_order.json')
     copy(NOVEMBER / 'manifests/development_2022_32.json', package / 'portable/development32.json')
@@ -137,6 +146,20 @@ def build(destination, *, weights=True):
               'weights': {'public_graphcast': {'path': data['baseline_checkpoint'],
                           'sha256': file_sha256(data['baseline_checkpoint'])}, **references}}
     write(package / 'portable/external_assets.json', assets)
+    download_digest = file_sha256(WEIGHTS_DOWNLOAD)
+    original_checksums = (WEIGHTS_DOWNLOAD.parent / 'SHA256SUMS').read_text().splitlines()
+    if f'{download_digest}  {WEIGHTS_DOWNLOAD.name}' not in original_checksums:
+        raise ValueError('Existing handoff weights archive differs from its recorded checksum')
+    write(package / 'portable/weights_download.json', {
+        'source_host': 'Della', 'path': str(WEIGHTS_DOWNLOAD),
+        'filename': WEIGHTS_DOWNLOAD.name, 'sha256': download_digest,
+        'bytes': WEIGHTS_DOWNLOAD.stat().st_size,
+        'access': 'An authorized SSH account able to read this project directory is required; this is not a public URL.',
+        'included_in_this_delivery': weights,
+        'contents': ['weights/public_graphcast.npz', 'weights/M1_raw.pkl',
+                     'weights/M1_swa.pkl', 'weights/SHA256SUMS']})
+    (package / 'portable/weights_download.SHA256SUMS').write_text(
+        f'{download_digest}  {WEIGHTS_DOWNLOAD.name}\n')
     (package / 'portable/prepared_files.txt').write_text(''.join(x['relative_path'] + '\n' for x in inventory))
     (package / 'runtime').mkdir()
     (package / 'runtime/requirements.lock.txt').write_text(runtime_lock())
@@ -147,9 +170,11 @@ def build(destination, *, weights=True):
         'upstream_source_digest': original['source_digest'], 'upstream_files': original['files'],
         'adapters': {str(p.relative_to(ROOT)): file_sha256(p) for p in adapters},
         'computation': 'All original submitted source files copied byte-for-byte; portable adapters are additional files.',
-        'scope': 'Five M1-recipe GC–Mamba lambda arms and four fresh full-GC horizon arms.'})
+        'scope': 'Five M1-recipe GC–Mamba lambda arms and four fresh full-GC horizon arms.',
+        'full_gc_schedule': 'Constant3e-7 from the first update; no warmup or decay.',
+        'supersedes': 'lianghong_weather_20261112; prior full-GC template used cosine decay.'})
     checksum_file(package)
-    code_archive = destination / 'lianghong_weather_20261112_code.tar.gz'
+    code_archive = destination / f'{PACKAGE_NAME}_code.tar.gz'
     with tarfile.open(code_archive, 'w:gz', compresslevel=1) as archive:
         archive.add(package, arcname=package.name)
     archives = [code_archive]
@@ -160,9 +185,14 @@ def build(destination, *, weights=True):
         for model, record in references.items():
             copy(Path(record['path']), weights_dir / f'{model}.pkl')
         checksum_file(weights_dir)
-        weight_archive = destination / 'lianghong_weather_20261112_weights.tar.gz'
-        with tarfile.open(weight_archive, 'w:gz', compresslevel=1) as archive:
-            archive.add(weights_dir, arcname='weights')
+        weight_archive = destination / f'{PACKAGE_NAME}_weights.tar.gz'
+        with tarfile.open(WEIGHTS_DOWNLOAD, 'r:gz') as archive:
+            archived_checksums = archive.extractfile('weights/SHA256SUMS').read().decode()
+        if archived_checksums != (weights_dir / 'SHA256SUMS').read_text():
+            raise ValueError('Reference archive weights differ from the requested training/evaluation inputs')
+        # Reuse the exact archive so bundled and separately downloaded weights
+        # have the same checksum, independent of gzip/tar creation timestamps.
+        copy(WEIGHTS_DOWNLOAD, weight_archive)
         archives.append(weight_archive)
     (destination / 'SHA256SUMS').write_text(''.join(f'{file_sha256(p)}  {p.name}\n' for p in archives))
     return {'package': str(package), 'archives': [str(p) for p in archives],

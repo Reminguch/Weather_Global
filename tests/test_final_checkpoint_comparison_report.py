@@ -78,10 +78,15 @@ def test_raw_swa_styles_share_colors_but_distinguish_weight_averaging():
     assert reporter.checkpoint_pairs(old) == {}
 
 
-def test_final_report_records_pairs_and_warnings_without_loss_gate(tmp_path, monkeypatch):
+@pytest.mark.parametrize("full_gc_positive_rate", [None, 3e-7, 1e-5])
+def test_final_report_records_pairs_and_warnings_without_loss_gate(tmp_path, monkeypatch, full_gc_positive_rate):
     root, data, images = (tmp_path / name for name in ("campaign", "data", "images"))
     root.mkdir()
     models = model_pair("M1", weight=None) + model_pair()
+    if full_gc_positive_rate is not None:
+        models = model_pair("M1", weight=None) + model_pair("gc_l000", "full_gc", 0.) + model_pair("gc_l025", "full_gc", .25)
+        for model in models[2:]:
+            model["learning_rate"] = 3e-7 if model["lambda"] == 0 else full_gc_positive_rate
     manifest = seal(root / "manifest.json", {"models": models,
         "data_root": str(data), "image_root": str(images),
         "report_title": "Final 2500 raw/SWA comparison", "figure_title": "Final 2500",
@@ -94,7 +99,7 @@ def test_final_report_records_pairs_and_warnings_without_loss_gate(tmp_path, mon
     for index, model in enumerate(models):
         # M1 SWA is deliberately worse; public-GC repeat differences exceed the
         # reference bound. Both remain reportable finite observations.
-        full_loss = (2.1, 2.2, 1.8, 1.7)[index]
+        full_loss = (2.1, 2.2, 1.8, 1.7, 1.9, 1.8)[index]
         baseline_loss = 2. + index * .05
         items[model["id"]] = {"model": model, "loss": {
             "baseline": np.full(40, baseline_loss), "baseline_rollout": baseline_loss,
@@ -112,7 +117,7 @@ def test_final_report_records_pairs_and_warnings_without_loss_gate(tmp_path, mon
     assert result["numerical_warnings"] > 0
     payload = unseal(data / "report.json")
     assert payload["manifest_hash"] == manifest["record_hash"]
-    assert len(payload["raw_vs_swa"]) == 2
+    assert len(payload["raw_vs_swa"]) == len(models) // 2
     assert payload["raw_vs_swa"][0]["swa_mse_reduction_vs_raw_rollout_pct"] < 0
     assert payload["raw_vs_swa_csv"]["path"] == str(data / "raw_vs_swa.csv")
     assert figure_titles == ["Final 2500"]
@@ -120,6 +125,7 @@ def test_final_report_records_pairs_and_warnings_without_loss_gate(tmp_path, mon
     assert text.startswith("# Final 2500 raw/SWA comparison")
     assert "Matched raw versus SWA weights" in text
     assert "intermediate" not in text
+    assert ("**Learning-rate caveat:**" in text) == (full_gc_positive_rate == 1e-5)
     with (data / "summary.csv").open() as stream:
         rows = list(csv.DictReader(stream))
     assert rows[1]["checkpoint_kind"] == "raw"

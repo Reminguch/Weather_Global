@@ -1,5 +1,15 @@
 # Fresh GC–Mamba versus GraphCast fine-tuning: accuracy, spectra, and smoothing
 
+**November 12 comparison-policy correction:** the user rejected the full-GC
+peak-LR `1e-5` lineages below for scientific comparisons, including their
+continuations/SWAs. Retain them as archival evidence only. Use full-GC peak LR
+`3e-7` going forward; only lambda0 currently has results at that rate. Existing
+positive-lambda `1e-5` continuations were subsequently canceled and replaced
+by fresh `3e-7` arrays `17421838 → 17421839`; see the
+[activated replacement](v24_full_gc_positive_lambda_lr3em7_restart_2026-11-12.md).
+The GC–Mamba M1-matched schedule is separate. See the
+[current eligibility policy](v24_full_gc_comparison_policy_2026-11-12.md).
+
 **Date:** 2026-11-06, America/New_York.  
 **Status:** implemented and submitted on 2026-11-07; full-GC calibration completed. Pending GCFT λ0 production was redirected to fresh peak-LR `3e-7` training on November 7; the revision below supersedes the original λ0 calibration-selection rule.  
 **Workspace:** `/scratch/gpfs/DABANIN/iv9432/Weather_global`.  

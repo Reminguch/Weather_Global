@@ -33,13 +33,13 @@
 \title{GraphCast--Mamba: Learning Non-Markovian Corrections for Weather Forecasting}
 
 \author{
-\normalsize Ilya Vilkoviskiy$^{1\Il{,*}}$, Liang-Hong Mo$^{1\Il{,*}}$, Suozhi Huang$^{2}$, Dmitry A. Abanin$^{1,3,4,5}$\\[0.5em]
+\normalsize Ilya Vilkoviskiy$^{1,*}$, Liang-Hong Mo$^{1,*}$, Suozhi Huang$^{2}$, Dmitry A. Abanin$^{1,3,4,5}$\\[0.5em]
 \small $^{1}$Department of Physics, Princeton University, Princeton, NJ 08544, USA\\
 \small $^{2}$Department of Electrical and Computer Engineering, Princeton University,\\
 \small Princeton, NJ 08544, USA\\
 \small $^{3}$\'Ecole Polytechnique F\'ed\'erale de Lausanne (EPFL), 1015 Lausanne, Switzerland\\
-\small $^{4}$Google Research, Mountain View, CA, USA\\
-\small $^{5}$Princeton Quantum Initiative, Princeton University, Princeton, NJ 08544, USA
+\small $^{4}$Princeton Quantum Initiative, Princeton University, Princeton, NJ 08544, USA\\
+\small $^{5}$Google Research, Brandschenkestrasse 150, 8002 Z\"urich, Switzerland
 }
 \date{}
 
@@ -89,19 +89,19 @@ Our contributions are threefold.
 \begin{figure}[!tp]
     \centering
     \begin{subfigure}{\linewidth}
-        \includegraphics[width=0.93\linewidth]{Pics/gc_mamba_architecture/presentation/03_temporal_rollout.pdf}
+        \includegraphics[width=0.93\linewidth]{arxiv_pics/fig1_GC_mamba.pdf}
         \caption{Autoregressive rollout over three six-hour steps. {Each GraphCast--Mamba forecast advances the two-frame input window; dashed orange arrows carry the temporal memory state}, initialized here with $m_0=0$.}
         \label{fig:GC_Mamba_rollout}
     \end{subfigure}
     \par\smallskip
     \begin{subfigure}{\linewidth}
-        \includegraphics[width=0.93\linewidth]{Graphs/arxiv_2023/overview_heatmap.pdf}
+        \includegraphics[width=0.93\linewidth]{arxiv_pics/fig1_improvement.pdf}
         \caption{{Variable-group RMSE reductions at days 5 through 10.}}
         \label{fig:breadth_7yr}
     \end{subfigure}
     \par\smallskip
     \begin{subfigure}{\linewidth}
-        \includegraphics[width=0.93\linewidth]{Graphs/arxiv_2023/overview_coverage.pdf}
+        \includegraphics[width=0.93\linewidth]{arxiv_pics/fig1_channel_coverage.pdf}
         \caption{{Channel scores: channels with lower RMSE than GraphCast at each six-hour lead.}}
         \label{fig:coverage_7yr}
     \end{subfigure}
@@ -111,7 +111,7 @@ Our contributions are threefold.
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{Pics/gc_mamba_architecture/presentation/02_correction_branch.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig2_correction_branch.pdf}
     \caption{{Trainable Mamba correction branch.} Two graph message-passing steps each feed a two-layer Mamba module, followed by decoding and an output head initialized to zero. {The frozen GraphCast backbone forecast $G_\theta(X_t)$ is combined with the learned forecast correction $c_t$ to produce $\hat{Y}_t$. The Mamba correction branch has separate parameters and a temporal memory state $m_t$}, comprising the SSM states and causal-convolution caches of its four Mamba layers.}
     \label{fig:GC_Mamba_correction}
     \vspace{-10pt}
@@ -221,7 +221,7 @@ We train the GraphCast–Mamba correction branch on seven years of ERA5 data (20
 
 \begin{figure}[!t]
     \centering
-    \includegraphics[width=\linewidth]{Graphs/arxiv_2023/forecast_skill.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig4_forecast_skill.pdf}
     \caption{{GraphCast--Mamba forecast skill on the 122 evaluation initializations in 2023 (Section~\ref{sec:eval_protocol}). Top: {GraphCast loss} and its per-lead reduction. Bottom: $2$\,m temperature RMSE and RMSE reduction on the same forecast initializations. The Mamba correction branch uses $d_{\mathrm{inner}}=16$, a threefold Mamba learning rate (LR), and SWA over post-warm-up updates 500--2,000. Every reduction uses the paired GraphCast baseline shown in the absolute-error panels.}}
     \label{fig:res1_forecast}
 \end{figure}
@@ -264,7 +264,7 @@ Despite operating at $1^\circ$ resolution, GraphCast--Mamba achieves better long
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{Graphs/common_grid_2023_public_checkpoints_ens/fig5_public_checkpoints_2023_repaired_vs_ens.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig5_common_grid_comparison.pdf}
     \caption{Forecast RMSE relative to the matched ECMWF ensemble mean (ENS) on a common $1.5^\circ$ grid. From left to right: 700\,hPa specific humidity (Q700), $2$\,m temperature (T2m), and 850\,hPa zonal wind (U850). Blue shows the selected GraphCast--Mamba model M1 ($1^\circ$), dashed gray its public GraphCast\_small backbone ($1^\circ$), and green the public GraphCast checkpoint ($0.25^\circ$). From 122 candidate 00\,UTC initializations every third day in 2023, each diagnostic and lead uses the identical ENS-available dates for all four forecasts (92--105 starts per point in these panels). Squared errors are pooled before taking square roots. The horizontal line marks ENS at $100\%$; lower values indicate lower RMSE. Appendix~\ref{app:common_grid} specifies the protocol.}
     \label{fig:common_grid_selected}
 \end{figure}
@@ -274,8 +274,6 @@ Despite operating at $1^\circ$ resolution, GraphCast--Mamba achieves better long
 The preceding results show that GraphCast--Mamba improves forecasts at longer lead times across the predicted atmospheric state. The correction branch introduces both additional trainable capacity and temporal memory. {To examine the contribution of temporal memory, we compare the selected model with a matched control trained and evaluated with memory reset at every step. We also reset the selected model's memory only during forecasting to measure its dependence on retained state.}
 
 {Table~\ref{tab:memory_controls} summarizes three policies obtained from two training runs. Policy names specify memory handling during training first and forecasting second. Carry passes the updated SSM state and causal-convolution cache to the next step; reset zeros both before every step. Resetting leaves all learned weights and the two-frame meteorological input in place: the full correction branch still computes a correction, but cannot retain its temporal memory state between calls. Every training segment and independent forecast begins with a zero temporal memory state under all three policies.}
-
-%Note for the future: ideally, we want a unified training framework, not jumping from 2.5k steps to 2-8k.
 
 \begin{table}[!htb]
     \centering
@@ -299,7 +297,7 @@ The preceding results show that GraphCast--Mamba improves forecasts at longer le
 
 \begin{figure}[!htb]
     \centering
-    \includegraphics[width=0.8\linewidth]{Graphs/arxiv_2023/memory_policies.pdf}
+    \includegraphics[width=0.8\linewidth]{arxiv_pics/fig6_memory_policies.pdf}
     \caption{{{\textbf{Comparison of carry/carry, carry/reset, and matched reset/reset memory policies defined in Table~\ref{tab:memory_controls}.} Curves show exact GraphCast loss reduction relative to a common GraphCast baseline on the 122 initializations in 2023. Reset/reset uses the matched training schedule described in the text.}}}
     \label{fig:memory_reset}
 \end{figure}
@@ -313,7 +311,9 @@ The preceding results show that GraphCast--Mamba improves forecasts at longer le
 
 Our results show that a small correction branch with persistent temporal memory can improve forecasts from a frozen pretrained weather model at longer forecast lead times. {The matched reset-trained control supports a benefit from retaining temporal memory for the tested configuration and training realization, while inference-time reset demonstrates the selected model's dependence on retained history.} This suggests that compact temporal extensions offer a promising way to improve existing forecasters with limited additional training. How this benefit depends on spatial resolution and the choice of backbone remains an open question.
 
-{\textbf{Limitations.} Deterministic AI weather models can produce overly smooth fields and struggle to predict extremes despite good average skill. \citet{zhang2025numerical} discuss this smoothing tendency and find that several leading models underestimate the frequency and intensity of record-breaking heat, cold, and wind events. We have not systematically evaluated whether GraphCast--Mamba reduces smoothing or improves extreme-event prediction. The aggregate loss and RMSE reductions reported here therefore do not establish improved skill for rare extremes.}
+{\textbf{Limitations.} Our results show that non-Markovian memory can improve forecasts from a frozen Markovian backbone. This suggests the possibility of jointly learning the forecasting dynamics and temporal memory within a native model. However, autoregressive training introduces sequential dependencies between forecast steps, limiting temporal parallelism and opportunities for batching and data reuse. Backpropagation through long rollouts also requires storing or recomputing intermediate activations, making efficient computation and memory access central challenges for joint training of the full model. To keep training tractable, our study restricts learning to a correction branch attached to a frozen pretrained forecaster.
+
+A separate direction concerns high spatial frequencies. At fixed resolution, dynamically important unresolved scales may increase the value of temporal history, as suggested by the PDE studies discussed in the introduction. Regimes with substantial high-frequency content could therefore provide a more sensitive probe of non-Markovian memory. Our aggregate loss and RMSE metrics do not establish whether memory improves fine-scale predictions or reduces excessive smoothing; this requires evaluating scale-dependent forecast errors and spatial-gradient statistics.}
 \FloatBarrier
 
 
@@ -347,13 +347,6 @@ and training will be open-sourced upon publication.
 \label{app:training_configuration}
 The configuration below supplies the principal {GraphCast loss} and RMSE results in Section~\ref{sec:numerical}.
 
-% Provenance: artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/
-% runs/di16_fast_mamba/run_config.json; baseline SHA-256:
-% e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29.
-% Data: data/graphcast/graphcast/dataset/wb2_res1_levels13_train.zarr.stage_report.json,
-% prepared_stream/res1/metadata.json, anchor_manifests/v24_Ilya_res1/metadata.json.
-% Normalization file hashes: artifacts/evaluations/
-% v24_res1_2023_stride3_memory_20261004/protocol.json, statistics.
 \paragraph{Backbone, data, and normalization.}
 We use the public \texttt{GraphCast\_small} checkpoint trained on ERA5 1979--2015, with $1^\circ$ resolution, 13 pressure levels, a mesh refined through level 5, and precipitation as both an input and an output. Its filename is {\small\texttt{GraphCast\_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz}}.
 
@@ -363,19 +356,13 @@ Training examples are drawn from ERA5 2015--2021, with 2022 reserved for develop
 We initialize the Mamba correction branch from the frozen GraphCast backbone checkpoint: its grid-to-mesh encoder (G2M), mesh-to-grid decoder (M2G), and two graph message-passing steps copy the corresponding pretrained weights, using the first two of GraphCast's 16 graph message-passing steps. We insert newly initialized Mamba modules after these graph message-passing steps and append a linear output head with weights and biases initialized to zero. Consequently, the initial forecast correction is zero and the GraphCast--Mamba forecast equals the pretrained GraphCast backbone forecast. The copied spatial parameters, Mamba modules, and output head form the trainable parameters $\phi$; the separate GraphCast backbone parameters $\theta$ remain frozen throughout training on ERA5 2015--2021. Each optimizer update processes one window from each of four independent segments, giving batch size $B=4$ under the memory-carry procedure in Section~\ref{sec:training}.
 
 \paragraph{Optimizer and checkpoint settings.}
-% Both stage configs and the archived training/endpoint_step.py and runner.py
-% are retained under res1_batch4_temporal_lr_20260908; the first-stage config is
-% seeds/di16_fast_mamba_warmup/run_config.json. The second stage is a weights-only
-% restart, with fresh optimizer, RNG, recurrent state, and data cursor.
+
 The reported model uses two optimization stages. The first stage, called the 500-update warm-up in the main text, linearly increases the learning rate from zero to $10^{-4}$ over its first 50 updates and then holds it constant. Spatial and Mamba parameters use the same learning rate during this stage. The second stage transfers the learned correction weights and starts a fresh optimizer for 2,000 further updates, resetting the random-number generator, temporal memory, and data cursor. Its spatial learning rate ramps from zero to $10^{-4}$ over 50 updates and then follows cosine decay toward $10^{-5}$ over the remaining 1,950 updates. The Mamba learning rate is three times the spatial learning rate throughout this second stage.
 
 Both stages use AdamW with moments $(0.9,0.98)$, weight decay $10^{-4}$ applied to all trainable correction parameters, global gradient-norm clipping at 1, and random seed 22. Model computation uses bfloat16, with float32 meteorological fields and temporal-state boundaries. The configuration uses spatial width 512, inner dimension 16, and one $B,C$ group. The evaluated model averages the parameters saved at second-stage updates 500, 1,000, 1,500, and 2,000 using SWA; these are the post-warm-up checkpoint indices used elsewhere in the paper.
 
 \paragraph{Matched reset-training control.}
-% Control: artifacts/checkpoints/v24_Ilya/res1_selected_matched_reset_20261015/
-% runs/branch/swa/swa_step00500-02000.pkl; SHA-256:
-% db0e8032ac47daebd4e9c8869e4eac3c325613156507512567f20f6382086ab6.
-% Exact restored/runtime sources: source_provenance.json in that training root.
+
 The reset/reset control uses the same backbone, training data, correction architecture, parameter count, batch size four, random seed 22, precision, optimizer schedules, and SWA indices as the selected carry-trained model. Both its 500-update warm-up and 2,000-update main stage reset the SSM states and causal-convolution caches before every correction prediction; the main stage starts from its own reset-trained warm-up weights. The 24-step training windows, $K=20$ feedback-conditioned tail, full correction feedback, and loss objective are retained. Hyperparameters are fixed to the selected configuration without further model selection. The control uses the recovered archived training and model code, with previously unarchived dependencies supplied from the workspace and frozen for the new run. The historical environment was not fully archived, so matching refers to the configured training protocol and does not imply bitwise reproduction of the earlier run.
 
 \subsection{Complete loss definition}
@@ -397,10 +384,7 @@ We use GraphCast loss as the common label for the weighted MSE diagnostics. {The
 
 \subsection{Memory-control evaluation and uncertainty}
 \label{app:memory_evaluation}
-% Frozen extension: artifacts/evaluations/v24_matched_reset_2023_20261018/
-% protocol.json; protocol hash:
-% 81520bf89343412676b7cdf7229200f673a868245426f6176d41756b9d12d9cb.
-% Numerical results and sensitivity intervals: report/summary.json, report/report.md.
+
 The matched reset/reset evaluation reuses the original frozen evaluator, initialization manifest, input data, and normalization statistics. Carry/carry and carry/reset reuse their original forecast files. All three policies start with zero temporal memory, feed back their full corrected forecasts, and are scored on the same 122 initializations and 40 six-hour leads; late-December forecasts use verifying ERA5 states through 9 January 2024. All loss reductions use the original carry/carry evaluation's uncorrected GraphCast trajectory as their common denominator, pooling losses before computing ratios.
 
 The carry/carry versus matched reset/reset rollout contrast is a separate planned analysis added after the original selected-model evaluation; it is not part of that evaluation's original confirmatory endpoint family. Day 10 is a secondary endpoint. We resample complete paired forecasts using 10,000 non-wrapping block-bootstrap draws with seed 20260916 and blocks of five consecutive initialization positions (12 elapsed days). Intervals for reductions, contrasts, and leadwise curves are pointwise 95\% intervals, conditional on the fixed checkpoints and the 2023 sample. They do not measure training-seed or between-year variation, or establish simultaneous significance across leads.
@@ -441,7 +425,7 @@ Repeated uncorrected GraphCast evaluations differ numerically. For reset/reset, 
 Table~\ref{tab:lr_sensitivity} shows that, for inner dimension 16, increasing the Mamba learning-rate multiplier from $1\times$ to $3\times$ raises the ten-day aggregate loss reduction from $15.67\%$ to $16.34\%$ and the day-10 reduction from $22.44\%$ to $23.68\%$. For inner dimension 32, the best tested multiplier is $1\times$; increasing it to $3\times$ lowers the aggregate reduction from $16.29\%$ to $15.73\%$. Dimension 32 performs better at $0.3\times$ and $1\times$, whereas dimension 16 performs better at $3\times$. Thus, the smaller GraphCast-Mamba head benefits from a larger learning rate in these runs, supporting joint selection of Mamba capacity and learning rate. The results do not establish a monotonic benefit from increasing either quantity.\par
 \end{samepage}
 
-\Il{Across all six tested combinations of Mamba inner dimension and learning-rate multiplier, ten-day aggregate GraphCast loss reductions on the 2022 development set range from $14.70\%$ to $16.34\%$, with day-10 reductions of $21.98$--$23.68\%$. These consistently substantial gains indicate that the overall correction benefit is robust across the tested choices of Mamba capacity and learning rate.}
+Across all six tested combinations of Mamba inner dimension and learning-rate multiplier, ten-day aggregate GraphCast loss reductions on the 2022 development set range from $14.70\%$ to $16.34\%$, with day-10 reductions of $21.98$--$23.68\%$. These consistently substantial gains indicate that the overall correction benefit is robust across the tested choices of Mamba capacity and learning rate.
 
 \FloatBarrier
 \subsection{\texorpdfstring{{Optimizer configuration study}}{Optimizer configuration study}}
@@ -501,13 +485,7 @@ Table~\ref{tab:variable_group_rmse} provides the numerical results underlying Fi
 \clearpage
 \subsection{Computational resources}
 \label{app:computational_resources}
-% Selected run: di16_fast_mamba, Slurm array task 13740084_6 (job 13783955).
-% sacct: COMPLETED, elapsed 22:40:45, 8 CPUs, gres/gpu=1,
-% batch MaxRSS=101817568K (97.1008 GiB).
-% logs/v24_r1_b4lr_13740084_6.out confirms 500+2000 updates and SWA.
-% GPU telemetry: artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/
-% logs/train_13740084_6_gpu.csv; max memory.used=23701 MiB, sampled every 5 s.
-% Parameter counts: selected run_config.json, derived.
+
 Table~\ref{tab:computational_resources} reports the measured resources for the selected model. The elapsed time covers the complete GPU allocation for the 500-update initialization stage, the 2,000-update main stage, compilation, data loading, checkpointing, and SWA construction. Data preparation, hyperparameter search, and forecast evaluation are excluded. Forecast evaluation ran separately, and neither training stage performed inline validation. Host memory is the peak resident memory reported by Slurm; GPU memory is the largest value observed in five-second telemetry samples.
 
 \begin{table}[!htbp]
@@ -546,7 +524,7 @@ In \emph{closed-loop training}, the corrected GraphCast--Mamba forecast supplies
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{Graphs/main_v3/training_ar_horizon_15yr_closedloop.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig7_training_horizon_closed_loop.pdf}
     \caption{Forecast skill after closed-loop training with different training tail lengths $K$. During the tail, corrected GraphCast--Mamba predictions supply subsequent inputs. Each curve shows {GraphCast loss} reduction relative to GraphCast over ten forecast days; positive values indicate improvement. {The vertical dashed line marks $20\times6=120$\,h (5 days), the training tail duration for $K=20$. Gains for this model persist beyond its training tail to day 10, twice that duration.}}
     \label{fig:training_horizon_closed_loop}
 \end{figure}
@@ -561,7 +539,7 @@ In our experiments, training with this teacher-forced prefix and a tail independ
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{Graphs/main_v2/training_ar_horizon.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig8_training_horizon_open_loop.pdf}
     \caption{Forecast skill after open-loop training with a teacher-forced prefix and different training tail lengths $K$. During the tail, uncorrected GraphCast forecasts supply subsequent inputs. {GraphCast loss} reduction exhibits a pronounced crossover, with substantially larger long-lead gains for $K\geq18$. {The vertical dashed line marks $20\times6=120$\,h (5 days), the training tail duration for $K=20$; this model retains positive gains beyond that duration, up to day 10.} This figure and Figure~\ref{fig:training_horizon_closed_loop} use the same vertical scale but compare separate sweeps with different experimental settings and loss reconstructions (Appendix~\ref{app:training_loss}).}
     \label{fig:training_horizon_open_loop}
 \end{figure}
@@ -575,7 +553,7 @@ This crossover raises an interesting question about how temporal memory, trainin
 \label{app:common_grid}
 \begin{figure}[!t]
     \centering
-    \includegraphics[width=\linewidth]{Graphs/common_grid_2023_public_checkpoints_ens/fig9_public_checkpoints_2023_repaired_vs_ens.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig9_common_grid_all_variables.pdf}
     \caption{The comparison in Figure~\ref{fig:common_grid_selected} extended to 12 diagnostics. Blue shows the selected GraphCast--Mamba model M1 ($1^\circ$), dashed gray its public GraphCast\_small backbone ($1^\circ$), and green the public GraphCast checkpoint ($0.25^\circ$). Z denotes geopotential, T temperature, Q specific humidity, U zonal wind, and V meridional wind; a three-digit suffix gives pressure in hPa. T2m denotes $2$\,m temperature, U10 and V10 the $10$\,m wind components, and MSL mean sea-level pressure. All four forecasts use identical dates and ERA5 truth at each diagnostic and lead on the $1.5^\circ$ grid; the available date set varies across points (91--108 starts). Curves show pooled RMSE as a percentage of the matched ENS-mean RMSE, with ENS at $100\%$.}
     \label{fig:res1_all_variables}
 \end{figure}
@@ -604,7 +582,7 @@ To complement the aggregate seven-year results in Section~\ref{sec:numerical}, F
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{Graphs/city_traces/cities_Paris_NYC_20220115_compact.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig10_city_forecasts.pdf}
     \caption{{Ten-day forecasts from 00\,UTC on 15 January 2022 at the $1^\circ$ grid points nearest Paris ($49^\circ$N, $2^\circ$E; left) and New York City ($41^\circ$N, $74^\circ$W; right).
     From top to bottom, rows show $2$\,m temperature (T2m), $850$\,hPa zonal wind (U850), and $6$\,h accumulated precipitation in physical units.
     ERA5 is shown in black, the frozen GraphCast forecast in dashed orange, and the GraphCast--Mamba forecast in blue.

@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.analyze_models.merge_v24_2023_eval import cadence_block_counts, loss_improvement
 from scripts.experiments.run_v24_mgda import check, pinned, read, seal, unseal, write
+from scripts.analyze_models.comparison_policy import POLICY, partition_models, presentation_directory
 
 
 def pooled_power_score(prediction, truth):
@@ -37,18 +38,18 @@ def pooled_power_score(prediction, truth):
 
 def build_if_complete(training_campaign):
     root = Path(training_campaign).resolve()
-    destination = root / 'report'
+    selected_path = root / 'selected_arms.json'
+    if not selected_path.exists():
+        return {'status': 'pending', 'reason': 'both methods must finish training'}
+    selected = unseal(selected_path)
+    tasks, excluded = partition_models(selected['tasks'], root)
+    destination = presentation_directory(root / 'report', excluded)
     destination.mkdir(exist_ok=True)
     with (destination / 'report.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         if (destination / 'complete.json').exists():
             return unseal(destination / 'complete.json')
-        selected_path = root / 'selected_arms.json'
-        if not selected_path.exists():
-            return {'status': 'pending', 'reason': 'both methods must finish training'}
-        selected = unseal(selected_path)
-        tasks = selected['tasks']
-        if len(tasks) != 10 or len({t['logical_id'] for t in tasks}) != 10:
+        if len(selected['tasks']) != 10 or len({t['logical_id'] for t in selected['tasks']}) != 10:
             raise ValueError('Expected ten distinct selected scalar arms')
         expected = [(task, root / 'smoothing' / task['logical_id']) for task in tasks]
         missing = [task['logical_id'] for task, directory in expected if not (directory / 'report.json').exists()]
@@ -66,6 +67,14 @@ def build_if_complete(training_campaign):
 
 
 def _build(root, destination, selected, expected, *, extra_metadata=None):
+    included, excluded = partition_models([task for task, _ in expected], root)
+    included_ids = {task['logical_id'] for task in included}
+    expected = [(task, directory) for task, directory in expected if task['logical_id'] in included_ids]
+    # The caller may already have filtered expected while checking readiness.
+    _, selected_exclusions = partition_models(selected['tasks'], root)
+    excluded = selected_exclusions or excluded
+    destination = presentation_directory(destination, excluded)
+    destination.mkdir(parents=True, exist_ok=True)
     records, losses, sources, warnings = [], [], [], []
     canonical, initialization_ids, canonical_power, canonical_layout = None, None, None, None
     variants = ('raw', 'gaussian', 'band')
@@ -135,18 +144,7 @@ def _build(root, destination, selected, expected, *, extra_metadata=None):
             elapsed_field = task.get('training_elapsed_field', 'elapsed_seconds')
             row['training_stage_elapsed_gpu_hours'] = (
                 sum(p[elapsed_field] for p in proofs) / 3600 if proofs else None)
-    contrasts = []
-    for weight in (0., .25, .5, .75, 1.):
-        for variant in variants:
-            indices = [next(i for i, row in enumerate(records) if row['model_family'] == family
-                            and row['lambda'] == weight and row['variant'] == variant)
-                       for family in ('gc_mamba', 'full_gc')]
-            a, b = indices
-            difference = draws[:, a, 0] - draws[:, b, 0]
-            lo, hi = np.quantile(difference, [.025, .975])
-            contrasts.append({'lambda': weight, 'variant': variant,
-                              'mamba_advantage_percentage_points': float(point[a, 0] - point[b, 0]),
-                              'ci95_lower': float(lo), 'ci95_upper': float(hi)})
+    contrasts = paired_contrasts(records, point, draws)
     with (destination / 'tradeoff.csv').open('w', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(records[0]))
         writer.writeheader()
@@ -157,6 +155,7 @@ def _build(root, destination, selected, expected, *, extra_metadata=None):
     _plot(destination, records)
     result = seal(destination / 'complete.json', {'status': 'complete', 'sources': sources,
         'selected_arms': pinned(root / 'selected_arms.json'), 'records': records, 'contrasts': contrasts,
+        'comparison_policy': POLICY if excluded else None, 'excluded_models': excluded,
         'baseline_repeatability': warnings, 'evaluation_year_reused': True,
         'bootstrap': {'replicates': 10000, 'seed': 20260916, 'block_starts': 5,
                       'method': 'paired non-wrapping moving-block percentile', 'coverage': 'pointwise exact MSE'},
@@ -165,6 +164,28 @@ def _build(root, destination, selected, expected, *, extra_metadata=None):
         **(extra_metadata or {})})
     (destination / 'pending.json').unlink(missing_ok=True)
     return result
+
+
+def paired_contrasts(records, point, draws):
+    """Compare only eligible same-lambda pairs; an excluded arm is not missing data."""
+    contrasts = []
+    variants = ('raw', 'gaussian', 'band')
+    for weight in (0., .25, .5, .75, 1.):
+        for variant in variants:
+            indices = [next(i for i, row in enumerate(records) if row['model_family'] == family
+                            and row['lambda'] == weight and row['variant'] == variant)
+                       for family in ('gc_mamba', 'full_gc')
+                       if any(row['model_family'] == family and row['lambda'] == weight
+                              and row['variant'] == variant for row in records)]
+            if len(indices) != 2:
+                continue
+            a, b = indices
+            difference = draws[:, a, 0] - draws[:, b, 0]
+            lo, hi = np.quantile(difference, [.025, .975])
+            contrasts.append({'lambda': weight, 'variant': variant,
+                              'mamba_advantage_percentage_points': float(point[a, 0] - point[b, 0]),
+                              'ci95_lower': float(lo), 'ci95_upper': float(hi)})
+    return contrasts
 
 
 def _plot(destination, records):

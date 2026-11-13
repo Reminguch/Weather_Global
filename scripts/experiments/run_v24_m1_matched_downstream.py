@@ -184,13 +184,16 @@ def advance(root, manifest, stage):
 
 def report(root, manifest):
     from scripts.analyze_models import report_v24_scalar_lambda as reporter
+    from scripts.analyze_models.comparison_policy import partition_models, presentation_directory
     selected = unseal(manifest["selected_arms"]["path"])
     reference = Path(manifest["reference"])
     expected = [({"logical_id": "M1", "model_family": "historical_gc_mamba", "lambda": None}, reference)]
-    expected += [(task, Path(manifest["directories"][task["logical_id"]])) for task in selected["tasks"]]
+    included, excluded = partition_models(selected["tasks"])
+    expected += [(task, Path(manifest["directories"][task["logical_id"]])) for task in included]
     for _, directory in expected:
         require(unseal(directory / "report.json")["status"] == "complete", "Annual report incomplete")
-    destination = root / "report"
+    destination = presentation_directory(root / "report", excluded)
+    destination.mkdir(parents=True, exist_ok=True)
     with (destination / "report.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         if (destination / "complete.json").exists():

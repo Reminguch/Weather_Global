@@ -51,8 +51,8 @@ MAE also remain distinct. A reset control retains the two-frame meteorological
 input, so describe it as lacking persistent temporal memory.
 
 The terminology pass preserves collaborator annotations and numerical results.
-`tools/standardize_figure_labels.py` updates the archived figure labels from
+`archive/tools/standardize_figure_labels.py` updates the archived figure labels from
 preserved input PDFs and checks that no pixels outside the label regions change.
-Its provenance is recorded in `tools/figure_label_changes.json`. The figure
+Its provenance is recorded in `archive/tools/figure_label_changes.json`. The figure
 PNGs and architecture SVGs are refreshed from the PDFs used in the paper.
 The plotting generators retain the approved labels for subsequent regeneration.

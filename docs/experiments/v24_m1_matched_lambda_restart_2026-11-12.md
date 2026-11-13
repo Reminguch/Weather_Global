@@ -1,5 +1,15 @@
 # GC–Mamba lambda restart with M1's training recipe
 
+**Later November 12 correction:** the user excluded the old full-GC `1e-5`
+lineages from scientific comparisons and specified `3e-7` for future full-GC
+work. The original full-GC rate-retention proposal below is historical; it is
+not a current rate recommendation. The user subsequently approved fresh
+full-GC replacements, now submitted as `17421838 → 17421839`; see the
+[activated replacement](v24_full_gc_positive_lambda_lr3em7_restart_2026-11-12.md).
+GC–Mamba training/history is unchanged; its old shared finish controller was
+replaced by external annual controller `17422049` to use the new full-GC runs.
+See the [comparison policy](v24_full_gc_comparison_policy_2026-11-12.md).
+
 Date: **2026-11-12, America/New_York**. Status: **GC–Mamba-only restart submitted;
 all new jobs pending at verification**. The user approved cancellation and fresh submission
 for GC–Mamba only, explicitly keeping DeepMind/full-GC unchanged. This supersedes

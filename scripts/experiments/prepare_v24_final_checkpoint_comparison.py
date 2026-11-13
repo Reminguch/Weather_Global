@@ -22,7 +22,8 @@ DEFAULT = "artifacts/evaluations/v24_final_checkpoint_comparison_20261111"
 DRIVER = "scripts/experiments/prepare_v24_final_checkpoint_comparison.py"
 WRAPPER = "scripts/experiments/v24_final_checkpoint_comparison.slurm"
 OVERLAYS = (DRIVER, WRAPPER, "scripts/experiments/run_v24_raw_checkpoint_pilot.py",
-            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py")
+            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py",
+            "scripts/analyze_models/comparison_policy.py")
 SWA_STEPS = (1000, 1500, 2000, 2500)
 TRAINING_DEPENDENCIES = ("17049163", "17062358")
 LIMITS = (

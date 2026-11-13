@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.experiments.run_v24_mgda import check, pinned, read, seal, unseal
 from scripts.experiments.frozen_runtime import _digest
+from scripts.analyze_models.comparison_policy import POLICY, partition_models, presentation_directory
 
 POWER_KEYS = ("truth_power", "prediction_power", "error_power", "cross_power")
 REFERENCE_RELATIVE = 1e-6
@@ -373,7 +374,10 @@ def report(root):
     root = Path(root).resolve()
     manifest = unseal(root / "manifest.json")
     items, layout, dates, sources = load_models(root, manifest)
-    data_root, image_root = Path(manifest["data_root"]), Path(manifest["image_root"])
+    models, excluded = partition_models(manifest["models"])
+    included_ids = {model["id"] for model in models}
+    data_root = presentation_directory(manifest["data_root"], excluded)
+    image_root = presentation_directory(manifest["image_root"], excluded)
     data_root.mkdir(parents=True, exist_ok=True)
     image_root.mkdir(parents=True, exist_ok=True)
     canonical = items["M1_raw"]
@@ -392,6 +396,8 @@ def report(root):
                            "power": canonical["power"]["prediction_power"][:, 0]}
     for identity, item in items.items():
         model = item["model"]
+        if identity not in included_ids:
+            continue
         series[identity] = {"label": model["label"], "family": model["model_family"],
                             "plot_group": model.get("plot_group", "reference" if identity.startswith("M1_") else model["model_family"]),
                             "step": model["step"], "lambda": model["lambda"],
@@ -429,7 +435,7 @@ def report(root):
                            "power_error_pct": float(per_lead[lead]) if np.isfinite(per_lead[lead]) else None})
     write_csv(data_root / "summary.csv", summary)
     write_csv(data_root / "lead_curves.csv", curves)
-    pairs = paired_summary(manifest["models"], series, spread, day10_spread)
+    pairs = paired_summary(models, series, spread, day10_spread)
     pair_path = data_root / "raw_vs_swa.csv"
     if pairs:
         write_csv(pair_path, pairs)
@@ -441,11 +447,12 @@ def report(root):
                         exact_gc_loss=np.stack([v["loss"] for v in series.values()]),
                         metadata=np.asarray(json.dumps({"layout": layout, "initialization_times": dates,
                                                         "canonical_baseline": "M1_raw evaluation"})))
-    figures = make_figures(image_root, manifest["models"], series,
+    figures = make_figures(image_root, models, series,
                            [tuple(c) for c in layout["channels"]], len(dates),
                            figure_title=manifest.get("figure_title", "Raw-checkpoint pilot"))
     warnings = [row for row in diagnostics if row["exceeds_reference"]]
     payload = {"status": "complete", "manifest_hash": manifest["record_hash"], "count": len(dates),
+               "comparison_policy": POLICY if excluded else None, "excluded_models": excluded,
                "initialization_times": dates, "target_steps": 40, "summary": summary,
                "baseline_reference": "public GC branch from M1_raw; common denominator for all models",
                "baseline_repeat_spread_rollout": spread, "baseline_repeat_spread_day10": float(day10_spread),
@@ -459,6 +466,15 @@ def report(root):
                "excluded_zero_truth_bins_per_lead": np.sum(~mask, axis=(1, 2)).tolist(),
                "limits": manifest.get("report_limits", "Small development pilot, not checkpoint selection or a claim about full-year skill. Raw lambda checkpoints at update 1250 are intermediate in planned 2500-update training; M1 update 2000 follows its 500-update warm-up. SWA is a separate historical reference. Full-GC lambda0 used peak LR 3e-7, whereas positive-lambda full-GC runs used 1e-5: this is not a fixed-LR lambda-only comparison. Finite worse metrics do not stop training/evaluation."),
                "figures": figures, "pooled_spectra": pinned(pooled_path), "sources": sources}
+    if excluded:
+        payload["archived_source_limits"] = payload["limits"]
+        payload["limits"] = (
+            "Filtered saved-checkpoint development diagnostic, not a full-year skill estimate or checkpoint selection. "
+            "The rejected full-GC peak-LR1e-5 training lineages are excluded from every displayed table and figure. "
+            "The remaining full-GC3e-7 lambda0 point is not a full-GC lambda sweep. "
+            "Training recipes and checkpoint budgets differ; inspect the recorded checkpoint identities. "
+            "The original source-protocol limitations remain in archived_source_limits in the JSON. "
+            "Finite worse metrics and numerical drift remain advisory.")
     seal(data_root / "report.json", payload)
     lines = [f"# {manifest.get('report_title', 'Raw M1 and lambda checkpoint pilot: MSE and power spectra')}\n",
              f"Matched **{len(dates)} starts in 2022**, 40 six-hour leads, cold full feedback. "
@@ -475,6 +491,10 @@ def report(root):
               f"(day 10: {day10_spread:.6g}). These are numerical warnings, not gates. "
               "The CSV separately records whether each decrease exceeds that measured baseline spread; "
               "it does not estimate full model noise.", "", payload["limits"], ""]
+    if excluded:
+        lines += ["**Comparison policy (2026-11-12):** full-GC peak-LR `1e-5` runs are excluded by user instruction. "
+                  "Their raw measurements remain in the archived source report for provenance/debugging only. "
+                  "Eligible full-GC `3e-7` and GC–Mamba results remain displayed.", ""]
     if pairs:
         lines += ["## Matched raw versus SWA weights", "",
                   "The same color identifies each training run: solid curves and filled markers are raw "
@@ -495,9 +515,11 @@ def report(root):
         lines += ["", "Positive MSE reductions and negative power-error changes favor SWA. "
                   "The paired CSV retains whether each MSE decrease exceeds the measured public-GC "
                   "repeat spread; this is advisory and does not estimate raw/SWA model repeatability.", ""]
-    full_gc_weights = [model.get("lambda") for model in manifest["models"]
-                       if model["model_family"] == "full_gc"]
-    if 0 in full_gc_weights and any(weight is not None and weight > 0 for weight in full_gc_weights):
+    full_gc_models = [model for model in models if model["model_family"] == "full_gc"]
+    zero_rates = {model.get("learning_rate") for model in full_gc_models if model.get("lambda") == 0}
+    positive_rates = {model.get("learning_rate") for model in full_gc_models
+                      if model.get("lambda") is not None and model["lambda"] > 0}
+    if 3e-7 in zero_rates and 1e-5 in positive_rates:
         lines += ["**Learning-rate caveat:** full-GC λ=0 used peak LR `3e-7`; positive-λ full-GC runs used `1e-5`. "
                   "Their differences combine loss weight and learning rate.", ""]
     for figure in figures:
@@ -506,9 +528,10 @@ def report(root):
             lines += [f"![{Path(figure).stem.replace('_', ' ')}]({relative})", ""]
     lines += ["Checkpoint paths and hashes:", ""]
     lines.extend(f"- {model['label']}: `{model['checkpoint']['path']}`; SHA256 `{model['checkpoint']['sha256']}`."
-                 for model in manifest["models"])
+                 for model in models)
     (data_root / "report.md").write_text("\n".join(lines) + "\n")
-    return {"status": "complete", "count": len(dates), "models": len(items),
+    return {"status": "complete", "count": len(dates), "models": len(models),
+            "excluded_models": excluded,
             "report": str(data_root / "report.md"), "summary": str(data_root / "summary.csv"),
             "figures": figures, "numerical_warnings": len(warnings)}
 

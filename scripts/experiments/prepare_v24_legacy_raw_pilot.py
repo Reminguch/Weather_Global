@@ -10,7 +10,8 @@ from scripts.experiments.run_v24_mgda import check, pinned, read, seal, unseal, 
 
 OVERLAYS = ("scripts/experiments/prepare_v24_legacy_raw_pilot.py",
             "scripts/experiments/run_v24_raw_checkpoint_pilot.py",
-            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py")
+            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py",
+            "scripts/analyze_models/comparison_policy.py")
 BASE = "artifacts/checkpoints/v24_Ilya"
 SPECS = (
     ("sep24_mse", "Sept24 grid-MSE control", "res1_amse_blend_lambda0p1_20260924", "mse_fp32", 2000, None, "September λ0.1 pair"),

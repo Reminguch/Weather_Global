@@ -1528,3 +1528,293 @@ digest is `8b363120bf494948770ecfa90c460391057600401edd4690eed23d3e70d01f1e`.
 No remote installation, GPU run or scientific improvement is claimed. Next:
 Lianghong supplies local data/scheduler paths and returns job records and
 completion artifacts; keep this execution distinct from the active Della runs.
+
+### 2026-11-12 — User excludes full-GC peak1e-5 from comparisons
+
+The user requested deleting the full-GC1e-5 results or marking them bad and
+never retrieving them for comparison, and specified3e-7 for full-GC work.
+Chose preservation with explicit scientific-comparison exclusion. Exact run
+identities and rationale are in the [policy](../../../docs/experiments/v24_full_gc_comparison_policy_2026-11-12.md);
+root AGENTS.md records the lasting instruction. This is a user-directed
+scope decision, not an execution-failure classification or a finite-loss gate.
+Historical numerical values, source integrity and warning evidence remain intact.
+
+Only full-GC lambda0 has3e-7 results: step500 exact rollout loss10.337334 versus
+GC10.840716 on32 development2022 starts (4.6434% reduction), and step1250
+10.610624 versus11.133143 onfour2022 starts/40leads (4.6934%). These cohorts
+cannot be treated as a learning curve. The accepted1250 model has day10 loss
+reduction8.0881%; no positive-lambda3e-7 result or final2500 checkpoint exists.
+
+Live Slurm inspection found full-GC17049163_0–4 pending: lambda0 retains3e-7,
+positive lambda retains1e-5. Their history/finish and mixed final chain remain
+pending, with the old frozen mixed plan still referencing excluded lineages.
+The new GC–Mamba17406861/862 remains pending with M1 spatial peak1e-4 and
+main Mamba multiplier3. Portable full-GC horizons already use3e-7 atlambda0.
+
+Asked whether to replace the pending high-rate full-GC continuations with
+fresh3e-7 runs; no scheduling action is claimed by this eligibility update.
+Existing high-rate1250 checkpoints cannot be relabeled or resumed as fresh
+low-rate experiments. Preserve the eligible lambda0 trajectory and the
+independent GC–Mamba recipe. Current report code applies explicit lineage
+exclusions to new presentation outputs while preserving sealed old reports.
+
+Implementation verification:36 report/preparation regressions passed, followed
+by8 focused policy/scalar tests after ensuring a known excluded lineage cannot
+be made eligible by relabeling its learning rate. Cached pilot reporting and
+the combined M1 figure now use separate `_eligible_20261112_v2` directories;
+eligible tables contain nine rows and exclude the four high-rate production
+arms. Original13-row measurements remain sealed. There was no new inference,
+checkpoint rewrite, job submission or cancellation in this marking operation.
+
+<a id="e013"></a>
+## e013 — Fresh positive-lambda full-GC sweep at peak3e-7 (superseded)
+
+**Later November12 correction:** superseded by [e014](#e014). All newly
+submitted cosine training/downstream jobs below were canceled while pending,
+as were oldlambda0 continuation/history17049163_0/17049164_0. Their saved
+artifacts remain historical. No e013 positive-lambda training result was produced.
+
+Date:2026-11-12 (America/New_York). Initial execution: submitted/pending;
+canceled before starting under e014. Outcome: superseded; no new
+positive-lambda cosine result was produced.
+
+**Decision:** the user explicitly chose to replace the four rejected full-GC
+positive-lambda continuations with fresh3e-7 runs. Preserve the existing3e-7
+lambda0 trajectory, GC–Mamba training/history, saved-checkpoint diagnostic,
+and all historical weights/logs/source. The e012 exclusion remains in force.
+
+**Recipe:** lambda0.25/0.5/0.75/1 start independently from public GC-small
+with new optimizer state, peak3e-7→3e-8,100-update warm-up and continuous2500
+updates. Seed22, batch4, BPTT24/K20, segment96, full weather gradients, exact
+grid MSE plus stable AMSE excess, and frozen shuffled order match the accepted
+lambda0 recipe. Fresh0→1250 and exact-resume1250→2500 are allocation boundaries,
+not an optimizer reset. No profile, LR calibration or GPU qualification added.
+
+**Activation:** new arrays17421838→17421839 each contain four arms; history
+17421840 and completion17421841 follow. Retained lambda0 uses17049163_0 and
+17049164_0. GC–Mamba17406861/62/63 and diagnostic17404694/17404732 are unchanged.
+After verifying pending state, canceled only old positive full-GC train/history
+17049163_1–4/17049164_1–4 and obsolete shared controllers17049165,17406864,
+17406897,17406898,17406899. No high-rate weights initialize replacements.
+
+**Evaluation:** new mixed final17422018→17422019→17422020 compares raw2500
+and SWAs at total1000/1500/2000/2500 on four common2022 starts/40leads, reusing
+M1 raw/SWA. External annual controller17422049 validates all ten endpoints,
+preserves GCM initial500/main2000 proof evidence, then dispatches development32
+filter fitting and annual122 raw/Gaussian/band evaluations and paired reports.
+Both start after17049163_0:17421839:17406862 and never invoke canceled finish
+hooks. The active family comparison retains different documented training
+recipes; within full GC all five arms now use the same low-rate schedule.
+
+**Validation and resources:**18 training/scalar tests and34 focused downstream
+tests passed, plus frozen-source/config validation and eight Slurm test-only
+requests. All649 parent training files are identical; two new orchestration
+files were added. Prior full-GC1250 jobs took19:57:40–20:07:45 and224.534–228.220GiB
+RSS, supporting1×80GB GPU/8CPU/384GiB/30h per part. No numerical-descent gate was
+introduced. Final queue inspection confirms all eight new job groups pending,
+correct dependencies, protected jobs intact and canceled jobs absent.
+
+**Provenance and next action:** [protocol, source hashes and complete job table](../../../docs/experiments/v24_full_gc_positive_lambda_lr3em7_restart_2026-11-12.md),
+[active five-arm full-GC selection](../../../artifacts/plans/v24_full_gc_lr3em7_restart_20261112/active_full_gc_selection.json),
+and [activation receipt](../../../artifacts/plans/v24_full_gc_lr3em7_restart_20261112/activation/complete.json).
+Inspect sealed training/evaluation completion records before claiming new skill.
+Finite deterioration and repeat differences remain recorded warnings; let valid
+bounded runs reach their planned endpoints and evaluations.
+
+<a id="e014"></a>
+## e014 — Five fresh full-GC lambda arms at constant3e-7
+
+Date:2026-11-12 (America/New_York). Execution: submitted; no completed
+constant-rate training/evaluation result. Outcome: pending.
+
+**Decision:** after the GraphCast final autoregressive-stage schedule discussion,
+the user requested keeping3e-7 only. The full-GC schedule is therefore constant
+from the first update, with no warmup and no decay. All five lambdas0/.25/.5/.75/1
+start fresh from public GC-small with fresh optimizer state. The earlierlambda0
+run's1250-update weights used warmup/cosine and cannot represent this new
+schedule. Retain those scores/checkpoints only with their actual historical
+recipe. The original user-directed exclusion of full-GC1e-5 lineages remains.
+
+**Recipe:** preserve seed22, batch4, BPTT24/K20,96-step segments, full weather
+gradients, exact-grid-MSE-plus-stable-AMSE-excess objective, and the frozen
+shuffled sample order. Train2500 updates in fresh0→1250 and exact-resume
+1250→2500 allocations. Native config uses `learning_rate_schedule=constant`,
+`warmup_steps=0`, `learning_rate=3e-7`, `end_learning_rate=null`; the null value
+is the preserved validator's required representation, and effective LR stays
+3e-7 at every update. No profile or calibration run was added.
+
+**Activation:** fresh five-arm training arrays **17429091→17429092**, history
+**17429093**, and completion **17429094** are submitted. After verifying pending
+state, canceled e01317421838/39/40/41, mixed17422018/19/20, annual17422049,
+and oldlambda0 train/history17049163_0/17049164_0 before execution. No prior
+weights, logs, manifests or frozen source were deleted. GC–Mamba training/history
+**17406861/17406862/17406863** is unchanged. The saved-checkpoint diagnostic
+17404694_2–5/17404732 completed and remains available under its actual recipes.
+
+**Evaluation:** rebuilt mixed raw/SWA and annual pipelines depend only on
+**17429092:17406862**, combining all five fresh constant-rate full-GC arms
+with existing M1-recipe GC–Mamba. Mixed raw2500/SWA uses four2022 starts/40leads,
+reuses principal M1 raw/SWA forecasts, and averages the prescribed total
+updates1000/1500/2000/2500. Annual smoothing fits on32 development2022 starts
+and evaluates122 annual2023 starts with raw/Gaussian/band results and paired
+reporting. These remain comparisons of different family training recipes.
+Submitted mixed jobs are **17429215→17429216_2–21→17429217**; annual/smoothing
+controller is **17429218**, with the same two-parent dependency. No unassigned
+future jobs or completed evaluations are claimed here.
+Final queue verification found all eight new job groups **PENDING** with
+correct dependencies, all canceled jobs absent and protected GC–Mamba arrays
+present. The [sealed activation receipt](../../../artifacts/plans/v24_full_gc_constant_lr3em7_20261112/activation/complete.json)
+and active selection in its plan root preserve that inspected state.
+
+**Validation and resources:** nine focused training tests passed, including
+the actual Optax constant LR and serialization/resume at1250; frozen runtime
+validated all five configurations and LR atindices0/99/100/1249/1250/2499.
+All eight training/downstream Slurm test-only calls passed before submission.
+All649 original computational files are unchanged, with two orchestration
+additions. Comparable1250 jobs completed in19:57:40–20:07:45 at224.534–228.220GiB
+RSS, supporting the retained1×80GB GPU/8CPU/384GiB/30h request per allocation.
+Finite loss increases and drift remain recorded warnings, not stopping gates.
+
+**Portable handoff:** the corrected package
+`artifacts/handoffs/lianghong_weather_20261112_constant_lr3em7/` and read-only
+[portable instructions](../../../docs/experiments/README_LIANGHONG_PORTABLE_RUNS.md)
+apply constant3e-7/no-warmup to Lianghong's four fresh full-GC horizons atlambda0.
+Validation passed34 CPU tests and four real full-GC configurations;672 original
+computational source files remain identical. GC–Mamba templates are unchanged.
+Old handoff archives stay immutable; no remote execution or delivery is claimed.
+
+**Provenance:** [current protocol](../../../docs/experiments/v24_full_gc_constant_lr3em7_2026-11-12.md),
+[training manifest](../../../artifacts/checkpoints/v24_Ilya/res1_full_gc_constant_lr3em7_20261112/manifest.json),
+manifest hash `9b4ac57585cfe9d738b52103bc4fa8095c687d889a711525d4073e46da0b4ef1`,
+training source `e8e07f2a7c3cd549e37a6cdc88c967a51fdb549960a2bc0f1df78afc30a70c88`.
+New evaluation roots:
+`artifacts/evaluations/v24_constant_lr_mixed_final_comparison_20261112/` and
+`artifacts/evaluations/v24_constant_lr_gc_lambda_annual_20261112/`.
+Inspect sealed training and evaluation completion records before reporting
+skill. Existing cosine-lambda0 results do not establish this schedule's outcome.
+
+<a id="e015"></a>
+## e015 — GraphCast-style optimal filtering for the v4 GC/M1 comparison
+
+**Date:** 2026-11-12 (America/New_York); updated November 13.
+**Execution:** 2022 fit complete; 92/122 annual starts evaluated.
+**Outcome:** interim MSE/power tradeoff; full-year result pending.
+
+**Question:** does the principal M1 advantage persist after public GC and M1
+each receive the degree-wise spectral filter from GraphCast Supplement §7.4.2?
+The user requested reworking smoothing and evaluating on v4's 2023 set, then
+explicitly required fitting on 2022.
+
+**Protocol:** fit unrestricted real gains independently by predictor, lead,
+physical variable/pressure level, and degree 0–179 on the existing 32 development
+starts. Evaluate 122 starts at 00 UTC every third day in 2023, with 40 six-hour
+leads on the native 1°/13-level grid. Use public GC-small and the exact principal
+M1 SWA from v4; no other model enters. There is no lead/wind tying, Gaussian or
+four-band restriction, regularization, gain clamp, denominator floor, residual
+restoration, or discrete-mean correction. Zero forecast-power modes receive
+identity with diagnostics. Raw rollout feedback is unchanged. Raw and pure
+projection outputs accompany the optimal filter to expose truncation effects.
+
+**Scoring:** exact original GC grid loss remains primary, using the copied
+canonical v4 GC metrics as common denominator. Preserve raw GC/M1 rerun drift,
+separately compare filtered M1 with filtered GC, and report physical spectral
+MSE/RMSE, explicitly named weighted spectral loss, projection residuals,
+mean/positivity diagnostics, and paired intervals. The 2023 year has prior
+analysis exposure. Finite drift, unusual gains, or worse loss remain warnings.
+
+**Implementation:** new core, observer, campaign and reporter preserve the
+completed smoothing run's model/evaluator computation. The old dispatcher only
+gains optional observer injection. The actual v4 recovery evaluator differs
+in hash, so original reference metrics and rerun differences remain explicit.
+Old 2022 statistics are pooled too coarsely to refit; old 2023 summaries lack
+coefficients/fields needed for arbitrary filtered grid loss. Fresh forecasts
+are therefore necessary, but no training is required.
+
+**Execution:** **17430308_0–3 → 17430309 → 17430310_0–7 → 17430311**,
+all pending at post-submission verification. Four calibration tasks each have
+eight starts; eight annual tasks each have 15–16 starts. Each GPU task requests
+one 80 GB GPU, four CPUs, 20 GiB host RAM, and 62/90 minutes for calibration/
+evaluation. Prior 30–47 minute runs at 9–10.3 GiB support these resources.
+
+**Validation:** 17 focused tests, real PNG/PDF rendering, four Slurm test-only
+requests, and a real-field 181×360 T179 geometry check passed. The latter was
+finite with QR condition 2.332 and coefficient roundtrip relative error
+4.1e-9–2.7e-8. A local Zarr async probe stalled; direct chunk decoding succeeded,
+and the production loader remains unchanged.
+
+**Evidence:** [protocol](../../../docs/experiments/v24_optimal_smoothing_v4_2026-11-12.md),
+[manifest](../../../artifacts/evaluations/v24_optimal_smoothing_v4_20261112/manifest.json),
+[validation](../../../artifacts/evaluations/v24_optimal_smoothing_v4_20261112/checks/validation.json).
+Manifest `b69ebc7e623b2a2bab0645a6d020f8807645f70b5eadc76dced61b3e116449af`;
+source `a470b86a6936c744308e1bfabbd08fe3ceabd5411019d76f7830947ce6033fa6`.
+Next: inspect actual completion and `report.json` before interpreting improvement.
+The report job automatically produces the tables and figures.
+
+### November 13 interim evaluation
+
+All 32 development starts and the fit completed; annual shards 0–5 completed
+92 starts from January 1 through October 1 at 40 leads. Shards 6/7 (October 4
+through December 30, 30 starts) remain pending on priority; report17430311 waits
+on them. Thus execution is still partial, with substantial fourth-quarter
+coverage missing. The interim report does not replace annual completion files.
+
+Canonical v4 GC-denominated exact loss reductions (rollout / day10) are:
+filtered GC **10.9123% / 18.6650%**, raw M1 **14.7112% / 22.4317%**, filtered
+M1 **15.3533% / 25.4324%**. Direct filtered M1 versus filtered GC is **4.9850%**
+rollout reduction, paired95% interval **4.1243–5.9559%**, and **8.3204%** at
+day10, interval **6.9930–10.0064%**. These intervals resample five-start blocks
+on this completed subset, conditional on fixed checkpoints and 2022 filters.
+Raw M1 versus filtered GC retains4.2643% rollout reduction. Optimal filtering
+therefore substantially narrows the gap on this subset while retaining an M1
+advantage; annual conclusions remain pending.
+
+Filtering lowers each model's own raw rollout loss by10.8808% (GC) and0.7528%
+(M1). Aggregate raw rerun differences versus canonical v4 are−0.0353% and
++0.0382%; both filtering decreases exceed those measured aggregate differences.
+Per-date/lead maximum relative differences are3.9907% and1.7923%, retained as
+warnings. The observed repeat difference is not a complete noise distribution.
+Observer/evaluator FP64/FP32 differences remain below their reference bounds.
+
+All1,195,200 fitted gains are finite, with18,014 negative and93,153 greater
+than1, none above10 in magnitude. Unit-gain projection alone worsens grid loss;
+the fitted gains produce the improvement. Preserve this as unrestricted optimal
+filtering, not pure attenuation. Completed calibration took22–23min/shard;
+evaluation took37–39min/shard, within requested resources.
+
+Evidence: [interim readout](../../../artifacts/evaluations/v24_optimal_smoothing_v4_20261112/interim_20261113/REPORT.md),
+[sealed result](../../../artifacts/evaluations/v24_optimal_smoothing_v4_20261112/interim_20261113/report.json),
+and paired losses/CSV in the same directory. Frozen source and input checks
+passed; all92 statistic files were hash-checked. No jobs or scientific settings
+were changed. Next: inspect the remaining shards and automatic annual report.
+
+### November 13 power-spectrum comparison
+
+The user requested power spectra alongside MSE. Saved physical statistics on
+the same 92 dates give rollout power errors 59.4141% / 78.3995% for raw /
+filtered GC and 67.5267% / 77.6371% for raw / filtered M1. Day-10 values are
+65.6292% / 92.1136% and 84.1939% / 90.5157%, respectively. The diagnostic is
+`100 × mean |P_forecast/P_truth − 1|`, pooling dates before taking ratios and
+equally weighting 83 channels, degrees 1–179, and leads. It uses physical
+fields without climatology subtraction, excludes degree zero, and is not
+total-energy error or phase accuracy. No undefined bins or denominator floors.
+
+Both filters worsen aggregate power error at every lead while improving MSE.
+Raw M1 beats filtered GC on both aggregate metrics at every lead. Versus raw
+GC, however, raw M1 improves MSE but worsens power matching. Filtered M1 has
+slightly lower power error than filtered GC, without a spectral confidence
+interval. These results do not establish universal fine-scale power recovery
+or improvement at every variable/degree. This qualifies the MSE-only reading.
+
+Evidence: [joint report](../../../plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/REPORT.md),
+sealed `summary.json`, pooled arrays and degree/lead CSVs in the same directory;
+three PNG/PDF pairs show degree ratios at days 1/3/7/10, power errors by lead,
+and MSE/power tradeoffs. The reporter verifies input hashes/dates and reproduces
+the preceding exact MSE values. No forecasts rerun or filters refit on 2023.
+
+Full-year follow-up **17470053 → afterok:17430311** was submitted and verified
+pending on dependency. It requests 8 GiB / two CPUs / 20 minutes, with successful
+Slurm test-only validation, and requires all 122 starts. Campaign subdirectory
+`power_reporting_20261113/` pins the submission and separate source digest
+`e3226c6153d824c1fa583d02689dee85e50b11db1673ec38d189c025620ab9dc`.
+It will write `v24_optimal_smoothing_v4_2023_power_20261113` data/images and a
+sealed completion record. The original fit/evaluation snapshot is unchanged.

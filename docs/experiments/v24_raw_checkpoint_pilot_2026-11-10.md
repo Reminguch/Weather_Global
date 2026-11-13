@@ -1,5 +1,10 @@
 # Non-SWA M1 and existing lambda checkpoints: fast MSE/spectrum pilot
 
+**November 12 correction:** full-GC peak-LR `1e-5` runs are excluded from
+scientific comparisons by explicit user instruction. Their original sealed
+measurements remain archival evidence; use only the full-GC `3e-7` lambda0
+result here. See the [comparison policy](v24_full_gc_comparison_policy_2026-11-12.md).
+
 Updated: **2026-11-11, America/New_York**. Status: both pilots completed and inspected.
 This is an evaluation of saved checkpoints. The separate four-fresh-run
 full-GC AR-horizon training campaign remains on hold.
@@ -27,18 +32,18 @@ Fresh models, all raw step1250:
 | λ | GC–Mamba MSE | GC–Mamba power error | Full-GC MSE | Full-GC power error |
 | ---: | ---: | ---: | ---: | ---: |
 | 0 | 10.8511 | 64.321% | 10.6106 | 63.972% |
-| 0.25 | 10.9865 | 63.440% | 12.1664 | 67.581% |
-| 0.5 | 11.0667 | 62.843% | 13.0646 | 63.048% |
-| 0.75 | 11.0064 | 63.112% | 12.2449 | 60.427% |
-| 1 | 11.0951 | 64.801% | 12.5368 | 58.539% |
+| 0.25 | 10.9865 | 63.440% | Excluded: LR1e-5 | Excluded |
+| 0.5 | 11.0667 | 62.843% | Excluded: LR1e-5 | Excluded |
+| 0.75 | 11.0064 | 63.112% | Excluded: LR1e-5 | Excluded |
+| 1 | 11.0951 | 64.801% | Excluded: LR1e-5 | Excluded |
 
 Fresh GC–Mamba has substantially higher MSE than M1 at this interim endpoint,
 despite lower aggregate power mismatch. Full-GC λ0 improves MSE4.693% versus
-public GC; positiveλ arms worsen rollout MSE9.28–17.35%. Full-GC λ1 improves
-power matching but worsens MSE12.608%. The different λ0/positiveλ learning rates
-preclude attributing those differences to lambda alone. Training completion
-and scientific improvement remain separate; this report does not stop or
-alter any training schedule.
+public GC. Positive-lambda full-GC results were excluded on November12; they
+cannot establish a scientific lambda comparison. No positive-lambda full-GC
+result at the accepted3e-7 rate is available. Training completion and scientific
+improvement remain separate; this documentation change does not alter a
+training schedule.
 
 Historical raw endpoints, with each training history kept separate:
 
@@ -72,9 +77,11 @@ with no excluded zero-truth-power bins.
 
 Reports and figures:
 
-- [Fresh complete table and all figures](../../plots/analyze_models/data/resolution_eval/v24_raw_checkpoint_pilot_20261110/report.md).
+- [Current eligible comparison table and figures](../../plots/analyze_models/data/resolution_eval/v24_raw_checkpoint_pilot_20261110_eligible_20261112_v2/report.md): full-GC3e-7 lambda0, GC–Mamba and public-GC/M1 references.
+- [Current eligible MSE/power tradeoff](../../plots/analyze_models/images/resolution_eval/v24_raw_checkpoint_pilot_20261110_eligible_20261112_v2/mse_power_tradeoff.png).
+- [Archival fresh table and figures — includes excluded full-GC runs; do not use as a comparison](../../plots/analyze_models/data/resolution_eval/v24_raw_checkpoint_pilot_20261110/report.md).
 - [Historical complete table and all figures](../../plots/analyze_models/data/resolution_eval/v24_legacy_raw_checkpoint_pilot_20261110/report.md).
-- [Fresh MSE/power tradeoff](../../plots/analyze_models/images/resolution_eval/v24_raw_checkpoint_pilot_20261110/mse_power_tradeoff.png).
+- [Archival fresh MSE/power tradeoff — superseded for comparisons](../../plots/analyze_models/images/resolution_eval/v24_raw_checkpoint_pilot_20261110/mse_power_tradeoff.png).
 - [M1/fresh GC–Mamba power spectra](../../plots/analyze_models/images/resolution_eval/v24_raw_checkpoint_pilot_20261110/power_spectrum_gc_mamba.png)
   and [power ratios](../../plots/analyze_models/images/resolution_eval/v24_raw_checkpoint_pilot_20261110/power_ratio_gc_mamba.png).
 - [M1/October power spectra](../../plots/analyze_models/images/resolution_eval/v24_legacy_raw_checkpoint_pilot_20261110/power_spectrum_october_500_update_continuation.png).

@@ -2,7 +2,11 @@
 
 Prepared 2026-11-12. This package runs **both studies on your cluster** using the
 included source, local data paths and your scheduler settings. It does not contact
-Della or depend on Della job IDs. The existing Della jobs are unchanged.
+Della or depend on Della job IDs. This revision uses **constant `3e-7` from the
+first update for full GC, with no warmup or decay**. It supersedes the earlier
+November 12 full-GC cosine template. GC–Mamba's M1 recipe is unchanged.
+Use a fresh full-GC output directory; previously trained cosine checkpoints
+cannot be resumed or relabeled as this constant-rate study.
 
 The code archive includes the computational source frozen for the November 12
 GC–Mamba submission, additional portable launchers, exact configuration templates,
@@ -10,6 +14,12 @@ training anchors, normalization statistics, evaluation dates and a pinned Python
 dependency list. The separate weights archive includes the public GraphCast-small
 initializer and the historical M1 raw/SWA reference checkpoints. Training starts
 fresh from public GraphCast; the M1 checkpoints are evaluation references only.
+
+**Code-only delivery:** send the roughly2.3MB code archive and its matching
+`SHA256SUMS`. Download the existing weights archive separately from the Della
+directory below. This requires an authorized Della SSH account with read access
+to the project directory; the filesystem path is not a public download URL.
+No model weights are included in the code archive.
 
 ## Studies and counters
 
@@ -19,8 +29,8 @@ fresh from public GraphCast; the M1 checkpoints are evaluation references only.
 | Objective | Native M1 MSE + lambda × stable AMSE excess; lambda 0 uses the original MSE path | Standard GC MSE, lambda 0; existing FP32 full-field calculation |
 | Weather feedback gradients | Stopped; memory gradients retained | Full gradients |
 | Training | Initial 500 + main 2,000 | One continuous 2,500-update schedule |
-| Learning rate | Initial `1e-4`; main spatial `1e-4 → 1e-5`, Mamba 3× | `3e-7 → 3e-8` |
-| LR ramp | 50 updates in each stage | 100 updates |
+| Learning rate | Initial `1e-4`; main spatial `1e-4 → 1e-5`, Mamba 3× | Constant `3e-7` throughout |
+| LR ramp | 50 updates in each stage | None |
 | Data order | Historical contiguous order, restarted at main stage | Fixed shuffled order shared by all four horizons |
 | Allocation 1 | Initial 500; parameters-only reset; main 750 | Updates 1–1,250 |
 | Allocation 2 | Exact resume main 750→2,000 | Exact resume 1,250→2,500 |
@@ -40,19 +50,40 @@ or mismatched inputs/checkpoints are errors.
 
 ## 1. Unpack and activate Python
 
-Run from the directory containing the transferred archives and their SHA256SUMS:
+Run from the directory containing the code archive and its matching `SHA256SUMS`:
 
 ```bash
 set -euo pipefail
 sha256sum -c SHA256SUMS
-tar -xzf lianghong_weather_20261112_code.tar.gz
-tar -xzf lianghong_weather_20261112_weights.tar.gz
-cd lianghong_weather_20261112
-sha256sum -c SHA256SUMS
-(cd ../weights && sha256sum -c SHA256SUMS)
+tar -xzf lianghong_weather_20261112_constant_lr3em7_code.tar.gz
+export LH_PACKAGE="$PWD/lianghong_weather_20261112_constant_lr3em7"
+(cd "$LH_PACKAGE" && sha256sum -c SHA256SUMS)
+```
 
-export LH_PACKAGE="$PWD"
-export LH_WEIGHTS="$(cd ../weights && pwd)"
+If the weights archive was not sent with the code, download it using your
+authorized Della SSH login. Replace `YOUR_LOGIN@DELLA_HOST` with the login and
+host you normally use; credentials are not included in the package.
+
+```bash
+export LH_DELLA=YOUR_LOGIN@DELLA_HOST
+rsync -a --partial --info=progress2 \
+  "$LH_DELLA:/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/handoffs/lianghong_weather_20261112_constant_lr3em7/lianghong_weather_20261112_constant_lr3em7_weights.tar.gz" \
+  ./
+sha256sum -c "$LH_PACKAGE/portable/weights_download.SHA256SUMS"
+```
+
+The archive is495.19MB. Its source path, size and SHA256 are also recorded in
+`portable/weights_download.json`. If SSH access is unavailable, the same weights
+archive must be transferred separately or placed in an accessible download
+location; this package does not create public hosting.
+
+After obtaining the archive, extract it alongside the code and activate Python:
+
+```bash
+tar -xzf lianghong_weather_20261112_constant_lr3em7_weights.tar.gz
+export LH_WEIGHTS="$PWD/weights"
+(cd "$LH_WEIGHTS" && sha256sum -c SHA256SUMS)
+cd "$LH_PACKAGE"
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r runtime/requirements.lock.txt
@@ -83,7 +114,7 @@ export LH_ANNUAL_DATA=/absolute/path/to/arco_res1_levels13_2023_eval.zarr
 export LH_OUTPUT=/absolute/path/to/new_weather_experiments
 mkdir -p "$LH_OUTPUT"
 export LH_GCM="$LH_OUTPUT/gcm_m1_lambda"
-export LH_FULLGC="$LH_OUTPUT/full_gc_ar"
+export LH_FULLGC="$LH_OUTPUT/full_gc_ar_constant_lr3em7"
 export LH_DEV="$LH_OUTPUT/comparison_2022"
 export LH_ANNUAL="$LH_OUTPUT/comparison_2023"
 ```

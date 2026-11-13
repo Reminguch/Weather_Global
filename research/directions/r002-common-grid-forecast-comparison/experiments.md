@@ -1204,3 +1204,99 @@ the same correction. The annual array has started and produced initial
 forecasts; final annual validation is still pending. Resume via
 `graphcast_fig2a_2018_full_local_20261019/control/state.json`, Slurm jobs
 `15870083`, `15870088`, `15870456`, and the campaign's `report/summary.json`.
+
+<a id="e013"></a>
+## e013 — 2026-11-13: date uncertainty for existing ENS-matched v4 figures
+
+Event date: 2026-11-13
+Recorded: 2026-11-13 (America/New_York)
+Execution: completed (saved-score aggregation, CPU bootstrap and figure
+generation; final manuscript build/publication pending separately)
+Outcome: supported for positive day-10 M1-versus-GC025 RMSE contrasts on the
+observed matched dates; no new seed, year or native-resolution comparison
+
+**Question and change:** Add uncertainty to the approved fixed-checkpoint
+ENS-relative Figures 5/9 using their actual matched samples. Reuse e010's
+repaired 2023 forecasts; do not transfer intervals from the full-122 model-only
+comparison to the smaller ENS-available subsets. No training, new forecasts
+or scheduler jobs were run.
+
+**Setup and estimator:** The original 122-position every-third-day 00 UTC
+2023 calendar supplies 40 six-hour leads and 12 diagnostics on the common
+1.5-degree grid. Each diagnostic/lead has 91–108 starts with the same mask for
+M1, its public 1-degree GraphCast backbone, public GC025 and ENS. Pool spatial
+MSE over matched dates, then take the square root; plot 100 × model RMSE / ENS
+RMSE. The directly paired M1-versus-GC025 contrast is
+100 × (1 − RMSE_M1 / RMSE_GC025), expressed as percent RMSE reduction, not
+GraphCast loss reduction. Point estimates reproduce the saved approved summary.
+
+Uncertainty uses 10,000 paired non-wrapping moving-block draws, seed 20260916,
+blocks of five consecutive positions (12 elapsed days), and 122 positions per
+draw. Shared date multiplicities are drawn on the original regular calendar
+before applying each ENS-availability mask, consistently across all models,
+leads and diagnostics. The 2.5th/97.5th percentiles form pointwise 95% intervals.
+No missing forecast is interpolated. A draw retains 66–120 available positions
+after masking; every bootstrap statistic is finite. Date windows overlap and
+non-wrapping blocks underweight boundaries, so this procedure does not establish
+independence or simultaneous coverage across all leads/diagnostics.
+
+**Day-10 observed paired reductions and date intervals:**
+
+| Diagnostic | Matched starts | M1 RMSE reduction vs GC025 | Pointwise 95% CI |
+| --- | ---: | ---: | ---: |
+| Q700 | 94 | 7.7035% | 6.9320–8.4506% |
+| T2m | 98 | 10.5782% | 8.8165–11.5457% |
+| U850 | 98 | 9.8273% | 8.6746–10.8028% |
+| Z500 | 91 | 8.4752% | 6.5365–10.0220% |
+
+All twelve day-10 point estimates remain 7.7035–11.4190%, and all twelve paired
+lower bounds are positive. The original pointwise ranking and ENS-relative
+values are unchanged; M1 still has higher day-10 RMSE than ENS. These results
+condition on fixed selected checkpoints, the observed year and availability
+masks. They do not measure training-seed or between-year variability, eliminate
+earlier numerical-pilot exposure, isolate resolution or establish native
+0.25-degree skill or inference speedup. Overlap of marginal ENS-relative bands
+is not itself a paired test. The five fresh carry seeds in r001/e003 are a
+separate native-grid experiment and are not added to these curves.
+
+**Provenance and validation:**
+
+- [Existing matched MSE source](../../../plots/analyze_models/data/resolution_eval/public_checkpoints_2023_repaired_ens_20261018/matched_per_initialization_mse.csv),
+  SHA256 `efebc49bec01d1b988c0c753e1178781ede52102339e22ffb1347987834e5b68`;
+  187,720 source rows, with 46,930 score cells per model. Its accompanying
+  saved summary SHA256 is
+  `4bd1d95067398e96c02743dbcb3195628b0097fc16c7f8e5ab6130642c0e32d3`.
+- [New plot/bootstrap script](../../../scripts/analyze_models/plot_v4_common_grid_uncertainty.py),
+  SHA256 `e42f2d723ce0e19f68cbdc9eb1707f4160268c1976d0521a0555f65ef8f1e7c4`;
+  the preserved computation snapshot has SHA256
+  `30d4cb6573b807897950e72e607419f3e72b45a1dc5097ddee029ff2ad1d092c`.
+  A plot-only update improved six-inch print readability without changing
+  numerical CSV/NPZ artifacts. A copied [source snapshot](../../../plots/analyze_models/data/resolution_eval/v4_common_grid_uncertainty_20261113/source/plot_v4_common_grid_uncertainty.py)
+  and the copied block-sampling helper accompany the outputs. These hashes,
+  not the current potentially dirty repository HEAD, identify this analysis.
+- [Summary, validation and complete source hashes](../../../plots/analyze_models/data/resolution_eval/v4_common_grid_uncertainty_20261113/summary.json),
+  [paired contrasts](../../../plots/analyze_models/data/resolution_eval/v4_common_grid_uncertainty_20261113/m1_vs_gc025_paired_rmse_reduction.csv),
+  [curve table](../../../plots/analyze_models/data/resolution_eval/v4_common_grid_uncertainty_20261113/curves.csv),
+  and saved bootstrap multiplicities/availability masks in the same directory.
+
+The repaired and reference protocol hashes are respectively
+`a0e67b8a329c32f0d8c60880136beb17126f8130ee339eda3f3662c5a91dda76` and
+`b69bf34e002a47cc12b17a6ffda91e377834412d31598e6bb6a20dea4fda5228`.
+Validation checks identical model masks, source hashes against the independent
+e010 audit, finite bootstrap statistics, ENS normalized exactly to 100, unchanged
+point estimates and explicit expanded-index recomputation of draws 0/17/9999
+for every day-10 diagnostic/model. No numerical-noise acceptance gate is added.
+
+New uncertainty assets are prepared for [`Overleaf/v4.tex`](../../../Overleaf/v4.tex),
+leaving the original arXiv manuscript and original figure assets unchanged.
+The final checked v4 PDF has 10 main-text pages and 24 pages total; source,
+figures, numerical exports, response draft and PDF were pushed to
+Non-Markovian-Weather/main as `a5df67a`. See the
+[validation receipt](../../../artifacts/manuscripts/iclr2027_v4/seed_revision_validation.json).
+No OpenReview or arXiv upload was performed. The separate e012 2018
+annual campaign was not inspected here: its final completion and paper-parity
+conclusions remain unverified.
+
+**Next decision:** Include these date intervals and their scope in v4, keeping
+seed SD separate and preserving the full paired contrast export. Inspect the
+separate e012 annual artifacts before making any new 2018 reproduction claim.

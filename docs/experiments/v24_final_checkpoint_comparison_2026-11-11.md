@@ -1,5 +1,14 @@
 # Final 2,500-update MSE and power-spectrum comparison, with and without SWA
 
+**November 12 eligibility correction:** the full-GC peak-LR `1e-5` lineages
+are excluded by user instruction, including final raw/SWA outputs. The frozen
+mixed plan below still contains them as archival evaluations; apply the
+[current comparison policy](v24_full_gc_comparison_policy_2026-11-12.md) to
+presentation. A later approved replacement now uses peak `3e-7` for all five
+full-GC arms, retaining lambda0 and starting four positives fresh. The current
+final comparison chain is **17422018 → 17422019 → 17422020**; the older chains
+below are canceled history. See the [active protocol](v24_full_gc_positive_lambda_lr3em7_restart_2026-11-12.md).
+
 Date: 2026-11-11 (America/New_York). Status: **superseded on November 12**.
 
 The user authorized a fresh GC–Mamba-only restart. Pending jobs

@@ -1,8 +1,210 @@
 # Development — MSE / AMSE-adjustment MGDA
 
-Updated: 2026-11-12 (America/New_York)
+Updated: 2026-11-13 (America/New_York)
 
-## Portable handoff for Lianghong — 2026-11-12
+## Optimal spherical filtering on v4's cohort — 2026-11-12
+
+**November 13 power addition:** the requested joint report is complete for the
+same 92 starts. See
+[MSE/power evidence](../../../plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/REPORT.md).
+Both filters worsen aggregate power matching while improving MSE; raw M1
+beats filtered GC on both metrics, but trades better MSE for worse power
+matching versus raw GC. `report_v24_optimal_smoothing_power.py` pools saved
+physical statistics before forming channelwise ratios;
+`plot_v24_optimal_smoothing_power.py` produces degree/lead/tradeoff PNG/PDFs.
+Exact losses reproduce the previous interim report; no forecast rerun or refit.
+
+Full-year CPU power reporting **17470053** is pending on **17430311**;
+`17430310_6/7` remain pending on priority. Resources: 8 GiB, two CPUs, 20 minutes.
+Its manifest, tested submission plan, wrapper and receipt are under campaign
+`power_reporting_20261113/`. Its separate source digest is
+`e3226c6153d824c1fa583d02689dee85e50b11db1673ec38d189c025620ab9dc`.
+The wrapper requires a sealed complete 122-start report and records pinned
+plots in `complete.json`. Future output name:
+`v24_optimal_smoothing_v4_2023_power_20261113`. Existing workers and their frozen
+source are unchanged. Inspect both annual completion and this follow-up before
+reporting full-year MSE/power conclusions.
+
+**November 13 status:** the 2022 fit is complete. Annual shards 0–5 completed
+92/122 starts (January 1–October 1); `17430310_6/7` remain pending on priority
+and `17430311` waits on them. The separate `interim_20261113/` report shows
+filtered M1 versus filtered GC rollout reduction4.9850% (95% interval4.1243–
+5.9559%) on those92 dates. This is incomplete annual evidence. Both filtering
+decreases exceed observed aggregate raw rerun differences, which remain warnings.
+No changes were made to jobs, frozen source, or the fitting protocol. Resume
+with the remaining two shards and the automatic annual report.
+
+User-authorized [e015](experiments.md#e015) is implemented and submitted in
+`artifacts/evaluations/v24_optimal_smoothing_v4_20261112/`:
+**17430308_0–3 → 17430309 → 17430310_0–7 → 17430311**. All jobs were pending
+when verified. Fit 32 starts in 2022, then score 122 starts in 2023 at 40 leads;
+principal v4 M1 SWA and public GC only. No result is inferred from submission.
+
+The new campaign driver uses `OptimalSphericalFilter`, `OptimalFilterObserver`,
+and a dedicated reporter. It preserves the prior smoothing computational
+source plus six explicit observer/report/dispatch overlays. Source digest:
+`a470b86a6936c744308e1bfabbd08fe3ceabd5411019d76f7830947ce6033fa6`.
+Always execute workers from this snapshot. Existing training, older constrained
+smoothing campaigns, and portable archives remain unchanged.
+
+The filter independently fits every lead/channel/degree, including degree zero,
+with unrestricted real least squares; application is pure `S[b A f]`.
+Raw and projected controls expose truncation effects. The reporter uses copied
+canonical v4 GC values for exact-loss reductions, records rerun drift, and
+separately compares filtered models. Seventeen tests, actual figure rendering,
+a real-field production-grid check, and four Slurm test-only requests passed.
+See the [protocol and output list](../../../docs/experiments/v24_optimal_smoothing_v4_2026-11-12.md).
+Resume by inspecting these jobs, `checks/`, and eventual `report.json`.
+Finite metric increases or drift do not block evaluation.
+
+## Code-only LH delivery — 2026-11-12
+
+The user requested sharing code while referring LH to our directory for weights.
+New delivery: `artifacts/handoffs/lianghong_weather_20261112_constant_lr3em7_code_only/`.
+Send its code archive (2,279,105 bytes) and matching outer `SHA256SUMS`.
+The included README provides SSH/rsync download instructions;
+`portable/weights_download.json` and `portable/weights_download.SHA256SUMS`
+pin the existing495,189,641-byte weights archive in the original constant-rate
+handoff directory. The archive checksum is
+`bf2c3abf559df176a55573ae30abcebfde8c38480c6da99c88a87abd514b4e40`.
+
+Current host metadata identifies `lm8598` as Lianghong Mo and shows membership
+in `dabanin`, granting traversal of the restricted project ancestor; descendants
+and weight files permit reads. This establishes filesystem permission, not a
+tested remote SSH session. No permissions were changed or public hosting created.
+Validation confirmed no weights in the code archive, unchanged688 source/template/
+test files, all package/archive checksums, and README shell syntax. Reused the
+previous valid computational tests; no training or scheduler changes occurred.
+See [delivery validation](../../../artifacts/handoffs/lianghong_weather_20261112_constant_lr3em7_code_only/validation/validation.json).
+
+## Current: five fresh full-GC constant3e-7 arms — 2026-11-12
+
+The user clarified **constant3e-7 from update0**, with zero warmup and no decay.
+All five lambdas0/.25/.5/.75/1 now start fresh from public GC-small in
+`artifacts/checkpoints/v24_Ilya/res1_full_gc_constant_lr3em7_20261112/`.
+Training **17429091_0–4→17429092_0–4**, history **17429093_0–4**, and completion
+**17429094** are submitted. No new constant-rate scientific result exists.
+The configuration has `learning_rate_schedule=constant`, `warmup_steps=0`,
+`learning_rate=3e-7`, and `end_learning_rate=null`, as required by the preserved
+validator. The effective LR is3e-7 throughout2500 updates. The1250 split is an
+exact optimizer/RNG/data resume, not a schedule restart.
+
+The earlier lambda0 run used warmup/cosine, so its raw1250 checkpoint and
+scores remain historical only. Pending oldlambda0 training/history17049163_0/
+17049164_0 and the e013 cosine chain17421838/39/40/41,
+17422018/19/20/49 were canceled before starting. Preserve their configurations,
+weights, logs and frozen sources. GC–Mamba17406861/17406862/17406863 is
+unchanged; diagnostic17404694_2–5/17404732 completed and remains preserved.
+The original1e-5 scientific-comparison exclusion is unchanged.
+
+New raw/SWA root:
+`artifacts/evaluations/v24_constant_lr_mixed_final_comparison_20261112/`.
+New annual/smoothing root:
+`artifacts/evaluations/v24_constant_lr_gc_lambda_annual_20261112/`.
+Both depend on **17429092:17406862**, with no retained cosine full-GC arm.
+Submitted mixed raw/SWA jobs are **17429215→17429216_2–21→17429217**;
+annual/smoothing controller is **17429218**. All eight training/downstream
+Slurm test-only calls passed before submission.
+Use the [current protocol](../../../docs/experiments/v24_full_gc_constant_lr3em7_2026-11-12.md)
+and activation records under
+`artifacts/plans/v24_full_gc_constant_lr3em7_20261112/activation/` for the
+submission records and final queue audit. No completed evaluation is inferred.
+The final queue audit verified all eight new job groups **PENDING** with
+correct dependencies, canceled jobs absent and protected GC–Mamba arrays
+present. The sealed [activation receipt](../../../artifacts/plans/v24_full_gc_constant_lr3em7_20261112/activation/complete.json)
+and active selection in the same plan root identify the actual submitted state.
+
+Training manifest hash:
+`9b4ac57585cfe9d738b52103bc4fa8095c687d889a711525d4073e46da0b4ef1`;
+source digest:
+`e8e07f2a7c3cd549e37a6cdc88c967a51fdb549960a2bc0f1df78afc30a70c88`.
+All649 parent computational files are byte-identical; only two orchestration
+files were added. Nine focused tests passed, including actual Optax constant
+rate and serialized-state resume. Actual frozen configs verify LR3e-7 at
+indices0/99/100/1249/1250/2499. Retain proven1×80GB GPU/8CPU/384GiB/30h per
+1250-update allocation; no extra qualification run or finite-descent gate.
+
+Lianghong's revised read-only [portable README](../../../docs/experiments/README_LIANGHONG_PORTABLE_RUNS.md)
+points to `artifacts/handoffs/lianghong_weather_20261112_constant_lr3em7/`.
+Her full-GC K8/K12/K16/K20 runs are also freshconstant3e-7/no-warmup atlambda0;
+GC–Mamba computation/templates are unchanged.34 CPU tests and four real
+full-GC configurations passed, preserving672 original computational source
+files. Original handoff archives remain immutable. No LH-side installation,
+submission, training or message delivery is claimed.
+
+## Historical: superseded cosine positive-lambda replacement — 2026-11-12
+
+This e013 entry records the earlier activation. Its new full-GC training and
+shared downstream jobs were superseded by the constant-rate correction above
+before starting; the retained lambda0 continuation/history was also canceled.
+The GC–Mamba training/history IDs listed here remain unchanged.
+
+User explicitly approved fresh replacement after the exclusion decision.
+New campaign `artifacts/checkpoints/v24_Ilya/res1_full_gc_positive_lambda_lr3em7_20261112/`
+has four fresh public-GC arms atlambda0.25/0.5/0.75/1, peak3e-7→3e-8,
+fixed2500-update schedule with100 warm-up, and the unchanged full-GC K20 recipe.
+Training arrays **17421838→17421839**, history **17421840**, and validation-only
+finish **17421841** are submitted/pending. The two allocations stop1250/2500;
+there is no optimizer/schedule reset at1250 and no old high-rate weight reuse.
+
+Retained full-GC lambda0 training/history **17049163_0/17049164_0**, GC–Mamba
+training/history **17406861/17406862/17406863**, and saved-checkpoint diagnostic
+**17404694/17404732** were verified pending with valid dependencies afterward.
+Canceled only old positive full-GC17049163_1–4/17049164_1–4 and obsolete shared
+controllers17049165,17406864,17406897,17406898,17406899. The GCM finish hook had
+hardcoded the old full-GC selection; an external controller replaces it while
+preserving GCM training. Follow the [replacement protocol](../../../docs/experiments/v24_full_gc_positive_lambda_lr3em7_restart_2026-11-12.md)
+for new downstream status/IDs and the cancellation/protected-job evidence.
+
+Training source digest `eb614ed459e0a6782de26a49afbcc042a9a136a0b8d8d077617b0d98a5f94df7`;
+all649 parent source files unchanged, with two orchestration additions.
+18 training/scalar tests, four frozen-config validations and Slurm test-only
+requests passed;34 downstream/final/scalar tests passed. All new results remain
+pending. The earlier pending-replacement notes below are historical.
+
+Final raw/SWA chain **17422018→17422019→17422020** uses
+`artifacts/evaluations/v24_low_lr_mixed_final_comparison_20261112/`.
+Annual controller **17422049** uses
+`artifacts/evaluations/v24_low_lr_gc_lambda_annual_20261112/`, validates ten
+endpoints, then dispatches development32/annual122 fitting/evaluation and its
+actual report joins. Both begin after **17049163_0:17421839:17406862**.
+All five selected full-GC arms use3e-7; no old positive high-rate model enters
+either selection. Their frozen sources preserve the original pilot computation.
+Both plan entry points and four downstream Slurm test-only calls passed.
+Final queue verification found all eight new job groups pending with valid
+dependencies and all protected jobs present. Active selection and activation
+receipt are under `artifacts/plans/v24_full_gc_lr3em7_restart_20261112/`.
+
+## Historical exclusion decision; comparison rule remains active — 2026-11-12
+
+The user rejected the November full-GC peak1e-5 setting for scientific
+comparisons, including all derived continuations/SWAs/filtered results.
+Preserve its evidence, but never present it in default comparison tables,
+figures or claims. The accepted full-GC rate going forward is peak3e-7.
+GC–Mamba's M1-matched schedule is unchanged. The
+[policy and inspected evidence](../../../docs/experiments/v24_full_gc_comparison_policy_2026-11-12.md)
+identify the exact runs and eligible lambda0 scores; root AGENTS.md records
+the durable instruction. Frozen sources and sealed reports stay immutable.
+
+The inspection at that earlier decision found full-GC17049163_0 at3e-7 and17049163_1–4 at1e-5,
+all pending. Their history/finish and mixed final17406897/898/899 are still
+pending too. No positive-lambda3e-7 run exists. User clarification on replacing
+those pending high-rate runs with fresh3e-7 trajectories is outstanding;
+this record does not claim a scheduler change. New GC–Mamba17406861/862 remains
+at M1's1e-4 spatial peak, with main-stage Mamba multiplier3.
+
+Current report code uses `scripts/analyze_models/comparison_policy.py` to
+exclude exact campaign/run identities, including derived checkpoints even if
+later metadata declares a lower LR. Fresh3e-7 identities and GC–Mamba remain
+eligible. The raw pilot and combined M1 plot write separate
+`_eligible_20261112_v2` presentation directories with nine rows, preserving the
+original thirteen-row sealed report. The scalar/annual reporters omit unmatched
+same-lambda contrasts. Future source overlays include the policy helper;
+already submitted frozen sources are unchanged and remain subject to this
+presentation rule.36 report/preparation regression tests and8 focused
+policy/scalar tests passed. No new forecasts were needed.
+
+## Historical portable handoff, superseded for full-GC scheduling — 2026-11-12
 
 The user requested exact runnable code for another cluster and explicitly chose
 **both studies**: five fresh M1-recipe GC–Mamba lambda arms and four fresh
@@ -42,7 +244,11 @@ source digest is `8b363120bf494948770ecfa90c460391057600401edd4690eed23d3e70d01f
 Evidence is recorded in the handoff's `validation/` directory. The existing Della production
 chains below remain unchanged; Lianghong's future remote run/job IDs are unknown.
 
-## GC–Mamba-only M1-recipe restart submitted — 2026-11-12
+## GC–Mamba-only M1-recipe restart; historical downstream — 2026-11-12
+
+Training/history17406861/62/63 remains active unchanged. The finish and mixed
+downstream IDs in this original activation record were subsequently replaced;
+use the current constant-rate controller entries above.
 
 The user approved the reviewed restart **only for GC–Mamba**, explicitly keeping
 full GC/DeepMind unchanged. The earlier ten-arm review remains historical in

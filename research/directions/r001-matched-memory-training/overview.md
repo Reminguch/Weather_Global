@@ -2,7 +2,7 @@
 
 Category: training
 Status: active
-Updated: 2026-10-18 (America/New_York)
+Updated: 2026-11-13 (America/New_York)
 
 ## Question and hypothesis
 
@@ -11,6 +11,36 @@ loss relative to resetting memory at every prediction, with the selected model's
 architecture and optimization protocol held fixed?
 
 ## Current understanding
+
+**November 13 user clarification:** The earlier eight-start 2023 spectral pilot
+did not influence the principal model selection. The user requests that those
+pilot results not be raised in the reviewer response. Preserve the historical
+pilot and existing evaluation-protocol disclosures as provenance; do not infer
+selection on 2023 from the fact that the pilot was run. See the clarification
+in [experiments.md](experiments.md#pilot-selection-clarification).
+
+**November 13 existing-data replication update ([e003](experiments.md#e003)):**
+Five fresh local M1 carry/carry retrainings, seeds 22–26, now measure training-seed
+variation for this reconstructed recipe. Their SWAs reduce exact GraphCast loss
+by **14.1682% ± 0.4332 percentage points** over the ten-day rollout and
+**21.0283% ± 0.7502 points** at day 10 (mean ± sample SD). Every seed has all
+122 starts × 40 leads. The independent local seed 22 is not the published seed-22
+checkpoint; the historical configs/environment were unavailable locally, and
+local verification includes NCAR repairs at three valid times. These five runs
+therefore remain a separate replication cohort, not six pooled seeds with the
+original selected model.
+
+The new v4 Figure 4 shows five-seed SWA curves and ±1 seed SD. Figure 6 preserves
+the original matched-SWA result and date-bootstrap intervals in one panel and
+adds local raw main-step-2,000 carry/control results in another. The local
+reset/reset control still has **one training seed**; its raw checkpoint cannot
+be mixed with the five SWAs to claim a multi-seed matched memory contrast.
+Figure preparation reused existing evidence without training, forecast generation
+or job submission. The original arXiv source/assets remain unchanged by this
+November update. Checked v4 (10 main pages, 24 total), figures, data and
+response draft were pushed to Non-Markovian-Weather/main as `a5df67a`; no
+OpenReview or arXiv upload was performed. The inherited AI-use statement
+needs author correction for the new analytical assistance.
 
 The selected di16/Mamba-LR×3 checkpoint has complete evaluations on 122 starts
 throughout 2023. Its ten-day exact GraphCast loss reduction is 14.4240% with
@@ -68,9 +98,13 @@ training description, and new uncertainty appendix state the fixed-checkpoint,
 single-training-realization scope, separate planned analysis, historical source
 limitation, and numerical denominator sensitivity.
 
-No additional run is required for this replacement. Replication across training
-seeds would address the remaining unmeasured training variability if broader
-generalization is sought.
+The November 13 update is prepared for [`Overleaf/v4.tex`](../../../Overleaf/v4.tex)
+using the separate figures and provenance in [e003](experiments.md#e003).
+Finish the v4 build/review and record publication separately. Carry-model seed
+variation is now measured; matched reset-trained seed variation remains
+unmeasured. Further paired carry/reset training replications would address
+broader training-policy claims, but are not required to present this existing
+evidence and have not been launched.
 
 ## Records
 

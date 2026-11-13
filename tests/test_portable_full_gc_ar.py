@@ -20,8 +20,8 @@ def template():
             "distributed": {"per_device_batch_size": 4},
             "objective": {"loss_kind": "gc_mse_amse_excess", "spectral_excess_weight": 0},
             "optimizer": {"max_steps": 2500, "learning_rate": 3e-7,
-                          "end_learning_rate": 3e-8, "warmup_steps": 100,
-                          "learning_rate_schedule": "cosine", "seed": 22},
+                          "end_learning_rate": None, "warmup_steps": 0,
+                          "learning_rate_schedule": "constant", "seed": 22},
             "output": {"output_root": "/old/runs", "run_name": "old"}}
 
 
@@ -32,7 +32,7 @@ def test_all_four_horizons_are_fresh_and_differ_only_in_k_and_output(tmp_path):
                for horizon in campaign.HORIZONS]
     assert original == template()
     assert len({cfg["output"]["run_name"] for cfg in configs}) == 4
-    assert configs[-1]["output"]["run_name"] == "gcft_s22_k20_lr3em7"
+    assert configs[-1]["output"]["run_name"] == "gcft_s22_k20_lr3em7_constant"
     normalized = []
     for horizon, cfg in zip(campaign.HORIZONS, configs, strict=True):
         assert cfg["sequence"]["ar_tail_k"] == horizon
@@ -46,9 +46,13 @@ def test_all_four_horizons_are_fresh_and_differ_only_in_k_and_output(tmp_path):
     assert all(cfg == normalized[0] for cfg in normalized)
 
 
-def test_nonstandard_template_cannot_silently_change_the_recipe(tmp_path):
+@pytest.mark.parametrize("field,value", [("learning_rate", 1e-5),
+                                        ("learning_rate_schedule", "cosine"),
+                                        ("warmup_steps", 100),
+                                        ("end_learning_rate", 3e-8)])
+def test_nonstandard_template_cannot_silently_change_the_recipe(tmp_path, field, value):
     cfg = template()
-    cfg["optimizer"]["learning_rate"] = 1e-5
+    cfg["optimizer"][field] = value
     with pytest.raises(ValueError, match="template differs"):
         campaign.make_config(cfg, tmp_path, 20, {}, tmp_path / "order")
 

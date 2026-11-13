@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Compare the fresh M1-recipe GC–Mamba sweep with the unchanged full-GC sweep."""
+"""Compare prescribed full-GC and M1-recipe GC–Mamba raw/SWA endpoints."""
 from __future__ import annotations
 
 import argparse
 import copy
 import json
 from pathlib import Path
+import re
 import shutil
 import sys
 
@@ -20,6 +21,10 @@ from scripts.experiments.run_v24_mgda import check, pinned, read, seal, submit_o
 DRIVER = "scripts/experiments/prepare_v24_mixed_final_comparison.py"
 WRAPPER = "scripts/experiments/v24_mixed_final_comparison.slurm"
 DEFAULT = "artifacts/evaluations/v24_mixed_final_comparison_20261112"
+LOW_LR_DEFAULT = "artifacts/evaluations/v24_low_lr_mixed_final_comparison_20261112"
+POSITIVE_FULL_GC = "artifacts/checkpoints/v24_Ilya/res1_full_gc_positive_lambda_lr3em7_20261112"
+CONSTANT_FULL_GC = "artifacts/checkpoints/v24_Ilya/res1_full_gc_constant_lr3em7_20261112"
+CONSTANT_LR_DEFAULT = "artifacts/evaluations/v24_constant_lr_mixed_final_comparison_20261112"
 GCM = "artifacts/checkpoints/v24_Ilya/res1_m1_matched_gcm_lambda_20261112"
 FULL_GC = original.TRAINING
 REFERENCE = original.REFERENCE
@@ -27,7 +32,8 @@ TOTAL_SWA_STEPS = (1000, 1500, 2000, 2500)
 GCM_SWA_STEPS = (500, 1000, 1500, 2000)
 OVERLAYS = (DRIVER, WRAPPER, "scripts/experiments/prepare_v24_final_checkpoint_comparison.py",
             "scripts/experiments/run_v24_raw_checkpoint_pilot.py",
-            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py")
+            "scripts/analyze_models/report_v24_raw_checkpoint_pilot.py",
+            "scripts/analyze_models/comparison_policy.py")
 LIMITS = (
     "Four matched 2022 development starts and 40 six-hour leads, not annual skill. "
     "All models have 2500 total updates. Fresh GC–Mamba uses the historical M1 "
@@ -40,6 +46,30 @@ LIMITS = (
     "updates. M1 raw/SWA forecasts are reused. Finite drift and deterioration "
     "remain advisory; no numerical improvement is required for completion."
 )
+LOW_LR_LIMITS = (
+    "Four matched 2022 development starts and 40 six-hour leads, not annual skill. "
+    "All models have 2500 total updates. Fresh GC–Mamba uses the historical M1 "
+    "500+2000-update recipe, native BF16 MSE and stopped weather gradients. Full GC "
+    "uses a continuous2500-update schedule, FP32 grid MSE and full weather gradients. "
+    "Every full-GC lambda arm uses peakLR3e-7: lambda0 retains its existing fresh trajectory, "
+    "and positive lambdas start fresh with independent optimizer state. Rejected1e-5 "
+    "weights are not initializers or comparison models. Training recipes differ across families. "
+    "Prescribed raw endpoints and equal-weight SWAs at total1000/1500/2000/2500 are reported; "
+    "GC–Mamba main steps500/1000/1500/2000 include500 prior updates. M1 raw/SWA forecasts "
+    "are reused. Finite drift and deterioration are advisory, not acceptance gates."
+)
+CONSTANT_LR_LIMITS = (
+    "Four matched2022 development starts and40 six-hour leads, not annual skill. "
+    "All five full-GC lambda arms start fresh from public GC with new optimizers and "
+    "constantLR3e-7 from the first update: no warmup and no decay. No prior full-GC "
+    "lambda0, cosine-schedule or rejected1e-5 weights are reused. GC–Mamba retains "
+    "its submitted historical-M1 500+2000-update recipe and separate LR schedule. "
+    "All models have2500 total updates; gradient feedback, loss arithmetic, data order "
+    "and optimizer schedules differ across families. Prescribed raw endpoints and "
+    "equal-weight SWAs at total1000/1500/2000/2500 are reported; GC–Mamba main "
+    "steps500/1000/1500/2000 follow500 initial updates. M1 raw/SWA forecasts are reused. "
+    "Finite drift and deterioration remain advisory, not acceptance gates."
+)
 
 
 def require(condition, message):
@@ -47,14 +77,15 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def freeze_extension(workspace, parent, destination):
+def freeze_extension(workspace, parent, destination, overlays=None):
     """Keep all forecasting/metric source byte-identical to the completed pilot."""
     if destination.exists():
         raise FileExistsError(destination)
     previous = verify_source(parent)
+    overlays = OVERLAYS if overlays is None else overlays
     files = {}
-    for relative in sorted(set(previous["files"]) | set(OVERLAYS)):
-        source = (workspace if relative in OVERLAYS else parent) / relative
+    for relative in sorted(set(previous["files"]) | set(overlays)):
+        source = (workspace if relative in overlays else parent) / relative
         digest = file_sha256(source)
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -66,17 +97,20 @@ def freeze_extension(workspace, parent, destination):
     write(destination / "snapshot.json", {
         "format": FORMAT, "workspace": str(workspace), "files": files,
         "source_digest": _digest(files), "parent_snapshot": pinned(parent / "snapshot.json"),
-        "overlays": list(OVERLAYS)})
+        "overlays": list(overlays)})
     return verify_source(destination)
 
 
-def full_gc_specs(training):
+def full_gc_specs(training, weights=None):
     manifest_record = pinned(training / "manifest.json")
     manifest = unseal(manifest_record["path"])
     selection_record = pinned(training / "selected_arms_full_gc.json")
     tasks = unseal(selection_record["path"])["tasks"]
     require([task["lambda"] for task in tasks] == [0, .25, .5, .75, 1],
             "Expected unchanged five full-GC arms")
+    if weights is not None:
+        tasks = [task for task in tasks if task["lambda"] in weights]
+        require({task["lambda"] for task in tasks} == set(weights), "Requested full-GC arm is absent")
     specs, inputs = [], [manifest_record, selection_record]
     for task in tasks:
         require(task["model_family"] == "full_gc", "Full-GC selection family differs")
@@ -104,6 +138,56 @@ def full_gc_specs(training):
             "final_proof_path": str(training / "checks" / f"{task['id']}_step00002500.json"),
             "label": f"Full GC λ={task['lambda']:g} (existing recipe)"})
     return specs, inputs
+
+
+def fresh_full_gc_specs(training, *, constant=False):
+    """Pin fresh 3e-7 configurations without requiring future checkpoint files."""
+    record = pinned(training / "manifest.json")
+    manifest = unseal(record["path"])
+    selected_record = pinned(training / "selected_arms_full_gc.json")
+    tasks = unseal(selected_record["path"])["tasks"]
+    weights = [0, .25, .5, .75, 1] if constant else [.25, .5, .75, 1]
+    require([task["lambda"] for task in tasks] == weights,
+            "Fresh full-GC lambda coverage differs")
+    specs, inputs = [], [record, selected_record]
+    for task in tasks:
+        check(task["config"])
+        cfg = read(task["config"]["path"])
+        require(task["model_family"] == cfg["model_family"] == "full_gc"
+                and task["learning_rate"] == cfg["optimizer"]["learning_rate"] == 3e-7
+                and cfg["optimizer"]["max_steps"] == 2500,
+                "Fresh full-GC family, LR or schedule differs")
+        require(task.get("resume_step", 0) == 0, "Fresh full-GC arm cannot resume rejected weights")
+        if constant:
+            optimizer = cfg["optimizer"]
+            require(optimizer["learning_rate_schedule"] == "constant"
+                    and optimizer.get("end_learning_rate") is None and optimizer["warmup_steps"] == 0,
+                    "Constant full-GC schedule requires no decay and no warmup")
+        inputs.append(task["config"])
+        run = training / "runs" / task["id"]
+        specs.append({"id": task["logical_id"], "training_run_id": task["id"],
+            "model_family": "full_gc", "lambda": task["lambda"], "learning_rate": 3e-7,
+            "training_config": task["config"], "run_config_path": str(run / "run_config.json"),
+            "checkpoint_paths": {str(step): str(run / "checkpoints" / f"checkpoint_step{step:08d}.pkl")
+                                 for step in TOTAL_SWA_STEPS},
+            "swa_steps": list(TOTAL_SWA_STEPS), "final_stored_step": 2500,
+            "training_manifest_hash": manifest["record_hash"], "training_source_digest": manifest["source_digest"],
+            "final_proof_path": str(training / "checks" / f"{task['id']}_step00002500.json"),
+            "constant_learning_rate": constant,
+            "label": f"Full GC λ={task['lambda']:g} (fresh {'constant ' if constant else ''}LR3e-7)"})
+    return specs, inputs
+
+
+def positive_full_gc_specs(training):
+    return fresh_full_gc_specs(training, constant=False)
+
+
+def constant_full_gc_specs(training):
+    return fresh_full_gc_specs(training, constant=True)
+
+
+def valid_dependency(value):
+    return re.fullmatch(r"[0-9]+(?:_[0-9]+)?", str(value)) is not None
 
 
 def gcm_specs(training):
@@ -135,13 +219,17 @@ def gcm_specs(training):
     return specs, inputs
 
 
-def prepare(root, workspace, reference_root, gcm_training, full_gc_training, training_dependencies):
+def prepare(root, workspace, reference_root, gcm_training, full_gc_training, training_dependencies,
+            positive_full_gc_training=None, constant_full_gc_training=None):
     from scripts.analyze_models.report_v24_raw_checkpoint_pilot import verify_computational_sources
     root, workspace, reference_root, gcm_training, full_gc_training = [Path(p).resolve()
         for p in (root, workspace, reference_root, gcm_training, full_gc_training)]
     require(not root.exists(), "Use a new comparison directory; preserve completed evidence")
-    require(len(training_dependencies) == 2 and all(str(job).isdigit() for job in training_dependencies),
-            "Supply unchanged full-GC and new GC–Mamba second-part array IDs")
+    require(not (positive_full_gc_training and constant_full_gc_training), "Choose one fresh full-GC recipe")
+    expected_dependencies = 3 if positive_full_gc_training else 2
+    require(len(training_dependencies) == expected_dependencies
+            and all(valid_dependency(job) for job in training_dependencies),
+            "Supply one dependency for each training source (array or exact array task)")
     parent_record = pinned(reference_root / "manifest.json")
     parent = unseal(parent_record["path"])
     check(parent["cohort"])
@@ -149,7 +237,15 @@ def prepare(root, workspace, reference_root, gcm_training, full_gc_training, tra
             "Expected completed four-start/40-lead pilot")
     require(verify_source(Path(parent["source_root"]))["source_digest"] == parent["source_digest"],
             "Reference source differs")
-    gc_specs, gc_inputs = full_gc_specs(full_gc_training)
+    if constant_full_gc_training:
+        gc_specs, gc_inputs = constant_full_gc_specs(Path(constant_full_gc_training).resolve())
+    else:
+        gc_specs, gc_inputs = full_gc_specs(full_gc_training, weights=(0,) if positive_full_gc_training else None)
+    if positive_full_gc_training:
+        positive_specs, positive_inputs = positive_full_gc_specs(Path(positive_full_gc_training).resolve())
+        gc_specs += positive_specs
+        gc_inputs += positive_inputs
+        require(all(spec["learning_rate"] == 3e-7 for spec in gc_specs), "All full-GC arms must use3e-7")
     new_specs, new_inputs = gcm_specs(gcm_training)
     specs = new_specs + gc_specs
     models, reference_inputs = original.reference_models(reference_root, parent_record, parent)
@@ -168,19 +264,21 @@ def prepare(root, workspace, reference_root, gcm_training, full_gc_training, tra
     snapshot = freeze_extension(workspace, Path(parent["source_root"]), root / "source")
     template = copy.deepcopy(parent)
     template.pop("record_hash")
+    limits = CONSTANT_LR_LIMITS if constant_full_gc_training else LOW_LR_LIMITS if positive_full_gc_training else LIMITS
     template.update(models=models, source_root=str(root / "source"), source_digest=snapshot["source_digest"],
         format="v24_mixed_final_comparison_v1", inputs=inputs, parent_campaign=parent_record,
         image_root=str(workspace / "plots/analyze_models/images/resolution_eval" / root.name),
         data_root=str(workspace / "plots/analyze_models/data/resolution_eval" / root.name),
-        report_title="2500 total updates: M1-recipe GC–Mamba and unchanged full GC, raw versus SWA",
-        figure_title="2500 total updates: two training recipes", report_limits=LIMITS)
-    template["protocol"].update(limitations=LIMITS, swa_total_updates=list(TOTAL_SWA_STEPS),
+        report_title="2500 total updates: M1-recipe GC–Mamba and full GC, raw versus SWA",
+        figure_title="2500 total updates: two training recipes", report_limits=limits)
+    template["protocol"].update(limitations=limits, swa_total_updates=list(TOTAL_SWA_STEPS),
                                 swa_weights=[.25]*4, checkpoint_selection="Prescribed final raw and SWA endpoints")
     verify_computational_sources(parent, template)
     return seal(root / "plan.json", {
         "format": "v24_mixed_final_comparison_plan_v1", "workspace": str(workspace),
         "source_root": template["source_root"], "source_digest": snapshot["source_digest"],
         "training_dependencies": list(training_dependencies), "specs": specs,
+        "constant_full_gc_training": str(Path(constant_full_gc_training).resolve()) if constant_full_gc_training else None,
         "inputs": inputs, "manifest_template": template,
         "resources": {"materialize": {"cpus": 2, "mem_gib": 8, "minutes": 30},
                       "evaluate": {"cpus": 4, "mem_gib": 16, "minutes": 62},
@@ -207,6 +305,14 @@ def final_sources(spec):
             and proof["lambda"] == spec["lambda"] and proof["manifest_hash"] == spec["training_manifest_hash"]
             and proof["source_digest"] == spec["training_source_digest"], "Final training completion differs")
     proofs = [record, proof["metrics"]]
+    if "run_config" not in resolved:
+        resolved["run_config"] = pinned(spec["run_config_path"])
+        cfg = read(resolved["run_config"]["path"])
+        require(Path(cfg["config_source"]).resolve() == Path(spec["training_config"]["path"]).resolve(),
+                "Final run used a different declared configuration")
+        if "run_config" in proof:
+            require(proof["run_config"] == resolved["run_config"], "Actual run configuration differs")
+        proofs.append(resolved["run_config"])
     if spec["model_family"] == "gc_mamba":
         require(proof["total_training_updates"] == 2500, "New GC–Mamba did not complete2500 total updates")
         check(proof["initial_stage_proof"])
@@ -290,18 +396,23 @@ def submit(root, plan):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("prepare", "plan", "submit", "materialize"))
-    parser.add_argument("--root", type=Path, default=ROOT / DEFAULT)
+    parser.add_argument("--root", type=Path, default=ROOT / CONSTANT_LR_DEFAULT)
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--reference-root", type=Path, default=ROOT / REFERENCE)
     parser.add_argument("--gcm-training", type=Path, default=ROOT / GCM)
     parser.add_argument("--full-gc-training", type=Path, default=ROOT / FULL_GC)
-    parser.add_argument("--training-dependencies", nargs=2, metavar=("FULL_GC_ARRAY", "GCM_ARRAY"))
+    parser.add_argument("--positive-full-gc-training", type=Path)
+    parser.add_argument("--constant-full-gc-training", type=Path)
+    parser.add_argument("--training-dependencies", nargs='+', metavar="TRAINING_JOB")
     args = parser.parse_args(); root = args.root.resolve()
     if args.stage == "prepare":
         if not args.training_dependencies:
-            parser.error("prepare requires both final training array IDs")
+            parser.error("prepare requires one final training dependency per source")
+        if args.positive_full_gc_training is None and args.constant_full_gc_training is None:
+            args.constant_full_gc_training = ROOT / CONSTANT_FULL_GC
         plan = prepare(root, args.workspace, args.reference_root, args.gcm_training,
-                       args.full_gc_training, args.training_dependencies)
+                       args.full_gc_training, args.training_dependencies, args.positive_full_gc_training,
+                       args.constant_full_gc_training)
         result = {"plan": str(root / "plan.json"), "plan_hash": plan["record_hash"],
                   "commands": submission_plan(root, plan)}
     else:

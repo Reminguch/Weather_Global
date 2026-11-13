@@ -2,7 +2,7 @@
 
 Category: training
 Status: active
-Updated: 2026-11-12 (America/New_York)
+Updated: 2026-11-13 (America/New_York)
 
 ## Question and hypothesis
 
@@ -31,6 +31,81 @@ the same pair-gradient RMS preconditioning rule, so the control does not change
 to a single-gradient second-moment estimator.
 
 ## Current understanding
+
+November 13 power-spectrum addition to [e015](experiments.md#e015): on the
+same 92 starts, filtering improves MSE but worsens amplitude fidelity. Rollout
+power error is 59.4141% / 78.3995% for raw / filtered GC and 67.5267% / 77.6371%
+for raw / filtered M1. This equals the mean absolute power-ratio error across
+channels, positive degrees and leads, after pooling dates. Raw M1 beats filtered
+GC on both aggregate metrics at every lead; versus raw GC it has lower MSE but
+higher power error. The evidence does not establish a joint raw M1 improvement
+or universal fine-scale power recovery. See the
+[joint report and figures](../../../plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/REPORT.md).
+The full-year power-report job `17470053` waits for annual report `17430311`.
+
+November13 interim update to [e015](experiments.md#e015): fitting on all32
+2022 starts completed;92/122 annual starts are evaluated (January1–October1).
+Optimal filtering narrows the gap: independently filtered M1 still reduces
+rollout loss4.9850% versus filtered GC (paired95% interval4.1243–5.9559%) and
+day10 loss8.3204%. GC/M1 own-raw filtering gains10.8808%/0.7528% exceed observed
+aggregate rerun differences about0.04%. Thirty October–December starts remain
+queued, so this is not the full2023 result. See the
+[interim readout](../../../artifacts/evaluations/v24_optimal_smoothing_v4_20261112/interim_20261113/REPORT.md).
+
+November 12 smoothing correction, [e015](experiments.md#e015): the user requested
+GraphCast-style degree-wise optimal filtering, fitted on 2022 and evaluated on
+v4's 122-start 2023 cohort. The earlier Gaussian/four-band controls do not
+establish this flexible-filter comparison. Independent per-lead/channel/degree
+least squares and pure spherical reconstruction are implemented; GC/M1 chain
+17430308 → 17430309 → 17430310 → 17430311 is submitted and pending. Raw/projection
+controls, canonical v4 exact-loss denominators, and separate spectral scores
+are included. Scientific outcome remains pending; inspect the completed report
+before concluding whether M1's advantage survives this filtering class.
+
+Latest November12 decision, [e014](experiments.md#e014): the user requires
+**constant3e-7 from the first update**, with zero warmup and no cosine decay.
+All five full-GC lambdas0/0.25/0.5/0.75/1 therefore start fresh from public GC;
+the earlier lambda0 cosine checkpoint cannot be reused for this schedule.
+Arrays17429091→17429092, history17429093 and completion17429094 are submitted.
+There is no new constant-rate training/evaluation result. The four-arm cosine
+restart e013 and its downstream jobs, plus oldlambda0 continuation/history,
+were canceled while pending. Existing cosine checkpoints and their measured
+scores remain historical, not evidence for the constant-rate recipe.
+
+GC–Mamba training/history17406861/17406862/17406863 is unchanged. New mixed
+raw/SWA and annual pipelines use the five new constant-rate full-GC arms and
+the existing M1-recipe GC–Mamba campaign; both depend on17429092:17406862.
+Submitted mixed chain17429215→17429216→17429217 and annual controller17429218
+implement those replacement dependencies; no new evaluation result is claimed.
+The full-GC1e-5 exclusion remains in force. Cross-family recipes still differ
+in feedback gradients, loss arithmetic, optimizer schedule and data order.
+The [current protocol](../../../docs/experiments/v24_full_gc_constant_lr3em7_2026-11-12.md)
+records the fresh initialization, source-preservation evidence and current jobs.
+Lianghong's corrected portable package also uses constant3e-7/no-warmup for
+her four fresh full-GC horizons; no remote execution is claimed.
+
+### Historical November12 decisions superseded by e014
+
+Earlier November12 activation: the user approved four fresh full-GC positive-lambda
+runs at3e-7. Arrays17421838→17421839 now replace the rejected continuations;
+lambda0 retains17049163_0 at the same rate. Thus the active full-GC sweep uses
+peak3e-7 for all five lambdas. Old high-rate checkpoints remain excluded and
+are not initializers. GC–Mamba training/history17406861/62/63 is unchanged.
+At that earlier activation, shared downstream controllers were rebuilt around the three actual training
+sources: raw/SWA17422018→17422019→17422020 and annual17422049 are submitted.
+New training is pending; the eligible existing3e-7 lambda0 evidence
+below remains the only low-rate full-GC result. See [e013](experiments.md#e013)
+and the [superseded cosine protocol](../../../docs/experiments/v24_full_gc_positive_lambda_lr3em7_restart_2026-11-12.md).
+
+November12 user correction: **exclude the November full-GC peak1e-5
+lineages from all scientific comparisons**; retain their artifacts only for
+provenance/explicit diagnosis. Future full-GC work uses peak3e-7. At that rate,
+only lambda0 has results: exact rollout-loss reduction4.6434% at500 updates
+on32 development dates, and4.6934% at1250 onfour dates. No positive-lambda3e-7
+result is available. Submitted positive-lambda full-GC continuations still
+use1e-5; a replacement decision is pending. This supersedes older statements
+below treating those high-rate arms as eligible comparisons. GC–Mamba's
+M1-matched rate is unchanged. See the [comparison policy](../../../docs/experiments/v24_full_gc_comparison_policy_2026-11-12.md).
 
 November12 activation, superseding the earlier two-family review: the user
 approved restarting **GC–Mamba only**, leaving full GC/DeepMind unchanged.
