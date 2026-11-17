@@ -1,0 +1,80 @@
+{
+  "description": "Frozen day-5/day-10 amplitude and coherence; columns=lead, rows=metric",
+  "cohort": {
+    "count": 36,
+    "start": "2023-01-01",
+    "end": "2023-04-16",
+    "cadence_days": 3
+  },
+  "models": [
+    {
+      "id": "GC",
+      "label": "GraphCast",
+      "color": "#2864A5"
+    },
+    {
+      "id": "M1",
+      "label": "Carry/carry (M1)",
+      "color": "#D97720"
+    },
+    {
+      "id": "GC_filter",
+      "label": "GC + optimal filter",
+      "color": "#238B8E"
+    },
+    {
+      "id": "reset",
+      "label": "Reset/reset",
+      "color": "#9467BD"
+    }
+  ],
+  "lead_hours": [
+    120,
+    240
+  ],
+  "degrees": [
+    1,
+    179
+  ],
+  "source_csv": "weighted_spectral_curves.csv",
+  "source_sha256": "7dd434bc0e09bb1f52dcd4e1e711af35c4101276df9c991969b7b93060721894",
+  "source_script": "plot_v4_spectra_day5_day10_20261114.py",
+  "script_sha256": "8166fda5d3a3aaa02adf92e72ff51fc15a54f2d84cf5a6270b8e7b0bdd4be23c",
+  "figure_size_inches": [
+    6.25,
+    4.9
+  ],
+  "axes": 4,
+  "curves": 16,
+  "source_rows_selected": 1432,
+  "plotted_scalar_values_preserved": 2864,
+  "shared_y_limits_per_metric": {
+    "weighted_amplitude_ratio": [
+      0.0,
+      1.05
+    ],
+    "weighted_coherence": [
+      -0.025,
+      1.05
+    ]
+  },
+  "coherence_dashes": "GC/filter complementary (5,5) dashes with phases 0/5; butt caps; no markers or arrows",
+  "metric_definition": "Saved variable/pressure-weighted per-channel amplitude ratios and coherence; no reanalysis",
+  "new_forecasts_or_metric_computation": false,
+  "figures": [
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/v4_spectra_day5_day10_20261114/fig7_smoothing_day5_day10_v4_matched36.pdf",
+      "sha256": "2fbff3403e9010fad842e38dd1bd41544e51dbc71e058c33bfe224a1138c6481"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/images/resolution_eval/v4_spectra_day5_day10_20261114/fig7_smoothing_day5_day10_v4_matched36.png",
+      "sha256": "556f6841e79ba8a841b63cd48495a5210dd1662f9808906bd7589c8e0e7c5698"
+    }
+  ],
+  "validation": {
+    "source_and_snapshot_hashes": "passed",
+    "all_plotted_values_match_frozen_csv": true,
+    "shared_limits_per_metric": true,
+    "visual_review": "passed; both leads and all four models visible; no overlapping labels or clipping"
+  }
+}

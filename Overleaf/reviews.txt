@@ -1,0 +1,85 @@
+Official Review of Submission50116 by Reviewer tLBk
+Official Reviewby Reviewer tLBk22 Oct 2026, 06:06 (modified: 06 Nov 2026, 07:36)EveryoneRevisions
+Paper Summary:
+
+This paper augments a frozen GraphCast model with a trainable correction branch. The branch combines graph message passing and 4 Mamba layers to retain temporal memory across 6-hour steps. Trained for 2,500 steps on ERA5, it reduces 10-day forecast loss by 16.3% and day-10 loss by 23.68%.
+Presentation: 3: Clear and easy to follow.
+Informativeness: 1: I learned little or nothing new from this paper.
+Soundness: 1: I have significant concerns about the paper’s soundness that do not appear easy to address.
+Critical Strengths:
+
+well organized.
+Critical Weaknesses:
+
+    The explanation based on non-Markovian closure lacks direct evidence. Residual correction via multi-step training can mitigate rollout distribution shift and error accumulation, yielding performance gains that increase with forecast lead time. The paper fails to rule out this alternative explanation through baselines such as strictly matched multi-step fine-tuning or memoryless correction. Even if the efficacy of persistent memory is established, it remains necessary to distinguish whether it serves to compensate for model errors or to represent the historical dependencies of unresolved physical processes.
+
+2.Necessary baselines are missing. Comparisons with direct multi-step fine-tuning, parameter-efficient fine-tuning, and memoryless correction networks (constrained by the same computational budget) are essential to validate the core claims. Freezing the backbone does not rule out the possibility that performance gains stem from the training of the adapters themselves.
+
+    The assessment of prediction quality is incomplete. A general reduction in RMSE fails to distinguish between improvements in dynamics and increased spatial smoothing. The current results lack analyses of predicted fields, power spectra, gradients, and statistics of extreme events; thus, it remains unclear whether the reduction in error comes at the expense of structural integrity or intensity.
+
+4.The conceptual claims exceed the provided evidence.
+Questions For Authors:
+
+Given identical data, training budgets, and multi-step training protocols, what is the independent gain provided by persistent memory compared to direct fine-tuning or residual correction without memory?
+Flag For Ethics Review: No
+Rating: 1: Clear rejection
+Confidence: 4: I have substantial direct research experience on this topic.
+Add:
+Official Review of Submission50116 by Reviewer Jvjy
+Official Reviewby Reviewer Jvjy21 Oct 2026, 07:29 (modified: 06 Nov 2026, 07:36)EveryoneRevisions
+Paper Summary:
+
+This article proposes GraphCast Mamba, a non-Markovian correction framework that enhances frozen pre trained GraphCast models using Mamba branches based on trainable graphs. By retaining time memory in the autoregressive prediction step, this method aims to improve long-term weather forecasting. The ERA5 experiment showed that the total GraphCast loss decreased by 16.34% after ten days, and by 23.68% on the tenth day. The RMSE of the 11 variable groups continued to improve. Perform memory reset ablation to study the contribution of persistent time information.
+Presentation: 3: Clear and easy to follow.
+Informativeness: 2: I learned something interesting or useful.
+Soundness: 2: I have minor or fixable concerns about the paper’s soundness.
+Critical Strengths:
+
+S1. Substantial improvements in long-horizon forecasting. The method achieves consistent improvements across multiple atmospheric variables, particularly at longer lead times. Improving an existing pretrained model without retraining the backbone is practically valuable.
+
+S2. Meaningful investigation of temporal memory. The carry/reset and reset/reset controls attempt to distinguish the benefits of persistent memory from additional model capacity. The experiments on training rollout length also provide useful insights into autoregressive forecasting.
+Critical Weaknesses:
+
+W1. The core proposition relies on a comparison between persistent memory and memory reset models. However, Figure 6 combines the results of different experimental runs, while Appendix A.2 shows the differences in loss calculation between the main experiments and memory control. In addition, carry/reset introduces training inference mismatch. Therefore, the 10.77 percentage point advantage reported has not yet provided a fully controllable estimate of the independent contribution to temporal memory.
+
+W2. The preliminary assessment only used 32 predictions from the 2022 development set for initialization, which also provides information for hyperparameter selection. Do not provide confidence intervals, multiple training seeds, and independent test results. Although Appendix C includes annual comparisons, these comparisons use different model configurations (K=22), which limits their direct comparability with the main results.
+Questions For Authors:
+
+Q1. Can the author evaluate the main model on a larger independent test set and report statistical uncertainty? This will help establish improved robustness under different atmospheric conditions.
+
+Q2. How does the proposed method compare to GRU/LSTM or fixed history correction models that match parameters? This comparison will clarify whether these gains come from Mamba specific memory mechanisms or more general temporal conditioning effects.
+Flag For Ethics Review: No
+Rating: 2: Weak rejection
+Confidence: 3: I am familiar with this topic and its relevant literature.
+Add:
+Official Review of Submission50116 by Reviewer v96w
+Official Reviewby Reviewer v96w20 Oct 2026, 16:17 (modified: 06 Nov 2026, 07:36)EveryoneRevisions
+Paper Summary:
+
+This paper proposes GraphCast–Mamba, a temporal-memory correction model for medium-range global weather forecasting. First, the authors propose a Mamba-based correction branch that applies memory-guided updates to a frozen GraphCast backbone. They further provide a method to train the correction model over long autoregressive rollouts, ensuring the memory remains effective at extended lead times. Evaluated on ERA5, the proposed method demonstrates consistent improvements in long-lead forecast skill across all evaluated variable groups. The authors also provide ablation studies on memory-reset policies and training tail length.
+Presentation: 2: Generally understandable, but requires substantial effort in places.
+Informativeness: 2: I learned something interesting or useful.
+Soundness: 2: I have minor or fixable concerns about the paper’s soundness.
+Critical Strengths:
+
+    Lightweighted but effective model: The method improves an existing pretrained forecaster using only a small correction branch. Even with this small addition and short training, the corrected model substantially reduces long-lead forecast error compared with the baseline.
+
+    Consistent Improvements across variable-group and days: The gains are broad across all 11 variable groups at every lead time from day 5 to day 10. Also, corrected 1° model attains lower long-lead error than the 0.25° GraphCast on a common 1.5° grid.
+
+    Controlled Memory Ablations: The paper provides an ablation study which separate the effect of temporal memory. This results directly supports the effectiveness of the temporal memory.
+
+Critical Weaknesses:
+
+    Potential Effect of Smoothed prediction: As authors mentioned in the limitations section, the RMSE improvements may partially stem from smooth prediction rather than better prediction, lowering RMSE by blurry outputs. It is recommended to clarify this point, to strengthen the effectiveness of the proposed method.
+
+    Inconsistent Checkpoints Across Comparisons: The comparison with the 0.25° GraphCast uses a model trained with K=22 which differs from the principal model with K = 20. Authors do not explain why a different setting was selected for the comparison. Including the principal model in this comparison would confirm that the claimed advantage over the 0.25° GraphCast holds for the proposed configuration.
+
+Questions For Authors:
+
+    Could the authors report energy spectra of the forecasts at long lead times to show whether the RMSE gains come from smoother forecasts?
+
+    Why is a K = 22 model used for the 0.25° GraphCast comparison instead of the principal K = 20 model? Also, it is recommended to add result for principle model(K=20) for the comparison.
+
+Flag For Ethics Review: No
+Rating: 3: Weak acceptance
+Confidence: 3: I am familiar with this topic and its relevant literature.

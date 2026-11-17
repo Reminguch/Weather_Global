@@ -1,0 +1,210 @@
+{
+  "created": "2026-11-14",
+  "description": "Original carry/carry and reset/reset outputs: matched four-date preview",
+  "cohort": {
+    "count": 4,
+    "initialization_ids": [
+      "20230101T000000Z",
+      "20230401T000000Z",
+      "20230703T000000Z",
+      "20231001T000000Z"
+    ],
+    "status": "preliminary_four_date_preview"
+  },
+  "models": [
+    {
+      "id": "GC",
+      "label": "GraphCast"
+    },
+    {
+      "id": "M1",
+      "label": "Carry/carry (M1)"
+    },
+    {
+      "id": "GC_filter",
+      "label": "GC + optimal filter"
+    },
+    {
+      "id": "reset",
+      "label": "Reset/reset"
+    }
+  ],
+  "sources": [
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/gc_m1_reference/summary.json",
+      "sha256": "2586b5949e0362f3efd5366865c11bd64d3d40a06ec91b73bc9a63d5ff5f6f43"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/gc_m1_reference/power_pooled.npz",
+      "sha256": "9aa28bfdb6083ed0b869b1b8f0688cdd3773848feff7ce06776dcb80c98e0da4"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/report/summary.json",
+      "sha256": "177f31f0bf894c9e8120dade1d0439bc7e20aa1ebcecd6ce843a58ef6c36be80"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/report/power_pooled.npz",
+      "sha256": "360bb3d17edb0c7fbbab5826bb6c29418488a4b07db5feaf85d655f12789b20c"
+    },
+    {
+      "path": "artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json",
+      "sha256": "822eeba33b190db255e57397437af7329d19279fad544833f84cb3cf4d114e3f"
+    },
+    {
+      "path": "scripts/analyze_models/plot_v4_memory_spectra_appendix_20261114.py",
+      "sha256": "2748c7659a3222be7da6f0355abc5e570c38491a36f257951560af489d736c63"
+    },
+    {
+      "path": "scripts/analyze_models/plot_v4_smoothing_paper_20261114.py",
+      "sha256": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501"
+    },
+    {
+      "path": "src/analysis/optimal_spherical_filter.py",
+      "sha256": "7c2df3ef3fd0fc5915a6766a2c33628027e32724150c6fc80cbdf340837574ba"
+    }
+  ],
+  "definitions": {
+    "loss": "Saved exact native-grid GraphCast weighted MSE; raw unfiltered M1 and reset forecasts",
+    "power": "Date-pooled physical power per total degree: sum_m |coefficient(l,m)|^2 with positive m doubled; normalized continuous spherical mean-square convention",
+    "degree_range": "1..179; degree zero excluded; no climatological-mean subtraction",
+    "amplitude_ratio": "Per-channel sqrt(date-pooled forecast power / date-pooled truth power), then loss variable/pressure-weighted average",
+    "coherence": "Per-channel pooled real cross-power / sqrt(pooled forecast power * pooled truth power), then the same weighted average",
+    "channel_weights": "Original GC variable weights and pressure-proportional level weights, normalized to sum one; no difference-stddev weighting of dimensionless ratios",
+    "units": "T2m K^2; Z500 geopotential m^4 s^-4; Q700 converted kg/kg to g/kg before squaring (power x1e6); TP6h converted m to mm before squaring (power x1e6)",
+    "filter": "Existing GC filter fitted on 32 development starts in 2022; output-only filtering; raw M1/reset are unchanged",
+    "equal_power_rescaling": "Not applied; raw carry/reset power arrays are exactly equal to the saved input arrays",
+    "uncertainty": "Four dates and fixed checkpoints; no spectral confidence intervals or training-seed uncertainty",
+    "channel_mismatch": "Equal-degree 100*mean_l |Pf/Py-1| and truth-power-weighted 100*sum_l |Pf-Py|/sum_l Py, l=1..179"
+  },
+  "checks": {
+    "spectral_identity_relative_max": 6.575784960456679e-16,
+    "maximum_absolute_channel_coherence": 0.9999996225499289,
+    "finite_values_retained": true,
+    "spectral_intervals": "not estimated",
+    "original_raw_model_powers_unchanged": true,
+    "same_truth_and_dates": true,
+    "normalized_weight_sum": 0.9999999999999998
+  },
+  "preserved_numerical_diagnostics": {
+    "canonical_reset_metric_drift": {
+      "reference_relative_bound": 0.001,
+      "maximum_absolute_difference": 0.3302906556704741,
+      "maximum_relative_difference": 0.013962722298006313,
+      "pooled_measured": 10.164970060993923,
+      "pooled_reference": 10.19427907280624,
+      "pooled_difference": -0.02930901181231672,
+      "warnings": [
+        "Finite preview reset forecast/archived reset checkpoint evaluation drift exceeds 0.001 relative reference; values retained"
+      ]
+    },
+    "worker_grid_mse_roundoff": {
+      "reference_relative_bound": 1e-05,
+      "maximum_absolute_difference": 7.698995393212726e-06,
+      "maximum_relative_difference": 2.802593091538831e-07,
+      "pooled_measured": 11.006341474646382,
+      "pooled_reference": 11.0063430884853,
+      "pooled_difference": -1.6138389181224317e-06,
+      "warnings": []
+    }
+  },
+  "contrasts": {
+    "rollout": {
+      "exact_loss_by_model": {
+        "GC": 11.851948332219331,
+        "M1": 10.002799668006592,
+        "GC_filter": 10.623955864661935,
+        "reset": 10.164970060993923
+      },
+      "m1_vs_raw_gc_reduction_pct": 15.602064845202356,
+      "m1_vs_optimal_gc_reduction_pct": 5.846750537824352,
+      "optimal_gc_vs_raw_gc_reduction_pct": 10.361102100142627,
+      "power_error_by_model_pct": {
+        "GC": 59.62183361197707,
+        "M1": 67.4916019730978,
+        "GC_filter": 78.49913405807487,
+        "reset": 65.99417130600169
+      },
+      "m1_vs_reset_reduction_pct": 1.59538485617019
+    },
+    "day5": {
+      "exact_loss_by_model": {
+        "GC": 9.361321021161192,
+        "M1": 8.69140780114301,
+        "GC_filter": 8.975101110019923,
+        "reset": 8.666931354480623
+      },
+      "m1_vs_raw_gc_reduction_pct": 7.156182535604206,
+      "m1_vs_optimal_gc_reduction_pct": 3.1608926228161804,
+      "optimal_gc_vs_raw_gc_reduction_pct": 4.125698822508306,
+      "power_error_by_model_pct": {
+        "GC": 61.545618287059845,
+        "M1": 69.36504743523663,
+        "GC_filter": 82.59256930444214,
+        "reset": 68.85440287396355
+      },
+      "m1_vs_reset_reduction_pct": -0.28241191329769766
+    },
+    "day10": {
+      "exact_loss_by_model": {
+        "GC": 30.10311379210348,
+        "M1": 22.748759864519364,
+        "GC_filter": 24.84683081587265,
+        "reset": 23.791522892113342
+      },
+      "m1_vs_raw_gc_reduction_pct": 24.430542230197048,
+      "m1_vs_optimal_gc_reduction_pct": 8.444018341417593,
+      "optimal_gc_vs_raw_gc_reduction_pct": 17.46092783800204,
+      "power_error_by_model_pct": {
+        "GC": 66.55944392026841,
+        "M1": 84.24510589327029,
+        "GC_filter": 92.23580877270606,
+        "reset": 76.13262142887092
+      },
+      "m1_vs_reset_reduction_pct": 4.382918371062505
+    }
+  },
+  "figures": [
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_memory_spectra_appendix_20261114/memory_loss_amplitude_coherence_preview4.pdf",
+      "sha256": "418872f4f60431a0d3df6b3f412693efc07fcd96369591d4d405b7a973a2a8c2"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_memory_spectra_appendix_20261114/memory_loss_amplitude_coherence_preview4.png",
+      "sha256": "d99649c15c8e47dddd3368623bd155e8d9831b2fbaffcf3a8f949967a418a4b0"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_memory_spectra_appendix_20261114/memory_physical_power_day5_preview4.pdf",
+      "sha256": "6a70150d2f8bdcc2b712f9905c39c21c04c2ba21f0aab0a810115b28d7776eba"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_memory_spectra_appendix_20261114/memory_physical_power_day5_preview4.png",
+      "sha256": "6afea5ef9a742823635e4ed9a10bac522c2dc8f730d075f69947492b28e78f6d"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_memory_spectra_appendix_20261114/memory_physical_power_day10_preview4.pdf",
+      "sha256": "70591a1dc281df61745716c1fe8878ceab68f574ec7c366683b30f883db24241"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_memory_spectra_appendix_20261114/memory_physical_power_day10_preview4.png",
+      "sha256": "cdaab4f859c7c45b8fca04c1bced07887ac88193070ea96b6eb6da4e515a31c5"
+    }
+  ],
+  "curves": [
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_memory_spectra_appendix_20261114/exact_loss_by_lead.csv",
+      "sha256": "ca632ad062095f2064527bc5e66653c31afcb9615f76b931383e9d047fc36b50"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_memory_spectra_appendix_20261114/weighted_amplitude_coherence.csv",
+      "sha256": "57249632a308579e9ae7f19086284b345e99e05fa21791ae282493a8302f5dd8"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_memory_spectra_appendix_20261114/physical_power_selected_fields.csv",
+      "sha256": "9b4ee20c0d877170520d6c16858ebc63cd52ba76a74d3c1052cdee903aff7dc6"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_memory_spectra_appendix_20261114/all_channels_selected_leads_summary.csv",
+      "sha256": "3f341c34605246028bd6c39016212ffdaa765770af8e5c8bbbe348cfd8dcbd9c"
+    }
+  ]
+}

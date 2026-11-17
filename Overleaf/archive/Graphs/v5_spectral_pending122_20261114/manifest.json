@@ -1,0 +1,162 @@
+{
+  "purpose": "Clearly provisional spectral graphics pending the full evaluation",
+  "source_cohort": {
+    "forecast_count": 36,
+    "start": "2023-01-01",
+    "end": "2023-04-16",
+    "status": "frozen_interim_matched_cohort"
+  },
+  "planned_evaluation": {
+    "forecast_count": 122,
+    "status": "in_progress_per_author",
+    "replace_before_camera_ready": true
+  },
+  "sources": {
+    "plots/analyze_models/data/resolution_eval/v4_appendix_e_matched36_20261114/all_channels_selected_leads_curves.npz": "540817f7725072e13fd1a44b7a9b04e339b7522a79ef9e463863dc02ccbcf1e5",
+    "plots/analyze_models/data/resolution_eval/v4_appendix_e_matched36_20261114/all_channels_selected_leads_summary.csv": "558ec5bbc186ee1ff573133e5a42b183c223c02fac41507c8182ad4f4d0062be",
+    "plots/analyze_models/data/resolution_eval/v4_appendix_e_matched36_20261114/loss_by_lead.csv": "f40d308d4f7d23a1658f3f4ffc348d344f6592fef5cc79344f64401bdc6b5e58",
+    "plots/analyze_models/data/resolution_eval/v4_appendix_e_matched36_20261114/weighted_spectral_curves.csv": "7dd434bc0e09bb1f52dcd4e1e711af35c4101276df9c991969b7b93060721894",
+    "scripts/analyze_models/plot_v4_appendix_e_four_models_20261114.py": "543dbcfe08cd245f1f0dd23c151bd7d4180b23726930bd201de584ca6512f87f",
+    "scripts/analyze_models/plot_v4_appendix_e_matched36_20261114.py": "2bbfeb614d59ffdb3853f39ab7b54c6db2c4a0c7a3e09f40fc0139af60b54c7e",
+    "scripts/analyze_models/plot_v4_memory_spectra_appendix_20261114.py": "2748c7659a3222be7da6f0355abc5e570c38491a36f257951560af489d736c63",
+    "scripts/analyze_models/plot_v4_smoothing_loss_only_20261114.py": "4eb8b8c73e378fbe6cce5d25d0549eee520c7aa4bc2fb13face60370586c0e3a",
+    "scripts/analyze_models/plot_v4_smoothing_paper_20261114.py": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501",
+    "scripts/analyze_models/plot_v4_spectra_day5_day10_20261114.py": "8166fda5d3a3aaa02adf92e72ff51fc15a54f2d84cf5a6270b8e7b0bdd4be23c",
+    "scripts/analyze_models/plot_v5_m1_labels_20261114.py": "69aa7e376aadbb418559b872bb523d85f2b95c5f221c847ed09e72c4b8f47934",
+    "scripts/analyze_models/plot_v5_spectral_pending122_20261114.py": "5ef42c137fd10738184fb356957a89eed1f5e223c55fde1ee9c34238dd1e1db2"
+  },
+  "draft_heading_substitutions": {
+    "36 matched forecast dates": "Provisional evaluation",
+    "Day 5 \u00b7 36 matched forecast dates": "Day 5 \u00b7 provisional evaluation",
+    "Day 10 \u00b7 36 matched forecast dates": "Day 10 \u00b7 provisional evaluation"
+  },
+  "figure_names": {
+    "fig7_smoothing_day5_day10_v4_matched36": "fig6_smoothing_day5_day10_v5_pending122",
+    "fig12_smoothing_loss_v4_matched36": "fig10_smoothing_loss_v5_pending122",
+    "fig13_smoothing_feature_amplitude_matched36": "fig11_smoothing_feature_amplitude_v5_pending122",
+    "fig14_smoothing_feature_coherence_matched36": "fig12_smoothing_feature_coherence_v5_pending122",
+    "fig15_smoothing_lead_spectra_matched36": "fig13_smoothing_lead_spectra_v5_pending122",
+    "fig17_memory_power_day5_matched36": "fig14_memory_power_day5_v5_pending122",
+    "fig18_memory_power_day10_matched36": "fig15_memory_power_day10_v5_pending122"
+  },
+  "plotted_coordinates_identical": true,
+  "coordinate_signatures": {
+    "fig7_smoothing_day5_day10_v4_matched36": {
+      "sha256": "7d1629a63e5bac6f5255d7ea6537640a5106ac028478eb81a6d49a3dbc276153",
+      "lines": 20,
+      "band_paths": 0,
+      "coordinate_scalars": 5760
+    },
+    "fig12_smoothing_loss_v4_matched36": {
+      "sha256": "334d9fb4428e381b80fe99b0158f613f15765f532783bfe7ccb90810692bd9a2",
+      "lines": 5,
+      "band_paths": 0,
+      "coordinate_scalars": 328
+    },
+    "fig13_smoothing_feature_amplitude_matched36": {
+      "sha256": "032a3d38dff06ed3e3351b5a8959da22c3446f43617d6d8a5b2c609595243ee4",
+      "lines": 20,
+      "band_paths": 0,
+      "coordinate_scalars": 5760
+    },
+    "fig14_smoothing_feature_coherence_matched36": {
+      "sha256": "887e47cf871b9783a80245776a87da671a2d4adc1fb23dea1297f36daff7aca8",
+      "lines": 20,
+      "band_paths": 0,
+      "coordinate_scalars": 5760
+    },
+    "fig15_smoothing_lead_spectra_matched36": {
+      "sha256": "b4c39335846658a17d21292c5137c3fd12e83930696a0b53d1224cd3f3b3fa52",
+      "lines": 30,
+      "band_paths": 0,
+      "coordinate_scalars": 8640
+    },
+    "fig17_memory_power_day5_matched36": {
+      "sha256": "41fc0ef5e2c23eb34d565c66c4081a14fb2a598f79662a651308c3407e38c341",
+      "lines": 20,
+      "band_paths": 0,
+      "coordinate_scalars": 7176
+    },
+    "fig18_memory_power_day10_matched36": {
+      "sha256": "c54876c52abf3598e559178b61ee5262014be63f52cfac5d257e210edb832e89",
+      "lines": 20,
+      "band_paths": 0,
+      "coordinate_scalars": 7176
+    }
+  },
+  "source_exports_unchanged": true,
+  "new_evaluations_or_metric_calculations": false,
+  "figure5_unchanged": true,
+  "figures": [
+    {
+      "file": "fig6_smoothing_day5_day10_v5_pending122.pdf",
+      "sha256": "36bbbdfbb5963235e06cddcd1a2664b4f9f0a59c0f945a1b8e94f63f39937bd4",
+      "bytes": 36239
+    },
+    {
+      "file": "fig6_smoothing_day5_day10_v5_pending122.png",
+      "sha256": "0cc32f2d97abfcd069b637bf0e4ad735df521e2c24a063a3764a40f4cc385769",
+      "bytes": 148590
+    },
+    {
+      "file": "fig10_smoothing_loss_v5_pending122.pdf",
+      "sha256": "bd4d76b1324a7197fac6225682266a978f2a32899fd35c71806d3c140867f978",
+      "bytes": 14064
+    },
+    {
+      "file": "fig10_smoothing_loss_v5_pending122.png",
+      "sha256": "ba961322cb1346358dee3d36d869be72449600af9b20da62d2a80e89f56b5e43",
+      "bytes": 74285
+    },
+    {
+      "file": "fig11_smoothing_feature_amplitude_v5_pending122.pdf",
+      "sha256": "0c2ec255f10ffe98a29db0182a414a38cf57ce02db30f1de8557c0521d602ed4",
+      "bytes": 38315
+    },
+    {
+      "file": "fig11_smoothing_feature_amplitude_v5_pending122.png",
+      "sha256": "759d1e6128e66d525e9ab03f8698d072920b29625fc62a2cca785d75fc796c06",
+      "bytes": 209834
+    },
+    {
+      "file": "fig12_smoothing_feature_coherence_v5_pending122.pdf",
+      "sha256": "8639afe7aaf65bb939c5cfdce3c86c7c2527f84c0583876ef0d50dbab0395cfb",
+      "bytes": 32570
+    },
+    {
+      "file": "fig12_smoothing_feature_coherence_v5_pending122.png",
+      "sha256": "7ea788f7c9c2d398adce5d4ea4a0de45d22cc29c11aea7b400fc759878416139",
+      "bytes": 143704
+    },
+    {
+      "file": "fig13_smoothing_lead_spectra_v5_pending122.pdf",
+      "sha256": "5e39d28e77a733fa8499eed980f49bc6ad23dcc437bf4fc8b3f5d95cc9aa2ccd",
+      "bytes": 42239
+    },
+    {
+      "file": "fig13_smoothing_lead_spectra_v5_pending122.png",
+      "sha256": "fad30a72e97d0c9f0561a1fe791c71b706fa9eb82c48ac030c264b89948aa4a9",
+      "bytes": 217855
+    },
+    {
+      "file": "fig14_memory_power_day5_v5_pending122.pdf",
+      "sha256": "b21373db1da994a812a2c5a9c6a95aca7b0f536de579d4000c565645c883885f",
+      "bytes": 42679
+    },
+    {
+      "file": "fig14_memory_power_day5_v5_pending122.png",
+      "sha256": "a3932718492ded77a8152706dd7d70fdc1adb037ea67b40d99ce89071189a5de",
+      "bytes": 193319
+    },
+    {
+      "file": "fig15_memory_power_day10_v5_pending122.pdf",
+      "sha256": "6e3dfbb6ddf1845d49d062450aae1e4b574645298c1df2af69788bf5dd7d8437",
+      "bytes": 44071
+    },
+    {
+      "file": "fig15_memory_power_day10_v5_pending122.png",
+      "sha256": "531a416a3b1f06ee42f5c75ec00cd386b2884a5d6e8f225dd3e6cfcc6c6c36b4",
+      "bytes": 224393
+    }
+  ]
+}

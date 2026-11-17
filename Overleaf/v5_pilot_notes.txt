@@ -1,0 +1,157 @@
+V5 manuscript — updated November 15, 2026 (America/New_York)
+
+Purpose
+Fit the existing paper within ten main-text pages while retaining its structure
+and scientific argument. The standalone clean source is v5_clean.tex;
+v5.tex retains the tracked comparison, and v4 remains separate.
+
+Tracked review requested by the user
+v5.tex now shows the original v4 wording with literal \sout{} wherever prose
+was removed or replaced. Replacements are green. The three moved implementation
+items retain their original-location copies and have explicit relocation notes.
+Old figure captions are struck without adding figure numbers. The former score
+table is retained and struck next to its replacement. Float-placement changes
+are labelled in the review view.
+v5_clean.tex now contains the complete clean manuscript, with deleted blocks
+physically removed from its source and new/revised text in blue. It does not
+input v5.tex or contain strikethrough/review-condition machinery. Edit this clean
+file directly; v5.tex remains the separately preserved tracked comparison.
+Both retain the restored original introduction and the same scientific content.
+
+Latest editorial revision
+The November 15 spectral refresh uses all 122 matched starts (January 1–December
+30, 2023) and 40 six-hour leads. Both v5 sources, Figures 6 and 10–13, and
+Table 1 use these same dates. The earlier 36- and 70-date exports are preserved;
+archive/Graphs/v5_spectral_matched122_20261115 contains current data and sources.
+The 30-date reset extension completed and merged with the original 92 dates.
+No new jobs were launched for this requested replot. The quoted spectral
+numbers in the v96w reviewer response are synchronized with the paper.
+
+Figures 11–13 use the same compact spectral-plot style as Figure 6: one legend
+row below the panels, no repeated draft-status heading, and shorter canvases.
+All field/lead titles, numerical annotations, label font sizes, curves, and
+axis limits are retained. Use this style for subsequent related spectral plots.
+Formatting only: Figure 6 loses its redundant draft-status heading and uses a
+single-row legend below the panels, retaining the original font sizes and every
+plotted value. Its canvas height changes from 4.9 to 3.8 inches. Earlier top-float
+placement and removal of the pre-conclusion float barrier let the figure share
+page 9 with discussion. Table 1, conclusion, and limitations fit on page 10.
+All manuscript text, equations, tables, captions, and comments are preserved;
+the official ICLR style, fonts, and margins are unchanged.
+The matched reset-trained, reset-evaluated model is named R1 throughout the
+active v5 text, tables, and figure legends. The local seed-22 reset run is
+identified as an R1 retraining, distinct from the original matched SWA control.
+Historical comments and struck review text retain the previous policy name.
+The spectral manuscript now reports the completed 122-initialization evaluation.
+The draft-status note and outdated qualifications have been removed from both
+v5 sources and captions. The new plots and table use the completed annual
+data. Rerun diagnostics remain in source comments and manifests; spectral
+scores remain fixed-checkpoint point estimates without new confidence intervals.
+The day-5/day-10 physical power-spectrum plots are removed at the author's
+request (former v5 Figures 14–15, v4 Figures 16–17). Their captions remain
+struck in the review copy; original figure blocks and PDFs are archived in
+archive/Graphs/v5_removed_power_figures_20261114/. The common-grid and city
+plots are now v5 Figures 14–15.
+The clean PDF, including the latest author layout edits, has 10 main-text
+pages and 29 total pages; the tracked review PDF has 37 pages.
+Appendix C's repeated setup and main-text summaries are consolidated; its
+equations and four figures remain; annual provenance and repeatability values
+are preserved internally. Shared training/SWA and bootstrap methods are defined once in A.1/A.4
+and referenced from the other appendices. ENS filenames remain in source
+comments. The compact-appendix baseline had 33 total pages and 11 main-text pages.
+Appendix A opens with an overview and retains a shorter training recipe.
+Data preparation is one sentence; filenames and storage paths were removed.
+The main text defines M1 as the original selected SWA checkpoint; independent
+runs are called M1 retrainings. Legends use the same distinction.
+All three Figure 1 subfigures contain their own centering command.
+The previous Appendix E now follows B as C. Common-grid and city appendices
+become D and E; all scientific results and the original introduction remain.
+
+Layout of the introduction-restored baseline
+The review PDF is intentionally longer because it includes the deleted text.
+After restoring the original introduction at the user's request, the clean view
+has 11 main-text pages and 35 total pages including references and appendices.
+The conclusion and limitations occupy about one-third of page 11. No further
+compression was applied; all text outside the introduction is byte-identical
+to the preceding tracked v5. The baseline/lower-is-better definition appears in the table
+header and caption; redundant newly added wording was omitted from its lead-in.
+The official ICLR style, text size, margins, and line spacing are unchanged.
+
+Relative-error table
+The spectral table uses L/L_GC and D_P/D_P,GC. Raw GraphCast is 1.00
+in every column, and lower is better. These are separately normalized metrics,
+not loss-reduction percentages. The 24 entries were recomputed from the saved
+exact 122-date scores and displayed to two decimals; no forecasts were rerun. Table numbers are unchanged by
+the review layer: spectral scores are Table 2 in v4 and Table 1 in v5.
+
+Preserved
+- Title, abstract, contributions, and all main section/subsection headings.
+- All forecast, memory, common-grid, and tabulated spectral numerical results.
+- Retained figure panels and inclusion widths, including higher-resolution
+  comparison and both day 5 and day 10 in the spectral figure.
+- Distinctions between M1, five-seed SWA replication, raw-checkpoint replication,
+  the single reset-trained seed, and date-versus-seed uncertainty.
+- Annual spectral-cohort provenance and repeatability diagnostics in source
+  comments and manifests, with earlier cohorts preserved in their archives.
+- Collaborator comments, original blue/red markup, and inherited author TODOs.
+  In particular, the AI-use statement still has its existing author-review TODO.
+
+Editorial changes
+- Restored the complete original v4 introduction, including the two paragraphs
+  shortened in the first pilot. Existing method-prose edits remain as before.
+- Moved graph notation, layer dimensions, and the detailed correction-path
+  equations to Appendix A.2; the additive recurrence remains in Section 3.1.
+- Moved the training schematic and policy table to Appendix A.2. Their defining
+  training and reset protocols remain in the main text.
+- Shortened repeated setup wording and selected figure captions.
+- Condensed the common-grid discussion. Its example confidence intervals remain
+  in the existing appendix table, referenced from the main text.
+- Shortened the smoothing motivation, preserving its two citations and purpose.
+- Allowed spectral results text to flow past the figure rather than forcing a
+  separate float page. This also incorporates the concurrent v4 removal of that
+  same FloatBarrier after the initial source snapshot.
+
+Figure mapping
+V4 figure 1 -> v5 figure 1: unchanged three-panel overview, same assets.
+V4 figure 2 -> v5 figure 2: unchanged correction branch, same asset.
+V4 figure 3 -> v5 figure 7: training schematic, now Appendix A.2, drawn in LaTeX.
+V4 figure 4 -> v5 figure 3: fig3_forecast_skill_v5_seeds.pdf.
+V4 figure 5 -> v5 figure 4: fig4_common_grid_comparison_v5_ci.pdf.
+V4 figure 6 -> v5 figure 5: fig5_memory_policies_v5_matched_only.pdf.
+V4 figure 7 -> v5 figure 6: fig6_smoothing_day5_day10_v5_matched122.pdf.
+V4 figures 8–9 keep their numbers and original assets.
+V4 figures 12–15 become v5 figures 10–13 in the reordered spectral appendix.
+V4 figures 16–17 (physical power spectra) are omitted from v5.
+V4 figures 10–11 become v5 figures 14–15 (common-grid and city examples).
+V5 figures 6 and 10–13 use the complete annual data and M1/R1 labels;
+figures 3–4 and 14–15 are byte-identical copies of their original assets.
+V4 policy table 1 -> v5 table 2, now Appendix A.2.
+V4 spectral score table 2 -> v5 table 1, retained in Section 4.6.
+
+Build and review artifacts
+Run: bash build_v5.sh /absolute/path/outside/Overleaf
+Latest artifact directory: artifacts/manuscripts/v5_spectral_matched122_20261115/
+Previous spectral style: artifacts/manuscripts/v5_spectral_style_20261114/
+Previous main-text formatting: artifacts/manuscripts/v5_formatting_20261114/
+Previous R1 naming update: artifacts/manuscripts/v5_r1_naming_20261114/
+Previous physical-spectrum removal: artifacts/manuscripts/v5_remove_power_figures_20261114/
+Previous full-evaluation draft: artifacts/manuscripts/v5_pending122_20261114/
+Previous compact appendices: artifacts/manuscripts/v5_appendix_compact_20261114/
+Previous appendix/M1 revision: artifacts/manuscripts/v5_appendix_revision_20261114/
+Previous standalone-clean build: artifacts/manuscripts/v5_clean_tex_20261114/
+Previous clean-blue build: artifacts/manuscripts/v5_clean_blue_20261114/
+Introduction-restored build: artifacts/manuscripts/v5_intro_restored_20261114/
+Previous tracked build: artifacts/manuscripts/v5_tracked_20261114/
+This local directory is outside the standalone manuscript repository. It retains
+the source snapshot, compiled pilot, baseline snapshot,
+source diff, validation summary, and build log. No numerical evaluations were
+rerun for this editorial pilot.
+
+Initial markup provenance
+archive/v5_pilot_20261114/v4_before_compression.tex is the original v4 snapshot.
+archive/v5_pilot_20261114/v5_clean_relative_errors.tex records the initial clean
+target for generating this review layer. tracked_change_manifest.json records
+the before/after blocks. tools/make_v5_tracked.py generated the initial markup;
+normal editing and build_v5.sh do not regenerate or overwrite the manuscript.
+That generator is historical; do not rerun it over the standalone clean working file.
+ulem.sty is the unmodified CTAN 2019-11-18 package with its original license.

@@ -1,0 +1,38 @@
+{
+  "fig6_smoothing_day5_day10_v5_variables122": {
+    "size_inches": [
+      6.25,
+      3.8
+    ],
+    "axes": 4,
+    "lines_including_references": 22,
+    "coordinate_sha256": "ca53187f32b48cb7bc6017c6ce5ff6cd074dbb1ef74a16aaad2a6cfd89505eda"
+  },
+  "fig11_smoothing_variables_day5_v5_matched122": {
+    "size_inches": [
+      6.5,
+      3.15
+    ],
+    "axes": 8,
+    "lines_including_references": 44,
+    "coordinate_sha256": "5864fc08c9396a8efbd63667b0120e8cf15db9086812effe4d76f45d7457fe89"
+  },
+  "fig12_smoothing_variables_day10_v5_matched122": {
+    "size_inches": [
+      6.5,
+      3.15
+    ],
+    "axes": 8,
+    "lines_including_references": 44,
+    "coordinate_sha256": "59be714498bf1b005611e0e6f546cdfbf2374f5b39eb272b9f6615be47fc744c"
+  },
+  "fig13_smoothing_lead_spectra_v5_variables122": {
+    "size_inches": [
+      6.25,
+      5.6
+    ],
+    "axes": 6,
+    "lines_including_references": 33,
+    "coordinate_sha256": "ad26915b06a654f197d5ffb136fe89fd36fc6e298a98e26a6795759ebf483149"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "date": "2026-11-14",
+  "purpose": "Figure6 restricted to matched carry/carry and reset/reset policies",
+  "sources": {
+    "plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/figure6_original_swa_curves.csv": "a0fb70baa0a02a4f8a2a8fe8d9f86c554ba6c9fead38bc101002b2b9a077000b",
+    "plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/figure6_raw_curves.csv": "df19fabb5e4f60ba4b8f23a798d2a170318219028a286ff0559113e90000f4d7",
+    "plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/original_memory_paired_contrasts.csv": "e5a672e98369488476e2c00087d9734deee9be74ec8a8f28a1eebd5651f82ac8",
+    "plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/raw_memory_endpoints.csv": "e66c1044283b9856af812c48bc4b12a1606be92e9ea58b343ac77e5befcd0a1f",
+    "plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/figure6_raw_carry_mean_sd_curves.csv": "25920b367773bae083b476b977047da7604c0c28c86c3e05c2258326a7d710ea",
+    "plots/analyze_models/data/resolution_eval/v4_seed_uncertainty_20261113/summary.json": "57bd6921d2e7c97552ae016f60ecd5e7b57252f2188a082c4545c26634242ae2",
+    "scripts/analyze_models/plot_v4_memory_two_policies_20261114.py": "cb21ae994a593a11f6dc84acc55f9fd0ef3d77e10b2f4faac126a3a918beec1f",
+    "scripts/analyze_models/plot_v4_seed_replication.py": "d37d1216c84816a0c689037b0ce0e0a247b1e5166ad19e70096893dc257e5aa6"
+  },
+  "figures": {
+    "plots/analyze_models/images/resolution_eval/v4_memory_two_policies_20261114/fig6_memory_policies_v4_two_policies.pdf": "f9e9d41329ae92e5d8493e13665aabcc1743a2c85d57ee93f979fb8a02f5f8f2",
+    "plots/analyze_models/images/resolution_eval/v4_memory_two_policies_20261114/fig6_memory_policies_v4_two_policies.png": "5486d787203d122cfad08a8f7316013bc4d3515bb83458a73539d2df9fea6d0e"
+  },
+  "tables": {
+    "figure6_original_swa_curves.csv": "f9190486a82d6fb5bd6ebd65904687c642970ffa57eb920da6b5afa93a9e86b1",
+    "figure6_raw_carry_mean_sd_curves.csv": "25920b367773bae083b476b977047da7604c0c28c86c3e05c2258326a7d710ea",
+    "figure6_raw_curves.csv": "576ac3e55d86d6fe84b20f57527c5f7fa8a668aa78c1f9eda93731ffc0162959",
+    "original_memory_paired_contrasts.csv": "4f58c56d6e91c70de6ca28c71750c670a68c4a8c52e90c5770f4ce4092e4e0c5",
+    "raw_memory_endpoints.csv": "69b57bdbe5157916bf0a12728fa6d79ef9478859b4eff55c87b8d48a7f90cc02"
+  },
+  "figure_size_inches": [
+    6,
+    4.05
+  ],
+  "y_limits_pct": [
+    -3.0,
+    27
+  ],
+  "original_policy_ids": [
+    "M1",
+    "R_matched"
+  ],
+  "replication_model_ids": [
+    "s22_carry_raw2000",
+    "s23_carry_raw2000",
+    "s24_carry_raw2000",
+    "s25_carry_raw2000",
+    "s26_carry_raw2000",
+    "s22_reset_reset"
+  ],
+  "forecast_dates_per_model": 122,
+  "lead_count": 40,
+  "checks": {
+    "retained_curve_exports_exact": true,
+    "saved_seed_aggregate_copied_byte_for_byte": true,
+    "original_confidence_intervals_reused": true,
+    "common_baseline_within_each_panel": true,
+    "retained_five_seed_statistics_verified": true
+  },
+  "scope": [
+    "Presentation-only subset of the existing validated Figure6 exports.",
+    "Original SWA panel retains paired pointwise 95% date-block-bootstrap intervals.",
+    "Replication panel retains five raw carry seeds, mean and sample SD, versus one raw reset seed.",
+    "The two panels retain distinct checkpoints, environments and verification provenance.",
+    "No training, forecasts, resampling, or numerical result recomputation; no Overleaf files modified."
+  ]
+}

@@ -1,0 +1,50 @@
+Day-5 and day-10 spectra by feature: four-date preliminary preview
+
+Start with these six-field comparisons:
+  familiar_power_5d.pdf       Physical power, including the ERA5 reference
+  familiar_amplitude_5d.pdf   sqrt(forecast power / ERA5 power)
+  familiar_coherence_5d.pdf   Pattern agreement, shown separately
+
+Day-10 versions use the same fields, models, dates and styling:
+  familiar_power_10d.pdf
+  familiar_amplitude_10d.pdf
+  familiar_coherence_10d.pdf
+
+Every variable/pressure level is included in the seven-page atlases:
+  all_features_power_5d.pdf
+  all_features_amplitude_5d.pdf
+  all_features_coherence_5d.pdf
+
+The corresponding all_features_*_10d.pdf atlases also cover all 83 channels.
+Every surface/atmospheric-variable group has both _5d and _10d PDF/PNG files.
+
+best_worst_* shows the exact three lowest and three highest M1 equal-degree
+power mismatch scores across all 83 channels. These are relative ranks; inspect
+the curves. Rankings are computed separately at each lead, so selected
+best/worst fields can differ between days 5 and 10. Use familiar_* or the
+variable-group plots to compare the same fields across leads.
+Panel labels compare M1 and raw GraphCast using the same
+equal-degree power mismatch: 100 mean_l |Pforecast/PERA5 - 1|, l=1..179.
+Each model is explicitly labelled; smaller is closer to ERA5. Energy-weighted
+scores remain available in the numeric table. Equal-degree mismatch emphasizes
+weak spectral tails; energy-weighted mismatch emphasizes scales with most power.
+
+At day 5, T2m preserves power relatively well. Z500/T850 retain most large-scale power
+but lose small-scale power. Precipitation and vertical pressure velocity at
+500 hPa have strong power deficits. Raw GraphCast is closer to ERA5 power than
+M1 for most channels; power fidelity and forecast MSE are different quantities.
+
+Fields: T=temperature, Z=geopotential, Q=specific humidity, U/V=horizontal wind
+components, W=vertical pressure velocity, MSLP=mean sea-level pressure,
+TP6h=6-hour precipitation. Numbers on atmospheric labels are pressure in hPa.
+
+All panels include raw GC, raw M1, optimally filtered GC and raw matched
+reset/reset on January 1, April 1, July 3 and October 1, 2023. Fixed checkpoints,
+no uncertainty bands; no new forecasts or model selection in this analysis.
+
+Complete numeric ranking, definitions and provenance:
+plots/analyze_models/data/resolution_eval/v24_literature_spectral_preview4_20261113/by_feature/
+
+Each lead has its own feature_ranking_5d/10d.csv, feature_curves_5d/10d.npz,
+summary_5d/10d.json and REPORT_5d/10d.txt. Day-10 values use the saved 240-hour
+moments; the existing day-5 figures and data are preserved.

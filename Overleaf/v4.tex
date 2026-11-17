@@ -33,23 +33,19 @@
     \renewcommand{\suozhi}[1]{}
 \fi
 
-% Revisions relative to archive/main_v3.tex: changed paragraphs, captions,
-% headings, numerical cells, and the new bibliography entry are blue.
-% Replaced figure panels have blue frames; their scientific color scales are intact.
+% Revisions relative to archive/main_v3.tex: only changed text and numerical
+% values are blue; preserved wording remains black. Figures have no revision frames.
 \usepackage{etoolbox}
 \newcommand{\vfourchange}[1]{{\color{blue}#1}}
 \pdfstringdefDisableCommands{\def\vfourchange#1{#1}}
-\newcommand{\vfourgraphic}[2][]{%
-    \begingroup
-    \setlength{\fboxrule}{0.5pt}%
-    \setlength{\fboxsep}{-\fboxrule}% keep the original graphic dimensions
-    \fcolorbox{blue}{white}{\includegraphics[#1]{#2}}%
-    \endgroup
-}
+% November 14 smoothing revision: new changes are red; earlier changes stay blue.
+\newcommand{\vfourred}[1]{{\color{red}#1}}
+\pdfstringdefDisableCommands{\def\vfourred#1{#1}}
 \newcommand{\vfourbibitem}[2][]{%
     \par\color{black}% finish the preceding reference before changing color
     \vfouroriginalbibitem[#1]{#2}%
     \ifstrequal{#2}{hersbach2020era5}{\color{blue}}{}%
+    \ifstrequal{#2}{subich2025spectral}{\color{red}}{}%
 }
 \AtBeginEnvironment{thebibliography}{%
     \let\vfouroriginalbibitem\bibitem
@@ -77,7 +73,7 @@
 \maketitle
 
 \begin{abstract}
-\vfourchange{Unresolved atmospheric processes can introduce history dependence beyond the short input windows used by many weather forecasting models. We introduce GraphCast--Mamba, which augments a frozen, pretrained \(1^\circ\) GraphCast backbone with a trainable correction branch combining graph message passing and Mamba layers. The branch retains a temporal memory state across successive six-hour forecast steps, learning corrections informed by context beyond GraphCast's two-frame input. Training is confined to the correction branch, using ERA5 data from 2015--2021. After 2,500 optimizer updates, including warm-up, five independent retrainings of the selected configuration reduce GraphCast loss (normalized weighted mean-squared error) by $14.17\%\pm0.43$ percentage points over the full ten-day forecast and by $21.03\%\pm0.75$ percentage points at day 10, evaluated on 122 initializations in 2023; uncertainties are sample standard deviations across training seeds. The original selected checkpoint reduces day-10 root-mean-square error (RMSE) by 7.09--14.60\% across all 11 evaluated variable groups. A matched reset-trained control supports a contribution from persistent memory for the tested training realization. These results show broad improvements through a short correction-training schedule while retaining the pretrained backbone.}
+Unresolved atmospheric processes can introduce history dependence beyond the short input windows used by many weather forecasting models. We introduce GraphCast--Mamba, which augments a frozen, pretrained \(1^\circ\) GraphCast backbone with a trainable correction branch combining graph message passing and Mamba layers. The branch retains a temporal memory state across successive six-hour forecast steps, learning corrections informed by context beyond GraphCast's two-frame input. Training is confined to the correction branch, using ERA5 data from 2015--2021. After 2,500 optimizer updates, including warm-up, \vfourchange{five independent retrainings of the selected configuration reduce GraphCast loss (normalized weighted mean-squared error) by $14.17\%\pm0.43$ percentage points over the full ten-day forecast and by $21.03\%\pm0.75$ percentage points at day 10, evaluated on 122 initializations in 2023; uncertainties are sample standard deviations across training seeds. The original selected checkpoint reduces day-10 root-mean-square error (RMSE) by 7.09--14.60\% across all 11 evaluated variable groups. A matched reset-trained control supports a contribution from persistent memory for the tested training realization.} These results \vfourchange{show} broad improvements through a short correction-training schedule while retaining the pretrained backbone.
 
 \end{abstract}
 
@@ -96,12 +92,12 @@
 
 {To investigate this question, we introduce GraphCast--Mamba, which augments a frozen pretrained $1^\circ$ GraphCast backbone with a trainable correction branch combining graph message passing and Mamba layers~\citep{lam2023graphcast,gu2023mamba}. Graph message passing exchanges spatial information, while Mamba retains temporal context across successive six-hour forecast steps. The branch adds a history-dependent correction to each backbone forecast, and the corrected forecast supplies the next input. Only the correction branch is trained.}
 
-\vfourchange{{Our principal experiment trains the correction on ERA5 data from 2015--2021, selects the model on 32 forecast initializations from the 2022 development set, and evaluates ten-day forecasts on 122 initializations in 2023 at $1^\circ$ resolution.} This experiment tests the benefit of correction for one pretrained backbone at a fixed resolution. Its dependence on resolution and transfer to other forecasters remain open questions.}
+Our principal experiment trains the correction on ERA5 data from 2015--2021\vfourchange{, selects the model on 32 forecast initializations from the 2022 development set,} and evaluates ten-day forecasts on \vfourchange{122 initializations in 2023} at $1^\circ$ resolution. This experiment tests the benefit of correction for one pretrained backbone at a fixed resolution. Its dependence on resolution and transfer to other forecasters remain open questions.
 
 Our contributions are threefold.
 \begin{itemize}
     \item \textbf{A temporal-memory correction model.} GraphCast--Mamba combines spatial message passing with temporal Mamba layers in a separate Mamba correction branch, extending the predictor's temporal context while keeping the pretrained GraphCast backbone frozen.
-    \item \vfourchange{\textbf{Evidence for a contribution from temporal memory.} A matched control trained and evaluated without persistent temporal memory uses the same architecture, parameter count, and optimization schedule. Retaining memory improves ten-day GraphCast loss reduction by $5.26$ percentage points (pointwise paired 95\% confidence interval: $4.70$--$5.86$) for this training realization.}
+    \item \textbf{Evidence for a contribution from temporal memory.} \vfourchange{A matched control trained and evaluated without persistent temporal memory uses the same architecture, parameter count, and optimization schedule. Retaining memory improves ten-day GraphCast loss reduction by $5.26$ percentage points (pointwise paired 95\% confidence interval: $4.70$--$5.86$) for this training realization.}
     \item \vfourchange{\textbf{Broad improvements and training-seed replication.} Five independent retrainings reduce ten-day GraphCast loss by $14.17\%\pm0.43$ percentage points and day-10 loss by $21.03\%\pm0.75$ percentage points (mean $\pm$ sample SD). For the original selected checkpoint, day-10 RMSE decreases by $7.09$--$14.60\%$ across all 11 evaluated variable groups.}
 \end{itemize}
 
@@ -118,13 +114,13 @@ Our contributions are threefold.
     \end{subfigure}
     \par\smallskip
     \begin{subfigure}{\linewidth}
-        \vfourgraphic[width=0.93\linewidth]{arxiv_pics/fig1_improvement.pdf}
+        \includegraphics[width=0.93\linewidth]{arxiv_pics/fig1_improvement.pdf}
         \caption{{Variable-group RMSE reductions at days 5 through 10.}}
         \label{fig:breadth_7yr}
     \end{subfigure}
     \par\smallskip
     \begin{subfigure}{\linewidth}
-        \vfourgraphic[width=0.93\linewidth]{arxiv_pics/fig1_channel_coverage.pdf}
+        \includegraphics[width=0.93\linewidth]{arxiv_pics/fig1_channel_coverage.pdf}
         \caption{{Channel scores: channels with lower RMSE than GraphCast at each six-hour lead.}}
         \label{fig:coverage_7yr}
     \end{subfigure}
@@ -230,13 +226,13 @@ At each step, the forecast correction is supervised against the residual target 
 Appendix~\ref{app:training_loss} gives the full loss definition and weights.
 
 \paragraph{Training schedule.}
-\vfourchange{We train with AdamW for 2,000 post-warm-up updates after a 500-update warm-up, or 2,500 optimizer updates in total. The evaluated model uses stochastic weight averaging (SWA); Appendix~\ref{app:training} provides the complete training configuration, model-selection procedure, and computational costs.}
+We train with AdamW for 2,000 post-warm-up updates after a 500-update warm-up, or 2,500 optimizer updates in total. The evaluated model uses stochastic weight averaging (SWA); Appendix~\ref{app:training} \vfourchange{provides the complete training configuration, model-selection procedure, and computational costs.}
 
 
 \section{Results}
 \label{sec:numerical}
 
-\vfourchange{We train the GraphCast–Mamba correction branch on seven years of ERA5 data (2015–2021), keeping the GraphCast backbone frozen. We then evaluate whether the model improves forecast skill, how broadly the gains extend across the atmospheric state, and how strongly performance depends on temporal memory. To assess the latter, we compare against a matched reset-trained control and a memory-reset evaluation of the selected checkpoint.}
+We evaluate whether GraphCast--Mamba, with its correction branch trained on seven years of ERA5 data (2015--2021), improves on the frozen GraphCast backbone forecasts, how broadly the gains extend across the atmospheric state, and whether temporal memory contributes beyond the correction branch's additional capacity. \vfourchange{To assess the latter, we compare against a matched control trained and evaluated with memory reset at every step.}
 
 \subsection{Evaluation protocol and metrics}
 \label{sec:eval_protocol}
@@ -244,12 +240,12 @@ Appendix~\ref{app:training_loss} gives the full loss definition and weights.
 
 \begin{figure}[!t]
     \centering
-    \vfourgraphic[width=\linewidth]{arxiv_pics/fig4_forecast_skill_v4_seeds.pdf}
+    \includegraphics[width=0.8\linewidth]{arxiv_pics/fig4_forecast_skill_v4_seeds.pdf}
     \caption{\vfourchange{Five-seed replication on 122 forecast initializations in 2023. Top: exact GraphCast loss and its reduction. Bottom: $2$\,m temperature RMSE and its reduction. Thin curves show independent retrainings with seeds 22--26; the thick curve and shading show their mean and one sample SD, not a confidence interval or a forecast ensemble. Each seed uses its own repeated public GraphCast baseline. Losses and squared physical errors are pooled over dates before ratios and square roots; seed scores are then summarized. All runs use the selected $K=20$, $d_{\mathrm{inner}}=16$ configuration and four-checkpoint SWA (Appendix~\ref{app:seed_replication}).}}
     \label{fig:res1_forecast}
 \end{figure}
 
-\vfourchange{The experiments use the pretrained $1^\circ$ GraphCast backbone and the correction trained in Section~\ref{sec:training}. The original checkpoint, denoted M1, was selected among six learning-rate arms on 32 initializations from the 2022 development set (Appendix~\ref{sec:training_sensitivity}) and fixed for evaluation on 122 initializations at 00\,UTC every third day from 1 January to 30 December 2023, at 40 six-hour leads from 6 to 240\,h. M1 supplies the variable-group, channel-coverage, and common-grid results. Figure~\ref{fig:res1_forecast} instead reports five fresh retrainings of its fixed configuration on the same forecast dates; they do not include the original checkpoint. Appendix~\ref{app:seed_replication} distinguishes their provenance and verification-data repairs. Earlier pilot exposure within 2023 is disclosed in Appendix~\ref{app:memory_evaluation}.}
+The principal experiments use GraphCast--Mamba with the original pretrained $1^\circ$ GraphCast backbone and the Mamba correction branch trained in Section~\ref{sec:training}. \vfourchange{The original checkpoint, denoted M1, was selected among six learning-rate arms on 32 initializations from the 2022 development set (Appendix~\ref{sec:training_sensitivity}) and fixed for evaluation on 122 initializations at 00\,UTC every third day from 1 January to 30 December 2023, at 40 six-hour leads from 6 to 240\,h. M1 supplies the variable-group, channel-coverage, and common-grid results. Figure~\ref{fig:res1_forecast} instead reports five fresh retrainings of its fixed configuration on the same forecast dates; they do not include the original checkpoint. Appendix~\ref{app:seed_replication} distinguishes their provenance and verification-data repairs.}
 
 Each forecast takes two ERA5 states as input. GraphCast--Mamba initializes the temporal memory state to zero, and advances for ten days using its own predictions as feedback. GraphCast--Mamba feeds back its full prediction, while GraphCast follows an independent uncorrected trajectory. Stateful models retain their updated temporal memory state between steps; the controls without persistent temporal memory reset it at every step.
 
@@ -266,37 +262,37 @@ For each variable and lead, RMSE pools squared physical-unit errors across forec
 
 \subsection{Forecast skill improves at longer forecast lead times}
 
-\vfourchange{Figure~\ref{fig:res1_forecast} shows that the correction benefit grows at longer lead times across five independently trained SWA models. Ten-day GraphCast loss reduction is $14.17\%\pm0.43$ percentage points, with day-10 reduction $21.03\%\pm0.75$ percentage points (mean $\pm$ sample SD across seeds). Individual reductions range from $13.69$--$14.84\%$ and $20.08$--$22.15\%$, respectively. The original selected M1 yields $14.42\%$ and $21.66\%$ in its archived evaluation; it is a separate reference, not a sixth seed. Physical-unit $2$\,m temperature errors show the same concentration of gains at longer lead times. Table~\ref{tab:seed_replication} gives each seed's scores.}
+Figure~\ref{fig:res1_forecast} shows that the benefit of the correction is concentrated at longer forecast lead times\vfourchange{ across five independently trained SWA models}. \vfourchange{Ten-day GraphCast loss reduction is $14.17\%\pm0.43$ percentage points, with day-10 reduction $21.03\%\pm0.75$ percentage points (mean $\pm$ sample SD across seeds). Individual reductions range from $13.69$--$14.84\%$ and $20.08$--$22.15\%$, respectively. The original selected M1 yields $14.42\%$ and $21.66\%$ in its archived evaluation; it is a separate reference, not a sixth seed.} Physical-unit errors show a similar pattern\vfourchange{ for $2$\,m temperature}. \vfourchange{Table~\ref{tab:seed_replication} gives each seed's scores.}
 
 
 
 
 \subsection{Gains extend across the predicted atmospheric state}
-\vfourchange{For the original selected checkpoint, the gains at longer forecast lead times extend across the predicted atmospheric state. {All 11 variable groups have lower RMSE at every evaluated six-hour lead from day 5 through day 10, with day-10 reductions of $7.09$--$14.60\%$ (Figure~\ref{fig:breadth_7yr}).} These improvements span circulation, thermodynamic, moisture, and surface quantities. Table~\ref{tab:variable_group_rmse} in Appendix~\ref{app:variable_group_rmse} reports the reductions by variable at selected leads, together with absolute day-10 RMSEs.}
+\vfourchange{For the original selected checkpoint,} the gains at longer forecast lead times extend across the predicted atmospheric state. All 11 variable groups have lower RMSE at every evaluated six-hour lead from day 5 through day 10, with day-10 reductions of \vfourchange{$7.09$--$14.60\%$} (Figure~\ref{fig:breadth_7yr}). These improvements span circulation, thermodynamic, moisture, and surface quantities. Table~\ref{tab:variable_group_rmse} in Appendix~\ref{app:variable_group_rmse} reports the reductions by variable at selected leads, together with absolute day-10 RMSEs.
 
 
 
-\vfourchange{{Appendix~\ref{app:city_traces} complements these aggregate results with individual forecast trajectories at Paris and New York City, including both improvements and larger local errors in a historical January 2022 forecast.}}
+Appendix~\ref{app:city_traces} complements these aggregate results with individual forecast trajectories at Paris and New York City, including both improvements and larger local errors\vfourchange{ in a historical January 2022 forecast}.
 
 \subsection{\texorpdfstring{{Comparison with higher-resolution GraphCast}}{Comparison with higher-resolution GraphCast}}
 \label{sec:common_grid}
-\vfourchange{Figure~\ref{fig:common_grid_selected} compares the selected $1^\circ$ GraphCast--Mamba model with its frozen GraphCast\_small backbone and the public $0.25^\circ$ GraphCast checkpoint~\citep{lam2023graphcast}. Forecasts are initialized throughout 2023 and verified against identical ERA5 fields on a common $1.5^\circ$ grid, with RMSE expressed relative to the matched ECMWF ensemble mean (ENS). At each diagnostic and lead, every predictor uses the same available dates. GraphCast--Mamba has lower RMSE than the $0.25^\circ$ checkpoint for all 12 diagnostics at every evaluated lead from day 3.5 through day 10 (Appendix~\ref{app:common_grid}). At day 10, reductions are $7.70\%$ for 700\,hPa specific humidity, $10.58\%$ for $2$\,m temperature, and $9.83\%$ for 850\,hPa zonal wind, spanning $7.70$--$11.42\%$ across the 12 diagnostics. Paired day-10 date-bootstrap intervals for these three reductions are $[6.93,8.45]\%$, $[8.82,11.55]\%$, and $[8.67,10.80]\%$, respectively (Table~\ref{tab:common_grid_intervals}).}
+Figure~\ref{fig:common_grid_selected} compares the \vfourchange{selected $1^\circ$} GraphCast--Mamba model with its \vfourchange{frozen} GraphCast\vfourchange{\_small} backbone and the \vfourchange{public} GraphCast ($0.25^\circ$) reference~\citep{lam2023graphcast} for \vfourchange{specific humidity at 700\,hPa}, $2$\,m temperature, and zonal wind at 850\,hPa. All forecasts are verified on a common $1.5^\circ$ grid. \vfourchange{Forecasts are initialized throughout 2023 and verified against identical ERA5 fields, with RMSE expressed relative to the matched ECMWF ensemble mean (ENS). At each diagnostic and lead, every predictor uses the same available dates. GraphCast--Mamba has lower RMSE than the $0.25^\circ$ checkpoint for all 12 diagnostics at every evaluated lead from day 3.5 through day 10. At day 10, reductions are $7.70\%$ for 700\,hPa specific humidity, $10.58\%$ for $2$\,m temperature, and $9.83\%$ for 850\,hPa zonal wind, spanning $7.70$--$11.42\%$ across the 12 diagnostics. Paired day-10 date-bootstrap intervals for these three reductions are $[6.93,8.45]\%$, $[8.82,11.55]\%$, and $[8.67,10.80]\%$, respectively (Table~\ref{tab:common_grid_intervals}).} This comparison shows that the learned correction can improve skill at longer forecast lead times even relative to a model with finer output resolution. Appendix~\ref{app:common_grid} provides the complete set of variables.
 
-\vfourchange{Despite operating at $1^\circ$ resolution, GraphCast--Mamba achieves better long-lead accuracy than the more computationally demanding $0.25^\circ$ GraphCast model on the common verification grid. The reference uses approximately 16 times as many horizontal grid points, four times as many mesh vertices, and 37 rather than 13 pressure levels, increasing spatial computation and activation-memory requirements. This comparison concerns the specified fixed models on the common verification grid; it does not isolate the effect of resolution or measure skill at native $0.25^\circ$ scales. ENS retains lower RMSE on all 12 diagnostics at day 10.}
+\vfourchange{The higher-resolution reference uses approximately 16 times as many horizontal grid points, four times as many mesh vertices, and 37 rather than 13 pressure levels, increasing spatial computation and activation-memory requirements. This comparison concerns the specified fixed models on the common verification grid; it does not isolate the effect of resolution or measure skill at native $0.25^\circ$ scales. ENS retains lower RMSE on all 12 diagnostics at day 10.}
 \suozhi{\color{blue}I think it is interesting that our GC-Mamba outperforms even the much larger model.}
 
 \begin{figure}[!htbp]
     \centering
-    \vfourgraphic[width=\linewidth]{arxiv_pics/fig5_common_grid_comparison_v4_ci.pdf}
-    \caption{\vfourchange{RMSE relative to matched ECMWF ensemble mean (ENS) on a common $1.5^\circ$ grid for Q700, T2m and U850. Blue: original selected M1 ($1^\circ$); dashed gray: its public GraphCast\_small backbone ($1^\circ$); green: public GraphCast ($0.25^\circ$). Each point uses identical ENS-available dates for all four forecasts (92--105 of 122 candidate starts in 2023). Squared errors are pooled before RMSE; ENS is $100\%$. Shading gives pointwise 95\% paired date-block-bootstrap intervals for fixed checkpoints, not seed variation (Appendix~\ref{app:common_grid}).}}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig5_common_grid_comparison_v4_ci.pdf}
+    \caption{Comparison with higher-resolution GraphCast. From left to right: \vfourchange{700\,hPa specific humidity (Q700)}, $2$\,m temperature (T2m), and 850\,hPa zonal wind (U850). Blue shows \vfourchange{the original selected} GraphCast--Mamba model \vfourchange{M1} at $1^\circ$, dashed gray its \vfourchange{public} GraphCast\vfourchange{\_small} baseline, and green the \vfourchange{public} GraphCast ($0.25^\circ$) reference. Forecasts are verified on a common $1.5^\circ$ grid; RMSE is expressed as a percentage of the ECMWF ensemble \vfourchange{mean} (ENS) reference, with $100\%$ indicating equal error. \vfourchange{Each point uses identical ENS-available dates for all four forecasts (92--105 of 122 candidate starts in 2023). Squared errors are pooled before RMSE. Shading gives pointwise 95\% paired date-block-bootstrap intervals for fixed checkpoints, not seed variation (Appendix~\ref{app:common_grid}).}}
     \label{fig:common_grid_selected}
 \end{figure}
 
-\subsection{\vfourchange{{Temporal memory contributes to forecast skill}}}
+\subsection{Temporal memory contributes \vfourchange{to forecast skill}}
 \label{sec:memory_ablation}
-\vfourchange{The preceding results show that GraphCast--Mamba improves forecasts at longer lead times across the predicted atmospheric state. The correction branch introduces both additional trainable capacity and temporal memory. {To examine the contribution of temporal memory, we compare the selected model with a matched control trained and evaluated with memory reset at every step. We also reset the selected model's memory only during forecasting to measure its dependence on retained state.}}
+The preceding results show that GraphCast--Mamba improves forecasts at longer lead times across the predicted atmospheric state. The correction branch introduces both additional trainable capacity and temporal memory. To \vfourchange{examine} the contribution of temporal memory in the Mamba correction branch, we \vfourchange{compare the selected model with a matched control trained and evaluated with memory reset at every step.}
 
-\vfourchange{Table~\ref{tab:memory_controls} summarizes three policies. The original comparison uses two training runs; the subsequent replication uses five carry-trained runs and one reset-trained run. Policy names specify memory handling during training first and forecasting second. Carry passes the updated SSM state and causal-convolution cache to the next step; reset zeros both before every step. Resetting leaves all learned weights and the two-frame meteorological input in place: the full correction branch still computes a correction, but cannot retain its temporal memory state between calls. Every training segment and independent forecast begins with a zero temporal memory state under all three policies.}
+Table~\ref{tab:memory_controls} summarizes \vfourchange{two} policies obtained from two training runs \vfourchange{in the original SWA comparison}. \vfourchange{The subsequent replication uses five carry-trained runs and one reset-trained run.} Policy names specify memory handling during training first and forecasting second. Carry passes the updated SSM state and causal-convolution cache to the next step; reset zeros both before every step. Resetting leaves all learned weights and the two-frame meteorological input in place: the full correction branch still computes a correction, but cannot retain its temporal memory state between calls. Every training segment and independent forecast begins with a zero temporal memory state under \vfourchange{both} policies.
 
 \begin{table}[!htb]
     \centering
@@ -308,38 +304,79 @@ For each variable and lead, RMSE pools squared physical-unit errors across forec
         Training/forecasting & Training & Forecasting \\
         \midrule
         Carry/carry & $\checkmark$ & $\checkmark$ \\
-        Carry/reset & $\checkmark$ & $\times$ \\
         Reset/reset & $\times$ & $\times$ \\
         \bottomrule
     \end{tabular}
-    \caption{{Memory retained between successive steps: $\checkmark$ denotes retention; $\times$ denotes resetting both the SSM state and causal-convolution cache before every step. Carry/carry and carry/reset share the same trained weights. Reset/reset is trained separately with the same architecture and parameter count.}}
+    \caption{{Memory retained between successive steps: $\checkmark$ denotes retention; $\times$ denotes resetting both the SSM state and causal-convolution cache before every step. Reset/reset is trained separately with the same architecture and parameter count.}}
     \label{tab:memory_controls}
 \end{table}
 
-\vfourchange{{In the original SWA comparison, carry/carry and carry/reset use the selected checkpoint. Reset/reset is trained independently with memory reset in both its 500-update warm-up and 2,000-update main stage. Both training configurations use seven years of data, a $K=20$ feedback-conditioned training tail, inner dimension $d_{\mathrm{inner}}=16$, and the same batch size, optimizer schedule, training seed, and SWA checkpoint indices (Appendix~\ref{app:training_configuration}).} We evaluate all three policies on the same 122 forecast initializations and 40 lead times of Section~\ref{sec:eval_protocol}, using a common GraphCast baseline. {Appendices~\ref{app:training_loss} and~\ref{app:memory_evaluation} describe the loss calculation and paired uncertainty estimates.}}
+The two training runs \vfourchange{in the original SWA comparison} use the same seven-year dataset, architecture, optimizer, and training seed, differing in their training/forecasting memory policy. Both use a training tail of $K=20$ feedback-conditioned steps, inner dimension $d_{\mathrm{inner}}=16$. \vfourchange{Carry/carry uses the selected checkpoint. Reset/reset is trained independently with memory reset in both its 500-update warm-up and 2,000-update main stage. Both configurations use the same batch size, optimizer schedule, and SWA checkpoint indices (Appendix~\ref{app:training_configuration}).} We evaluate \vfourchange{both} policies on the \vfourchange{same 122} forecast initializations and \vfourchange{40} lead times of Section~\ref{sec:eval_protocol}\vfourchange{, using a common GraphCast baseline}. Appendix~\ref{app:training_loss} describes the loss calculation for these controls\vfourchange{; Appendix~\ref{app:memory_evaluation} describes the paired uncertainty estimates}.
 
 \begin{figure}[!htb]
     \centering
-    \vfourgraphic[width=\linewidth]{arxiv_pics/fig6_memory_policies_v4_seeds.pdf}
-    \caption{\vfourchange{Memory-policy comparisons, with a common public GraphCast denominator within each panel. Left: original selected SWA checkpoint and matched SWA reset/reset control, with pointwise 95\% date-block-bootstrap intervals. Right: independent replication using raw main-step 2,000 checkpoints; five carry/carry seeds (thin curves, mean and one sample SD) versus local seed-22 carry/reset and reset/reset controls. Carry/reset shares its carry/carry weights. The right-panel band describes carry/carry seed variation only; reset/reset has one training seed. SWA and raw checkpoints are not mixed within either comparison. Appendix~\ref{app:seed_replication} describes the replication.}}
+    \includegraphics[width=0.8\linewidth]{arxiv_pics/fig6_memory_policies_v4_matched_only.pdf}
+    \caption{\textbf{Comparison of carry/carry and reset/reset memory policies defined in Table~\ref{tab:memory_controls}.} Curves show GraphCast loss reduction relative to \vfourchange{a common public GraphCast baseline within each panel} over ten forecast days. \vfourchange{Left: original selected SWA checkpoint and matched SWA reset/reset control, with pointwise 95\% date-block-bootstrap intervals. Right: independent replication using raw main-step 2,000 checkpoints; five carry/carry seeds (thin curves, mean and one sample SD) versus the local seed-22 reset/reset control. The right-panel band describes carry/carry seed variation only; reset/reset has one training seed. SWA and raw checkpoints are not mixed within either comparison. Appendix~\ref{app:seed_replication} describes the replication.}}
     \label{fig:memory_reset}
 \end{figure}
 
+\vfourchange{In the original matched SWA comparison, day-10 GraphCast loss reductions are $21.66\%$ for carry/carry and $13.64\%$ for reset/reset. The carry/carry advantage is $8.02$ percentage points (pointwise 95\% confidence interval: $7.20$--$9.05$).}
 
-\vfourchange{{Over the full ten-day rollout, carry/carry achieves a $14.42\%$ GraphCast loss reduction, compared with $9.16\%$ for matched reset/reset. The paired advantage is $5.26$ percentage points (pointwise 95\% confidence interval: $4.70$--$5.86$). At day 10, the reductions are $21.66\%$ and $13.64\%$, respectively, a difference of $8.02$ percentage points (pointwise 95\% confidence interval: $7.20$--$9.05$). Figure~\ref{fig:memory_reset} shows all three policies.}}
-
-\vfourchange{{Resetting the selected model's memory only during forecasting (carry/reset) yields $4.57\%$ rollout and $9.62\%$ day-10 loss reduction. Its rollout reduction is $9.85$ percentage points below carry/carry.} This shows that the model uses its temporal memory state, although the drop may partly reflect the mismatch between training and forecasting. {The matched training-policy comparison supports a benefit from persistent memory for this configuration and training realization. These intervals quantify forecast-sample uncertainty for fixed checkpoints, not variation across training seeds.}}
+\vfourchange{Over the full ten-day rollout, carry/carry achieves a $14.42\%$ GraphCast loss reduction, compared with $9.16\%$ for matched reset/reset. The paired advantage is $5.26$ percentage points (pointwise 95\% confidence interval: $4.70$--$5.86$). Figure~\ref{fig:memory_reset} shows both policies. The matched training-policy comparison supports a benefit from persistent memory for this configuration and training realization. These intervals quantify forecast-sample uncertainty for fixed checkpoints, not variation across training seeds.}
 
 \vfourchange{The independent raw-checkpoint replication in Figure~\ref{fig:memory_reset} yields carry/carry reductions of $13.51\%\pm0.42$ percentage points over the rollout and $20.19\%\pm0.71$ percentage points at day 10 (five-seed mean $\pm$ SD). The local reset/reset control yields $9.21\%$ and $13.09\%$, respectively; all five carry/carry seeds exceed this control at both endpoints. This adds replication of correction skill, but the single reset-trained seed does not establish the distribution of the memory-policy contrast across training seeds.}
 
 \FloatBarrier
+\subsection{\vfourred{Smoothing and spectral fidelity}}
+\label{sec:smoothing}
+\vfourred{It is known \citep{lam2023graphcast,subich2025spectral} that improvements in MSE can come at the cost of spatial detail: smoothing can reduce error while weakening small-scale structures. In order to investigate these effects we also examine spatial power spectra of forecast by assessing whether predictions preserve variability across spatial scales.  In particular, we compare the learned correction with an optimally smoothing filter applying to the GraphCast baseline to assess whether similar accuracy gains can be obtained through output smoothing and how the two approaches differ in spectral fidelity.}
+
+\vfourred{Following the filter construction in \citet[Supplementary Section~7.4.2]{lam2023graphcast}, we transform GraphCast forecasts into spherical harmonics and fit one multiplicative gain per forecast lead, variable/pressure level and total wavenumber. The gains minimize coefficient-domain squared error on 32 development initializations from 2022. We freeze them before evaluation and filter only the reported outputs, leaving autoregressive feedback unchanged. ``Optimal'' refers to this fitted linear filter family. We compare raw GraphCast, GraphCast plus the optimal filter, carry/carry (M1) and matched reset/reset on the same fixed 36 initializations from January--April 2023. Both correction models retain their original unfiltered outputs.}
+
+\vfourred{Figure~\ref{fig:smoothing_spectra} shows the spectral amplitude ratio (the square root of forecast-to-ERA5 power) and coherence at days 5 and 10. Coherence measures pattern agreement separately from amplitude \citep{subich2025spectral}. Table~\ref{tab:smoothing_scores} reports exact GraphCast-weighted MSE and aggregate power mismatch as percentages of raw GraphCast over the rollout and at days 5 and 10 ($100\%$ denotes the baseline; lower is better). Power mismatch averages the absolute relative departure from ERA5 power across channels and wavenumbers; Appendix~\ref{app:smoothing} defines the metrics and provides the filtering equations, per-variable spectra and numerical details. These fixed-checkpoint diagnostics are separate from the principal 122-date memory comparison.}
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig7_smoothing_day5_day10_v4_matched36.pdf}
+    \caption{\vfourred{Amplitude ratio (top) and coherence (bottom) at day 5 (left) and day 10 (right) for the four predictors on the fixed 36-date cohort. An amplitude ratio of one denotes power matching; coherence measures normalized cross-power. Channel-wise ratios are formed after pooling dates and averaged with GraphCast variable/pressure weights. Positive output-filter gains preserve GraphCast coherence; complementary dashes retain both curves. Appendix~\ref{app:smoothing} gives the definitions and the effect of negative gains.}}
+    \label{fig:smoothing_spectra}
+\end{figure}
+
+\vfourred{The day-5 comparison supports the proposed architecture: carry/carry has $2.84\%$ lower MSE than reset/reset, with $0.50$ percentage points higher aggregate power mismatch ($68.66\%$ versus $68.16\%$). It also improves on filtered GraphCast in both MSE and power mismatch. Over the full rollout, carry/carry retains $4.25\%$ lower MSE than filtered GraphCast, with power mismatch $67.14\%$ versus $78.28\%$. Thus the tested output filter does not reproduce the correction's accuracy--spectral-fidelity performance. Raw GraphCast retains closer aggregate power matching than either correction model.}
+
+\vfourred{By day 10, all four forecasts have substantially larger absolute errors and reduced spectral coherence compared with day 5 (Figure~\ref{fig:smoothing_spectra}; Appendix~\ref{app:smoothing_features}); carry/carry's MSE, for example, rises from $7.83$ to $23.50$. Its $10.20\%$ MSE advantage over reset/reset at day 10 accompanies a larger power-mismatch difference ($84.47\%$ versus $75.74\%$). This longer lead extends beyond the five-day feedback-conditioned training tail. The day-5 result therefore provides the clearest support for an accuracy gain with a small aggregate spectral cost; the day-10 results document a more degraded forecasting regime and do not establish a uniformly better tradeoff than reset/reset.}
+
+\begin{table}[!htbp]
+    \centering
+    \begingroup\color{red}\small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{lrrrrrr}
+        \toprule
+        \multicolumn{7}{c}{Relative error (\%; raw GraphCast = 100) $\downarrow$} \\
+        \addlinespace[2pt]
+        & \multicolumn{2}{c}{Ten-day rollout} & \multicolumn{2}{c}{Day 5} & \multicolumn{2}{c}{Day 10} \\
+        \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+        Forecast & \shortstack{Relative\\MSE} & \shortstack{Relative\\power\\mismatch} & \shortstack{Relative\\MSE} & \shortstack{Relative\\power\\mismatch} & \shortstack{Relative\\MSE} & \shortstack{Relative\\power\\mismatch} \\
+        \midrule
+        Raw GraphCast & 100.00 & 100.00 & 100.00 & 100.00 & 100.00 & 100.00 \\
+        GraphCast + optimal filter & 88.66 & 133.60 & 95.84 & 136.09 & 81.02 & 142.35 \\
+        Carry/carry (M1) & 84.90 & 114.59 & 93.95 & 113.65 & 76.58 & 130.61 \\
+        Reset/reset & 90.33 & 111.65 & 96.70 & 112.83 & 85.28 & 117.11 \\
+        \bottomrule
+    \end{tabular}
+    \endgroup
+    \caption{\vfourred{Relative errors on the fixed 36-date cohort, expressed as percentages of raw GraphCast: $100L/L_{\mathrm{GC}}$ for exact GraphCast MSE and $100D_P/D_{P,\mathrm{GC}}$ for aggregate power mismatch. Raw GraphCast is $100\%$ in every column; lower is better. Rollout scores pool all forty leads. The two metrics are normalized separately and measure distinct quantities; both correction models are unfiltered. Appendix~\ref{app:smoothing} defines $D_P$ and the evaluation procedure. Values are fixed-checkpoint point estimates.}}
+    \label{tab:smoothing_scores}
+\end{table}
+
+\FloatBarrier
 \section{Conclusion}
 
-\vfourchange{Our results show that a small correction branch with persistent temporal memory can improve forecasts from a frozen pretrained weather model at longer forecast lead times. {Five independent retrainings reproduce the correction benefit. The matched reset-trained control supports a memory benefit for the tested configuration and training realization, while inference-time reset demonstrates dependence on retained history.} This suggests that compact temporal extensions offer a promising way to improve existing forecasters with limited additional training. How this benefit depends on spatial resolution and the choice of backbone remains an open question.}
+Our results show that a small correction branch with persistent temporal memory can improve forecasts from a frozen pretrained weather model at longer forecast lead times. \vfourchange{Five independent retrainings reproduce the correction benefit. The matched reset-trained control supports a memory benefit for the tested configuration and training realization.} This suggests that compact temporal extensions offer a promising way to improve existing forecasters with limited additional training. How this benefit depends on spatial resolution and the choice of backbone remains an open question.
 
 \vfourchange{{\textbf{Limitations.} Our results show that non-Markovian memory can improve forecasts from a frozen Markovian backbone. This suggests the possibility of jointly learning the forecasting dynamics and temporal memory within a native model. However, autoregressive training introduces sequential dependencies between forecast steps, limiting temporal parallelism and opportunities for batching and data reuse. Backpropagation through long rollouts also requires storing or recomputing intermediate activations, making efficient computation and memory access central challenges for joint training of the full model. To keep training tractable, our study restricts learning to a correction branch attached to a frozen pretrained forecaster.
 
-A separate direction concerns high spatial frequencies. At fixed resolution, dynamically important unresolved scales may increase the value of temporal history, as suggested by the PDE studies discussed in the introduction. Regimes with substantial high-frequency content could therefore provide a more sensitive probe of non-Markovian memory. Our aggregate loss and RMSE metrics do not establish whether memory improves fine-scale predictions or reduces excessive smoothing; this requires evaluating scale-dependent forecast errors and spatial-gradient statistics.}}
+\vfourred{Lower aggregate forecast error does not by itself establish recovery of fine-scale variability. Section~\ref{sec:smoothing} and Appendix~\ref{app:smoothing} examine the associated power-spectrum changes and the scope of the filtering and memory comparisons.}}}
 \FloatBarrier
 
 
@@ -394,7 +431,7 @@ We initialize the Mamba correction branch from the frozen GraphCast backbone che
 
 \vfourchange{The reported model uses two optimization stages. The first stage, called the 500-update warm-up in the main text, linearly increases the learning rate from zero to $10^{-4}$ over its first 50 updates and then holds it constant. Spatial and Mamba parameters use the same learning rate during this stage. The second stage transfers the learned correction weights and starts a fresh optimizer for 2,000 further updates, resetting the random-number generator, temporal memory, and data cursor. Its spatial learning rate ramps from zero to $10^{-4}$ over 50 updates and then follows cosine decay toward $10^{-5}$ over the remaining 1,950 updates. The Mamba learning rate is three times the spatial learning rate throughout this second stage.}
 
-\vfourchange{Both stages use AdamW with moments $(0.9,0.98)$, weight decay $10^{-4}$ applied to all trainable correction parameters, global gradient-norm clipping at 1, and random seed 22. Model computation uses bfloat16, with float32 meteorological fields and temporal-state boundaries. The configuration uses spatial width 512, inner dimension 16, and one $B,C$ group. The evaluated model averages the parameters saved at second-stage updates 500, 1,000, 1,500, and 2,000 using SWA; these are the post-warm-up checkpoint indices used elsewhere in the paper.}
+\vfourchange{Both stages use AdamW with moments $(0.9,0.98)$, weight decay $10^{-4}$ applied to all trainable correction parameters, global gradient-norm clipping at 1, and random seed 22. Model computation uses bfloat16, with float32 meteorological fields and temporal-state boundaries.} The configuration uses spatial width 512, inner dimension 16, and one $B,C$ group. \vfourchange{The evaluated model averages the parameters saved at second-stage updates 500, 1,000, 1,500, and 2,000 using SWA; these are the post-warm-up checkpoint indices used elsewhere in the paper.}
 
 \paragraph{\vfourchange{Matched reset-training control.}}
 
@@ -415,16 +452,16 @@ The per-step loss in Equation~\ref{eq:training_objective} is the {GraphCast loss
 Here $N_{\mathrm{g}}$ is the number of grid points and $L_v$ is the number of levels for variable $v$. The scales $\sigma_{v,\ell}$ are GraphCast's standard deviations of six-hour differences. The latitude weights $a_i$ have unit mean and include the pole-cell correction. For upper-air variables, $q_{v,\ell}=p_\ell/\overline{p}$ weights levels in proportion to pressure; surface variables have $L_v=1$ and $q_{v,1}=1$. The variable weights $\lambda_v$ are 1 for upper-air variables and $2$\,m temperature, and 0.1 for the two $10$\,m wind components, mean sea-level pressure, and six-hour accumulated precipitation.
 
 \paragraph{{Evaluation variants.}}
-\vfourchange{We use GraphCast loss as the common label for the weighted MSE diagnostics. {The principal results and updated 2023 memory comparisons evaluate Equation~\ref{eq:training_gc_loss} directly. Memory-policy comparisons use a common GraphCast baseline within each comparison, whereas Figure~\ref{fig:res1_forecast} uses each seed's paired baseline.} {The closed-loop training-tail sweep reconstructs it from channel RMSEs using per-level normalization and pressure weights, without the pole-cell correction.} The archived open-loop sweep instead uses variable-group RMSEs and level-averaged normalization scales. These reconstructions therefore approximate the loss above.}
+We use GraphCast loss as the common label for the weighted MSE diagnostics. The principal results \vfourchange{and updated 2023 memory comparisons} evaluate Equation~\ref{eq:training_gc_loss} directly. \vfourchange{Memory-policy comparisons use a common GraphCast baseline within each comparison, whereas Figure~\ref{fig:res1_forecast} uses each seed's paired baseline.} The closed-loop training-tail sweep \vfourchange{reconstructs} it from channel RMSEs using per-level normalization and pressure weights, without the pole-cell correction. The archived open-loop sweep instead uses variable-group RMSEs and level-averaged normalization scales. These reconstructions therefore approximate the loss above.
 
 \subsection{\vfourchange{Memory-control evaluation and uncertainty}}
 \label{app:memory_evaluation}
 
-\vfourchange{The original matched SWA comparison reuses the original frozen evaluator, initialization manifest, input data, and normalization statistics. Carry/carry and carry/reset reuse their original forecast files. All three policies start with zero temporal memory, feed back their full corrected forecasts, and are scored on the same 122 initializations and 40 six-hour leads; late-December forecasts use verifying ERA5 states through 9 January 2024. All loss reductions in this comparison use the original carry/carry evaluation's uncorrected GraphCast trajectory as their common denominator, pooling losses before computing ratios. The independent raw-checkpoint replication is specified separately below.}
+\vfourchange{The original matched SWA comparison reuses the original frozen evaluator, initialization manifest, input data, and normalization statistics. Carry/carry reuses its original forecast files. Both policies start with zero temporal memory, feed back their full corrected forecasts, and are scored on the same 122 initializations and 40 six-hour leads; late-December forecasts use verifying ERA5 states through 9 January 2024. All loss reductions in this comparison use the original carry/carry evaluation's uncorrected GraphCast trajectory as their common denominator, pooling losses before computing ratios. The independent raw-checkpoint replication is specified separately below.}
 
 \vfourchange{The carry/carry versus matched reset/reset rollout contrast is a separate planned analysis added after the original selected-model evaluation; it is not part of that evaluation's original confirmatory endpoint family. Day 10 is a secondary endpoint. We resample complete paired forecasts using 10,000 non-wrapping block-bootstrap draws with seed 20260916 and blocks of five consecutive initialization positions (12 elapsed days). Intervals for reductions, contrasts, and leadwise curves are pointwise 95\% intervals, conditional on the fixed checkpoints and the 2023 sample. They do not measure training-seed or between-year variation, or establish simultaneous significance across leads.}
 
-\vfourchange{The positive rollout contrast persists with three-start and seven-start blocks, resampling within calendar quarters, and exclusion of the three previously exposed pilot initializations present in this sample (15 February, 15 July, and 15 November 2023, all at 00\,UTC). The latter retains 119 starts and gives $5.27$ percentage points (95\% interval: $4.70$--$5.90$); excluded dates are masked after resampling on the original regular grid. This sensitivity does not remove prior test-year exposure or overlap between forecast windows. Non-wrapping blocks underweight boundary dates, and quarter-wise resampling breaks dependence across quarter boundaries.}
+\vfourchange{The positive rollout contrast persists with three-start and seven-start blocks and with resampling within calendar quarters. These checks do not remove dependence from overlapping forecast windows. Non-wrapping blocks underweight boundary dates, and quarter-wise resampling breaks dependence across quarter boundaries.}
 
 \vfourchange{Repeated uncorrected GraphCast evaluations differ numerically. For reset/reset, the pooled baseline loss differs by $0.0872\%$ from the common baseline, with a largest initialization/lead difference of $4.39\%$. Using each policy's own repeated baseline instead gives a carry/carry versus reset/reset rollout contrast of $5.34$ percentage points (95\% interval: $4.78$--$5.95$), preserving the conclusion. The reported main estimates consistently use the common baseline.}
 
@@ -462,7 +499,7 @@ Here $N_{\mathrm{g}}$ is the number of grid points and $L_v$ is the number of le
 
 \vfourchange{For Figure~\ref{fig:res1_forecast}, we first pool loss or physical-unit squared error over forecast dates within each seed, then compute reductions and RMSE. We report the arithmetic mean and sample standard deviation ($n-1$ denominator) of the resulting five scores at each lead. The same operation applies to the rollout-level loss ratio in Equation~\ref{eq:v3_loss_reduction}. Each seed uses its own repeated public-backbone baseline; thus finite baseline repeatability also contributes to these observed score differences. The band describes variation across training realizations on a fixed year, not date-sampling uncertainty, a confidence interval for the mean, or a forecast ensemble. The export contains exact loss and T2m MSE only; variable-group and common-grid results remain single-checkpoint analyses.}
 
-\vfourchange{For the local memory comparison in Figure~\ref{fig:memory_reset}, all arms instead use raw main-stage update-2,000 checkpoints and the public-backbone trajectory from local carry/carry seed 22 as a common denominator. Carry/reset uses that seed's trained weights and resets only during forecasting. Reset/reset has its own reset-trained warm-up and main stage, matching the carry-trained configuration except for temporal-state handling. The five carry/carry runs yield rollout reduction $13.51\%\pm0.42$ percentage points and day-10 reduction $20.19\%\pm0.71$ percentage points. Local carry/reset yields $1.51\%$ and $8.60\%$; reset/reset yields $9.21\%$ and $13.09\%$. Only carry/carry has five training seeds: this is not a five-seed paired comparison of memory policies. No SWA carry result is contrasted with a raw reset control.}
+\vfourchange{For the local memory comparison in Figure~\ref{fig:memory_reset}, all arms instead use raw main-stage update-2,000 checkpoints and the public-backbone trajectory from local carry/carry seed 22 as a common denominator. Reset/reset has its own reset-trained warm-up and main stage, matching the carry-trained configuration except for temporal-state handling. The five carry/carry runs yield rollout reduction $13.51\%\pm0.42$ percentage points and day-10 reduction $20.19\%\pm0.71$ percentage points. Local reset/reset yields $9.21\%$ and $13.09\%$. Only carry/carry has five training seeds: this is not a five-seed paired comparison of memory policies. No SWA carry result is contrasted with a raw reset control.}
 
 \subsection{\texorpdfstring{{Mamba capacity and learning-rate selection}}{Mamba capacity and learning-rate selection}}
 \label{sec:training_sensitivity}
@@ -473,7 +510,7 @@ Here $N_{\mathrm{g}}$ is the number of grid points and $L_v$ is the number of le
 
 \begin{table}[!htbp]
     \centering
-    \caption{\vfourchange{{Mamba capacity and learning-rate comparison at $1^\circ$. Entries are {GraphCast loss} reductions (\%) on the 32 forecast initializations from the 2022 development set; bold marks the largest value in each metric column. The multiplier applies only to Mamba parameters, with the spatial learning rate fixed. All six configurations use the same training schedule and SWA window.}}}
+    \caption{Mamba capacity and learning-rate comparison at $1^\circ$. Entries are {GraphCast loss} reductions (\%) on the \vfourchange{32 forecast initializations from the 2022 development set}; bold marks the largest value in each metric column. The multiplier applies only to Mamba parameters, with the spatial learning rate fixed. All six configurations use the same training schedule and SWA window.}
     \label{tab:lr_sensitivity}
     \small
     \begin{tabular}{rrrr}
@@ -512,14 +549,14 @@ Day-10 reductions for the 22 completed selected SWA configurations range from $1
 \end{samepage}
 
 \paragraph{Training methods and model selection.}
-\vfourchange{{{Table~\ref{tab:lr_sensitivity} reports all six SWA configurations from the Mamba capacity and learning-rate comparison.} The original selected M1 uses the dimension-16, $3\times$ Mamba learning-rate SWA configuration, which has the largest aggregate and day-10 {GraphCast loss} reductions on the 2022 development sample among the completed SWA configurations in the reported optimizer and learning-rate studies.} {This checkpoint is fixed for the 2023 evaluation; Figure~\ref{fig:res1_forecast} reports five subsequent retrainings of this fixed configuration.}}
+Table~\ref{tab:lr_sensitivity} reports all six SWA configurations from the Mamba capacity and learning-rate comparison. \vfourchange{The original selected M1 uses} the dimension-16, $3\times$ Mamba learning-rate SWA configuration, which has the largest aggregate and day-10 {GraphCast loss} reductions \vfourchange{on the 2022 development sample} among the completed SWA configurations in the reported optimizer and learning-rate studies. \vfourchange{This checkpoint is fixed for the 2023 evaluation; Figure~\ref{fig:res1_forecast} reports five subsequent retrainings of this fixed configuration.}
 
-\vfourchange{{{In the optimizer study, each run screens periodic checkpoints and three SWA windows on eight forecast initializations.} The selected checkpoint and SWA are then evaluated on the 32 forecast initializations from the 2022 development set.}}
+In the optimizer study, each run screens periodic checkpoints and three SWA windows on eight forecast initializations. The selected checkpoint and SWA are then evaluated on the \vfourchange{32 forecast initializations from the 2022 development set}.
 
 \subsection{Variable-group RMSE}
 \label{app:variable_group_rmse}
 
-\vfourchange{Table~\ref{tab:variable_group_rmse} provides the numerical results underlying Figure~\ref{fig:breadth_7yr} at selected forecast leads. {It uses the original selected seven-year correction and its paired GraphCast baseline on the 122 forecast initializations in 2023, evaluated on the native $1^\circ$ grid as described in Section~\ref{sec:eval_protocol}.}}
+Table~\ref{tab:variable_group_rmse} provides the numerical results underlying Figure~\ref{fig:breadth_7yr} at selected forecast leads. It uses the \vfourchange{original selected} seven-year correction and its paired GraphCast baseline on the \vfourchange{122 forecast initializations in 2023}, evaluated on the native $1^\circ$ grid as described in Section~\ref{sec:eval_protocol}.
 
 \begin{table}[!htbp]
     \centering
@@ -533,7 +570,7 @@ Day-10 reductions for the 22 completed selected SWA configurations range from $1
         \midrule
         \multicolumn{6}{@{}l}{\textit{Upper-air variables (13 pressure levels)}} \\
         Geopotential [m$^2$\,s$^{-2}$] & \vfourchange{{784.41}} & \vfourchange{{703.68}} & \vfourchange{{1.24}} & \vfourchange{{5.22}} & \vfourchange{{10.29}} \\
-        Temperature [K] & \vfourchange{{3.10}} & \vfourchange{{2.79}} & \vfourchange{{2.11}} & \vfourchange{{5.98}} & \vfourchange{{10.07}} \\
+        Temperature [K] & 3.10 & \vfourchange{{2.79}} & \vfourchange{{2.11}} & \vfourchange{{5.98}} & \vfourchange{{10.07}} \\
         Specific humidity [g\,kg$^{-1}$] & \vfourchange{{1.10}} & \vfourchange{{0.97}} & \vfourchange{{4.33}} & \vfourchange{{7.88}} & \vfourchange{{11.68}} \\
         Zonal wind [m\,s$^{-1}$] & \vfourchange{{8.67}} & \vfourchange{{7.63}} & \vfourchange{{2.76}} & \vfourchange{{7.19}} & \vfourchange{{11.94}} \\
         Meridional wind [m\,s$^{-1}$] & \vfourchange{{9.05}} & \vfourchange{{7.85}} & \vfourchange{{2.78}} & \vfourchange{{7.22}} & \vfourchange{{13.23}} \\
@@ -547,7 +584,7 @@ Day-10 reductions for the 22 completed selected SWA configurations range from $1
         \shortstack[l]{$6$\,h accumulated\\precipitation [mm]} & \vfourchange{{2.69}} & \vfourchange{{2.47}} & \vfourchange{{2.96}} & \vfourchange{{5.57}} & \vfourchange{{8.36}} \\
         \bottomrule
     \end{tabular}
-    \caption{\vfourchange{Physical-unit RMSE and relative RMSE reduction for the original selected GraphCast--Mamba checkpoint; these are not five-seed averages. Days 5, 7, and 10 denote leads of 120, 168, and 240\,h. RMSE pools cosine-latitude-weighted squared errors across forecast initializations and, for upper-air groups, equally across 13 pressure levels before taking the square root. Each reduction is $100(1-\mathrm{RMSE}_{\mathrm{model}}/\mathrm{RMSE}_{\mathrm{GC}})$, computed before rounding. Positive values indicate lower RMSE; these percentages are distinct from GraphCast loss reductions.}}
+    \caption{Physical-unit RMSE and relative RMSE reduction for the \vfourchange{original selected} GraphCast--Mamba \vfourchange{checkpoint; these are not five-seed averages}. Days 5, 7, and 10 denote leads of 120, 168, and 240\,h. RMSE pools cosine-latitude-weighted squared errors across forecast initializations and, for upper-air groups, equally across 13 pressure levels before taking the square root. Each reduction is $100(1-\mathrm{RMSE}_{\mathrm{model}}/\mathrm{RMSE}_{\mathrm{GC}})$, computed before rounding. Positive values indicate lower RMSE; these percentages are distinct from GraphCast loss reductions.}
     \label{tab:variable_group_rmse}
 \end{table}
 
@@ -590,12 +627,12 @@ Day-10 reductions for the 22 completed selected SWA configurations range from $1
 
 We examine how forecast skill depends on the training tail length $K$ under two input-feedback policies. Each 24-step training window begins with a \emph{teacher-forced prefix}: the model receives ERA5 states as meteorological inputs while updating and retaining its temporal memory. For $K>1$, the final $K$ steps instead use forecast feedback, leaving $24-K$ teacher-forced steps. The label $K=1$ denotes fully teacher-forced training, with ERA5 inputs at every step. We evaluate the resulting models over 40 six-hour forecast steps (ten days) and report {GraphCast loss} reduction relative to GraphCast; positive values indicate improved forecast skill.
 
-\subsection{\vfourchange{{Closed-loop training}}}
+\subsection{Closed-loop training}
 In \emph{closed-loop training}, the corrected GraphCast--Mamba forecast supplies the next meteorological input during the training tail. The learned correction therefore affects both the current prediction and the inputs encountered at subsequent steps. Figure~\ref{fig:training_horizon_closed_loop} compares models trained with different $K$, showing how the duration of this feedback changes forecast skill.
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{arxiv_pics/fig7_training_horizon_closed_loop.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig8_training_horizon_closed_loop_v4.pdf}
     \caption{Forecast skill after closed-loop training with different training tail lengths $K$. During the tail, corrected GraphCast--Mamba predictions supply subsequent inputs. Each curve shows {GraphCast loss} reduction relative to GraphCast over ten forecast days; positive values indicate improvement. {The vertical dashed line marks $20\times6=120$\,h (5 days), the training tail duration for $K=20$. Gains for this model persist beyond its training tail to day 10, twice that duration.}}
     \label{fig:training_horizon_closed_loop}
 \end{figure}
@@ -610,7 +647,7 @@ In our experiments, training with this teacher-forced prefix and a tail independ
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{arxiv_pics/fig8_training_horizon_open_loop.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig9_training_horizon_open_loop_v4.pdf}
     \caption{Forecast skill after open-loop training with a teacher-forced prefix and different training tail lengths $K$. During the tail, uncorrected GraphCast forecasts supply subsequent inputs. {GraphCast loss} reduction exhibits a pronounced crossover, with substantially larger long-lead gains for $K\geq18$. {The vertical dashed line marks $20\times6=120$\,h (5 days), the training tail duration for $K=20$; this model retains positive gains beyond that duration, up to day 10.} This figure and Figure~\ref{fig:training_horizon_closed_loop} use the same vertical scale but compare separate sweeps with different experimental settings and loss reconstructions (Appendix~\ref{app:training_loss}).}
     \label{fig:training_horizon_open_loop}
 \end{figure}
@@ -624,8 +661,8 @@ This crossover raises an interesting question about how temporal memory, trainin
 \label{app:common_grid}
 \begin{figure}[!t]
     \centering
-    \vfourgraphic[width=\linewidth]{arxiv_pics/fig9_common_grid_all_variables_v4_ci.pdf}
-    \caption{\vfourchange{The comparison in Figure~\ref{fig:common_grid_selected} extended to 12 diagnostics. Blue shows the selected GraphCast--Mamba model M1 ($1^\circ$), dashed gray its public GraphCast\_small backbone ($1^\circ$), and green the public GraphCast checkpoint ($0.25^\circ$). Z denotes geopotential, T temperature, Q specific humidity, U zonal wind, and V meridional wind; a three-digit suffix gives pressure in hPa. T2m denotes $2$\,m temperature, U10 and V10 the $10$\,m wind components, and MSL mean sea-level pressure. All four forecasts use identical dates and ERA5 truth at each diagnostic and lead on the $1.5^\circ$ grid; the available date set varies across points (91--108 starts). Curves show pooled RMSE as a percentage of the matched ENS-mean RMSE, with ENS at $100\%$. Shading gives pointwise 95\% date-block-bootstrap intervals, conditional on the fixed checkpoints.}}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig10_common_grid_all_variables_v4_ci.pdf}
+    \caption{\vfourchange{The comparison in Figure~\ref{fig:common_grid_selected} extended to 12 diagnostics. Blue shows the selected \mbox{GraphCast--Mamba} model M1 ($1^\circ$), dashed gray its public GraphCast\_small backbone ($1^\circ$), and green the public GraphCast checkpoint ($0.25^\circ$). Z denotes geopotential, T temperature, Q specific humidity, U zonal wind, and V meridional wind; a three-digit suffix gives pressure in hPa. T2m denotes $2$\,m temperature, U10 and V10 the $10$\,m wind components, and MSL mean sea-level pressure. All four forecasts use identical dates and ERA5 truth at each diagnostic and lead on the $1.5^\circ$ grid; the available date set varies across points (91--108 starts). Curves show pooled RMSE as a percentage of the matched ENS-mean RMSE, with ENS at $100\%$. Shading gives pointwise 95\% date-block-bootstrap intervals, conditional on the fixed checkpoints.}}
     \label{fig:res1_all_variables}
 \end{figure}
 
@@ -636,7 +673,7 @@ This crossover raises an interesting question about how temporal memory, trainin
 \vfourchange{Each forecast receives observed ERA5 states at $-6$ and $0$\,h, then advances through 40 six-hour leads from 6 to 240\,h using its own forecast feedback. Time-varying $0.25^\circ$ ERA5 inputs are subsampled to $1^\circ$ for GraphCast\_small and M1 and restricted to their 13 pressure levels; these models retain static fields from their existing training and evaluation store. M1 begins each forecast with zero temporal memory and feeds back its full corrected prediction. Network inference uses bfloat16, with physical fields and state boundaries in float32.}
 
 \paragraph{\vfourchange{Dates and ENS reference.}}
-\vfourchange{The candidate sample consists of 122 initializations at 00\,UTC every third day from 1 January through 30 December 2023, with verification extending through 9 January 2024. The evaluation protocol records earlier numerical-pilot exposure, including three candidate starts (15 February, 15 July and 15 November); no checkpoint selection used this comparison. ENS denotes the ECMWF IFS ensemble-mean forecast distributed by WeatherBench~2 on its conservative $121\times240$ grid. We use available 2023 forecasts from the extended 2016--2024 store.\footnote{\raggedright The ENS stores under \url{gs://weatherbench2/datasets/ifs_ens/} are \path{2016-2024-240x121_equiangular_with_poles_conservative_mean.zarr} (forecast source) and \path{2018-2022-240x121_equiangular_with_poles_conservative_mean.zarr} (layout reference).} Missing metadata and coordinate arrays were reconstructed from the complete 2018--2022 sibling store, with decoding checked against 71 overlapping forecast chunks. Missing forecast chunks remain unavailable.}
+\vfourchange{The candidate sample consists of 122 initializations at 00\,UTC every third day from 1 January through 30 December 2023, with verification extending through 9 January 2024. ENS denotes the ECMWF IFS ensemble-mean forecast distributed by WeatherBench~2 on its conservative $121\times240$ grid. We use available 2023 forecasts from the extended 2016--2024 store.\footnote{\raggedright The ENS stores under \url{gs://weatherbench2/datasets/ifs_ens/} are \path{2016-2024-240x121_equiangular_with_poles_conservative_mean.zarr} (forecast source) and \path{2018-2022-240x121_equiangular_with_poles_conservative_mean.zarr} (layout reference).} Missing metadata and coordinate arrays were reconstructed from the complete 2018--2022 sibling store, with decoding checked against 71 overlapping forecast chunks. Missing forecast chunks remain unavailable.}
 
 \vfourchange{At each diagnostic and lead, we retain exactly the same ENS-available initializations for all four forecasts. This gives 91--108 starts per point across the 12 diagnostics (92--105 in Figure~\ref{fig:common_grid_selected}), with 46,930 initialization--lead--diagnostic combinations per model. The matched date set can vary between diagnostics and leads; there is no single complete subset underlying every point. Selection depends only on forecast availability, not errors. Availability masks and the full candidate manifest accompany the figures.}
 
@@ -686,7 +723,7 @@ To complement the aggregate seven-year results in Section~\ref{sec:numerical}, F
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{arxiv_pics/fig10_city_forecasts.pdf}
+    \includegraphics[width=\linewidth]{arxiv_pics/fig11_city_forecasts_v4.pdf}
     \caption{{Ten-day forecasts from 00\,UTC on 15 January 2022 at the $1^\circ$ grid points nearest Paris ($49^\circ$N, $2^\circ$E; left) and New York City ($41^\circ$N, $74^\circ$W; right).
     From top to bottom, rows show $2$\,m temperature (T2m), $850$\,hPa zonal wind (U850), and $6$\,h accumulated precipitation in physical units.
     ERA5 is shown in black, the frozen GraphCast forecast in dashed orange, and the GraphCast--Mamba forecast in blue.
@@ -696,5 +733,122 @@ To complement the aggregate seven-year results in Section~\ref{sec:numerical}, F
     \label{fig:city_traces_jan}
 \end{figure}
 
+
+\clearpage
+\begingroup\color{red}
+\section{\vfourred{Smoothing controls and scale-dependent diagnostics}}
+\label{app:smoothing}
+
+\vfourred{This appendix provides the filtering method, metric definitions and detailed diagnostics supporting Section~\ref{sec:smoothing}. Figure~\ref{fig:smoothing_spectra} and Table~\ref{tab:smoothing_scores} in the main text summarize day-5 and day-10 spectra and the four-model accuracy--power comparison; the results below use the same fixed 36-date cohort.}
+
+\paragraph{\vfourred{Purpose of the controls and evaluation setup.}}
+\vfourred{To distinguish gains attainable through output smoothing from those associated with persistent memory, we compare raw GraphCast, development-filtered GraphCast, carry/carry (M1), and matched reset/reset. Raw GraphCast provides the uncorrected baseline; its filtered output tests what the fitted linear filter can achieve through postprocessing alone. Comparing carry/carry with this filtered baseline tests whether the learned correction offers an advantage over the smoothing control. Comparing carry/carry with the separately trained reset/reset model assesses the benefit of retaining memory during training and forecasting, with the architecture and parameter count held fixed.}
+
+\vfourred{The two correction models use the original selected M1 SWA checkpoint and the matched reset/reset SWA checkpoint. All tables and plots use a fixed diagnostic cohort of 36 initializations, every third day at 00\,UTC from 1 January to 16 April 2023, evaluated at 40 six-hour leads. This interim cohort contains completed spectral outputs for every predictor; its data and figure sources are retained as a separate snapshot from subsequent extensions. The GraphCast filter is fitted on the established 32 development initializations in 2022. Each model produces its own autoregressive trajectory; filtering changes only GraphCast's reported output, never the input to the next forecast step. Carry/carry and reset/reset are shown without output filtering or amplitude rescaling. These fixed-checkpoint diagnostics are separate from the principal 122-date evaluation and the five retrainings in Figure~\ref{fig:res1_forecast}.}
+
+\paragraph{\vfourred{Accuracy after output filtering.}}
+\vfourred{On these 36 dates, carry/carry has $4.25\%$ lower ten-day exact GraphCast loss than filtered GraphCast (Figure~\ref{fig:smoothing_accuracy}). Its aggregate relative power mismatch is also lower, $67.14\%$ versus $78.28\%$. Thus carry/carry improves both measured scores relative to this filtered baseline on the diagnostic cohort. Raw GraphCast retains lower power mismatch, $58.59\%$, alongside higher forecast loss. Table~\ref{tab:smoothing_scores} reports both scores as percentages of raw GraphCast over the rollout and at days 5 and 10 ($100\%$ denotes the baseline; lower is better). These point estimates concern fixed checkpoints and the tested filter family; they do not identify what fraction of the correction benefit is caused by smoothing. The comparison with reset/reset is discussed separately in Appendix~\ref{app:smoothing_reset}.}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig12_smoothing_loss_v4_matched36.pdf}
+    \caption{\vfourred{Exact native-grid GraphCast loss for raw GraphCast, filtered GraphCast, carry/carry (M1) and reset/reset on 36 matched 2023 initializations. Each forecast follows its own unfiltered feedback trajectory. All losses use identical dates and leads. The five-day marker denotes the feedback-conditioned training-tail length. Curves are fixed-checkpoint point estimates without confidence bands.}}
+    \label{fig:smoothing_accuracy}
+\end{figure}
+
+\paragraph{\vfourred{Scale-dependent comparison.}}
+\vfourred{Following the amplitude/coherence diagnostics of \citet{subich2025spectral}, Figure~\ref{fig:smoothing_spectra} separates power matching from pattern agreement. M1 often attenuates more power than raw GraphCast, with comparatively modest coherence changes; the effect varies across variables and scales (Appendix~\ref{app:smoothing_features}). This is consistent with amplitude adjustment contributing to its accuracy gains, while the filtering comparison demonstrates a remaining advantage over the tested postprocessing baseline. The matched training-policy experiment in Section~\ref{sec:memory_ablation} separately supports a contribution from persistent memory; Appendix~\ref{app:smoothing_reset} shows the original carry/carry and reset/reset spectra on their common diagnostic dates.}
+
+\paragraph{\vfourred{Degree-wise least-squares output filter.}}
+\vfourred{We follow the filtering construction in Supplementary Section~7.4.2 of \citet{lam2023graphcast}, using the normalized spherical analysis/synthesis at our $1^\circ$ resolution and maximum degree $L=179$. Let $\widehat f_{s,c,k,\ell m}$ and $\widehat y_{s,c,k,\ell m}$ denote forecast and ERA5 coefficients for initialization $s$, channel $c$, forecast lead $k$, degree $\ell$ and order $m$. The development-fitted real gain is}
+\vfourred{\begin{equation}
+g_{c,k,\ell}=
+\frac{\sum_{s\in\mathrm{dev}}\sum_m
+       \operatorname{Re}(\widehat f_{s,c,k,\ell m}\widehat y_{s,c,k,\ell m}^{\,*})}
+     {\sum_{s\in\mathrm{dev}}\sum_m |\widehat f_{s,c,k,\ell m}|^2}.
+\label{eq:spectral_filter}
+\end{equation}}
+\vfourred{A separate gain is fitted for GraphCast at each lead, variable/pressure channel and degree, including degree zero. Gains are unrestricted real values: attenuation, amplification and negative gains are retained. An exactly zero denominator receives identity gain and is recorded. The fitted filter minimizes represented coefficient-domain squared error within this isotropic linear family; it is not a global optimizer of exact native-grid GraphCast loss. All gains are frozen before scoring the 2023 forecasts.}
+
+\vfourred{Write $A$ and $S$ for analysis and synthesis. For GraphCast, the raw field $f$, the unit-gain reconstruction $S[A f]$, and the filtered field $S[g A f]$ distinguish truncation from fitted amplitude changes. Reconstruction does not restore the unrepresented residual, so coefficient-domain optimization need not improve native-grid loss at every lead. The comparison with carry/carry and reset/reset uses their original unfiltered fields. All native-grid losses use the original ERA5 fields and the exact GraphCast weighting of Appendix~\ref{app:training_loss}.}
+
+\paragraph{\vfourred{Power, amplitude and coherence.}}
+\vfourred{For each channel and lead, define date-pooled forecast and truth powers $P^f_\ell=\langle\sum_m|\widehat f_{\ell m}|^2\rangle_s$ and $P^y_\ell=\langle\sum_m|\widehat y_{\ell m}|^2\rangle_s$, and real cross-power $C_\ell=\langle\sum_m\operatorname{Re}(\widehat f_{\ell m}\widehat y_{\ell m}^{\,*})\rangle_s$. Following \citet{subich2025spectral}, we plot}
+\vfourred{\begin{equation}
+a_\ell=\sqrt{P^f_\ell/P^y_\ell},\qquad
+\rho_\ell=\frac{C_\ell}{\sqrt{P^f_\ell P^y_\ell}},\qquad
+\frac{E_\ell}{P^y_\ell}=a_\ell^2+1-2a_\ell\rho_\ell,
+\label{eq:spectral_diagnostics}
+\end{equation}}
+\vfourred{where $E_\ell=P^f_\ell+P^y_\ell-2C_\ell$ is represented error power. Power matching and pattern agreement therefore measure different properties. A positive gain preserves coherence at a given channel, lead and degree; a negative gain reverses its sign. Similar amplitudes alone do not establish identical forecast errors or a causal mechanism. The spectra use physical fields without climatology subtraction; plots exclude degree zero and retain degrees 1--179. Wavelength is shown as $40{,}030/\ell$\,km. Aggregate amplitude/coherence curves average channel-wise ratios using normalized GraphCast variable and pressure-level weights, without difference-standard-deviation normalization. Physical powers with different units are never added across variables.}
+
+\vfourred{The scalar power-mismatch score underlying Table~\ref{tab:smoothing_scores} is instead}
+\vfourred{\begin{equation}
+D_P=\frac{100}{40\times83\times179}
+       \sum_{k=1}^{40}\sum_{c=1}^{83}\sum_{\ell=1}^{179}
+       \left|\frac{P^f_{c,k,\ell}}{P^y_{c,k,\ell}}-1\right|.
+\label{eq:relative_power_mismatch}
+\end{equation}}
+\vfourred{This rollout diagnostic weights leads, channels and degrees equally after pooling dates. At a fixed lead, $D_P$ averages only over the 83 channels and 179 degrees. It is a percentage relative-power mismatch, not a percentage loss of total atmospheric energy or a forecast-error score. Equal degree weights make weak spectral tails influential; the full curves are needed to interpret it. The per-feature annotations use the same definition at a single lead and channel, explicitly comparing M1 with original unfiltered GraphCast. A complementary ERA5-power-weighted score, $100\sum_\ell|P^f_\ell-P^y_\ell|/\sum_\ell P^y_\ell$, is retained in the numerical exports.}
+
+
+
+\paragraph{\vfourred{Diagnostic scope and numerical repeatability.}}
+\vfourred{The 36-date cohort supports descriptive comparisons for the evaluated checkpoints and covers January--April rather than a full year. We do not estimate date-sampling confidence intervals, training-seed variation or between-year uncertainty from this diagnostic sample. The paired date-bootstrap intervals and five-seed standard deviations reported elsewhere concern the larger evaluations in Appendices~\ref{app:memory_evaluation} and~\ref{app:seed_replication}; they are not transferred to these curves or scores.}
+
+\vfourred{The reset/reset spectral rerun has finite numerical differences from its archived loss evaluation on these same dates: pooled rollout loss is approximately $0.06\%$ higher, with a maximum individual relative difference of $2.46\%$. These measured differences are retained as numerical-repeatability diagnostics. All displayed comparisons use the common 36 dates and the original raw fields for both memory policies.}
+
+\subsection{\vfourred{Feature and lead-time diagnostics}}
+\label{app:smoothing_features}
+
+\vfourred{Figures~\ref{fig:smoothing_features_amplitude} and~\ref{fig:smoothing_features_coherence} show all four predictors for the same fixed diagnostics---T2m, Z500, Q700 and six-hour precipitation---on the common 36-date cohort. These fields span favorable power preservation, scale-dependent departures and strong power deficits. The full 83-channel numerical breakdown accompanies the figure sources. Figure~\ref{fig:smoothing_leads} retains six-hour and day-10 diagnostics alongside day 5; the longer lead remains relevant because the principal accuracy claim extends to ten days. No numerical comparison with the AMSE model itself is implied: we adopt its spectral diagnostics for our own resolution, verification data and checkpoints.}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig13_smoothing_feature_amplitude_v4_matched36.pdf}
+    \caption{\vfourred{Day-5 amplitude ratios for $2$\,m temperature (T2m), geopotential at 500\,hPa (Z500), specific humidity at 700\,hPa (Q700), and six-hour precipitation (TP6h). Every panel includes raw GraphCast, filtered GraphCast, carry/carry (M1) and reset/reset on the same 36 dates. Panel annotations compare the equal-degree power mismatch of M1 and raw GraphCast, with lower values denoting closer power matching. Ratios and mismatch scores are computed from pooled powers.}}
+    \label{fig:smoothing_features_amplitude}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig14_smoothing_feature_coherence_v4_matched36.pdf}
+    \caption{\vfourred{Coherence for the same forecasts and fields as Figure~\ref{fig:smoothing_features_amplitude}. Coherence measures normalized cross-power separately from amplitude fidelity. Panel annotations retain the same M1/raw-GraphCast power-mismatch scores to identify the corresponding spectral-fidelity comparison; they are not coherence errors.}}
+    \label{fig:smoothing_features_coherence}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig15_smoothing_lead_spectra_v4_matched36.pdf}
+    \caption{\vfourred{Aggregate spectral amplitude and coherence at six hours, five days and ten days for all four predictors on the same 36 dates. Channel-wise ratios are averaged with the same variable/pressure weights as Figure~\ref{fig:smoothing_spectra}. Full degree ranges are retained. These are point estimates without simultaneous significance estimates across scales.}}
+    \label{fig:smoothing_leads}
+\end{figure}
+
+\FloatBarrier
+\subsection{\vfourred{Matched memory-policy comparison}}
+\label{app:smoothing_reset}
+
+\vfourred{The original matched reset/reset evaluation saved losses but not spectral moments. The diagnostic rerun uses the same reset-trained SWA checkpoint, resetting both its SSM state and convolution cache before every prediction. Carry/carry uses the original M1 checkpoint with persistent memory. Table~\ref{tab:smoothing_scores} in the main text and Figures~\ref{fig:memory_power_day5} and~\ref{fig:memory_power_day10} below show these policies together with raw and filtered GraphCast on the same 36 dates used throughout this appendix. The two correction models are shown as predicted, without post-hoc amplitude matching. The 122-date memory-training comparison remains the principal evidence for the training-policy effect.}
+
+\vfourred{At day 5, carry/carry achieves $2.84\%$ lower GraphCast-weighted MSE than reset/reset, while aggregate power mismatch is $68.66\%$ versus $68.16\%$, a difference of $0.50$ percentage points. Thus, at this lead, persistent memory provides an accuracy benefit with a limited change in the aggregate power-mismatch score. Similar aggregate scores do not imply identical spectra: the per-field power and coherence curves retain differences across scales.}
+
+\vfourred{At day 10, the MSE advantage increases to $10.20\%$, accompanied by a larger power-mismatch difference: $84.47\%$ versus $75.74\%$. All four forecasts have higher absolute MSE and lower aggregate spectral coherence than at day 5 (Figures~\ref{fig:smoothing_accuracy} and~\ref{fig:smoothing_leads}). This lead extends beyond the five-day ($K=20$) feedback-conditioned training tail and illustrates the evolving accuracy--spectral-fidelity tradeoff during longer rollouts. It remains relevant to the paper's ten-day forecasting results. Averaged over all forty leads, carry/carry has $6.01\%$ lower loss, with power mismatch $67.14\%$ versus $65.42\%$. These results support a lead-dependent accuracy benefit; they do not establish an improvement at identical spectral fidelity or a uniformly better tradeoff than reset/reset. Table~\ref{tab:smoothing_scores} summarizes the separate loss and power-mismatch ratios as percentages of raw GraphCast for all four predictors ($100\%$ denotes the baseline; lower is better).}
+
+\vfourred{Figures~\ref{fig:memory_power_day5} and~\ref{fig:memory_power_day10} show the corresponding physical power spectra for T2m, Z500, Q700 and six-hour precipitation. ERA5 provides the reference in each panel. Showing carry/carry and reset/reset together makes their power differences visible without combining variables with different units or interpreting a single aggregate mismatch as an identical spectrum.}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig16_memory_power_day5_v4_matched36.pdf}
+    \caption{\vfourred{Day-5 physical power spectra of the original carry/carry and reset/reset forecasts, with raw GraphCast, filtered GraphCast and ERA5, on the same 36 dates as Table~\ref{tab:smoothing_scores}. Each panel retains its own physical squared units. Powers are pooled over dates before plotting; degree zero is omitted and no climatology is subtracted. Both memory policies are shown without amplitude rescaling.}}
+    \label{fig:memory_power_day5}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\linewidth]{arxiv_pics/fig17_memory_power_day10_v4_matched36.pdf}
+    \caption{\vfourred{Day-10 physical power spectra for the same forecasts, dates, fields and conventions as Figure~\ref{fig:memory_power_day5}. These spectra accompany the $10.20\%$ lower exact native-grid loss of carry/carry relative to reset/reset at this lead on the 36-date cohort. The plotted power differences remain part of the original predictions.}}
+    \label{fig:memory_power_day10}
+\end{figure}
+\endgroup
 
 \end{document}

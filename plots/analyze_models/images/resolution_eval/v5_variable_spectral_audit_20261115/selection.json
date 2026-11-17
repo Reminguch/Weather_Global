@@ -1,0 +1,58 @@
+{
+  "status": "exploratory_post_hoc_illustrations",
+  "reference": "matched reset-trained/reset-evaluated R1",
+  "fields": [
+    {
+      "channel": "T2m",
+      "window": "day10",
+      "reason": "Lower RMSE and power-weighted mismatch; equal-degree mismatch still worsens.",
+      "rmse_reduction_vs_R1_pct": 4.981699425790098,
+      "M1_power_weighted_mismatch_pct": 2.1168850010092597,
+      "R1_power_weighted_mismatch_pct": 2.49385789068705,
+      "power_weighted_mismatch_delta_pp": -0.3769728896777904,
+      "equal_degree_mismatch_delta_pp": 2.872363600155799,
+      "power_weighted_coherence_delta": 0.0011485684078331726
+    },
+    {
+      "channel": "T400",
+      "window": "day5",
+      "reason": "Lower RMSE, both mismatch measures, and higher coherence at day5; tradeoff emerges later.",
+      "rmse_reduction_vs_R1_pct": 1.9410666555269018,
+      "M1_power_weighted_mismatch_pct": 2.092896260470798,
+      "R1_power_weighted_mismatch_pct": 2.177304283312304,
+      "power_weighted_mismatch_delta_pp": -0.08440802284150628,
+      "equal_degree_mismatch_delta_pp": -1.0323350585772033,
+      "power_weighted_coherence_delta": 0.00044378290688829036
+    },
+    {
+      "channel": "U850",
+      "window": "day10",
+      "reason": "Lower RMSE and higher coherence with a substantial increase in attenuation/power mismatch.",
+      "rmse_reduction_vs_R1_pct": 5.558820345395487,
+      "M1_power_weighted_mismatch_pct": 37.086523352513595,
+      "R1_power_weighted_mismatch_pct": 20.922171653416974,
+      "power_weighted_mismatch_delta_pp": 16.16435169909662,
+      "equal_degree_mismatch_delta_pp": 8.886816030031184,
+      "power_weighted_coherence_delta": 0.015401849286061586
+    },
+    {
+      "channel": "Q100",
+      "window": "day10",
+      "reason": "Higher RMSE and both mismatch measures, with lower coherence; modest deterioration versus R1.",
+      "rmse_reduction_vs_R1_pct": -1.0132072215397248,
+      "M1_power_weighted_mismatch_pct": 29.827986959283116,
+      "R1_power_weighted_mismatch_pct": 28.647532391046774,
+      "power_weighted_mismatch_delta_pp": 1.1804545682363425,
+      "equal_degree_mismatch_delta_pp": 0.9007543627437826,
+      "power_weighted_coherence_delta": -0.00659641457439053
+    }
+  ],
+  "scope": "122 matched2023 starts, fixed checkpoints, no new intervals",
+  "selection_rationale": "Include an improvement in power-weighted metrics, a day5 joint improvement in both mismatch definitions, an accuracy-attenuation tradeoff, and an actual deterioration versus R1. These are illustrative, not representative frequency estimates; all83 channels are retained.",
+  "notes": [
+    "Power-weighted mismatch is a supplemental metric; existing equal-degree mismatch retained.",
+    "Full-field spectra without climatology subtraction can emphasize static large-scale patterns.",
+    "The plots include rawGC and filteredGC for context; field labels good/bad are not permanent across leads or baselines.",
+    "25% per-channel power cutoff with20/30% sensitivity is descriptive; recrossings and first-lead censoring are recorded."
+  ]
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "path": "Overleaf/archive/Graphs/v5_spectral_matched122_20261115/weighted_spectral_curves.csv",
+    "archive_name": "weighted_spectral_curves.csv",
+    "sha256": "d20c8dc58b8f6ec333a2224935d229da8eb93139b6ebee3d002877f0cb5e0d4d"
+  },
+  {
+    "path": "Overleaf/archive/Graphs/v5_spectral_matched122_20261115/all_channels_selected_leads_curves.npz",
+    "archive_name": "all_channels_selected_leads_curves.npz",
+    "sha256": "0774728ddc1bc2ba0b40e3db98389719dc281d395c0b02d8471107c0729d502e"
+  },
+  {
+    "path": "Overleaf/archive/Graphs/v5_spectral_matched122_20261115/summary.json",
+    "archive_name": "aggregate_source_summary.json",
+    "sha256": "af1457976ef934def0a3fb3b9b43abaee501b6004f20f01c4d1c363f7931a314"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/plot_data.npz",
+    "archive_name": "plot_data.npz",
+    "sha256": "326c8846f8900937c2526f51219ab767933300fa5340e073dcf5a96561ef7182"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/channel_metrics.csv",
+    "archive_name": "channel_metrics.csv",
+    "sha256": "4d1dea21dfecb74717acba4b54938054c987c09c836fbab3ecee3df774d6ddd0"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/channel_contrasts.csv",
+    "archive_name": "channel_contrasts.csv",
+    "sha256": "2d43409897c2e020bc7565bd52b7d60c04fce8ed193210333f703dd6cd6af8cb"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/lead_metrics.csv",
+    "archive_name": "lead_metrics.csv",
+    "sha256": "97131ab332609896b66c86108852b3d450d4c85f760e82d7a715eced0fc4af4e"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/scale_crossings.csv",
+    "archive_name": "scale_crossings.csv",
+    "sha256": "441defa6c80cdf1ee8ce739175d2b382a8a0952875d8e69d1f787903e3200d41"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/independent_validation.json",
+    "archive_name": "independent_validation.json",
+    "sha256": "3f3518bad021aa92bb627ccbd8a882d6271ef2b50188c5e138c8d6edca7d39e1"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/summary.json",
+    "archive_name": "channel_source_summary.json",
+    "sha256": "7d36d33649e84717d1d4854aa34c234976b62e8f4394c264b5d8820291ea99a5"
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "source_commit": "15823a8d104ba34738c1869a08cebedde3ecf155",
+  "cohort_count": 36,
+  "replaced_chart": "arxiv_pics/fig8_accuracy_power_summary_v4_matched36.pdf",
+  "replacement_label": "tab:smoothing_scores",
+  "figures": [
+    {
+      "previous": "fig9_training_horizon_closed_loop_v4.pdf",
+      "current": "fig8_training_horizon_closed_loop_v4.pdf",
+      "sha256": "0deb2433ce2637d193bb30f04f2c3532715576f0c18bf12ff2246c8743d45d44"
+    },
+    {
+      "previous": "fig10_training_horizon_open_loop_v4.pdf",
+      "current": "fig9_training_horizon_open_loop_v4.pdf",
+      "sha256": "b3cf3b16b89770634eaf133f10fd2b48ec56b1a002e39e22c1f852a3e4583b85"
+    },
+    {
+      "previous": "fig11_common_grid_all_variables_v4_ci.pdf",
+      "current": "fig10_common_grid_all_variables_v4_ci.pdf",
+      "sha256": "6d721dcc365ac8fd303707ecdb9e4fdf2c8c2218698493678cfe3de455576214"
+    },
+    {
+      "previous": "fig12_city_forecasts_v4.pdf",
+      "current": "fig11_city_forecasts_v4.pdf",
+      "sha256": "97efa3bb0d9026bb1ab2b51089a39106c7b118767eabc3f29d17b8b7413f818c"
+    },
+    {
+      "previous": "fig13_smoothing_accuracy_v4_matched36.pdf",
+      "current": "fig12_smoothing_accuracy_v4_matched36.pdf",
+      "sha256": "d3c971bc1c8c9c37b21b1bde359fad29bb7174605d65a615fb8b46cba0e33749"
+    },
+    {
+      "previous": "fig14_smoothing_feature_amplitude_v4_matched36.pdf",
+      "current": "fig13_smoothing_feature_amplitude_v4_matched36.pdf",
+      "sha256": "9850c8aaf2d7ddab821415b576f69343fc97afb4b0364dce81de8280524574ec"
+    },
+    {
+      "previous": "fig15_smoothing_feature_coherence_v4_matched36.pdf",
+      "current": "fig14_smoothing_feature_coherence_v4_matched36.pdf",
+      "sha256": "32b9e0a770b6708a484557123b42b52e95b9ecb0630210ba86cfc9f82d4e963a"
+    },
+    {
+      "previous": "fig16_smoothing_lead_spectra_v4_matched36.pdf",
+      "current": "fig15_smoothing_lead_spectra_v4_matched36.pdf",
+      "sha256": "2678e2d5b153983981108d131fb6b6dfa5b1571ea992ae8ee74be604dd04a85b"
+    },
+    {
+      "previous": "fig17_memory_power_day5_matched36.pdf",
+      "current": "fig16_memory_power_day5_v4_matched36.pdf",
+      "sha256": "1a41b59bd1a3d85ce5a0573aab2ae96cb9029f8683eea64c48cafcaaef80763d"
+    },
+    {
+      "previous": "fig18_memory_power_day10_matched36.pdf",
+      "current": "fig17_memory_power_day10_v4_matched36.pdf",
+      "sha256": "6b2c4e192f516d5923378763c5b78b2e69cffe7c58a94ec4e95c706946bc24e0"
+    }
+  ]
+}

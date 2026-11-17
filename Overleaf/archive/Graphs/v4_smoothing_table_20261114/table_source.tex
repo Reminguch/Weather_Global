@@ -1,0 +1,22 @@
+\begin{table}[!htbp]
+    \centering
+    \begingroup\color{red}\small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{lrrrrrr}
+        \toprule
+        \multicolumn{7}{c}{Reduction relative to raw GraphCast (\%) $\uparrow$} \\
+        \addlinespace[2pt]
+        & \multicolumn{2}{c}{Ten-day rollout} & \multicolumn{2}{c}{Day 5} & \multicolumn{2}{c}{Day 10} \\
+        \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+        Forecast & \shortstack{MSE\\reduction} & \shortstack{Power\\mismatch\\reduction} & \shortstack{MSE\\reduction} & \shortstack{Power\\mismatch\\reduction} & \shortstack{MSE\\reduction} & \shortstack{Power\\mismatch\\reduction} \\
+        \midrule
+        Raw GraphCast & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+        GraphCast + optimal filter & 11.34 & $-33.60$ & 4.16 & $-36.09$ & 18.98 & $-42.35$ \\
+        Carry/carry (M1) & 15.10 & $-14.59$ & 6.05 & $-13.65$ & 23.42 & $-30.61$ \\
+        Reset/reset & 9.67 & $-11.65$ & 3.30 & $-12.83$ & 14.72 & $-17.11$ \\
+        \bottomrule
+    \end{tabular}
+    \endgroup
+    \caption{\vfourred{Percentage reductions relative to raw GraphCast on the fixed 36-date cohort: $100(1-L/L_{\mathrm{GC}})$ for exact GraphCast MSE and $100(1-D_P/D_{P,\mathrm{GC}})$ for aggregate power mismatch. Rollout scores pool all forty leads. Positive values indicate improvement; negative values indicate deterioration. Zero denotes baseline performance, not zero error. The metrics measure distinct quantities; both correction models are unfiltered. Appendix~\ref{app:smoothing} defines $D_P$ and the evaluation procedure. Values are fixed-checkpoint point estimates.}}
+    \label{tab:smoothing_scores}
+\end{table}

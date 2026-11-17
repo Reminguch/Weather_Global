@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "independent_review": "Independent agent recomputed original source moments using scalar summation, without importing the analysis script.",
+  "checked_channels": [
+    "T2m",
+    "T400",
+    "Z500",
+    "TP6h"
+  ],
+  "checked_windows": [
+    "day5",
+    "day10",
+    "rollout"
+  ],
+  "metrics_checked": 72,
+  "contrasts_checked": 36,
+  "crossing_rows_checked": 144,
+  "maximum_metric_absolute_difference": 2.842170943040401e-14,
+  "limitations": "No new date-bootstrap or training-seed estimates; numeric agreement is not statistical significance."
+}

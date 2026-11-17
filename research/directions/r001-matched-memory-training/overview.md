@@ -2,7 +2,7 @@
 
 Category: training
 Status: active
-Updated: 2026-11-13 (America/New_York)
+Updated: 2026-11-14 (America/New_York)
 
 ## Question and hypothesis
 
@@ -12,12 +12,27 @@ architecture and optimization protocol held fixed?
 
 ## Current understanding
 
-**November 13 user clarification:** The earlier eight-start 2023 spectral pilot
-did not influence the principal model selection. The user requests that those
-pilot results not be raised in the reviewer response. Preserve the historical
-pilot and existing evaluation-protocol disclosures as provenance; do not infer
-selection on 2023 from the fact that the pilot was run. See the clarification
-in [experiments.md](experiments.md#pilot-selection-clarification).
+**November 14 presentation decision:** The active manuscript and reviewer
+response now focus on carry/carry versus independently trained reset/reset.
+The user removed the carry/reset inference-only diagnostic as peripheral to
+this comparison. Figure 6 retains its original matched SWA/date-interval panel
+and independent raw-checkpoint panel with five carry seeds and one reset seed;
+the carry/reset curves and associated prose/table row are omitted. All retained
+scores and uncertainty bands are unchanged. Historical carry/reset evidence is
+preserved below and in archived artifacts, not promoted as the manuscript's
+memory test. See the [revision record](experiments.md#two-memory-policies-20261114).
+
+**November 14 user clarification, reaffirming November 13:** The earlier
+eight-start 2023 spectral pilot did not influence principal model selection or
+similar decisions. Do not frame it as test-set tuning or raise its results in
+the manuscript or reviewer response. The user explicitly rejects the sentence
+about earlier pilot exposure and its associated discussion. `v4.tex` removes
+that sentence, the Appendix A.3 pilot-exclusion sensitivity/result, and the
+Appendix C pilot-exposure sentence. Historical runs and analysis artifacts stay
+available as internal provenance. This supersedes the earlier note to retain
+manuscript exposure disclosures; it does not change the actual evaluation data,
+scores or uncertainty calculations. See the
+[updated clarification](experiments.md#pilot-wording-cleanup-20261114).
 
 **November 13 existing-data replication update ([e003](experiments.md#e003)):**
 Five fresh local M1 carry/carry retrainings, seeds 22–26, now measure training-seed

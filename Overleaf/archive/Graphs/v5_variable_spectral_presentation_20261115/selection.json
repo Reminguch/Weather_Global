@@ -1,0 +1,29 @@
+{
+  "fields": [
+    "T2m",
+    "Z500",
+    "U850",
+    "Q100"
+  ],
+  "days": [
+    5,
+    10
+  ],
+  "models": [
+    "GC",
+    "M1",
+    "GC_filter",
+    "R1"
+  ],
+  "selection": "Illustrative contrasting cases; not a ranking or independent test set.",
+  "rationale": {
+    "T2m": "Relatively retained spectrum; surface/terrain caveat.",
+    "Z500": "Standard circulation diagnostic with nontrivial spectral tails.",
+    "U850": "Accuracy/coherence gain accompanied by attenuation.",
+    "Q100": "Adverse day-10 example against matched R1."
+  },
+  "reference_amplitude": 0.8660254037844386,
+  "reference_interpretation": "Per channel, sqrt(0.75) means 25% power deficit. On combined curves it is a weighted-amplitude reference, not 25% mean power deficit.",
+  "preserved": "Original equal-degree scores, separate truth-power-weighted scores, all 83 channels, 20/25/30% crossing sensitivity, and finite numerical warnings.",
+  "earlier_exploration": "The earlier T2m/T400/U850/Q100 selection is unchanged in v5_variable_spectral_audit_20261115."
+}

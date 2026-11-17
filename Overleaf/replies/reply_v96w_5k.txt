@@ -1,0 +1,37 @@
+TITLE
+=====
+Following your suggestions, we have added spectral diagnostics at days 5 and 10 and a fitted output-filtering control to assess the role of smoothing. To address your concern about checkpoint consistency, we have repeated the comparison with 0.25° GraphCast using the principal K=20 checkpoint M1, with paired confidence intervals. The revised results distinguish improvements in forecast error from preservation of spatial detail.
+
+MAIN TEXT
+=========
+We thank the reviewer for the constructive comments and the positive assessment of our correction approach.
+
+W1. Potential Effect of Smoothed prediction: As authors mentioned in the limitations section, the RMSE improvements may partially stem from smooth prediction rather than better prediction, lowering RMSE by blurry outputs. It is recommended to clarify this point, to strengthen the effectiveness of the proposed method.
+
+Response:
+
+We thank the reviewer for raising the concern about smoothing. We agree that lower RMSE alone does not establish better representation of atmospheric structure. Our new diagnostics show that M1 reduces forecast MSE but has greater aggregate power mismatch relative to ERA5 than raw GraphCast. We now discuss this accuracy–spectral-fidelity tradeoff explicitly and acknowledge that smoothing may contribute to the gains (Section 4.6, Figure 6, and Appendix C). The spectral evidence and fitted output-filtering control are detailed in Q1 below.
+
+W2. Inconsistent Checkpoints Across Comparisons: The comparison with the 0.25° GraphCast uses a model trained with K=22 which differs from the principal model with K = 20. Authors do not explain why a different setting was selected for the comparison. Including the principal model in this comparison would confirm that the claimed advantage over the 0.25° GraphCast holds for the proposed configuration.
+
+Response:
+
+We thank the reviewer for emphasizing consistent use of the principal checkpoint. We agree that the principal comparisons require a consistent checkpoint. The revised comparison uses the selected K=20 model M1 and retains its common-grid RMSE advantage. See Q2 below for the explanation of the earlier choice, the corrected comparison setup, and the results with paired confidence intervals.
+
+Q1. Could the authors report energy spectra of the forecasts at long lead times to show whether the RMSE gains come from smoother forecasts?
+
+Response:
+
+We have added day-5 and day-10 amplitude and coherence diagnostics to distinguish attenuation from spatial-pattern agreement, together with a fitted output-filtering control.
+
+The filter fits a separate spherical-harmonic gain for each lead, variable/pressure level, and total wavenumber by minimizing coefficient-domain squared error on 32 development initializations from 2022. The gains are frozen before evaluation and applied only to GraphCast's reported outputs, leaving autoregressive feedback unchanged. Raw GraphCast, filtered GraphCast, M1, and the matched reset-trained control R1 are evaluated on the same 122 initializations from 2023 and 40 six-hour leads.
+
+Over the full ten-day rollout, M1 achieves 4.02% lower GraphCast-weighted MSE than filtered GraphCast and lower aggregate power mismatch (67.56% versus 78.40%); raw GraphCast has lower mismatch than either (59.47%). Thus, the tested output filter does not reproduce M1's joint accuracy and spectral-fidelity performance, although smoothing may still contribute to its gains. The mismatch metric averages absolute relative-power errors equally over leads, channels, and wavenumbers; it is not a percentage of atmospheric energy lost. Table 6 reports both errors as ratios to raw GraphCast.
+
+Q2. Why is a K = 22 model used for the 0.25° GraphCast comparison instead of the principal K = 20 model? Also, it is recommended to add result for principle model(K=20) for the comparison.
+
+Response:
+
+The original comparison did not use the principal checkpoint consistently. We previously used different checkpoints because their evaluation results were broadly similar, but agree that a unified experimental setup should have been used across the principal comparisons.
+
+We have corrected this by repeating the comparison with 0.25° GraphCast using the original selected K=20 checkpoint M1, as in the variable-group and spectral analyses. Using matched dates on a common verification grid, M1 retains the reported RMSE advantage. The updated results and paired confidence intervals appear in Section 4.4, Figure 4, and Appendix D, Figure 14 and Table 8.

@@ -1,0 +1,14 @@
+{
+  "files": {
+    "README.md": "20cf6bbb3d8c3e9e80a8015c7b48a71fe41c03b608d229b8d1d32a9c271362bc",
+    "figure6_original_swa_curves.csv": "f9190486a82d6fb5bd6ebd65904687c642970ffa57eb920da6b5afa93a9e86b1",
+    "figure6_raw_carry_mean_sd_curves.csv": "25920b367773bae083b476b977047da7604c0c28c86c3e05c2258326a7d710ea",
+    "figure6_raw_curves.csv": "576ac3e55d86d6fe84b20f57527c5f7fa8a668aa78c1f9eda93731ffc0162959",
+    "manifest.json": "af1612731453d9869c58c082055c9f5ebfbbf4fb8b0191d8161f921e92141779",
+    "original_memory_paired_contrasts.csv": "4f58c56d6e91c70de6ca28c71750c670a68c4a8c52e90c5770f4ce4092e4e0c5",
+    "plot_v4_memory_two_policies_20261114.py": "cb21ae994a593a11f6dc84acc55f9fd0ef3d77e10b2f4faac126a3a918beec1f",
+    "raw_memory_endpoints.csv": "69b57bdbe5157916bf0a12728fa6d79ef9478859b4eff55c87b8d48a7f90cc02"
+  },
+  "manuscript_asset": "Overleaf/arxiv_pics/fig6_memory_policies_v4_matched_only.pdf",
+  "manuscript_asset_sha256": "f9e9d41329ae92e5d8493e13665aabcc1743a2c85d57ee93f979fb8a02f5f8f2"
+}

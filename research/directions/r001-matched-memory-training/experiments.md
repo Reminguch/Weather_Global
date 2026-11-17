@@ -354,3 +354,74 @@ Do not present prior pilot inspection as evidence of model selection on 2023.
 Keep the historical pilot outputs, frozen protocols, and existing provenance
 disclosures intact. No manuscript or experiment artifacts were changed by this
 clarification.
+
+<a id="pilot-wording-cleanup-20261114"></a>
+### 2026-11-14 — Remove irrelevant pilot-exposure framing from v4
+
+The user reaffirmed that the earlier pilot did not influence model selection
+or similar decisions and rejected the main-text sentence about prior 2023
+exposure. That wording conflated running numerical checks with tuning against
+test results. The earlier instruction to retain manuscript disclosures is
+superseded for the active manuscript and reviewer response; historical logs,
+frozen protocols and numerical artifacts remain preserved as internal evidence.
+
+Removed exactly three related passages from `Overleaf/v4.tex`: the main
+evaluation paragraph's pilot cross-reference, the Appendix A.3 excluded-pilot
+sensitivity result and exposure caveat, and the Appendix C pilot-exposure
+sentence. Retained the 2022 model-selection / 2023 evaluation split, all 122
+forecast dates, paired bootstrap specification, other block-length/quarter
+sensitivities, numerical repeatability, forecast-window overlap and data-repair
+details. Reviewer-response drafts already avoid pilot framing and need no edit.
+There are no new runs, exclusions, score changes or uncertainty calculations.
+
+The previous source/PDF are preserved under
+`artifacts/evaluations/v4_pilot_wording_cleanup_20261114/before/`.
+The manuscript was rebuilt; source/PDF hashes, reference checks, visual review
+and synchronization are recorded in the adjacent `validation.json`.
+Build and visual review passed (35 pages); the corrected source and compiled
+PDF were pushed to the linked manuscript repository on `main` at
+`e04115a6cd35912bcb856def62b81f072234f5fa`. The parent repository was not pushed.
+
+<a id="two-memory-policies-20261114"></a>
+### 2026-11-14 — Focus the manuscript on the matched training-policy comparison
+
+The user decided to omit the carry/reset inference-only diagnostic from the
+paper. Its intervention mixes state removal with a training/forecasting
+mismatch and is peripheral to the matched carry/carry versus reset/reset
+comparison. This is a presentation decision, not deletion or reclassification
+of the historical measurements.
+
+Removed carry/reset from active `Overleaf/v4.tex`, Table 1, Figure 6, conclusions
+and appendix descriptions. Updated both reviewer-response formats to acknowledge
+the original mismatch concern and center the matched training-policy comparison.
+The original arXiv source, full numerical exports, old figure and evaluation
+artifacts remain unchanged. No forecasts, training or bootstrap draws were run.
+
+The new figure directly subsets the validated November 13 exports. Retained
+original SWA curves and paired date intervals are exact copies; the local raw
+carry mean/SD CSV is copied byte-for-byte and independently checked against
+the five retained seed curves. Both panels retain their own common baseline;
+SWA/raw checkpoints and date/seed uncertainty remain distinct. The figure keeps
+its 6 x 4.05 inch canvas and 80% manuscript width. Shared y limits are now
+-3% to 27%, covering all retained points and bands. The single reset seed
+limitation remains explicit.
+
+Unchanged endpoints: original carry/carry and reset/reset rollout reductions
+14.42%/9.16%, paired contrast 5.26 pp [4.70,5.86]; day-10 reductions
+21.66%/13.64%, contrast 8.02 pp [7.20,9.05]. Local raw carry means are
+13.51% +/- 0.42 pp and 20.19% +/- 0.71 pp, versus reset/reset 9.21% and
+13.09%.
+
+Reproduction:
+[`scripts/analyze_models/plot_v4_memory_two_policies_20261114.py`](../../../scripts/analyze_models/plot_v4_memory_two_policies_20261114.py).
+Evidence: [source/curve manifest](../../../plots/analyze_models/data/resolution_eval/v4_memory_two_policies_20261114/manifest.json),
+[portable paper archive](../../../Overleaf/archive/Graphs/v4_memory_two_policies_20261114/).
+Prior manuscript/response files are preserved in
+`artifacts/evaluations/v4_memory_two_policies_20261114/before/`; build, visual
+review and publication details are recorded in its adjacent `validation.json`.
+
+**Completion:** manuscript and response builds and visual checks passed.
+The main text remains 10 pages (35 total); the response is two pages. Both
+compiled PDFs are updated in `Overleaf/`. The linked manuscript repository was
+pushed on `main` at `5d7463f323ae6bdc7c01dd5173b277c37320c088`. The parent
+Weather_global repository was not committed or pushed.

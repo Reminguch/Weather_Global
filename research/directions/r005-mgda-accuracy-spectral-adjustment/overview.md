@@ -2,7 +2,7 @@
 
 Category: training
 Status: active
-Updated: 2026-11-13 (America/New_York)
+Updated: 2026-11-15 (America/New_York)
 
 ## Question and hypothesis
 
@@ -31,6 +31,257 @@ the same pair-gradient RMS preconditioning rule, so the control does not change
 to a single-gradient second-moment estimator.
 
 ## Current understanding
+
+November 15 [authorized presentation revision](experiments.md#v5-variable-spectral-presentation-20261115):
+both v5 manuscripts now retain combined 83-channel curves in Section 4.6,
+with separate day-5/day-10 amplitude/coherence illustrations for T2m, Z500,
+U850 and Q100 in Appendix C. The selected fields' native-grid RMSE reductions
+versus R1 are 1.37/2.02/1.76/0.84% at day 5 and 4.98/4.60/5.56/-1.01%
+at day 10. This is explicitly an illustrative post-hoc selection, including
+an adverse case, not a best/worst ranking. Z500 replaces T400 in the manuscript;
+the exploratory T400 artifacts remain available. The sqrt(0.75) reference
+applies to power deficit only within an individual channel and scale; its
+combined-curve interpretation is weighted amplitude. Original equal-degree
+mismatch and full-channel exports are retained, including the all-83-channel
+day-10 deterioration versus R1 under that metric. No forecasts were rerun.
+The [follow-up reference explanation](experiments.md#v5-spectral-reference-explanation-20261115)
+ties the illustrative sqrt(0.75) line to Subich Section 3.1 and makes the
+day-5/day-10 contrast explicit: first sampled crossings are 16/16 and 7/12
+for M1/R1. Nearby 20% and 30% reference choices preserve that qualitative
+contrast. Full curve proximity supports day-5 similarity; a shared crossing
+alone does not establish equivalence.
+The authorized appendix follow-up interprets ranges below the line for the
+four illustrated fields: U850 gives the day-10 accuracy/attenuation tradeoff,
+T2m only isolated dips, Z500 excess fine-scale power with low coherence, and
+Q100 an adverse accuracy result despite similar attenuation.
+
+November 15 [per-channel audit and illustration selection](experiments.md#v5-variable-spectral-audit-20261115):
+the matched 122-date pools contain exact native-grid MSE for all 83 channels,
+so accuracy can be compared with spectra without substituting truncated
+spectral error. M1 lowers RMSE versus R1 in 81/83 channels at both day 5 and
+day 10. With the supplementary truth-power-weighted mismatch, 31 channels
+improve both metrics at day 5 and eight at day 10; the other improved-accuracy
+channels show a spectral tradeoff. Under the original equal-degree mismatch,
+all 83 channels worsen at day 10. Neither weighting should be presented as a
+complete measure of forecast quality: relative-error averaging emphasizes
+weak tails, while power weighting emphasizes energetic and potentially static
+large-scale structure. Post-hoc examples T2m, T400, U850 and Q100 show a
+power-weighted joint improvement, an earlier joint improvement in both
+mismatch definitions, an accuracy/attenuation tradeoff, and a modest day-10
+deterioration, respectively. Full channel tables accompany the figures.
+Per-channel 20/25/30% power-deficit crossing times are diagnostic, with
+recrossings and first-lead censoring retained. The manuscript was unchanged
+at that exploratory stage; the later authorized revision is linked above.
+
+November 15 [annual completion and v5 replacement](experiments.md#v5-spectra-matched122-20261115):
+the matched spherical evaluation is complete for all 122 standard 2023 starts,
+40 six-hour leads and 83 channels. All nine reset tail jobs and their annual
+report succeeded on November 14; the November 15 audit verified the exact
+date union, pooled-file digest and finite arrays. The current optimal-filter
+GC/M1 campaign likewise contains 122 dates. Both v5 sources now use this
+separately archived annual cohort in place of the frozen 70-date comparison.
+The completed replot shows M1's exact-loss reductions versus R1 of 2.85% at
+day 5, 5.76% across the rollout and 9.26% at day 10. Power mismatch is higher
+by 0.50, 1.51 and 7.96 percentage points, respectively. M1 improves both
+aggregate metrics versus filtered GC, while raw GC retains the smallest
+power mismatch. Thus the annual result supports an accuracy/spectral-fidelity
+tradeoff, not a memory advantage at identical spectra. The four comparators
+and all five plots use the same annual cohort. Finite reset rerun drift
+remains advisory: pooled loss differs by +0.0002531
+(about 0.00244%) from the archived reset evaluation, while the maximum local
+relative difference is 3.29457% against a 0.1% reference. Annual coverage does
+not add seed replication or spectral confidence intervals. The dated entries
+below preserve the earlier interim evidence and submission history.
+Both v5 PDFs compile with zero LaTeX warnings, and the checked annual table,
+captions and figures are readable without clipping or overlap; the clean main
+text remains ten pages. See the
+[manuscript validation](../../../artifacts/manuscripts/v5_spectral_matched122_20261115/validation.json).
+
+November 14 [annual coverage audit and reset tail extension](experiments.md#matched-reset-spectra-tail30-20261114)
+corrects the scope of the earlier 92-date explanation: raw GC/M1 spherical
+moments already exist for all 122 annual starts in the November 7 and 9
+smoothing campaigns. Only the newer optimal-filter rerun stops at 92 saved
+dates. The correct matched-reset October 4–December 30 spectra remain absent
+from the searched outputs. The user authorized nine GPU-test jobs, three or
+four dates each and 50 minutes per job, to collect those 30 dates. Submitted
+array `17574447_0–8` is followed by CPU report `17574448`; the initial check
+found all nine forecasts pending and the report waiting on its dependency.
+The original 92-date reset
+campaign and report `17572314` have now completed with all eight shard checks.
+Reuse those 92 reset dates for the eventual annual report and retain the frozen 70-date
+v5 record until a separately validated matched annual comparison is available.
+
+November 14 [v5 matched 70-date update](experiments.md#v5-spectra-matched70-20261114)
+replaces the active 36-date spectral plots, table and numerical discussion in
+both v5 sources at the user's request. All four predictors use the same
+January 1–July 27 starts. M1's exact-loss reduction versus R1 is 2.92% at
+day 5, 5.93% over the rollout and 9.70% at day 10; day-5 power mismatch is
+69.50% versus 68.97%. The tradeoff interpretation remains, without a new
+uncertainty claim. Historical 36-date artifacts are preserved. The 122-start
+annual protocol remains the target; the current 92-date spectral campaign
+does not include the final 30 reset dates.
+
+November 14 [final GPU-test wave](experiments.md#matched-reset-spectra-wave3-20261114):
+70/92 dates are complete and validated. Released GPU-test tasks `17572313_6–7`
+now cover the last 22 dates at 50 minutes, followed by report `17572314`.
+Pending originals `17553196_6–7` and report `17560837` were replaced safely.
+Completed spectra, frozen computation and fixed 36-date manuscript artifacts
+are unchanged. The initial check found task 6 configuring and task 7 pending;
+both subsequently completed in 23m42s/23m28s, followed by the successful 92-date
+report. No annual 122-date scientific comparison follows from that milestone.
+
+November 14 [Section 4.6 smoothing explanation](experiments.md#smoothing-section46-20261114):
+the user replaces the brief Section4.5 paragraph with a dedicated Section4.6.
+The main text now explains spectral relevance, cites GraphCast/AMSE, outlines
+the output-filter procedure and shows day-5 spectra in Figure 7 plus the
+four-model percentage summary in Table 2. Both metrics are explicitly labeled
+as reductions relative to raw GraphCast. Appendix E retains detailed methods.
+The fixed36 data and all figure bytes are unchanged; day5supports the design
+with a small aggregate spectral cost, while day10has higher absolute MSE and
+lower coherence. Space optimization is deferred by the user.
+
+November 14 [36-date Appendix E revision](experiments.md#appendix-e-matched36-20261114):
+`Overleaf/v4.tex` now uses the fixed January 1–April 16 cohort throughout
+Appendix E, its table and all eight figures. The main text retains one short
+red paragraph. Day-5 carry/carry improves MSE by 2.84% versus reset/reset with
+0.50 percentage points higher aggregate power mismatch; the larger day-10
+spectral cost remains explicit. All four comparators are retained. The 36-date
+data, source pins and plotting exports are archived separately and must not
+be overwritten when the larger campaign completes. Main 122-date results
+and their uncertainty are unchanged.
+
+November 14 [second GPU-test wave](experiments.md#matched-reset-spectra-wave2-20261114):
+completed coverage remains 36/92 dates. New `17560836_3–5` covers 34 dates on
+GPU-test at 50 minutes; retained `17553196_6–7` covers 22 dates on regular GPU
+at 61 minutes. Report `17560837` follows all remaining tasks. Replacements
+are released, completed outputs and frozen computation are unchanged, and
+no new spectra from this wave are claimed.
+
+November 14 [same-cohort 36-date comparison](experiments.md#matched-spectra-36-20261114)
+uses newly completed full-campaign reset shards 00–02 and re-pools the matching
+GC/M1/filter moments on exactly those dates. Every updated loss, spectrum,
+amplitude/coherence plot and per-feature plot uses the same January 1–April 16
+sample. Carry/carry has 2.84% lower day-5 MSE than reset/reset, with similar
+aggregate power mismatch (68.66%/68.16%). Its rollout/day-10 MSE advantages
+are 6.01%/10.20%; day-10 mismatch differs more (84.47%/75.74%). These point
+estimates do not establish an advantage at identical power or annual coverage.
+The four-date preview remains historical; manuscript results are not changed
+by this plot-only update. The new plot directory is
+`v24_literature_spectral_matched36_20261114`, including both feature leads.
+
+November 14 [day-10 per-feature extension](experiments.md#feature-spectra-day10-20261114)
+adds all day-10 power, amplitude and coherence counterparts to the existing
+four-date `by_feature` folder. Every plot includes GC, filtered GC, M1 and
+reset/reset. Three seven-page atlases cover all 83 channels; best/worst fields
+are ranked separately at each lead, while familiar fields remain fixed.
+The saved 240-hour moments are reused and day-5 outputs are preserved.
+
+November 14 [accelerated reset spectra](experiments.md#matched-reset-spectra-fast-20261114):
+`17553195_0–2` on GPU-test (50 minutes; 36 dates) and `17553196_3–7` on regular
+GPU (61 minutes; 56 dates) replace pending `17494525/17494526`, with report
+`17553202` after both arrays. Frozen computation and the full 92-date cohort
+are unchanged. All tasks remained pending at final inspection; estimated
+execution is 25–30 minutes per shard after starting, excluding queue delay.
+The three GPU-test shards have subsequently completed; the larger interim
+36-date result is described above. The full 92-date result remains incomplete.
+
+November 14 [required Appendix E comparators](experiments.md#appendix-e-four-models-20261114):
+the user requires reset/reset in every Appendix E experiment, table and plot,
+and excludes filtered M1 from the active comparison. Use raw GraphCast,
+development-filtered GraphCast, raw carry/carry (M1), and raw matched reset/reset
+on identical dates. Only four dates currently have completed spectra for all
+four; the larger reset spectral campaign has no completed statistics/report.
+All active Appendix E comparisons therefore use that four-date cohort and are
+labelled descriptive point estimates. Figures 11–15 are regenerated; 16–18
+already satisfy the comparator/cohort requirement. Prior 92-date filtering
+results and intervals remain archived, not mixed into these four-date plots.
+The principal 122-date memory-policy results and uncertainty are unchanged.
+Future Appendix E extensions must retain all four comparators on a common
+completed cohort, rather than append a reset row from a different sample.
+Table 7 now reports each metric as a percentage reduction relative to raw GC;
+negative values indicate deterioration. The underlying scores are unchanged,
+and the two normalized metrics remain distinct quantities.
+
+November 14 [appendix layout](experiments.md#smoothing-appendix-layout-20261114)
+shows the original carry/carry and reset/reset spectra together at days 5 and
+10, alongside their matched four-date native losses. All detailed smoothing
+methods, results and figures are now in Appendix E, with one short main-text
+summary. The 92-date filtering and four-date memory cohorts remain separate.
+Carry/carry's lower rollout and day-10 MSE accompanies greater attenuation;
+the displayed forecasts have not been amplitude-matched. The new physical
+power plots retain field-specific units and ERA5 reference. No new forecasts
+or training were run.
+
+November 14 [equal-power diagnostic](experiments.md#equal-power-memory-20261114)
+directly tests the proposed lower-MSE-at-identical-spectrum interpretation on
+the four matched preview dates. Positive rescaling to a symmetric common
+forecast-power target gives carry/carry 0.9131% higher weighted represented
+spectral MSE over the rollout, 0.3595% at day 5 and 0.6048% at day 10. The
+ordering persists for carry-power, reset-power and truth-oracle targets and
+when degree zero is included. These small descriptive differences do not
+establish significance or a general absence of memory benefit. The raw
+native-grid and full-cohort memory comparisons remain distinct. The current
+data do not support stating that carry/carry is better at the same spectrum.
+
+November 14 [red manuscript revision](experiments.md#smoothing-manuscript-20261114)
+reports the better measured accuracy/power-mismatch tradeoff relative to the
+tested filtered-GC baseline, while preserving the raw-GC spectral advantage
+and the separate scope of the four-date memory preview. A new paired interval
+for raw M1 versus filtered GC is 4.2643% [3.3738,5.3438]% lower rollout loss;
+day 10 is 4.6311% [3.1632,6.5746]%. These reuse saved 92-date native losses
+and the frozen reporter's 10,000 five-start block draws. No spectral CI or
+memory-related Pareto improvement is inferred. The full 83-channel day-5
+spectral export, fixed-checkpoint figures and code are archived with the paper.
+
+November 13 [per-feature spectral preview](experiments.md#feature-spectra-20261113)
+resolves day 5 into all 83 variable/pressure channels on the same four dates.
+T2m preserves power relatively well; precipitation and mid-atmosphere vertical
+velocity show substantial deficits. Z500 and T850 retain most large-scale
+power but have large relative small-scale errors. Rankings depend on scale
+weighting: equal-degree relative mismatch and ERA5-power-weighted mismatch
+are both retained, with separate amplitude, physical-power and coherence plots.
+M1 has lower equal-degree power mismatch than raw GC in only 3/83 channels,
+and than reset in 30/83. These descriptive counts do not establish significance
+or spectral superiority; they do not measure the exact GraphCast loss.
+
+November 13 [matched reset/reset spectral extension](experiments.md#matched-reset-spectra-20261113)
+adds the original matched reset SWA to the exact-loss figure on the same 92
+dates. Its archived evaluation contains no spectra, so the other six figures
+await a raw spectral rerun with the existing checkpoint. Original jobs
+**17494525/17494526** were superseded on November 14 by arrays
+**17553195/17553196** and report **17553202**, which will regenerate all seven
+plots automatically. Whether memory improves the
+accuracy/amplitude/coherence tradeoff remains unmeasured; no filtered-reset
+variant, retraining or filter fitting is included.
+Four-date preview **17495398** completed in **14m35s** on `gpu-test` within the
+user-requested 59-minute limit. All seven figures now include reset/reset in a
+separate preliminary folder. M1 has1.60% lower rollout loss but worse power
+matching; day5 curves are close and do not show M1 dominance. Finite reset
+rerun drift (~0.29% pooled) is retained. The full92-date comparison remains queued.
+
+November 13 [literature-style spectral figures](experiments.md#literature-spectral-20261113)
+reuse the pinned 92-date optimal-filter subset. New AMSE-style weighted amplitude
+and coherence panels, GraphCast-style spectral RMSE and physical spectra, and
+separate exact native-grid loss curves retain 6-hour, 5-day and 10-day evidence.
+At day 5 raw M1 improves exact loss by 2.2379% against filtered GC; filtering
+both gives 1.6333%. Amplitude deficits and modest coherence changes remain
+distinct. These are fixed-checkpoint point estimates, not five-seed spectra.
+The [presentation plan](../../../docs/reports/v24_spectral_presentation_plan_2026-11-13.txt)
+keeps the day-5 diagnostic prominent and the full lead range available. Original
+AMSE figures were extracted for reference; its reported ensemble-mean RMSE is
+not a directly comparable deterministic GraphCast loss. No jobs or manuscript
+files changed.
+
+November 13 [training-duration and K synthesis](experiments.md#training-steps-k-20261113)
+reuses completed evaluations. M1 at fixed K20 has non-monotonic raw MSE and
+spherical power mismatch at total updates 1,000/1,250/2,500 on four 2022 dates.
+The older relative-power MGDA continuation lowers zonal mismatch 14.750% but
+raises exact MSE 1.144% after 2,000 additional updates on eight 2023 dates.
+The 32-date GC–Mamba K sweep supports an MSE comparison, but has no matched
+saved spectra across K; fixed BPTT24 also changes teacher-prefix length.
+See the [summary and four figures](../../../plots/analyze_models/data/resolution_eval/v24_training_steps_and_k_20261113/REPORT.md).
+These are separate single-seed cohorts and spectral definitions, not a joint
+training-step × K response surface or a new full-GC result. No jobs changed.
 
 November 13 power-spectrum addition to [e015](experiments.md#e015): on the
 same 92 starts, filtering improves MSE but worsens amplitude fidelity. Rollout

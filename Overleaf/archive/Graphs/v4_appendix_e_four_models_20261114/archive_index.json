@@ -1,0 +1,24 @@
+{
+  "files": {
+    "README.md": "ddd81870b70a748ab01eb075c93783ec5479adb7dfa3cdcdd466a6f681d49a64",
+    "all_channels_selected_leads_curves.npz": "e9628c5c85d6820df47e0829ea4c5555aaa03761739e0a52d6e25015fb86a47a",
+    "all_channels_selected_leads_summary.csv": "6f99fed33f4f5c3d6bb33ba9e6534b78ebf7886a73fd4a97b0fbe0658e9f0b22",
+    "feature_day5_curves.csv": "ddf62bde723d72cae293f225872c9f44aff63aa5864527b96b696abf4337c1b2",
+    "loss_by_lead.csv": "7e1940b3b1d8a3aed7e844973817035c54a932e0219d5df424a79989a567badb",
+    "manifest.json": "23b08b3c02521fed89be9d094afb9e57faa5ea5903a684da96573842f2ee8e4f",
+    "plot_v4_appendix_e_four_models_20261114.py": "543dbcfe08cd245f1f0dd23c151bd7d4180b23726930bd201de584ca6512f87f",
+    "plot_v4_smoothing_paper_20261114.py": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501",
+    "summary.json": "b945884d3ed099ddc0ab0deec0948396c8870786935fbb67efbb3cf69ecad21d",
+    "table7_accuracy_power.csv": "9dabe27ccb8ac8eba295df8b93dda1c5863f92490ab971c56505929e8c2253a9",
+    "weighted_spectral_curves.csv": "03437b10a32b13da6d944a6afd0dfc8342fd9c0158ff0b695d156161d23d7170",
+    "table7_relative_to_graphcast.csv": "6c8273263a91733f555628a1b7faa3ece7d2e39b05817537f302759e6ab1911c",
+    "table7_relative_to_graphcast.json": "ac12d3241afcc894fc4c8faa9f8f7b313c0a8e45a9ca5eee9f57421bd7474e08"
+  },
+  "manuscript_figures": {
+    "fig11_smoothing_accuracy_v4_reset.pdf": "5a30188c05186eefd0fb791a989672179f4dae58d09f0fabe897b86c63bafc8f",
+    "fig12_smoothing_amplitude_coherence_v4_reset.pdf": "1aabec4ac7ec166806fddb116fe754eafc19f8c3798549a8b1b81a75a21f8951",
+    "fig13_smoothing_feature_amplitude_v4_reset.pdf": "58c5566f07d1b1a9cd97f94665f2059cbb6679347a22f344cbf105854f39cc51",
+    "fig14_smoothing_feature_coherence_v4_reset.pdf": "e9e7632f380c6820ebadda8f2c6cee0476b58862c3df599ccc450b94daabbfb6",
+    "fig15_smoothing_lead_spectra_v4_reset.pdf": "7e330998a7dfd3e76fc3138d4522e5a57094466fbc22555247dc7ef69233246d"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "source": "artifacts/manuscripts/v5_spectral_matched70_20261114",
+  "count": 70,
+  "files": {
+    "weighted_spectral_curves.csv": "4e1269e92260475fa8df232c965df3f39e71dec073fa3a222a28b3d88ed85b63",
+    "cohort.json": "8b016ed22f64b7438ad778c17eae242d3ca646619a172d2509733659eba99df8",
+    "reproduction.json": "273038e48f0bbc237f3f7baa56c0f9232f84b1be89cf6546b7e080ab758f815e",
+    "loss_by_lead.csv": "f3ec3933b82f0fd9cf18ecdb65484c3fb23dccae3b34c57560468bbc407a6023",
+    "plot_v5_matched_spectra.py": "ee2552f6341aec77a4ec345642125b688cf12fa5dd65143ff3ee19fc2822f7e0",
+    "comparison_scores.csv": "78ac605edc7750baa706c17b5b3ca1443e9a927c3de859a7afd4d4aab1f1fb58",
+    "README.md": "8e921edb1c763aca16be47c6ff8cf9f0aacede7b6eb6ffe650b781948991d0a0",
+    "all_channels_selected_leads_curves.npz": "0f7f7d42a3d9b96064f557f33ac71e8205f38706c6cf58028b2539fa29e066c4",
+    "independent_numeric_validation.json": "d67d387db018de0497d07ecb280114a3640f3f31eff2d05802eb0b3fa5fc9fe8",
+    "plot_v4_smoothing_paper_20261114.py": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501",
+    "table1_rows.tex": "5444ec3ee8da272b726828fbc46ea2483dbe048b826f896f81c24108d5bba80c",
+    "summary.json": "47ffa675b45d85c373abe3331ed377b5cdd9e1ab915b287e8781683e86f54dec",
+    "manifest.json": "45e6cb481c22a136eaf70d5a13f91f64915db3e7ec0ea4a3f82c115d83594d65",
+    "feature_day5_curves.csv": "83a1a6e714a8018b9d83cd4032ef8c9c50de1c121346d2096dff831279d7b580",
+    "previous36/fig10_smoothing_loss_v5_pending122.pdf": "f219a060b75e5a7ccbf6a1e1fb9f00a30b6fe0365c3a5941080f270652404153",
+    "previous36/fig13_smoothing_lead_spectra_v5_pending122.pdf": "7ee13b7f98d0a1655ad5a406af52c8f5d99f9683bd60fc6591c7ea1d67a68360",
+    "previous36/fig6_smoothing_day5_day10_v5_pending122.pdf": "9879c459cc0427654f93611792bacaf0eae4c49b5670e1658f29e6b52ab6db39",
+    "previous36/fig11_smoothing_feature_amplitude_v5_pending122.pdf": "762bba6f0e1e5b02f277c84b6fdd423bb8934a0b00a225f934c07b9a98e852b5",
+    "previous36/fig12_smoothing_feature_coherence_v5_pending122.pdf": "4d9a7e9360eb47f05384fd27a60e70d59dba8e18b773bdd54e342d9e8c124bc7"
+  }
+}

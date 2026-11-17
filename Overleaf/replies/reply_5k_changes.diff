@@ -1,0 +1,72 @@
+--- reply_Jvjy.txt (original preserved)
++++ reply_Jvjy_5k.txt
+@@ -1,26 +1,24 @@
++TITLE
++=====
++Following your suggestions, we have removed the carry/reset diagnostic, evaluated the selected K=20 configuration across the 2023 test year, and retained only the carry/carry (M1) versus reset/reset (R1) comparison. We also added five independent retrainings and reported variability and confidence intervals.
++
++MAIN TEXT
++=========
+ We thank the reviewer for the constructive comments.
+ 
+-Following your suggestions, we have removed the carry/reset diagnostic, evaluated the selected K=20 configuration across the 2023 test year keeping only carry/carry (M1) and reset/reset (R1) comparison. We also added five independent retrainings and provided variance and confident intervals.
++W1. Controlled memory comparison
+ 
+-W1. The core proposition relies on a comparison between persistent memory and memory reset models. However, Figure 6 combines the results of different experimental runs, while Appendix A.2 shows the differences in loss calculation between the main experiments and memory control. In addition, carry/reset introduces training inference mismatch. Therefore, the 10.77 percentage point advantage reported has not yet provided a fully controllable estimate of the independent contribution to temporal memory.
++We thank the reviewer for highlighting the need for a controlled memory comparison. The original manuscript used carry/carry versus reset/reset to support the benefit of persistent memory. We removed the carry/reset diagnostic, which tested a trained model's dependence on retained memory rather than model superiority, to avoid confusion from its training-inference mismatch.
+ 
+-Response:
++The revised M1 (carry/carry) versus R1 (reset/reset) comparison uses consistent training and scoring, addressing the loss-calculation concern. Both it and the independent retrainings support a persistent-memory benefit. Q1 below gives the controls, updated estimates, replication and uncertainty; Q2 clarifies the scope of this conclusion.
+ 
+-We thank the reviewer for highlighting the need for a clearly controlled memory comparison. The original manuscript already used carry/carry versus reset/reset to support the claimed benefit of persistent memory. The additional carry/reset diagnostic, examined a trained model's dependence on retained memory rather than model superiority. To avoid confusion arising from its training-inference mismatch we removed carry/resey diagnostic from the text.
++W2. Independent testing and checkpoint consistency
+ 
+-The revised matched comparison between M1 (carry/carry) and R1 (reset/reset) uses consistent training and scoring procedures, addressing the loss-calculation concern. Both this comparison and the independent retrainings support a benefit from persistent memory. See Q1 below for the controlled settings, updated M1-R1 estimates, replication results, and uncertainty analysis. Q2 clarifies the scope of this conclusion within the chosen architecture.
++We thank the reviewer for emphasizing independent testing and consistent comparisons. The selected configuration is fixed before independent full-year testing. Q1 gives the separate training, selection and test data, five retrainings, and retraining versus forecast-date uncertainty.
+ 
+-W2. The preliminary assessment only used 32 predictions from the 2022 development set for initialization, which also provides information for hyperparameter selection. Do not provide confidence intervals, multiple training seeds, and independent test results. Although Appendix C includes annual comparisons, these comparisons use different model configurations (K=22), which limits their direct comparability with the main results.
++Earlier checkpoints yielded broadly similar results, but we agree that principal comparisons require a unified setup. The repeated 0.25° GraphCast comparison uses the original selected K=20 checkpoint M1, as in the variable-group and spectral analyses, and retains its RMSE advantage on matched available dates and a common verification grid (Section 4.4, Figure 4, Appendix D).
+ 
+-Response:
+-
+-We thank the reviewer for emphasizing independent testing and consistency across comparisons. We now separate training, model selection, and independent full-year testing, with the selected configuration fixed before test evaluation. See Q1 below for the data split, five independent retrainings, and separate estimates of retraining variability and forecast-date uncertainty.
+-
+-Although the earlier checkpoints yielded broadly similar results, we agree that the principal comparisons require a unified setup. The repeated 0.25° GraphCast comparison now uses the original selected K=20 checkpoint M1, consistent with the variable-group and spectral analyses, and retains its RMSE advantage on matched available dates and a common verification grid (Section 4.4, Figure 4, Appendix D).
+-
+-Q1. Can the author evaluate the main model on a larger independent test set and report statistical uncertainty? This will help establish improved robustness under different atmospheric conditions.
+-
+-Response:
++Q1. Test evaluation and uncertainty
+ 
+ Training uses ERA5 2015-2021, model selection uses 32 initializations from 2022, and principal testing uses 122 initializations spanning 2023. On this test year, five independent retrainings of the fixed configuration, evaluated with checkpoint averaging, yield mean GraphCast loss reductions of 14.17% over the ten-day rollout and 21.03% at day 10. The corresponding sample standard deviations are 0.43 and 0.75 percentage points (Figure 3, Appendix A.5).
+ 
+@@ -28,11 +26,9 @@
+ 
+ In the independent replication using raw update-2,000 checkpoints for both policies, all five M1 retrainings outperform the local R1 retraining. Their mean rollout loss reduction is 13.51%, with a sample standard deviation of 0.42 percentage points, compared with 9.21% for R1. Even the weakest M1 retraining exceeds R1 by 3.61 percentage points, so the observed advantage is substantial relative to the measured variability across M1 retrainings. R1 has one local training seed, so this comparison does not estimate variability across reset-trained runs. Figure 5 presents this replication separately from the checkpoint-averaged comparison.
+ 
+-The sample standard deviations above describe variation across retrainings. Separately, paired date-block-bootstrap 95% confidence intervals quantify forecast-date uncertainty for fixed checkpoints (Figures 4, 5, and 14; Appendices A.4 and D). They do not estimate training-seed or between-year uncertainty.
++Sample standard deviations describe retraining variability. Paired date-block-bootstrap 95% confidence intervals quantify forecast-date uncertainty for fixed checkpoints, not training-seed or between-year uncertainty (Figures 4, 5, and 14; Appendices A.4 and D).
+ 
+-Q2. How does the proposed method compare to GRU/LSTM or fixed history correction models that match parameters? This comparison will clarify whether these gains come from Mamba specific memory mechanisms or more general temporal conditioning effects.
+-
+-Response:
++Q2. Comparisons with other temporal architectures
+ 
+ We thank the reviewer for raising this distinction. Our experiment tests whether retaining temporal state improves correction skill within a fixed architecture and parameter count. M1 and R1 share the same Mamba-based branch and differ in their temporal-state policy during training and forecasting. This comparison supports a benefit from persistent state in that branch, but cannot attribute it to a mechanism unique to Mamba.
+ 
+
+--- reply_v96w.txt (original preserved)
++++ reply_v96w_5k.txt
+@@ -1,6 +1,10 @@
++TITLE
++=====
++Following your suggestions, we have added spectral diagnostics at days 5 and 10 and a fitted output-filtering control to assess the role of smoothing. To address your concern about checkpoint consistency, we have repeated the comparison with 0.25° GraphCast using the principal K=20 checkpoint M1, with paired confidence intervals. The revised results distinguish improvements in forecast error from preservation of spatial detail.
++
++MAIN TEXT
++=========
+ We thank the reviewer for the constructive comments and the positive assessment of our correction approach.
+-
+-Following your suggestions, we have added spectral diagnostics at days 5 and 10 and a fitted output-filtering control to assess the role of smoothing. To address your concern about checkpoint consistency, we have repeated the comparison with 0.25° GraphCast using the principal K=20 checkpoint M1, with paired confidence intervals. The revised results distinguish improvements in forecast error from preservation of spatial detail.
+ 
+ W1. Potential Effect of Smoothed prediction: As authors mentioned in the limitations section, the RMSE improvements may partially stem from smooth prediction rather than better prediction, lowering RMSE by blurry outputs. It is recommended to clarify this point, to strengthen the effectiveness of the proposed method.
+ 

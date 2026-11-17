@@ -1,0 +1,3 @@
+Matched reset/reset is included in every figure. Raw reset only; no fitted reset filter.
+All comparisons use the same 36 initialization dates and original matched SWA checkpoint.
+Report: /scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_spectra_completed_20261114/reset

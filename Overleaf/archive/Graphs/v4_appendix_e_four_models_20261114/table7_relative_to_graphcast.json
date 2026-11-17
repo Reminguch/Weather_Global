@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-14",
+  "source": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/table7_accuracy_power.csv",
+  "source_sha256": "9dabe27ccb8ac8eba295df8b93dda1c5863f92490ab971c56505929e8c2253a9",
+  "reference_model": "GC",
+  "formula": "100 * (1 - model_score / raw_GraphCast_score), applied separately to pooled rollout loss and the pooled power-mismatch score",
+  "sign_convention": "positive = improvement; negative = deterioration; zero = raw GraphCast reference",
+  "columns_are_distinct_diagnostics": true,
+  "cohort_count": 4,
+  "lead_count": 40,
+  "raw_metrics_unchanged": true,
+  "rows": [
+    {
+      "forecast_count": "4",
+      "lead_count": "40",
+      "model": "GC",
+      "label": "GraphCast",
+      "exact_gc_rollout_loss": "11.851948332219331",
+      "power_mismatch_pct": "59.62183361197707",
+      "loss_reduction_vs_raw_gc_pct": 0.0,
+      "power_mismatch_reduction_vs_raw_gc_pct": 0.0
+    },
+    {
+      "forecast_count": "4",
+      "lead_count": "40",
+      "model": "GC_filter",
+      "label": "GC + optimal filter",
+      "exact_gc_rollout_loss": "10.623955864661935",
+      "power_mismatch_pct": "78.49913405807487",
+      "loss_reduction_vs_raw_gc_pct": 10.361102100142627,
+      "power_mismatch_reduction_vs_raw_gc_pct": -31.66172407402388
+    },
+    {
+      "forecast_count": "4",
+      "lead_count": "40",
+      "model": "M1",
+      "label": "Carry/carry (M1)",
+      "exact_gc_rollout_loss": "10.002799668006592",
+      "power_mismatch_pct": "67.4916019730978",
+      "loss_reduction_vs_raw_gc_pct": 15.602064845202356,
+      "power_mismatch_reduction_vs_raw_gc_pct": -13.199473891289081
+    },
+    {
+      "forecast_count": "4",
+      "lead_count": "40",
+      "model": "reset",
+      "label": "Reset/reset",
+      "exact_gc_rollout_loss": "10.164970060993923",
+      "power_mismatch_pct": "65.99417130600169",
+      "loss_reduction_vs_raw_gc_pct": 14.233763293072965,
+      "power_mismatch_reduction_vs_raw_gc_pct": -10.68792639873546
+    }
+  ]
+}

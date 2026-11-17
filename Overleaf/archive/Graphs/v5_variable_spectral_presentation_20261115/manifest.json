@@ -1,0 +1,47 @@
+{
+  "cohort_count": 122,
+  "channels": 83,
+  "source_pins": "input_manifest.json",
+  "renderer_sha256": "0fa6ac0c8a5ff8e9c09f8db7395b737503d348833a5bcef34326ed8506bb5b51",
+  "products": [
+    {
+      "filename": "fig6_smoothing_day5_day10_v5_variables122.pdf",
+      "sha256": "c90370388a4d482e2109f767608ef46d5ed91fa394aa40e68726a29fbb567d09"
+    },
+    {
+      "filename": "fig6_smoothing_day5_day10_v5_variables122.png",
+      "sha256": "4c69fb7a9ca9e62c3bd4a12114df984c0107b1c980a30bd2e03962c21b8dbcb6"
+    },
+    {
+      "filename": "fig11_smoothing_variables_day5_v5_matched122.pdf",
+      "sha256": "d365e5d34ae940926dd9e4094a4d22fe26a8973796ac9d315b07c2725ad21fe3"
+    },
+    {
+      "filename": "fig11_smoothing_variables_day5_v5_matched122.png",
+      "sha256": "8b2e00d27027a16ceb4b940f34ba9c1593e9343501f61b7e1d6e665e0018b875"
+    },
+    {
+      "filename": "fig12_smoothing_variables_day10_v5_matched122.pdf",
+      "sha256": "19b07ed2044fd9a6804cb4a854b42b7aae70ab5108a699c1b2675f9cdab9da47"
+    },
+    {
+      "filename": "fig12_smoothing_variables_day10_v5_matched122.png",
+      "sha256": "1dbc557052121a2d842382978e9fa517063f4569dd9cb40d6be38dac5cea5726"
+    },
+    {
+      "filename": "fig13_smoothing_lead_spectra_v5_variables122.pdf",
+      "sha256": "506c766b9b6d1ac0e343ce6c2c96c0496a15fc7ee4d99a3037d2a1e6ece34de6"
+    },
+    {
+      "filename": "fig13_smoothing_lead_spectra_v5_variables122.png",
+      "sha256": "a0c99d7ff973e7690df5954e153ed7ef4a0654ca29540bca11fbebd7cc72c3b8"
+    }
+  ],
+  "checks": {
+    "full_channel_export_agreement": true,
+    "native_grid_rmse_contrast_agreement": true,
+    "all_plotted_curve_values_verified": true,
+    "no_displayed_data_clipped": true
+  },
+  "notes": "Fixed-checkpoint point estimates. No new evaluation or training. Full source cohort and finite warnings are in the archived summaries."
+}

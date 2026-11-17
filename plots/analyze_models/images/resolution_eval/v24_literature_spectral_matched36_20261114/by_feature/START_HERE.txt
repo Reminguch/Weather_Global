@@ -1,0 +1,8 @@
+36-date feature spectra at day 5 and day 10
+
+All four models use the same 36 dates (2023-01-01 to 2023-04-16).
+Start with familiar_power_5d/10d.pdf, familiar_amplitude_5d/10d.pdf and familiar_coherence_5d/10d.pdf.
+The all_features_*_5d/10d.pdf atlases each cover all 83 channels on 7 pages.
+Best/worst fields are reranked for each lead; familiar fields stay fixed.
+Labels compare M1/raw-GC absolute equal-degree power mismatch; no filtered M1 is shown.
+Numerical rankings, curves, metric manifests and summaries are in the matching data/by_feature folder.

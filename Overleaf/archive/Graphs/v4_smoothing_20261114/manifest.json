@@ -1,0 +1,373 @@
+{
+  "created": "2026-11-14",
+  "description": "Compact v4 smoothing figures; saved-data analysis only",
+  "cohorts": {
+    "interim92": {
+      "count": 92,
+      "planned_count": 122,
+      "initialization_ids": [
+        "20230101T000000Z",
+        "20230104T000000Z",
+        "20230107T000000Z",
+        "20230110T000000Z",
+        "20230113T000000Z",
+        "20230116T000000Z",
+        "20230119T000000Z",
+        "20230122T000000Z",
+        "20230125T000000Z",
+        "20230128T000000Z",
+        "20230131T000000Z",
+        "20230203T000000Z",
+        "20230206T000000Z",
+        "20230209T000000Z",
+        "20230212T000000Z",
+        "20230215T000000Z",
+        "20230218T000000Z",
+        "20230221T000000Z",
+        "20230224T000000Z",
+        "20230227T000000Z",
+        "20230302T000000Z",
+        "20230305T000000Z",
+        "20230308T000000Z",
+        "20230311T000000Z",
+        "20230314T000000Z",
+        "20230317T000000Z",
+        "20230320T000000Z",
+        "20230323T000000Z",
+        "20230326T000000Z",
+        "20230329T000000Z",
+        "20230401T000000Z",
+        "20230404T000000Z",
+        "20230407T000000Z",
+        "20230410T000000Z",
+        "20230413T000000Z",
+        "20230416T000000Z",
+        "20230419T000000Z",
+        "20230422T000000Z",
+        "20230425T000000Z",
+        "20230428T000000Z",
+        "20230501T000000Z",
+        "20230504T000000Z",
+        "20230507T000000Z",
+        "20230510T000000Z",
+        "20230513T000000Z",
+        "20230516T000000Z",
+        "20230519T000000Z",
+        "20230522T000000Z",
+        "20230525T000000Z",
+        "20230528T000000Z",
+        "20230531T000000Z",
+        "20230603T000000Z",
+        "20230606T000000Z",
+        "20230609T000000Z",
+        "20230612T000000Z",
+        "20230615T000000Z",
+        "20230618T000000Z",
+        "20230621T000000Z",
+        "20230624T000000Z",
+        "20230627T000000Z",
+        "20230630T000000Z",
+        "20230703T000000Z",
+        "20230706T000000Z",
+        "20230709T000000Z",
+        "20230712T000000Z",
+        "20230715T000000Z",
+        "20230718T000000Z",
+        "20230721T000000Z",
+        "20230724T000000Z",
+        "20230727T000000Z",
+        "20230730T000000Z",
+        "20230802T000000Z",
+        "20230805T000000Z",
+        "20230808T000000Z",
+        "20230811T000000Z",
+        "20230814T000000Z",
+        "20230817T000000Z",
+        "20230820T000000Z",
+        "20230823T000000Z",
+        "20230826T000000Z",
+        "20230829T000000Z",
+        "20230901T000000Z",
+        "20230904T000000Z",
+        "20230907T000000Z",
+        "20230910T000000Z",
+        "20230913T000000Z",
+        "20230916T000000Z",
+        "20230919T000000Z",
+        "20230922T000000Z",
+        "20230925T000000Z",
+        "20230928T000000Z",
+        "20231001T000000Z"
+      ],
+      "status": "interim_incomplete_annual_evaluation",
+      "models": [
+        "GC",
+        "M1",
+        "GC_filter"
+      ],
+      "sources": [
+        {
+          "path": "plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/summary.json",
+          "sha256": "fdd1fd1ef3a85f901e8b199243e1ec0af69196a1bbff430605662bd07c707c92"
+        },
+        {
+          "path": "plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/power_pooled.npz",
+          "sha256": "c9c965a14c184bf85663d8bd0522018542fc31852db3c45b4180420cad771a47"
+        }
+      ]
+    },
+    "preview4": {
+      "count": 4,
+      "initialization_ids": [
+        "20230101T000000Z",
+        "20230401T000000Z",
+        "20230703T000000Z",
+        "20231001T000000Z"
+      ],
+      "status": "preliminary_four_date_preview",
+      "models": [
+        "GC",
+        "M1",
+        "GC_filter",
+        "reset"
+      ],
+      "sources": [
+        {
+          "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/gc_m1_reference/summary.json",
+          "sha256": "2586b5949e0362f3efd5366865c11bd64d3d40a06ec91b73bc9a63d5ff5f6f43"
+        },
+        {
+          "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/gc_m1_reference/power_pooled.npz",
+          "sha256": "9aa28bfdb6083ed0b869b1b8f0688cdd3773848feff7ce06776dcb80c98e0da4"
+        },
+        {
+          "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/report/summary.json",
+          "sha256": "177f31f0bf894c9e8120dade1d0439bc7e20aa1ebcecd6ce843a58ef6c36be80"
+        },
+        {
+          "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/report/power_pooled.npz",
+          "sha256": "360bb3d17edb0c7fbbab5826bb6c29418488a4b07db5feaf85d655f12789b20c"
+        }
+      ]
+    }
+  },
+  "filter_fit": "32 development starts in 2022; unchanged fitted filters, output-only application",
+  "definitions": {
+    "loss": "Saved exact native-grid GraphCast weighted MSE, pooled over dates; ratios of pooled losses",
+    "amplitude_ratio": "Per-channel sqrt(pooled forecast power / pooled truth power), then loss variable/pressure-weighted mean",
+    "coherence": "Per-channel pooled real cross-power / sqrt(pooled forecast power * pooled truth power), then loss variable/pressure-weighted mean",
+    "weights": "Frozen loss variable and pressure weights normalized to sum one; no stddev normalization for dimensionless ratios",
+    "degree_range": "1..179; positive degrees only for spectral curves; physical fields without climatological-mean removal",
+    "power_error": "100*mean abs(pooled forecast/truth power-1), equal over positive degrees and channels, then leads",
+    "channel_power_mismatch_equal_degree_pct": "100*mean_l abs(Pforecast(l)/Ptruth(l)-1), l=1..179; powers pooled over 92 dates before division",
+    "channel_power_mismatch_truth_power_weighted_pct": "100*sum_l abs(Pforecast(l)-Ptruth(l))/sum_l Ptruth(l), l=1..179; pooled powers",
+    "channel_mean_coherence": "Equal-degree mean of per-channel pooled cross-power/sqrt(Pforecast*Ptruth), l=1..179",
+    "feature_annotations": "Day-5 equal-degree power mismatch for raw M1 and raw GC, rounded to one decimal percent; identical scalar diagnostic in amplitude and coherence panels",
+    "uncertainty": "No spectral confidence intervals or seed variation; fixed original M1 and matched reset checkpoint",
+    "coherence_dashes": "GC blue and filtered GC teal use complementary (5,5) dash phases; no markers, arrows, offsets or clipping"
+  },
+  "checks": {
+    "interim92": {
+      "spectral_identity_relative_max": 1.8178350183993303e-15,
+      "maximum_absolute_channel_coherence": 0.9999995672707075,
+      "finite_values_retained": true,
+      "spectral_intervals": "not estimated"
+    },
+    "preview4": {
+      "spectral_identity_relative_max": 6.575784960456679e-16,
+      "maximum_absolute_channel_coherence": 0.9999996225499289,
+      "finite_values_retained": true,
+      "spectral_intervals": "not estimated"
+    },
+    "normalized_weight_sum": 0.9999999999999998,
+    "same_truth_in_preview": true,
+    "source_exact_losses_reproduced": true
+  },
+  "contrasts": {
+    "interim92": {
+      "rollout": {
+        "exact_loss_by_model": {
+          "GC": 11.448889152283739,
+          "M1": 9.768063645853116,
+          "GC_filter": 10.20315669909937
+        },
+        "m1_vs_raw_gc_reduction_pct": 14.68112306856726,
+        "m1_vs_optimal_gc_reduction_pct": 4.264298452700032,
+        "optimal_gc_vs_raw_gc_reduction_pct": 10.880815043404269,
+        "power_error_by_model_pct": {
+          "GC": 59.414130399928624,
+          "M1": 67.52670048606886,
+          "GC_filter": 78.39950227081155
+        }
+      },
+      "day5": {
+        "exact_loss_by_model": {
+          "GC": 8.442643400918392,
+          "M1": 7.939987497914328,
+          "GC_filter": 8.121747462163912
+        },
+        "m1_vs_raw_gc_reduction_pct": 5.9537739441818065,
+        "m1_vs_optimal_gc_reduction_pct": 2.2379415894957733,
+        "optimal_gc_vs_raw_gc_reduction_pct": 3.800894145541822,
+        "power_error_by_model_pct": {
+          "GC": 61.709417391015165,
+          "M1": 69.69678147551753,
+          "GC_filter": 82.46856510864691
+        }
+      },
+      "day10": {
+        "exact_loss_by_model": {
+          "GC": 29.819359558521732,
+          "M1": 23.141245544165464,
+          "GC_filter": 24.26497179829439
+        },
+        "m1_vs_raw_gc_reduction_pct": 22.395229519434146,
+        "m1_vs_optimal_gc_reduction_pct": 4.631063507800626,
+        "optimal_gc_vs_raw_gc_reduction_pct": 18.626784218241255,
+        "power_error_by_model_pct": {
+          "GC": 65.62918576172636,
+          "M1": 84.19393119559028,
+          "GC_filter": 92.11362805801444
+        }
+      }
+    },
+    "preview4": {
+      "rollout": {
+        "exact_loss_by_model": {
+          "GC": 11.851948332219331,
+          "M1": 10.002799668006592,
+          "GC_filter": 10.623955864661935,
+          "reset": 10.164970060993923
+        },
+        "m1_vs_raw_gc_reduction_pct": 15.602064845202356,
+        "m1_vs_optimal_gc_reduction_pct": 5.846750537824352,
+        "optimal_gc_vs_raw_gc_reduction_pct": 10.361102100142627,
+        "power_error_by_model_pct": {
+          "GC": 59.62183361197707,
+          "M1": 67.4916019730978,
+          "GC_filter": 78.49913405807487,
+          "reset": 65.99417130600169
+        },
+        "m1_vs_reset_reduction_pct": 1.59538485617019
+      },
+      "day5": {
+        "exact_loss_by_model": {
+          "GC": 9.361321021161192,
+          "M1": 8.69140780114301,
+          "GC_filter": 8.975101110019923,
+          "reset": 8.666931354480623
+        },
+        "m1_vs_raw_gc_reduction_pct": 7.156182535604206,
+        "m1_vs_optimal_gc_reduction_pct": 3.1608926228161804,
+        "optimal_gc_vs_raw_gc_reduction_pct": 4.125698822508306,
+        "power_error_by_model_pct": {
+          "GC": 61.545618287059845,
+          "M1": 69.36504743523663,
+          "GC_filter": 82.59256930444214,
+          "reset": 68.85440287396355
+        },
+        "m1_vs_reset_reduction_pct": -0.28241191329769766
+      },
+      "day10": {
+        "exact_loss_by_model": {
+          "GC": 30.10311379210348,
+          "M1": 22.748759864519364,
+          "GC_filter": 24.84683081587265,
+          "reset": 23.791522892113342
+        },
+        "m1_vs_raw_gc_reduction_pct": 24.430542230197048,
+        "m1_vs_optimal_gc_reduction_pct": 8.444018341417593,
+        "optimal_gc_vs_raw_gc_reduction_pct": 17.46092783800204,
+        "power_error_by_model_pct": {
+          "GC": 66.55944392026841,
+          "M1": 84.24510589327029,
+          "GC_filter": 92.23580877270606,
+          "reset": 76.13262142887092
+        },
+        "m1_vs_reset_reduction_pct": 4.382918371062505
+      }
+    }
+  },
+  "sources": [
+    {
+      "path": "artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json",
+      "sha256": "822eeba33b190db255e57397437af7329d19279fad544833f84cb3cf4d114e3f"
+    },
+    {
+      "path": "scripts/analyze_models/plot_v4_smoothing_paper_20261114.py",
+      "sha256": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501"
+    }
+  ],
+  "figures": [
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_loss_92.pdf",
+      "sha256": "6bc2a179a458a801948f72f6eb74ac1b24a54e57061b686a92eb753ba9243ea3"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_loss_92.png",
+      "sha256": "7ea359269a34781c0a526b9a40012b88bee8aba6d283855c9382d87a2d34ea04"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_spectra_day5_92.pdf",
+      "sha256": "7d8282a1ccc2d7bf456dbbacefd26cd65530f1db2d9ef48b5a3fda938879278b"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_spectra_day5_92.png",
+      "sha256": "fa516c5cd301d130f62e684f434d1767c3f57de533d5f26a5f3a709bec6f79ed"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_reset_preview4.pdf",
+      "sha256": "681ae464e92ac150467a9418e49a43d8b0cdb5c1a35d442c0c45a78126467453"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_reset_preview4.png",
+      "sha256": "74e9a5f49eba5359e316e22446c0d1e5ab1e0ba115ce61b52d86bdfec727399d"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_features_amplitude_day5_92.pdf",
+      "sha256": "d469a844e3f8af1dd54c7e8dd675a1a1a01f6eac69f77f4afccbf0b1ca4408eb"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_features_amplitude_day5_92.png",
+      "sha256": "ac8817f39c82fb3e37a0ff390b549f680eee448b019f694b51fa4bdde11badf0"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_features_coherence_day5_92.pdf",
+      "sha256": "74d812e17b16b738ab84a57f70ea460b6b5cffca8d73fa7cfffaf124e10fb3f0"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_features_coherence_day5_92.png",
+      "sha256": "992152ecb77f4ae1969bf8b62aa639822001fabf5a4e10265665abafce1cdbfb"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_spectra_6h_5d_10d_92.pdf",
+      "sha256": "2fbf52fcf77defddca177a8ac049f9e6bf0ae0f73231385c3a92117f3b9db273"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_smoothing_paper_20261114/smoothing_spectra_6h_5d_10d_92.png",
+      "sha256": "036373a01bc4953f470e6bfc6f3bae5ea72e9a84b87ce6a8fe35e7149ff48441"
+    }
+  ],
+  "curves": [
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_smoothing_paper_20261114/loss_by_lead.csv",
+      "sha256": "3a897e4cb9149d409397535c6689629c2589d95100ddf9157448fb220251c9dd"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_smoothing_paper_20261114/weighted_spectral_curves.csv",
+      "sha256": "8b71572bf0c36765ef1a4b11e683752b4e0a86a46e751874342b46e7bc5564b9"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_smoothing_paper_20261114/feature_day5_curves.csv",
+      "sha256": "ca3bf19f822ce3bae090ec3210c7eb8436c0b8f611c566c35b3dae624159c52e"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_smoothing_paper_20261114/all_channels_day5_summary.csv",
+      "sha256": "62782740eb7951425de1c6c49f3bdff6da4f70281d239400114fdc97ae079e76"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_smoothing_paper_20261114/all_channels_day5_curves.npz",
+      "sha256": "e180271998e12d89aeb2351e1727b5325f1cd143c54a177bb95e3d1c58a8fff2"
+    }
+  ]
+}

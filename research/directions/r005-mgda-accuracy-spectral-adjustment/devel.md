@@ -1,6 +1,56 @@
 # Development — MSE / AMSE-adjustment MGDA
 
-Updated: 2026-11-13 (America/New_York)
+Updated: 2026-11-15 (America/New_York)
+
+## Current annual spectral handoff — 2026-11-15
+
+The matched reset campaign is complete for all 122 standard 2023 dates.
+Use `artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/annual122_report/`
+for the pooled reset source, not the historical 92-date report alone. Nine
+tail tasks `17574447_0–8` and CPU report `17574448` completed with exit code zero;
+the report ended November 14 at 23:56:24 America/New_York. Its
+`checks/report.json` records 30 tail dates, 122 annual dates and preservation of
+the original 92. The audited pool covers January 1–December 30, every third
+day, with 40 leads (6–240 h), 83 channels and degree 0–179. All numeric arrays
+are finite and the recorded pooled SHA256 matches the file.
+
+The newer optimal-filter campaign `v24_optimal_smoothing_v4_20261112` also now
+contains all 122 GC/M1 date statistics. The November 13 pending/92-date notes
+below are historical, not the current coverage. For the authorized full-cohort
+v5 update, use separate output root
+`artifacts/evaluations/v24_matched_spectra_v5_replot_20261115`, archive
+`Overleaf/archive/Graphs/v5_spectral_matched122_20261115`, and build directory
+`artifacts/manuscripts/v5_spectral_matched122_20261115/build`.
+Retain the frozen 36/70-date archives and original bootstrap/seed results.
+Reset rerun diagnostics remain saved warnings, including the 3.29457% maximum
+local relative drift against the 0.1% reference; they do not block this update.
+The annual report itself has `plot_refresh=false`; its completion is separate
+from the user-authorized v5 replot and manuscript revision.
+
+The new replot summary now reports `complete_matched_2023`. Its five PDFs/PNGs
+use `_v5_matched122` filenames and all four comparators on the annual cohort.
+The portable archive holds the plotting source, all-channel numeric curves,
+exact-loss/power table rows, source pins and finite-drift diagnostics. The
+independent 48-metric arithmetic check reproduced the exports to maximum
+absolute difference `1.4210854715202004e-14`. See
+[replot summary](../../../artifacts/evaluations/v24_matched_spectra_v5_replot_20261115/summary.json)
+and [portable archive](../../../Overleaf/archive/Graphs/v5_spectral_matched122_20261115/summary.json).
+Main manuscript anchors are Figures 6 and 10–13 plus Table 1; all affected
+captions and claims must use 122 dates. Do not restore removed physical-power
+figures or overwrite the 70-date archive.
+
+The marked and clean v5 sources now reference all five annual PDFs and use the
+new table/contrasts. Before-edit source copies and `numeric_replacements.json`
+are under `artifacts/manuscripts/v5_spectral_matched122_20261115/`; keep the
+compilation logs and PDFs in its `build/` directory as the final build record.
+
+The [completed manuscript validation](../../../artifacts/manuscripts/v5_spectral_matched122_20261115/validation.json)
+records successful marked/clean builds (37/29 pages), zero LaTeX warnings,
+zero occurrences of provisional wording and verified annual numerical claims.
+The clean main text remains ten pages. Visual inspection of clean pages
+9–10 and 22–25 found no clipping or overlap. The reviewer v96w response is
+synchronized; standalone and combined reply builds pass. Original collaborator
+comments and the 36/70-date archives are preserved.
 
 ## Optimal spherical filtering on v4's cohort — 2026-11-12
 
@@ -887,3 +937,55 @@ Implementation is complete when the new graph supports the declared24/K20/96
 contract, the focused tests pass, metadata and exact resume describe it
 correctly, and the bounded campaign is ready to run. Forecast improvement is
 an experimental outcome, not an implementation acceptance condition.
+
+
+### 2026-11-14 — Fixed 36-date Appendix E handoff
+
+The user explicitly requested preserving the 36-date diagnostic while the
+remaining full-campaign spectra finish. The manuscript now points to
+`fig11`–`fig18` files ending `_matched36.pdf`; Figure16 replaces the redundant
+loss/spectral grid with a compact two-panel percentage summary. All others
+retain the prior canvas sizes and all manuscript inclusion widths are intact.
+The paper script pins the exact cohort SHA256, verifies all 12 prior scores,
+and asserts carry/reset original powers remain unchanged. Portable numerical
+exports and source/code pins are under
+`Overleaf/archive/Graphs/v4_appendix_e_matched36_20261114/`.
+
+Do not overwrite this archive or silently update its cohort when additional
+shards arrive. A full-cohort manuscript revision requires new output/archive
+names and explicit updates to every table, caption and numerical claim. The
+principal 122-date bootstrap/seed comparisons remain a separate evaluation.
+
+### 2026-11-14 — Complete the annual matched-reset spectral cohort
+
+The user authorized nine 50-minute GPU-test jobs for the missing 30 starts,
+October 4–December 30, 2023. Submitted campaign root:
+`artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/`.
+Use three four-date and six three-date shards, respecting the per-user limits
+of three running and 25 submitted GPU-test tasks. Verified evaluation array
+`17574447_0–8` is followed by CPU report `17574448` (`afterok:17574447`).
+Initial states are all pending; the report waits on its dependency. Inspect
+the root's `submissions/{evaluate,report}.json` and `initial_queue.txt` for
+the exact allocation and submission evidence. Report destination:
+`annual122_report/` under the campaign root.
+The original 92 reset dates are complete: final tasks `17572313_6–7` and report
+`17572314` succeeded, with eight checked shards and report count 92. The annual
+report should reuse those 92 plus the 30 tail dates, validating the exact 122-date
+union and checkpoint/source pins. GPU-test was empty at the preparation check;
+expected execution is 15–25 minutes per tail task after an unknown queue wait.
+Keep reset-before-every-step, zero initialization, cold full feedback, alpha one,
+40 leads and the 83-channel/degree 0–179 spherical observer unchanged.
+Preparation checks in `checks/preparation_validation.json` passed all nine
+forecast-setting comparisons, the exact 122-date union, inherited source pins
+and bit-for-bit reproduction of the original 92 pool's seven arrays. No tail
+forecast completion follows from those CPU checks or the submission itself.
+
+Existing raw GC/M1 spherical moments cover all 122 dates in both
+`v24_smoothing_m1_20261107/evaluate/*/statistics/` and
+`v24_smoothing_sweep_m1_20261109/evaluate/*/statistics/` under
+`artifacts/evaluations/`. The newer optimal-filter rerun's 92-date completion
+does not mean annual raw GC/M1 spectra are missing. Reuse those older raw
+moments only with checked identity/layout/cohort metadata; their old filtered
+variants do not automatically implement the newer optimal filter. Do not use
+LH seed 22 raw forecasts, unmatched reset models, or zonal-only spectra to fill
+the correct-R1 spherical gap. Preserve the frozen 70 v5 artifacts separately.

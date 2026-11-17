@@ -1,0 +1,280 @@
+{
+  "created": "2026-11-14",
+  "description": "All Appendix E comparisons share four models and four forecast dates",
+  "cohort": {
+    "count": 4,
+    "initialization_ids": [
+      "20230101T000000Z",
+      "20230401T000000Z",
+      "20230703T000000Z",
+      "20231001T000000Z"
+    ],
+    "lead_count": 40
+  },
+  "models": [
+    {
+      "id": "GC",
+      "label": "GraphCast"
+    },
+    {
+      "id": "M1",
+      "label": "Carry/carry (M1)"
+    },
+    {
+      "id": "GC_filter",
+      "label": "GC + optimal filter"
+    },
+    {
+      "id": "reset",
+      "label": "Reset/reset"
+    }
+  ],
+  "contrasts": {
+    "rollout": {
+      "exact_loss_by_model": {
+        "GC": 11.851948332219331,
+        "M1": 10.002799668006592,
+        "GC_filter": 10.623955864661935,
+        "reset": 10.164970060993923
+      },
+      "m1_vs_raw_gc_reduction_pct": 15.602064845202356,
+      "m1_vs_optimal_gc_reduction_pct": 5.846750537824352,
+      "optimal_gc_vs_raw_gc_reduction_pct": 10.361102100142627,
+      "power_error_by_model_pct": {
+        "GC": 59.62183361197707,
+        "M1": 67.4916019730978,
+        "GC_filter": 78.49913405807487,
+        "reset": 65.99417130600169
+      },
+      "m1_vs_reset_reduction_pct": 1.59538485617019
+    },
+    "day5": {
+      "exact_loss_by_model": {
+        "GC": 9.361321021161192,
+        "M1": 8.69140780114301,
+        "GC_filter": 8.975101110019923,
+        "reset": 8.666931354480623
+      },
+      "m1_vs_raw_gc_reduction_pct": 7.156182535604206,
+      "m1_vs_optimal_gc_reduction_pct": 3.1608926228161804,
+      "optimal_gc_vs_raw_gc_reduction_pct": 4.125698822508306,
+      "power_error_by_model_pct": {
+        "GC": 61.545618287059845,
+        "M1": 69.36504743523663,
+        "GC_filter": 82.59256930444214,
+        "reset": 68.85440287396355
+      },
+      "m1_vs_reset_reduction_pct": -0.28241191329769766
+    },
+    "day10": {
+      "exact_loss_by_model": {
+        "GC": 30.10311379210348,
+        "M1": 22.748759864519364,
+        "GC_filter": 24.84683081587265,
+        "reset": 23.791522892113342
+      },
+      "m1_vs_raw_gc_reduction_pct": 24.430542230197048,
+      "m1_vs_optimal_gc_reduction_pct": 8.444018341417593,
+      "optimal_gc_vs_raw_gc_reduction_pct": 17.46092783800204,
+      "power_error_by_model_pct": {
+        "GC": 66.55944392026841,
+        "M1": 84.24510589327029,
+        "GC_filter": 92.23580877270606,
+        "reset": 76.13262142887092
+      },
+      "m1_vs_reset_reduction_pct": 4.382918371062505
+    }
+  },
+  "table7_rows": [
+    {
+      "forecast_count": 4,
+      "lead_count": 40,
+      "model": "GC",
+      "label": "GraphCast",
+      "exact_gc_rollout_loss": 11.851948332219331,
+      "power_mismatch_pct": 59.62183361197707
+    },
+    {
+      "forecast_count": 4,
+      "lead_count": 40,
+      "model": "M1",
+      "label": "Carry/carry (M1)",
+      "exact_gc_rollout_loss": 10.002799668006592,
+      "power_mismatch_pct": 67.4916019730978
+    },
+    {
+      "forecast_count": 4,
+      "lead_count": 40,
+      "model": "GC_filter",
+      "label": "GC + optimal filter",
+      "exact_gc_rollout_loss": 10.623955864661935,
+      "power_mismatch_pct": 78.49913405807487
+    },
+    {
+      "forecast_count": 4,
+      "lead_count": 40,
+      "model": "reset",
+      "label": "Reset/reset",
+      "exact_gc_rollout_loss": 10.164970060993923,
+      "power_mismatch_pct": 65.99417130600169
+    }
+  ],
+  "projection_control": {
+    "model": "GC",
+    "raw_exact_rollout_loss": 11.851948332219328,
+    "unit_gain_projected_exact_rollout_loss": 11.957430881899233,
+    "optimal_filter_exact_rollout_loss": 10.623955864661937
+  },
+  "numerical_diagnostics": {
+    "reset_report": {
+      "canonical_reset_metric_drift": {
+        "reference_relative_bound": 0.001,
+        "maximum_absolute_difference": 0.3302906556704741,
+        "maximum_relative_difference": 0.013962722298006313,
+        "pooled_measured": 10.164970060993923,
+        "pooled_reference": 10.19427907280624,
+        "pooled_difference": -0.02930901181231672,
+        "warnings": [
+          "Finite preview reset forecast/archived reset checkpoint evaluation drift exceeds 0.001 relative reference; values retained"
+        ]
+      },
+      "worker_grid_mse_roundoff": {
+        "reference_relative_bound": 1e-05,
+        "maximum_absolute_difference": 7.698995393212726e-06,
+        "maximum_relative_difference": 2.802593091538831e-07,
+        "pooled_measured": 11.006341474646382,
+        "pooled_reference": 11.0063430884853,
+        "pooled_difference": -1.6138389181224317e-06,
+        "warnings": []
+      }
+    },
+    "reference_report": {},
+    "repeated_gc_rollout_loss": 11.847712888298844,
+    "gc_reference_rollout_loss": 11.851948332219328,
+    "repeated_gc_relative_difference_pct": -0.03573626716689704
+  },
+  "definitions": {
+    "loss": "Exact saved native-grid GraphCast weighted MSE; pool losses before ratios",
+    "power_mismatch": "100*mean abs(date-pooled Pf/Py-1), equally over 40 leads, 83 channels and degrees1..179",
+    "amplitude_coherence": "Per-channel ratios from date-pooled moments, averaged with normalized variable/pressure weights",
+    "filter": "GraphCast output-only filter fitted on 32 starts in2022; no feedback alteration",
+    "coherence_dashes": "GC/filtered-GC use complementary(5,5) phases0/5; no offsets, arrows or markers",
+    "field_selection": "T2m,Z500,Q700,TP6h, fixed before this presentation revision",
+    "feature_annotations": "Same equal-degree mismatch for raw M1 and raw GC in amplitude/coherence plots",
+    "uncertainty": "Four-date fixed-checkpoint point estimates; no new confidence intervals or training-seed variation",
+    "raw_outputs": "Carry/carry and reset/reset remain unfiltered, without amplitude rescaling"
+  },
+  "checks": {
+    "spectral_identity_relative_max": 6.575784960456679e-16,
+    "maximum_absolute_channel_coherence": 0.9999996225499289,
+    "finite_values_retained": true,
+    "spectral_intervals": "not estimated",
+    "four_models_in_every_figure": true,
+    "same_truth_and_dates": true,
+    "retained_four_date_contrasts_identical": true,
+    "raw_carry_reset_powers_unchanged": true,
+    "normalized_weight_sum": 0.9999999999999998
+  },
+  "sources": [
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/gc_m1_reference/summary.json",
+      "sha256": "2586b5949e0362f3efd5366865c11bd64d3d40a06ec91b73bc9a63d5ff5f6f43"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/gc_m1_reference/power_pooled.npz",
+      "sha256": "9aa28bfdb6083ed0b869b1b8f0688cdd3773848feff7ce06776dcb80c98e0da4"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/report/summary.json",
+      "sha256": "177f31f0bf894c9e8120dade1d0439bc7e20aa1ebcecd6ce843a58ef6c36be80"
+    },
+    {
+      "path": "artifacts/evaluations/v24_matched_reset_preview4_20261113/report/power_pooled.npz",
+      "sha256": "360bb3d17edb0c7fbbab5826bb6c29418488a4b07db5feaf85d655f12789b20c"
+    },
+    {
+      "path": "artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json",
+      "sha256": "822eeba33b190db255e57397437af7329d19279fad544833f84cb3cf4d114e3f"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_memory_spectra_appendix_20261114/manifest.json",
+      "sha256": "d4173c32c60adbcf7a7d3e36ec12aa196936eca77fa01215805af85bb42b14d8"
+    },
+    {
+      "path": "scripts/analyze_models/plot_v4_appendix_e_four_models_20261114.py",
+      "sha256": "543dbcfe08cd245f1f0dd23c151bd7d4180b23726930bd201de584ca6512f87f"
+    },
+    {
+      "path": "scripts/analyze_models/plot_v4_smoothing_paper_20261114.py",
+      "sha256": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501"
+    }
+  ],
+  "figures": [
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_loss_four_models.pdf",
+      "sha256": "5a30188c05186eefd0fb791a989672179f4dae58d09f0fabe897b86c63bafc8f"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_loss_four_models.png",
+      "sha256": "e6e05264d4f36b42d1bac9c28a201acef74f04951ec8a2e745ea93b56a9c3bfc"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_spectra_day5_four_models.pdf",
+      "sha256": "1aabec4ac7ec166806fddb116fe754eafc19f8c3798549a8b1b81a75a21f8951"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_spectra_day5_four_models.png",
+      "sha256": "633aed0f15942f34fda2c5dc341f0617f11df279d3f83796a0b5b2b9e69d7e13"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_features_amplitude_day5_four_models.pdf",
+      "sha256": "58c5566f07d1b1a9cd97f94665f2059cbb6679347a22f344cbf105854f39cc51"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_features_amplitude_day5_four_models.png",
+      "sha256": "b5bb1d8974de033c8db87627c7cca394067a400f0168408fa25e5c67f646b9fa"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_features_coherence_day5_four_models.pdf",
+      "sha256": "e9e7632f380c6820ebadda8f2c6cee0476b58862c3df599ccc450b94daabbfb6"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_features_coherence_day5_four_models.png",
+      "sha256": "9f375a923717b464a1faa51ce9dae2964a602225136cd99a732461b28d7ab1df"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_spectra_6h_5d_10d_four_models.pdf",
+      "sha256": "7e330998a7dfd3e76fc3138d4522e5a57094466fbc22555247dc7ef69233246d"
+    },
+    {
+      "path": "plots/analyze_models/images/resolution_eval/v4_appendix_e_four_models_20261114/smoothing_spectra_6h_5d_10d_four_models.png",
+      "sha256": "9406df5cfb2e95bf5396f71191276268104efbb8e0151d3fbee171dee5cec9b6"
+    }
+  ],
+  "curves": [
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/table7_accuracy_power.csv",
+      "sha256": "9dabe27ccb8ac8eba295df8b93dda1c5863f92490ab971c56505929e8c2253a9"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/loss_by_lead.csv",
+      "sha256": "7e1940b3b1d8a3aed7e844973817035c54a932e0219d5df424a79989a567badb"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/weighted_spectral_curves.csv",
+      "sha256": "03437b10a32b13da6d944a6afd0dfc8342fd9c0158ff0b695d156161d23d7170"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/feature_day5_curves.csv",
+      "sha256": "ddf62bde723d72cae293f225872c9f44aff63aa5864527b96b696abf4337c1b2"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/all_channels_selected_leads_summary.csv",
+      "sha256": "6f99fed33f4f5c3d6bb33ba9e6534b78ebf7886a73fd4a97b0fbe0658e9f0b22"
+    },
+    {
+      "path": "plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/all_channels_selected_leads_curves.npz",
+      "sha256": "e9628c5c85d6820df47e0829ea4c5555aaa03761739e0a52d6e25015fb86a47a"
+    }
+  ]
+}

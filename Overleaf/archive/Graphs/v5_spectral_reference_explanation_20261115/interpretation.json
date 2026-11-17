@@ -1,0 +1,23 @@
+{
+  "source": "../v5_variable_spectral_presentation_20261115/weighted_spectral_curves.csv",
+  "source_sha256": "d20c8dc58b8f6ec333a2224935d229da8eb93139b6ebee3d002877f0cb5e0d4d",
+  "crossing_rule": "First sampled integer degree whose weighted mean amplitude ratio is strictly less than sqrt(1-deficit); no interpolation.",
+  "interpretation": "A deficit fraction applies exactly to one channel and degree; combined crossings compare mean amplitude, not mean power.",
+  "literature": "https://arxiv.org/html/2501.19374v2#S3.SS1",
+  "differences": [
+    {
+      "lead_hours": 120,
+      "weighted_amplitude_ratio_maximum_absolute_M1_R1_difference": 0.01758848721588524,
+      "weighted_amplitude_ratio_mean_absolute_M1_R1_difference": 0.005147701136760711,
+      "weighted_coherence_maximum_absolute_M1_R1_difference": 0.010430462883197156,
+      "weighted_coherence_mean_absolute_M1_R1_difference": 0.003724018453527589
+    },
+    {
+      "lead_hours": 240,
+      "weighted_amplitude_ratio_maximum_absolute_M1_R1_difference": 0.14085358820121696,
+      "weighted_amplitude_ratio_mean_absolute_M1_R1_difference": 0.05088700470473546,
+      "weighted_coherence_maximum_absolute_M1_R1_difference": 0.03373458953150826,
+      "weighted_coherence_mean_absolute_M1_R1_difference": 0.012497081807344523
+    }
+  ]
+}

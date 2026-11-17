@@ -1,0 +1,774 @@
+{
+  "format": "v24_completed_matched_spectral_cohort_v1",
+  "status": "interim_matched_cohort",
+  "snapshot_time_utc": "2026-11-15T03:36:53.066426+00:00",
+  "count": 70,
+  "planned_count": 92,
+  "initialization_ids": [
+    "20230101T000000Z",
+    "20230104T000000Z",
+    "20230107T000000Z",
+    "20230110T000000Z",
+    "20230113T000000Z",
+    "20230116T000000Z",
+    "20230119T000000Z",
+    "20230122T000000Z",
+    "20230125T000000Z",
+    "20230128T000000Z",
+    "20230131T000000Z",
+    "20230203T000000Z",
+    "20230206T000000Z",
+    "20230209T000000Z",
+    "20230212T000000Z",
+    "20230215T000000Z",
+    "20230218T000000Z",
+    "20230221T000000Z",
+    "20230224T000000Z",
+    "20230227T000000Z",
+    "20230302T000000Z",
+    "20230305T000000Z",
+    "20230308T000000Z",
+    "20230311T000000Z",
+    "20230314T000000Z",
+    "20230317T000000Z",
+    "20230320T000000Z",
+    "20230323T000000Z",
+    "20230326T000000Z",
+    "20230329T000000Z",
+    "20230401T000000Z",
+    "20230404T000000Z",
+    "20230407T000000Z",
+    "20230410T000000Z",
+    "20230413T000000Z",
+    "20230416T000000Z",
+    "20230419T000000Z",
+    "20230422T000000Z",
+    "20230425T000000Z",
+    "20230428T000000Z",
+    "20230501T000000Z",
+    "20230504T000000Z",
+    "20230507T000000Z",
+    "20230510T000000Z",
+    "20230513T000000Z",
+    "20230516T000000Z",
+    "20230519T000000Z",
+    "20230522T000000Z",
+    "20230525T000000Z",
+    "20230528T000000Z",
+    "20230531T000000Z",
+    "20230603T000000Z",
+    "20230606T000000Z",
+    "20230609T000000Z",
+    "20230612T000000Z",
+    "20230615T000000Z",
+    "20230618T000000Z",
+    "20230621T000000Z",
+    "20230624T000000Z",
+    "20230627T000000Z",
+    "20230630T000000Z",
+    "20230703T000000Z",
+    "20230706T000000Z",
+    "20230709T000000Z",
+    "20230712T000000Z",
+    "20230715T000000Z",
+    "20230718T000000Z",
+    "20230721T000000Z",
+    "20230724T000000Z",
+    "20230727T000000Z"
+  ],
+  "first_initialization": "20230101T000000Z",
+  "last_initialization": "20230727T000000Z",
+  "completed_tasks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "completed_checks": [
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/checks/evaluate_00.json",
+      "sha256": "5ea004f97f7388c0feb822a24704a6664f7a05d23bd85980ec19ce0856523944"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/checks/evaluate_01.json",
+      "sha256": "27d01d8ff2fcf0f388e28c42a4990f9f88ca6ec50ac01698dfcbae5ad1c160d1"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/checks/evaluate_02.json",
+      "sha256": "0932408f3121cadb2d37263aed4959835d5123e4f5ecc7cf49f559bd946088a4"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/checks/evaluate_03.json",
+      "sha256": "446b5140e8d9b65a102811ce7772cf4acfadb371c373fd64ccffe387f138f068"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/checks/evaluate_04.json",
+      "sha256": "c8f145bed859348fe2d39543881cd42bdc52a316e22a74fa5219e86f36642b17"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/checks/evaluate_05.json",
+      "sha256": "37bb76985080411863b4eef8b011b203c4f53f6bfa875b796383302616363656"
+    }
+  ],
+  "reference_statistics": [
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230101T000000Z.npz",
+      "sha256": "3ba51f84ac7992920dec3fd8e5641bbca67d6c8dc4188aca3ee7c6bcaf6f01f5"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230104T000000Z.npz",
+      "sha256": "25f0a3637dba822772365142e4fc9005e798894370e2bfb41ac3ed8dd2959bfd"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230107T000000Z.npz",
+      "sha256": "686665d4c4d3c3ac173ba1afa3f78617bd3b08c1cc6484a766e12188cb9297ed"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230110T000000Z.npz",
+      "sha256": "ae9593427df62ee089e59df16f53e5f91ed2e3b59cb7f0999cdeeef3082d9770"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230113T000000Z.npz",
+      "sha256": "d940c6f3b500361d9a30377d65508eb4efc4dfb8396a508adc3330c710b4bf4e"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230116T000000Z.npz",
+      "sha256": "8b4f076bbd5c8e7fbbb4c5a12e93eea9dbb84bed58a446650d2b1909849cdb97"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230119T000000Z.npz",
+      "sha256": "5bba106a2ce23ae4e2bd4d0d86cf90509749e3c641759f85be1611da4b6fc884"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230122T000000Z.npz",
+      "sha256": "fffd2a61d9035cf1708c2c95391154fbd3f976f0b61b245c620b429fc4f2c547"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230125T000000Z.npz",
+      "sha256": "1081ff96de27649d848289bb3815ce8a559d5c2efc333c20a7e6749dd5189de7"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230128T000000Z.npz",
+      "sha256": "e747bd895d30698ff002924265b788f84b591299474ceb4f806c3319615c5528"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230131T000000Z.npz",
+      "sha256": "7566560ad0c8e046aaae1ed877f5bc5bcb49f3a867fb569d452bd02100c75b8e"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230203T000000Z.npz",
+      "sha256": "8494fa398ee68db0d5acdc6bb0b4a6d06281bcc762d5dfa515a7eed9f9ff5e83"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230206T000000Z.npz",
+      "sha256": "3cde47ddc98c9881dfa63d7a6303019cff3f304bb4a40adc84fc5af6e809bbdd"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230209T000000Z.npz",
+      "sha256": "6f8587b068ed115d89096b2fdd7ea972854ac8c2052d7d7c7c43305718d492f1"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230212T000000Z.npz",
+      "sha256": "7cde6f4bfa8900e19c88458394aa36ae845df60a56bbb187d84f046da4f7a56c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/00/statistics/20230215T000000Z.npz",
+      "sha256": "b9b445f32018b6f730f2a0efd6ef9122a9e7d8fdc7ae30b68d0ff6aa887af837"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230218T000000Z.npz",
+      "sha256": "8e12656bab75bcd82ca1644c1d70e97517ade236076f23f30fee727f82588281"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230221T000000Z.npz",
+      "sha256": "443584144448ebf065eb362ca04ea992982a907aedecfaae1f292e392557685b"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230224T000000Z.npz",
+      "sha256": "b7d55517cd117b6c857d8d96bf4030526af66feb6a790e67d89a46ec6c1b6a3b"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230227T000000Z.npz",
+      "sha256": "be7c2c1caaaeeb82cf603b06df9f6856548e842fa0943e9cbbd22af1d881a2d2"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230302T000000Z.npz",
+      "sha256": "fdbb17a946c30580dfdbb2a0369101dc51cbe016575dac9a81a2961d41d49fa9"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230305T000000Z.npz",
+      "sha256": "12b20d12c17be79d3cff18d87d93e586bc963df88a2dac488235e446b82613bb"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230308T000000Z.npz",
+      "sha256": "b26e266810583fefbf65a2c8b01a2dc9767cada58ca47aa3ceac07e630e4420f"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230311T000000Z.npz",
+      "sha256": "71ac4024efd180a5020be6553fbdceb51dd5c27b874f419e0f0c27a16b43b2d7"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230314T000000Z.npz",
+      "sha256": "254ef26f2934cabfdb7b2cc97b28c5a85c342209ebe3a122a0b4ccec1ead76da"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230317T000000Z.npz",
+      "sha256": "1c87c22305a602e0b307afaf7686fcc33a784013b351c956294df7cbc03a6db5"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230320T000000Z.npz",
+      "sha256": "876065c2e15b98e3ebd3b26aeb20a5ba78eb3752686f15010a6d33a84c0241d6"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230323T000000Z.npz",
+      "sha256": "7384c1e787d434c5d3781709219f69c9cd40d8384e953ec045a3089bddd757bc"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230326T000000Z.npz",
+      "sha256": "759e86e2d1b92876ac618c5193b724f13110c2b376839f5bbd924fb2c64cca1f"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230329T000000Z.npz",
+      "sha256": "56c99830b1178ad5622dfb0807efec1fef1e186449c90641c46c19fe8a84da62"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230401T000000Z.npz",
+      "sha256": "e2ab52d05859cc8cec33423dbe8b82b15c6a3dc6a07bd63bb6ef6e1ad9a1b76a"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/01/statistics/20230404T000000Z.npz",
+      "sha256": "dde0e19f5f59a78d361acfed3e2c8a8974cdae46ad426ad9d206c15cce6a0b65"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230407T000000Z.npz",
+      "sha256": "0d44947488c9f28c050147c4e8e2b029b06d6907aa5e8a5ffb9eae42a6aacab0"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230410T000000Z.npz",
+      "sha256": "9d09e6a4ef86dd298493c13632c31cdf10891ac6476f679437c2a9c5d5028009"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230413T000000Z.npz",
+      "sha256": "93288fbadcb5b720769d0c47af599c9093ecdbbab1647d7afaf1c50113e71523"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230416T000000Z.npz",
+      "sha256": "d90cc33732471b622daa84512124ad17232f99e6c10e56a6843677752cae8569"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230419T000000Z.npz",
+      "sha256": "da67d0ace221559ef9907adf2f49d4a3444c3b10e60901754c37f9a4f001cfc3"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230422T000000Z.npz",
+      "sha256": "4648822ae6369e0aad0bfe8386eeab7bccbb1a67fbee749d1de5451781b4b425"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230425T000000Z.npz",
+      "sha256": "3d62a5dca1b36c16bdddbdd8713be1312552c9288aed2154ac1418f934ee13c0"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230428T000000Z.npz",
+      "sha256": "a79910e975a77fb103bb2335242618495046ab98e9359964ec6abc2b4ffb73f6"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230501T000000Z.npz",
+      "sha256": "1dbef0efde1c9e326d013f7bfbf4e6b021b5762412c45520251ef3993ea6f235"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230504T000000Z.npz",
+      "sha256": "b1af919ceb60e3f1ca42d36a0c608dd8517d7d3ffe22669d6d1ed16b198cea97"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230507T000000Z.npz",
+      "sha256": "499651c7f6eabd1c3c1ac4566d8b5fb382ae17419c40b7147690a6ccc0025dd4"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230510T000000Z.npz",
+      "sha256": "98e6d3ae4676d6b732e8c4a4948bc6cb80bd2adb8e03d69d9d732b8d5c37201b"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230513T000000Z.npz",
+      "sha256": "358d39d87e1a73b7b4b563cfcd2a467e90f42be5279e0ca02a3c2ba170fd31bd"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230516T000000Z.npz",
+      "sha256": "09da6abbbbc389cd5f3db3cabbce13901bdd1fcdad3a0b0713368c90d7783cac"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/02/statistics/20230519T000000Z.npz",
+      "sha256": "0e241077008725295be7b3a17e374dd1307552fdbf4a1fd4de6ff8bbc4370400"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230522T000000Z.npz",
+      "sha256": "f319f7e0bcca213eedd81fc24e210311edd5157edc8724b66b1883d3f1e327f6"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230525T000000Z.npz",
+      "sha256": "a271baffecf8fd2e58ea7d5a99d341db953c59cb5c86f7f6bc86f6e1b8c741f9"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230528T000000Z.npz",
+      "sha256": "2ce3ac6e7b358140add13e339bcacb64703f802d68b64c06ea2aa0ddbe6d44ee"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230531T000000Z.npz",
+      "sha256": "3eb1d9928dedb9ba9c64a0e05927ac5a8c4279e355dc374f8fec02aeb9306c46"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230603T000000Z.npz",
+      "sha256": "e84adf7de799d14fb4c9ceafc90d179162e1b7fa7fb064b749b622a392456fed"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230606T000000Z.npz",
+      "sha256": "f2d96003513d4253322b39d19b5d30dc297bf8f55fbc5377fb12a036c25ef217"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230609T000000Z.npz",
+      "sha256": "2d5067eb9f14380adf03d13e7123cc0eacd3f23fc1f36e61a27820d163d3a7ba"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230612T000000Z.npz",
+      "sha256": "b4f23e06f622e968b234866caa7c130f0e81af074df01416178b3d2a7764669e"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230615T000000Z.npz",
+      "sha256": "05b45ed68e679847ff897e144880e6abe34e59c3b850c20b6a139558d45c9ac9"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230618T000000Z.npz",
+      "sha256": "716b94d304418bfd368644bca54245661a0c9c3f0a0840675bf910d4e93abf22"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230621T000000Z.npz",
+      "sha256": "5b2e9e30362b995e350028adb26e1653fa5397d2292c9ad5d72beac388f7e7b6"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230624T000000Z.npz",
+      "sha256": "556ca1b129182f3988d681e50a8659d2f8576a92ba2b576a3a39bba429e3dba2"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230627T000000Z.npz",
+      "sha256": "738425d1fdfd7248c99b5cd031f9750b511bdc60b85f81c2f2a9aceb9dadcb53"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230630T000000Z.npz",
+      "sha256": "1d900c99ade96be55500faea2d02d401af579273f2ba717eef34200733434622"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/03/statistics/20230703T000000Z.npz",
+      "sha256": "3b3cbf1e56c865a397daa06e692bc07cc7f4e826a14353101e5bc6b30f450d7a"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230706T000000Z.npz",
+      "sha256": "00ca7f6399ad4e41f054196454b7b5061d1235b3496c81b4c3661f3668206a2f"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230709T000000Z.npz",
+      "sha256": "085ccb24031ba2ccf885f98c0d7e24d04b3506e771aa565c402cfc51f91c8996"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230712T000000Z.npz",
+      "sha256": "062629feba7cc3c6327083c00ab36436573e5ccb8eaf6d21e79f7c7d3dfea704"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230715T000000Z.npz",
+      "sha256": "a71f8003cbeb9b57860e957be300c82f6bf4861f2678861b37647053217aa3f9"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230718T000000Z.npz",
+      "sha256": "4c33c03ca43256a943aaa511f75d48c9276c4814e14f024e08492a3c16c5ab70"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230721T000000Z.npz",
+      "sha256": "a2dff95c93cb60210ca70dc09a9ed23f641bd8ccdbacb8d0a8deb4ced0e2dc5c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230724T000000Z.npz",
+      "sha256": "42e512ff63018cd104559b75101d891f4c8fafeb4c53959c1fa76299b92573f1"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/evaluate/04/statistics/20230727T000000Z.npz",
+      "sha256": "01fc877fdac82e7b7d7286026a91cea7176b25ed918643bc9a54235abfacb9af"
+    }
+  ],
+  "reset_statistics": [
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230101T000000Z.npz",
+      "sha256": "b02b4915be8bdab92f961c751a72f15b3c44312d3c89f1351383ec5abadcfc7c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230104T000000Z.npz",
+      "sha256": "64110e62ac56244cb0089c31b3919ff654905f07a1d22aad32a5ed36f3fc0106"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230107T000000Z.npz",
+      "sha256": "2aa72598997be659578e18c0e457f99af13456110548722e848cfdcc466369ee"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230110T000000Z.npz",
+      "sha256": "86a59de1c2b15c7ec204a8576b7e0d3443a01e7a54e591b91ba997ffd79efdef"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230113T000000Z.npz",
+      "sha256": "5b3aeb45a3d594fb356d6f78843f5ba398473c727527cea2aa9e8e0de0db6c38"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230116T000000Z.npz",
+      "sha256": "5ddea834d3017e135a5de1e77c4ccf0f322571b72ffb636bfa9404a08648a215"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230119T000000Z.npz",
+      "sha256": "af7053f4764a70674bb90dfe7273090daf3eb9548f73210edc06e128086b357c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230122T000000Z.npz",
+      "sha256": "2766cb623f22f1548b5d1933f3559d2a30e8e3fb656296b826cae3a8ab12b45d"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230125T000000Z.npz",
+      "sha256": "9071bb0e06667a3c201fda9b9dc95811977a6d0785c7098024818baa94b5accf"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230128T000000Z.npz",
+      "sha256": "980014c752ef698ea234d9debf253d6ccc21d8b91037a8ef50c11fd18e93b1a9"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230131T000000Z.npz",
+      "sha256": "c5cd063d22de98e15a8070c19bd50616a442a4c4b09a6f43216d9174e37e473a"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/00/statistics/20230203T000000Z.npz",
+      "sha256": "b0149524664708c021f260322c0aaf1aea8ef5bf8143074b886981af8c9c1a2d"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230206T000000Z.npz",
+      "sha256": "4bf45ca5341f9a7c585b7e90ceaed3d99f1c8faa8ea55598b180e8d7e43faeee"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230209T000000Z.npz",
+      "sha256": "471ce3aeb562b1cb1697e14fe34e525aec041f2529a26d5d88ba1f9a01398fd1"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230212T000000Z.npz",
+      "sha256": "6729f5456ef56504635b11e5481ea44d71ab629be9c5dc0da800ddde8ee0ac5c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230215T000000Z.npz",
+      "sha256": "8337d309cf6a99345528abfb286d110ddb82f6c9018e16db23d6a040ffe17596"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230218T000000Z.npz",
+      "sha256": "b5d15ffa27bcc6ed399f65b04772a0644dd694997add99be471701bdf8f2a39a"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230221T000000Z.npz",
+      "sha256": "cca647b08209195a79828d20e5775c2af30c1df0391d7ac3d8ba85dac06819c3"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230224T000000Z.npz",
+      "sha256": "c24e26e7d37e8d81f08407cafd126d602cc780c931397f9b4ec7198b185f06c8"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230227T000000Z.npz",
+      "sha256": "afa5aa69d996f4c7adc97dc03d9d7ec06a4105d3510f9699435d09d73d89fa1c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230302T000000Z.npz",
+      "sha256": "a84a092dd7ab992cac4dad24234cd2e96c05f5defb328cdeec3bb045efa740be"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230305T000000Z.npz",
+      "sha256": "91f2ad0bc2cbcc32a50fa822a8f419980827229dadb07097c9eda50576fc8a58"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230308T000000Z.npz",
+      "sha256": "9b978fa4b8ae06f8d3edf4cdfdc67b9b6f913a4186527f652f4a908c4d28650d"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/01/statistics/20230311T000000Z.npz",
+      "sha256": "6729a8b0f39e13b2a1ad4090fba0e48c6158e2d5930fb09cb99581b3aed01639"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230314T000000Z.npz",
+      "sha256": "7e5e39344672f9a3baaf2dc1fb7c7965687a630685e35099bc4857453061607c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230317T000000Z.npz",
+      "sha256": "46bc13374578fd04ce1602fceaaa3a26cddf38cc171f3476c37d9428ac472bb3"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230320T000000Z.npz",
+      "sha256": "a9141b755a777e0126c98a7ddff31cf9a0b1fb385846dc93d0b0def1fd16471f"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230323T000000Z.npz",
+      "sha256": "b2afa36b8e6c764874cb4cb43e67098e9537259ecb9d47f5c8b36c41d0045f25"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230326T000000Z.npz",
+      "sha256": "9e88af5e0a58d356dff9e821d34b6cb2720f4da157b904731d5acfdcac560419"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230329T000000Z.npz",
+      "sha256": "cb0e66d41bb6b8ee63cd51508c5ec8c842dabeddf0919c520d344a9435dd2329"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230401T000000Z.npz",
+      "sha256": "19a7ed91a363556e174ba73359916505a30027a9e76cc4b29064140cdf69cf69"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230404T000000Z.npz",
+      "sha256": "a1d26dc8795199795b53214c336405aca4a36d82d72e480d1daf96c44fc66714"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230407T000000Z.npz",
+      "sha256": "28605b007b218d31ac7e3c0c96a5525e45de2fddc6fe151615bd4e673cd2a231"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230410T000000Z.npz",
+      "sha256": "0c3bb7752c12fbe56308958655b4e453ac4ab3659f8b415ce1707ca4992d1284"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230413T000000Z.npz",
+      "sha256": "e7d79d41f950c03a2b26552540aa211169bc8d22bca8b67ed930cda17e7a590f"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/02/statistics/20230416T000000Z.npz",
+      "sha256": "6e1dc04f19aabcdffcd2ae7b7d329589cdb5219470b8f1f2397f53b254623d9d"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230419T000000Z.npz",
+      "sha256": "5fb1f6fb29b31b475662040fd1f266ca5d143545e87579ef9167a70205318138"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230422T000000Z.npz",
+      "sha256": "c987808abd57731894581a5621c6ba6acf9ea1073a543b7346502553e60bc245"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230425T000000Z.npz",
+      "sha256": "0384f609a5529d398c56c4bbe6c68e43eb5f60fd70266f8d971b9fb35dd43c6b"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230428T000000Z.npz",
+      "sha256": "03e8280c11e3284bd4decf1047ee7acb6e644cb91406308b40b220d1aecdd5d9"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230501T000000Z.npz",
+      "sha256": "029f308f091608fb96cbaac8557f787da5dd8fb86975d6cf0738fde0f39db3a4"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230504T000000Z.npz",
+      "sha256": "9fb1fbd3070d59f2d08fd6527763ca4c0996cc64c1624d44dc650b25678488c2"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230507T000000Z.npz",
+      "sha256": "95bc28be6de9a2be0b7161bf92f1e7b719bea2cdd5eeeeef87857868b97eeedb"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230510T000000Z.npz",
+      "sha256": "717092180faa8b2e1c7d23a7e00669dcbc7be095ab4dc45bc76f7fbcd1208781"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230513T000000Z.npz",
+      "sha256": "58fa148f7d49d10983ce8db0136d2406e2d4f4ea05bda9ed794724d873bd5a7e"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230516T000000Z.npz",
+      "sha256": "9e1753bba5aece9e179dd6e1b3e5e9947cb5e5fc1cf5ead36782751722ed9ffe"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230519T000000Z.npz",
+      "sha256": "6bfb580bacfe6d9916befc15417c39d0973bc1e3d54bad19d208d65ff59b3136"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/03/statistics/20230522T000000Z.npz",
+      "sha256": "7e5ad569509da161497ad43f5d3f86bedc1827ea1ba6987d5339b48758e8ce0c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230525T000000Z.npz",
+      "sha256": "3e87659c39ea69eada60490253f118a9c54a3d53c4e9f2d0643d566fab81a086"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230528T000000Z.npz",
+      "sha256": "39445daab1cb259cc26e35e7d56afa9d5bda334b65a7054dd97e957345d34274"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230531T000000Z.npz",
+      "sha256": "15e88bd261ecc7d55683479eebb574250ce11b707488d12a5b6ff4d8836122a1"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230603T000000Z.npz",
+      "sha256": "f2cee1877b57ae572b312dbae72e8598c83ce1416a4ce3057f52cb7e06d384d0"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230606T000000Z.npz",
+      "sha256": "36a115fe7dc27272d2dbe6bdf30257cb558cd68ebba4032fd30f7cc9014e72a5"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230609T000000Z.npz",
+      "sha256": "47b3ecbf9e8c28ba4ec36874b2ac6e45cb6921eb6d2ecdd23062433d71201c8d"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230612T000000Z.npz",
+      "sha256": "ad9f12f08e434de8c8cdc4ea71bcb19368f99c1ca04ce33a4d532f5b771bdb8e"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230615T000000Z.npz",
+      "sha256": "c7a2647be5e72f26a9da6bba44d4cfc8f964413b94544fe83ed7a3c229133210"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230618T000000Z.npz",
+      "sha256": "bca96a4af967cddbb3864306cc1754afa469367ae53ea2706527c712874b554c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230621T000000Z.npz",
+      "sha256": "256728cbfcb3541eaac208d42bfe39598b2bd63b77e9cbada1f325d057d7e553"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/04/statistics/20230624T000000Z.npz",
+      "sha256": "d6791efac078d0a688bf219f77d6fe6a175aeb671d9bde23f1d601c9d6ffe84a"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230627T000000Z.npz",
+      "sha256": "d6c8450ffd8e684b59b66c132392a3bb399da8c4c2a57c0275621db48fe09b4b"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230630T000000Z.npz",
+      "sha256": "5b3b174d69213208715770d4a92a441bed0c12a6ea8ead9a84185ad14c5f68ba"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230703T000000Z.npz",
+      "sha256": "b36cac8c109bc86a98276df7821d396f236cf27527a268790f726bacb98edabb"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230706T000000Z.npz",
+      "sha256": "bce6ddbe814f98382589a66a076355ee2c9f3b274575cbacbc21cf9b3a8cbfba"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230709T000000Z.npz",
+      "sha256": "5dc4a677d162bd478185381910b37b5a4a7f9d07db6f6dcc601be015e7b483d4"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230712T000000Z.npz",
+      "sha256": "ea99078c378762d6fad3c19809b18123b957bdcde10462c651c1273272a79295"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230715T000000Z.npz",
+      "sha256": "13348a26578f1693290d04e8dd38a3f619996d7cf81b1791fed6b8f7eeef381b"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230718T000000Z.npz",
+      "sha256": "859553afa9f0d81611ee01b23230c2aee358c11af04a7ffd0b7b3a09c7ad046c"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230721T000000Z.npz",
+      "sha256": "f4bcfaf23dc42acd6621c09b391e52bc83aaf0da3a121ba007ada41430236c6a"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230724T000000Z.npz",
+      "sha256": "009fc6b6da6454202bd545cd05aeb0e13e89e5cef39ca35db7f081f898286128"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/evaluate/05/statistics/20230727T000000Z.npz",
+      "sha256": "ee69dd67e1cb3612a041c0c8e7dbcc087f158f414fc1eda5a0566dc6e2697eb7"
+    }
+  ],
+  "reset_protocol_hash_by_id": {
+    "20230101T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230104T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230107T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230110T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230113T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230116T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230119T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230122T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230125T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230128T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230131T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230203T000000Z": "3784e90a41b9fe712345633bc8964f88ea631321eb4d7110a457cba27d8994fe",
+    "20230206T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230209T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230212T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230215T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230218T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230221T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230224T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230227T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230302T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230305T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230308T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230311T000000Z": "85fc7c9c660e5cb7ffab5fd7b3d9b53e7ec90e630358762fcffe27a15d1b0f8a",
+    "20230314T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230317T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230320T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230323T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230326T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230329T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230401T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230404T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230407T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230410T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230413T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230416T000000Z": "7c59c1206c30ec18e76b1441a3fa2fe869c5eb9a5fe2a916aafa7db26804190c",
+    "20230419T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230422T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230425T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230428T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230501T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230504T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230507T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230510T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230513T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230516T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230519T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230522T000000Z": "cdd90718b5fdb381764f96b3ba6c8dde0116a82fccdadf31b97619d4c07917c7",
+    "20230525T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230528T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230531T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230603T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230606T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230609T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230612T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230615T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230618T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230621T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230624T000000Z": "4c1953e361d0b94e90f039ec17fc8161f2d5b2e4af67006cf993edee9d986fc2",
+    "20230627T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230630T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230703T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230706T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230709T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230712T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230715T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230718T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230721T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230724T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4",
+    "20230727T000000Z": "7cf1a4d7162a05d2184ca928242b5ea7e88c4486b9a0b40ea56af5d01ea0cda4"
+  },
+  "source_campaign_hash": "cacad87f9b89b4c45a6f6e3b7f42dedc004c4d13853f92ededaf98d1a752057b",
+  "reference_campaign_hash": "b69ebc7e623b2a2bab0645a6d020f8807645f70b5eadc76dced61b3e116449af",
+  "sources": [
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_matched_reset_spectra_20261113/manifest.json",
+      "sha256": "1e1224fb0a9f58e368e5846773f69b310eae6a2fcc117e141e60932123c931ac"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/manifest.json",
+      "sha256": "5f3db013c20adc4e76fc7d409a3d7071ad35958728fba38482d5cd4fa91a4dd6"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/interim_20261113/report.json",
+      "sha256": "95fa8142a59c7d8b4886cc748ca164d9266b8b9585b24503645a1305c1158d74"
+    },
+    {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json",
+      "sha256": "822eeba33b190db255e57397437af7329d19279fad544833f84cb3cf4d114e3f"
+    }
+  ],
+  "scope": "Intersection frozen from completed checked full-campaign shards; no preview-four padding; not annual",
+  "uncertainty": "Fixed-checkpoint point estimates; no new bootstrap or training-seed variation",
+  "record_hash": "9a4a7a1a5297ae7afa81131c2a4c7f8c6fd39bcdaf263880fad44e585660f01d"
+}

@@ -1818,3 +1818,1310 @@ Slurm test-only validation, and requires all 122 starts. Campaign subdirectory
 `e3226c6153d824c1fa583d02689dee85e50b11db1673ec38d189c025620ab9dc`.
 It will write `v24_optimal_smoothing_v4_2023_power_20261113` data/images and a
 sealed completion record. The original fit/evaluation snapshot is unchanged.
+
+<a id="training-steps-k-20261113"></a>
+## November 13 analysis of saved training-step and K experiments
+
+Event date: historical September–November 2026 experiments; synthesis recorded
+2026-11-13 (America/New_York). This is completed analysis of existing artifacts,
+not a new training attempt. The user requested an experiment summary and useful
+plots after asking whether MSE and power dependence on training steps and K
+could be inferred.
+
+The [report](../../../plots/analyze_models/data/resolution_eval/v24_training_steps_and_k_20261113/REPORT.md)
+contains four PNG/PDF figures, source-hashed CSVs and provenance. The three
+reproduction scripts are `plot_v24_training_k_summary_20261113.py`,
+`plot_v24_m1_steps_summary_20261113.py` and
+`plot_v24_mgda_steps_summary_20261113.py` under `scripts/analyze_models/`.
+No model execution, scheduler changes or remote execution occurred.
+
+- The completed GC–Mamba K sweep and historical matching K20 recipe provide
+  18 exact-loss records: six AR-tail settings at independent first-stage500,
+  raw total2500 and SWA, all on the same32 2022 starts/40leads. SWA rollout
+  reductions are−8.871%,−7.706%,+0.087%,+3.335%,+5.574%,+16.343% for
+  teacher forcing/tail0,K4,K8,K12,K16,K20. Raw K16 is below raw K12 on rollout
+  reduction, so the raw trend is not strictly monotonic. Fixed BPTT24 means
+  changing K also changes the teacher prefix; historical K1 means tail0, with
+  memory retained. K20 is a separately executed historical reference, not a
+  new sweep arm or a seed replicate. No matched K-sweep spectra were found.
+- On four identical2022 dates, principal M1 raw total1000/1250/2500 has exact
+  rollout MSE9.528498/9.325560/9.424010 and spherical power mismatch
+  70.497%/70.072%/75.943%. SWA gives9.171727 and71.886%; it is an average at
+  the same budget, not a later update. The1250→2500 MSE increase is1.0557%
+  and mismatch rises5.8708pp. The earlier1000→1250 MSE decrease is2.1298%.
+  The three raw points do not identify an optimum. Actual day10 T2m/Z500/U850
+  spectra and all40-lead score curves accompany the checkpoint summary.
+- The older relative-power MGDA and matched MSE continuation have raw
+  checkpoints0/500/1000/1500/2000 at fixedK20. On the same eight2023 spectral
+  dates, final MGDA changes exact MSE by+1.1437% and zonal mismatch by−14.7502%
+  versus the mature parent; MSE control changes them by+3.2256%/−0.9935%.
+  This supports a spectral/accuracy tradeoff, not preservation of parent MSE.
+  The separate32-date exact evaluations are not used in this joint plot.
+
+All curves describe seed22 only. M1's83-channel spherical mismatch and MGDA's
+nine-field zonal metric use different scales, fields and leads; never pool
+their scores or compare the four-date and32-date M1 losses directly. Training
+K is distinct from forecast lead. The new constant3e-7 full-GC artifacts contain
+no completed local result at inspection; excluded peak1e-5 results and their
+continuations are absent from every generated comparison.
+
+Numerical diagnostics remain advisory. Across18 K evaluations, baseline
+rollout range is0.045172 (0.41745% of mean), exceeding K8 SWA's0.08716% gain.
+M1's observed public-GC difference is0.079385; both the0.202937 decrease and
+subsequent0.098450 increase exceed it in magnitude, but it is not complete model
+noise. MGDA baseline range is0.088768; maximum parent-baseline deviation is
+0.066007/0.5906%. No spectral uncertainty interval was added. Finite drift and
+unfavorable results remain warnings, never release or training-stop gates.
+
+Validation reproduced saved exact-loss values/ratios and M1 spherical scores,
+checked common dates/leads and completion, pinned sources and scripts, and
+visually inspected all four figures. Next useful evidence would be matched
+spectral evaluation of retained K-sweep checkpoints; this requires inference
+but no new historical GC–Mamba training. It was not submitted by this analysis.
+
+<a id="literature-spectral-20261113"></a>
+## November 13 — Literature-style spectral diagnostics and presentation plan
+
+Execution: completed offline analysis and figure preparation. Outcome: supports
+an error/amplitude tradeoff for the fixed original M1 checkpoint on the existing
+92-date subset; no additional training-seed or annual-coverage claim.
+
+The user requested original AMSE graphs, clarification of their MSE results,
+new plots using established literature axes, and a presentation plan. Original
+AMSE arXiv:2501.19374v2 was downloaded unchanged, with original figures and source
+provenance under `artifacts/literature/amse_2501.19374v2/`. Its ensemble-mean RMSE
+is not the deterministic native-grid GraphCast loss used here; do not infer a
+comparable scalar MSE penalty or preservation from the published plots.
+
+New script `scripts/analyze_models/plot_v24_literature_spectral_comparison_20261113.py`
+reads only the pinned interim optimal-filter pooled statistics and fitted filter
+metadata. Seven PNG/PDF pairs are in
+`plots/analyze_models/images/resolution_eval/v24_literature_spectral_comparison_20261113/`:
+five-day and full 6-hour/5-day/10-day amplitude/coherence panels, represented
+physical spectral RMSE by lead, physical spectra at the three selected leads,
+and the separate exact native-grid GraphCast loss comparison. Numeric curves,
+channel weights, hashes, definitions and checks are in the matching data folder.
+
+All plots use the same 92 starts from January 1 through October 1, 2023; filters
+were fitted on 32 development starts in 2022. The sample remains incomplete
+relative to the planned 122. AMSE-style amplitude and coherence are computed
+per channel after pooling dates, then averaged with normalized variable/pressure
+weights. Field-standard-deviation normalization is not applied to dimensionless
+ratios. This differs from the earlier equal-channel aggregate power-error score.
+
+Raw M1 versus filtered GC has 4.2643% lower exact rollout loss, 2.2379% lower
+day-5 loss and 4.6311% lower day-10 loss. Filtering both models gives differences
+4.9850%, 1.6333% and 8.3204%. At day 5 and degree 40, weighted amplitude ratios
+are 0.7937/0.6545 for raw GC/M1, while coherence is 0.5360/0.5479. This illustrates
+stronger amplitude damping with modestly better pattern agreement; no uniform
+spectral-fidelity improvement or spectral significance is asserted.
+
+The exact-loss curves retain early-lead native-grid degradation from filtering.
+The fitted objective and reconstruction operate on represented T179 coefficients,
+so spectral RMSE is not native-grid RMSE. The native-loss plot uses paired newly
+evaluated raw GC (14.6811% M1 rollout reduction), not the archived canonical v4
+baseline (14.7112% on the same subset); direct M1/filtered-GC contrasts agree.
+No seed or date-confidence bands are invented for the spectral plots.
+
+Validation reproduced saved exact and spectral losses, verified source hashes,
+channel weights and common dates, and checked the spectral error/power/cross
+identity (maximum relative residual 1.82e-15). Figures were visually inspected
+and independently reviewed; short-figure footer spacing was corrected. No jobs,
+forecast runs, filter refitting, manuscript edits or publication occurred.
+
+The [presentation plan](../../../docs/reports/v24_spectral_presentation_plan_2026-11-13.txt)
+prioritizes accuracy before/after filtering and five-day amplitude/coherence,
+with all three spectral leads and variable-specific spectra retained in the
+appendix. Replace the clearly labeled interim plots when the already planned
+complete annual report becomes available. Original AMSE figures remain reference
+material and are not overlaid as numerically comparable model results.
+
+<a id="matched-reset-spectra-20261113"></a>
+## November 13 — Add matched reset/reset to every literature-style figure
+
+Execution: existing-loss addition completed; raw spectral evaluation submitted
+as array **17494525**, with report/plot refresh **17494526** after success.
+The first queue inspection found all eight shards pending for priority and
+the report waiting on its dependency.
+Outcome: spectral comparison pending. The user requested the reset/reset model
+in all seven figures to test whether persistent memory offers a better
+accuracy/amplitude/coherence tradeoff. That advantage is a hypothesis, not an
+assumed result.
+
+Use the original matched `R_matched` SWA, SHA256
+`db0e8032ac47daebd4e9c8869e4eac3c325613156507512567f20f6382086ab6`, from
+`artifacts/checkpoints/v24_Ilya/res1_selected_matched_reset_20261015/runs/branch/swa/swa_step00500-02000.pkl`.
+The historical unmatched reset and inference-reset M1 are different controls.
+The original matched evaluation has 122 dates of exact metrics but no spectral
+moments or physical field exports. Searches found no other saved spectra for
+this checkpoint.
+
+The loss figure now adds its archived results restricted to the identical
+92-date plotting cohort: rollout loss 10.36585848, day-5 loss 8.16351652 and
+day-10 loss 25.50644833. Existing rerun M1 losses are respectively 5.7670%,
+2.7381% and 9.2730% lower. These comparisons mix the archived reset evaluation
+with the already plotted M1 rerun and remain descriptive. On spectral rerun
+completion, use its exact loss and preserve the archived/new differences.
+
+All seven plotting functions and numeric exports now accept raw reset spectra,
+shown in purple. Raw reset is explicitly labelled as a reference in both
+columns of the full amplitude/coherence figure; no optimal-reset curve or
+filter is fabricated. The six spectral figures remain unchanged until the
+new measurements exist, with pending status recorded beside the figures.
+
+The new `v24_matched_reset_spectra_20261113` campaign freezes computational
+source from the original optimal-filter campaign and adds only raw observation,
+orchestration and plotting. It explicitly resets SSM and convolution state
+each prediction, retains cold/full feedback, and collects the same T179,
+83-channel raw moments on exactly 92 dates and forty leads. No training or
+filter fitting is required. Eight eleven/twelve-date shards request one
+A100-80GB PCIe, four CPUs, 16 GiB and 62 minutes each, based on completed
+17430308/17430310 resource measurements. A completion report will regenerate
+all seven PNG/PDF pairs in the requested folder.
+
+Frozen source digest is
+`b20c455c03e8c7e8f010fae274d74292f3c58dce221e51d3c9e0488e8dd34b19`;
+campaign hash is
+`cacad87f9b89b4c45a6f6e3b7f42dedc004c4d13853f92ededaf98d1a752057b`.
+Frozen-source checks and targeted CPU validation passed (known native weighted
+losses 1.1/0.275, spectral closure 9.76e-17, unchanged inputs, all eight reset
+configurations and finite drift retained). See campaign
+`checks/cpu_validation.json`. The workspace implementation is uncommitted;
+the immutable snapshot, not a repository revision alone, identifies this run.
+
+The protocol and evidence are in
+[the dated evaluation specification](../../../docs/experiments/v24_matched_reset_spectra_2026-11-13.md).
+Finite forecast rerun differences remain measured warnings, never acceptance
+gates. Checkpoint/source mismatches, corrupt inputs and nonfinite computation
+remain errors. No spectral tradeoff or uncertainty conclusion is available yet.
+
+Later November 13, the user requested faster results through GPU test and
+explicitly specified a **59-minute** walltime. Submitted preview job
+**17495398**, confirmed in `gputest` with QoS `gpu-test` and limit `59:00`.
+The initial queue state was pending. It uses four predeclared quarter-start
+dates available in the existing cohort: January 1, April 1, July 3 and October 1.
+The GC/M1 moments are repooled from their saved per-date outputs on exactly
+these dates; only the matched reset forecasts are new. The existing 92-date
+array/report remain unchanged.
+
+Preview campaign: `artifacts/evaluations/v24_matched_reset_preview4_20261113/`.
+One allocation collects the reset moments and regenerates all seven figures
+under `plots/analyze_models/images/resolution_eval/v24_literature_spectral_preview4_20261113/`.
+Explicit `--preview` and a distinct output name prevent overwriting the 92-date
+figures. Every preview figure is labelled preliminary. Expected execution is
+about 15–20 minutes after starting; queue delay is unknown. The allocation is
+59 minutes as requested, not the earlier proposed 30-minute budget.
+
+Frozen source digest:
+`91e7137e01519eb1af0e50143493615654afe6d5c42e2ccd8ff7d769c94ff836`.
+Campaign hash:
+`ee2b37c9aa1880d8882ddae4b6f5d37cfe802a66c0f36e557f362de4f188d529`.
+Preparation verified the exact four-date ordering, original per-date source and
+filter pins, matching channels/leads and frozen computational code. The raw
+observer/evaluator are reused unchanged; no redundant qualification forecast
+was launched. Spectral results remain pending.
+
+**Completion update:** preview17495398 completed in14m35s. All seven PDFs and
+seven PNGs were generated with raw reset/reset in purple, and all fourteen
+recorded hashes plus the plot-refresh/report pins were independently verified.
+The amplitude/coherence and power/loss layouts were visually checked. Full
+92-date evaluation17494525 and report17494526 remain pending at this inspection.
+
+Four-date exact losses (M1/reset) are10.00279967/10.16497006 averaged over the
+rollout,8.69140780/8.66693135 atday5, and22.74875986/23.79152289 atday10.
+Thus M1 reduces rollout/day10 loss1.5954%/4.3829%, while day5 is essentially
+tied (M1 loss0.2824% higher). Mean absolute power-ratio errors are respectively
+67.4916%/65.9942%,69.3650%/68.8544%,84.2451%/76.1326%: reset has better power
+matching on these aggregates. The spectral metric pools dates before forming
+ratios and equally averages83channels and positive degrees; it is not the
+variable/pressure-weighted amplitude/coherence ordinate.
+
+Atday5/degree40 (~1000km), M1/reset amplitude ratios are0.65681/0.67593 and
+coherences0.55012/0.55067. Atday10 their coherences are0.33634/0.31542 with
+stronger M1 damping. The preview does not demonstrate a uniformly better
+M1 tradeoff or statistical significance; it supports distinguishing lower
+error from spectral fidelity and awaits the full matched-date comparison.
+
+Finite reset-rerun drift is retained in the report: pooled loss changes by
+-0.02931 (about-0.29%) versus archived reset; maximum individual relative
+difference1.40%. The small day5 ordering should not be emphasized. This is a
+measured warning rather than a gate; nonfinite/source integrity checks passed.
+
+<a id="feature-spectra-20261113"></a>
+### November 13: separate day-5 spectra and coherence for every feature
+
+The user requested separate coherence and power-spectrum figures, then a
+feature-level breakdown identifying relatively good and poor power matching.
+This offline analysis reuses the completed four-date preview above: 2023
+January 1, April 1, July 3 and October 1, fixed original M1/matched-reset SWAs,
+raw GC and the same development-fitted optimal GC filter. No new forecast,
+training, filter fit or checkpoint selection was performed. Code is
+`scripts/analyze_models/plot_v24_spectra_by_feature_20261113.py`; output is under
+the existing preview's `by_feature/` directories in images and data.
+
+Every one of the 83 physical channels is shown separately: five surface
+channels and thirteen levels for each of six atmospheric variables. Physical
+power, AMSE-style amplitude ratio and coherence each have their own atlas.
+The familiar-field examples are fixed T2m/Z500/T850/Q700/TP6h/W500. A separate
+rank-selected figure shows the exact three lowest and three highest M1
+equal-degree mismatch scores, avoiding an undocumented favorable selection.
+GC/filtered-GC coherence retains complementary dashes; no filtered M1 appears.
+
+Two diagnostics use pooled moments and degrees 1–179, excluding the global
+mean: equal-degree mismatch is `100 mean_l |Pf/Pt - 1|`; ERA5-power-weighted
+mismatch is `100 sum_l |Pf-Pt| / sum_l Pt`. Lower is closer to the truth power
+spectrum. They are not forecast MSE or exact native-grid GraphCast loss.
+Equal-degree weighting emphasizes weak spectral tails; power weighting can
+hide their deficits. Physical units are kept separate across variables.
+
+| M1 field, day 5 | Equal-degree mismatch | ERA5-power-weighted mismatch |
+| --- | ---: | ---: |
+| T2m | 16.495% | 2.313% |
+| Z500 | 71.290% | 1.373% |
+| T850 | 52.988% | 1.887% |
+| Q700 | 73.700% | 16.94% |
+| Precipitation, 6-hour accumulation | 83.194% | 71.340% |
+| Vertical pressure velocity, 500 hPa | 77.163% | 71.788% |
+
+T2m is a relatively favorable example on both metrics. Z500/T850 preserve
+most power at the dominant large scales, while small-scale relative errors
+remain substantial. Precipitation and W500 retain only about 28.9% and 28.3%
+of positive-degree truth power, respectively. The equal-degree ranking is
+best for W1000/T2m/MSLP and worst for Z50/Z200/Z250; Z50's 129.34% score
+coexists with only 3.36% power-weighted mismatch, illustrating why neither
+ranking should be called overall physical quality by itself.
+
+M1 has lower equal-degree mismatch than raw GC in 3/83 channels and than reset
+in 30/83; the corresponding power-weighted counts are 11/83 and 29/83. These
+are descriptive four-date counts, not independent statistical tests. No broad
+spectral superiority or annual significance is supported. Keep the existing
+reset-rerun finite-drift warning and distinguish coherence from power fidelity.
+
+Evidence: [rankings](../../../plots/analyze_models/data/resolution_eval/v24_literature_spectral_preview4_20261113/by_feature/feature_ranking_5d.csv),
+[readout](../../../plots/analyze_models/data/resolution_eval/v24_literature_spectral_preview4_20261113/by_feature/REPORT_5d.txt),
+and [provenance/definitions](../../../plots/analyze_models/data/resolution_eval/v24_literature_spectral_preview4_20261113/by_feature/summary_5d.json).
+An independent read-only calculation confirmed the rankings and selected-field
+scores. Next, repeat these diagnostics on the completed matched larger cohort;
+retain these preliminary artifacts separately.
+
+<a id="smoothing-manuscript-20261114"></a>
+### November 14: manuscript revision and paired smoothing-control interval
+
+The user approved the proposed smoothing revision and requested all new
+corrections in red. `Overleaf/v4.tex` now adds a main-results subsection,
+two main figures, and an appendix with filter definitions, joint loss/power
+scores, feature and lead diagnostics, and the separately labelled four-date
+matched-reset preview. Earlier revisions remain blue; original arXiv prose
+and assets are preserved. Existing appendix figures are copied under their
+new v4 numbers, and the reviewer-response figure reference is updated.
+
+The manuscript claim is narrower than a universal architecture/Pareto claim:
+on 92 common dates, raw M1 has lower native GraphCast loss and lower declared
+relative power mismatch than development-fitted degree-wise filtered GC.
+Raw GC remains better on power matching. The established carry/carry versus
+reset/reset training comparison supports a memory benefit in forecast loss;
+the four-date spectral preview does not establish the same spectrum or an
+accuracy gain at matched spectral fidelity. No new evaluation or training
+was submitted by this revision.
+
+The raw-M1-versus-filtered-GC contrast now has an uncertainty calculation:
+rollout reduction **4.264298% [3.3738,5.3438]%** and day-10 reduction
+**4.631064% [3.1632,6.5746]%** (pointwise paired 95% intervals). The computation
+uses saved exact native-grid losses on the 92 common dates, the frozen
+reporter's `bootstrap_endpoints`, and the same 10,000 non-wrapping five-start
+draws and seed as the preceding report. Slot substitution changes only the
+compared pair. Reproduction of the published both-filtered interval agrees
+within 1e-10 percentage points. Filters and checkpoints are fixed; uncertainty
+from training seeds, filter fitting and different years is not estimated.
+
+Evidence: [contrast values/provenance](../../../artifacts/evaluations/v24_smoothing_revision_20261114/contrast_ci.json),
+[reproduction](../../../artifacts/evaluations/v24_smoothing_revision_20261114/compute_contrast_ci.py),
+[figure manifest](../../../plots/analyze_models/data/resolution_eval/v4_smoothing_paper_20261114/manifest.json),
+and [paper archive](../../../Overleaf/archive/Graphs/v4_smoothing_20261114/).
+The original `v4.tex` and PDF are retained under
+`artifacts/evaluations/v24_smoothing_revision_20261114/before/`.
+
+Six new PDF/PNG pairs use the original validated pooled moments. Day-5 feature
+annotations compare M1 and original GC using identical equal-degree power
+mismatch. The numerical archive covers all 83 channels and retains
+power-weighted mismatch and coherence separately. Source pins, exact-loss
+reproduction, spectral identities and plot readability were independently
+checked. The manuscript build and synchronization are recorded after final
+verification; this entry does not imply completed annual/reset spectra.
+
+**Completion:** the checked ICLR PDF has 12 main-text pages and 33 pages in
+total. New text, equations, table, bibliography entry and figure frames/captions
+are red; prior blue changes remain intact. References resolve, all six copied
+figure PDFs match their validated source hashes, and visual review passed.
+The pre-existing 0.92pt overfull box in the unchanged common-grid appendix
+remains the only overfull-box warning. The compiled `Overleaf/v4.pdf`, source,
+figure/data archive and corrected reviewer-response figure reference were
+synchronized to `Reminguch/Non-Markovian-Weather`, branch `main`, commit
+`02630e592dca82e761ece71c070f43ec6d5ed88b`, preserving repository history.
+The parent Weather_global repository was not committed or pushed.
+
+<a id="appendix-e-four-models-20261114"></a>
+### November 14: require reset/reset in every Appendix E comparison
+
+**Table presentation update, November 14:** following the user's request,
+Table 7 expresses both rollout loss and power mismatch as percentage reductions
+relative to raw GraphCast: `100 * (1 - model_score / raw_GraphCast_score)`.
+Raw GC is 0/0; filtered GC is 10.36/-31.66%; carry/carry is 15.60/-13.20%;
+reset/reset is 14.23/-10.69%. Positive values indicate improvement and negative
+values deterioration. The percentages normalize distinct diagnostics; their
+magnitudes cannot be combined as interchangeable costs and benefits. Underlying
+scores, cohort, spectra and experiments remain unchanged. The new
+`table7_relative_to_graphcast.{csv,json}` exports in the four-model archive
+preserve original metrics, converted values, formula and input hash. Validation
+and publication are recorded in
+`artifacts/evaluations/v4_table7_relative_percent_20261114/validation.json`.
+Compiled and visually checked the 35-page PDF; Table 7 remains on page 28.
+Published to the linked Overleaf repository at
+`996aca283998c295781d30789370f3caa20facf1`.
+
+The user first requested replacing filtered M1 in Table 7, then clarified that
+reset/reset must be included systematically in all Appendix E experiments.
+The required comparator set is now raw GraphCast, development-filtered
+GraphCast, original raw carry/carry (M1), and matched raw reset/reset.
+Filtered M1 is omitted from active appendix tables, figures and interpretation.
+
+A fresh filesystem audit found no completed statistics or report in the larger
+matched-reset spectral campaign. GC/M1 filtering remains at 92 completed dates,
+but only four dates have complete common spectral outputs for all four models:
+2023-01-01, 2023-04-01, 2023-07-03 and 2023-10-01 at 00 UTC. The truth powers
+match exactly, all moments are finite, and the reset checkpoint is the canonical
+matched SWA `db0e8032ac47daebd4e9c8869e4eac3c325613156507512567f20f6382086ab6`.
+No scheduler changes, inference or training were launched.
+
+Every active Appendix E table and figure is therefore restricted to that same
+four-date cohort. Figures 11–15 are regenerated with all four curves; Figures
+16–18 already satisfy the requirement and their PDFs are reused unchanged.
+The main-text appendix summary is updated consequentially. The principal
+122-date memory-policy experiment, five-seed results and their uncertainty
+remain unchanged. Existing 92-date filtering outputs and confidence intervals
+are archived; they are not presented as uncertainty for the four-date subset.
+
+| Four-date predictor | Exact rollout loss | Relative power mismatch (%) |
+| --- | ---: | ---: |
+| GraphCast, raw | 11.851948 | 59.6218 |
+| GraphCast, filtered | 10.623956 | 78.4991 |
+| Carry/carry (M1), raw | 10.002800 | 67.4916 |
+| Reset/reset, raw | 10.164970 | 65.9942 |
+
+Carry/carry has 5.84675% lower rollout loss than filtered GC and 1.59538% lower
+than reset/reset on this cohort; the corresponding day-10 contrasts are
+8.44402% and 4.38292%. At day 5 it has 0.28241% higher loss than reset/reset.
+These are descriptive fixed-checkpoint point estimates. Carry/carry's power
+mismatch is lower than filtered GC's but higher than raw GC's and reset/reset's;
+no identical-spectrum or general memory-related Pareto advantage is asserted.
+The actual raw memory-policy powers remain unchanged.
+
+Independent calculations from the saved NPZ moments reproduced the table and
+contrasts. GC unit-gain projection loss is 11.957431 and its filtering gain is
+10.36110%. Finite rerun differences remain provenance, not exclusion gates:
+against the same-date frozen references, raw GC differs by -0.09708% and M1
+by +0.06642%; reset pooled drift is about -0.29%, with maximum individual
+relative difference 1.40%. These differ from the archived 92-date diagnostics
+because the date cohort has changed.
+
+New reproduction script:
+`scripts/analyze_models/plot_v4_appendix_e_four_models_20261114.py`.
+Numerical exports/manifest are under
+`plots/analyze_models/data/resolution_eval/v4_appendix_e_four_models_20261114/`;
+the portable archive is `Overleaf/archive/Graphs/v4_appendix_e_four_models_20261114/`.
+Original manuscript/source files are preserved in
+`artifacts/evaluations/v4_appendix_e_four_models_20261114/before/`.
+Future extensions must include all four required predictors on an identical
+completed cohort. Build, figure checks and publication are recorded in the
+adjacent `validation.json`.
+
+Completed: all 24 source/output hash pins and 16 portable archive/figure pins
+verified. The ICLR PDF compiles to 35 pages (10 main-text pages), with no
+errors, unresolved references or overfull boxes. Independent rendered-page
+inspection of Appendix E pages 26–31, including Table 7, found no clipping or
+overlap. All figure width options are preserved. The compiled PDF is
+`Overleaf/v4.pdf`. Published the source, five replacement figures, numerical
+archive and PDF to the linked Overleaf repository on `main` at
+`70651a298f404ac4acbe0ac6b04b2939c22cfc83`; the sync clone is clean and matches
+origin. The parent Weather_global repository was not committed or pushed.
+
+<a id="equal-power-memory-20261114"></a>
+### November 14: direct test of the identical-power memory interpretation
+
+The user proposed emphasizing that carry/carry has lower MSE than reset/reset
+at the same power spectrum. Inspection confirmed that the larger matched-reset
+spectral report remains absent; its 92-date scalar-loss entries are archived
+losses, not completed spectral measurements. A new offline diagnostic therefore
+uses the existing four-date moments without generating forecasts, fitting an
+operational filter, or changing the manuscript.
+
+Primary target: `Pstar=sqrt(Pcarry*Preset)`, independently for every channel,
+lead and degree after pooling the four dates. Positive gains
+`g_i=sqrt(Pstar/P_i)` give identical date-pooled powers. The target uses only
+the two forecast spectra, not ERA5 amplitude. The represented matched error is
+`Pstar+Ptruth-2*g_i*C_i`, equivalently
+`Pstar+Ptruth-2*sqrt(Pstar*Ptruth)*rho_i`. Original GraphCast variable/pressure
+weights divided by squared difference-standard deviations aggregate channels.
+Primary degrees are 1--179; including degree zero is a secondary check.
+
+| Endpoint | Carry spectral MSE | Reset spectral MSE | Carry higher by |
+| --- | ---: | ---: | ---: |
+| Ten-day rollout | 9.807773778 | 9.719026607 | 0.9131% |
+| Day 5 | 8.416758727 | 8.386612922 | 0.3595% |
+| Day 10 | 22.706819015 | 22.570319195 | 0.6048% |
+
+The same ordering holds when matching both spectra to carry power, reset
+power or truth power (the last is explicitly an oracle diagnostic), and when
+degree zero is included. An independent calculation through the coherence
+identity reproduced the primary numbers; raw weighted spectral losses were
+verified against the saved observer values. These results do not support
+the proposed equal-spectrum advantage on this preview. They do not establish
+significance or a conclusion for the full year, and do not invalidate the
+separate matched-training forecast-loss result. Raw exact native-grid rollout
+loss remains 1.5954% lower for carry/carry on the same four dates.
+
+This is a retrospective coefficient-domain diagnostic. Equality holds for
+pooled power, not necessarily each individual forecast; gains are computed
+from the evaluation forecasts rather than fitted on development data. No
+native-grid MSE after reconstruction is claimed. Finite reset-rerun drift is
+retained, and no noise-derived gate is imposed. A first diagnostic arithmetic
+check used an inappropriate unit-dependent tolerance on a difference of large
+degree-zero geopotential powers; it was replaced by a recorded dimensionless
+identity residual. No moments or scientific scores were changed.
+
+Source: `scripts/analyze_models/diagnose_v24_equal_power_memory_20261114.py`.
+Evidence: [summary and definitions](../../../artifacts/evaluations/v24_equal_power_memory_preview4_20261114/summary.json),
+[readout](../../../artifacts/evaluations/v24_equal_power_memory_preview4_20261114/REPORT.txt),
+and [all leads/targets](../../../artifacts/evaluations/v24_equal_power_memory_preview4_20261114/leadwise.csv).
+No manuscript assertion or remote repository state was changed. The next
+scientific decision requires the larger matched spectral cohort rather than
+strengthening the claim from visually similar aggregate curves.
+
+<a id="smoothing-appendix-layout-20261114"></a>
+### November 14: appendix presentation of original carry/carry and reset/reset spectra
+
+The user clarified that the manuscript should compare the original forecast
+outputs, show power spectra for both memory policies, and move detailed
+smoothing discussion to the appendix with a short main-text paragraph.
+`Overleaf/v4.tex` now follows that layout. The artificial equal-power diagnostic
+above remains research evidence only and is not used in the manuscript plots.
+
+All smoothing figures and methods are in Appendix E. Original Figures 7–10
+retain their numbering; Figures 11–15 cover the separate 92-date filtering
+cohort. New Figures 16–18 use exactly the four preview dates for every model:
+native-grid loss and reduction across forty leads, amplitude and coherence at
+days 5 and 10, and per-field physical power spectra at those leads. Physical
+spectra show T2m, Z500, Q700 and TP6h with ERA5 reference, preserving original
+carry/carry and reset/reset powers. There is no amplitude rescaling. The
+1.5954% rollout and 4.3829% day-10 carry loss reductions remain paired with
+their actual scale-dependent power differences; day-5 loss is nearly tied.
+
+The new script and data are pinned in the
+[figure manifest](../../../plots/analyze_models/data/resolution_eval/v4_memory_spectra_appendix_20261114/manifest.json).
+An independent check reproduced all 5,728 physical-power export rows and all
+1,432 amplitude/coherence rows directly from saved moments. Mean weighted
+coherence over degrees is carry/reset 0.50937/0.50797 at day 5 and
+0.38160/0.37505 at day 10; corresponding mean amplitude is 0.65452/0.65943 and
+0.58978/0.63942. These descriptive four-date quantities do not establish
+spectral superiority or significance. No new forecast or training was run.
+
+The portable paper archive is
+[`Overleaf/archive/Graphs/v4_memory_spectra_appendix_20261114/`](../../../Overleaf/archive/Graphs/v4_memory_spectra_appendix_20261114/).
+All new prose, captions and frames remain red, preserving earlier blue edits.
+Response references were restored to Figures 5/9. Compilation, final visual
+review and linked-repository synchronization are recorded in
+`artifacts/evaluations/v24_smoothing_revision_20261114/appendix_move_validation.json`.
+
+**Completion:** final build and independent visual review passed: 10 main-text
+pages, 35 pages total, Appendix E starts on page 26, and Figures 16–18 appear
+on pages 33–35. References resolve and there are no overfull boxes. Compiled
+`Overleaf/v4.pdf` and `replies.pdf` are updated. The linked manuscript repository
+was pushed successfully on `main` at commit
+`d72425e58b0413ffebcd010443a01c058db75533`; the parent repository was not committed
+or pushed. Source/PDF hashes and validation details are recorded above.
+
+<a id="matched-reset-spectra-fast-20261114"></a>
+### November 14: accelerate the 92-date matched reset spectra
+
+Execution: submitted and released; pending at final inspection. Outcome:
+pending. The user requested more than four dates and specified three GPU-test
+tasks with 50-minute limits, with the remaining shards on regular GPU for
+61 minutes. Arrays `17553195_0–2` (`gputest` / `gpu-test`, 36 dates) and
+`17553196_3–7` (`gpu` / `gpu-short`, 56 dates) now cover all 92 fixed starts.
+Report `17553202` uses `afterok:17553195:17553196` to refresh seven literature
+figure pairs automatically.
+
+Slurm refused an in-place queue change. The replacement arrays/report were
+submitted held, original jobs `17494525/17494526` canceled while all were
+pending, then replacements released. No outputs were lost. GPU-test allows
+three running and 25 submitted jobs per user; no other user GPU-test tasks
+were present at preparation. No explicit array throttle was added. Resources
+remain one `gpu80&pcie` GPU, four CPUs and 16 GiB per forecast task. Preview
+timing (523 seconds for the first date, approximately 84 thereafter) supports
+25–30 minutes per eleven/twelve-date shard after starting. At final inspection
+GPU-test tasks awaited available nodes, regular GPU tasks awaited priority,
+and the report awaited dependencies; queue delay is unknown.
+
+The sealed manifest, frozen source, original matched reset SWA, reset policy,
+ordered January 1–October 1 cohort, forty leads and 83 channels are unchanged.
+Scientific pins, including reusable same-date GC/M1 moments, were verified.
+No training, filter fitting or checkpoint selection is added. Completion of
+these forecasts remains the next step; the four-date preview is still the
+completed reset spectral evidence, with no new scientific conclusion.
+
+Evidence: [plan](../../../artifacts/evaluations/v24_matched_reset_spectra_20261113/submissions/fast_20261114_plan.json),
+[commands and IDs](../../../artifacts/evaluations/v24_matched_reset_spectra_20261113/submissions/fast_20261114_jobs.json),
+[activation](../../../artifacts/evaluations/v24_matched_reset_spectra_20261113/submissions/fast_20261114_activation.json),
+and [protocol](../../../docs/experiments/v24_matched_reset_spectra_2026-11-13.md).
+
+<a id="feature-spectra-day10-20261114"></a>
+### November 14: add day-10 counterparts to every per-feature spectral plot
+
+The user requested day-10 versions of the existing day-5 plots under
+`plots/analyze_models/images/resolution_eval/v24_literature_spectral_preview4_20261113/by_feature/`.
+The unchanged script `scripts/analyze_models/plot_v24_spectra_by_feature_20261113.py`
+supports `--lead-hours 240` and reads index 39 from the saved four-date moments.
+All plots retain raw GraphCast, raw M1, development-filtered GraphCast and raw
+matched reset/reset; physical power plots also include ERA5. No forecasts,
+training, filter fitting, amplitude rescaling or model selection were performed.
+
+Completed 57 new files: 30 PDFs and 27 PNGs with `_10d` suffixes, including
+separate power/amplitude/coherence figures for familiar fields, best/worst
+fields and each variable group. Each metric also has a seven-page atlas of
+all 83 channels. Best/worst fields are reranked at day 10; the familiar fields
+are unchanged. M1/raw-GC panel annotations retain the existing absolute
+equal-degree power-mismatch percentages. The plot guide explains lead-specific
+rankings and how to compare fixed fields between days 5 and 10.
+
+The first rendering process exited 143 after completing amplitude/coherence
+and starting power. Power was completed separately through the same module
+with its runtime metric selection restricted to `power`; the final summary
+consolidates all 57 figures. No plotting source change was required. All 65
+source/data/figure hashes were independently verified; a direct Z500 check
+matched the 240-hour source power, amplitude and coherence exactly for every
+model. Representative six-field and 13-panel figures passed visual inspection.
+All 62 existing day-5 artifacts retain their original hashes.
+
+Data, rankings, provenance and checks are in the corresponding data folder:
+`plots/analyze_models/data/resolution_eval/v24_literature_spectral_preview4_20261113/by_feature/{feature_ranking_10d.csv,feature_curves_10d.npz,summary_10d.json,REPORT_10d.txt,validation_10d.json}`.
+These remain descriptive four-date fixed-checkpoint diagnostics. This task
+changes no manuscript or Overleaf files and performs no git publication.
+
+<a id="matched-spectra-36-20261114"></a>
+### November 14: recalculate every plotted comparison on 36 newly completed dates
+
+The user clarified that all compared results must use the newly available
+data. Completed checked reset shards 00–02 supply 36 starts, every three days
+from January 1 through April 16, 2023. The remaining five shards have no
+completion checks at this update. The new immutable cohort snapshot excludes
+the independent four-date preview; GC, filtered GC and raw M1 moments are
+re-pooled on exactly the same 36 dates as raw reset/reset. No inference,
+training, filter fitting or scheduler changes were made for this analysis.
+
+Sources and newly pooled reports:
+`artifacts/evaluations/v24_matched_spectra_completed_20261114/` contains
+`cohort.json`, `gc_m1_reference/`, `reset/`, and per-initialization exact loss
+arrays for both reports. The new offline script is
+`scripts/analyze_models/pool_v24_completed_matched_spectra_20261114.py`.
+All paired truth moments match exactly; all 87 source/output pins were checked.
+Reset rerun drift is retained: +0.0629% pooled versus the archived same-date
+control, maximum individual relative difference 2.4649%. These are advisory
+numerical diagnostics, not exclusion gates.
+
+| Period | Carry/carry exact loss | Reset/reset exact loss | Carry loss reduction vs reset | Carry/reset power mismatch (%) |
+| --- | ---: | ---: | ---: | --- |
+| Forty-lead rollout | 9.749073 | 10.372953 | 6.0145% | 67.1364 / 65.4186 |
+| Day 5 | 7.832126 | 8.061116 | 2.8407% | 68.6626 / 68.1628 |
+| Day 10 | 23.499227 | 26.168777 | 10.2013% | 84.4739 / 75.7435 |
+
+Relative to filtered GC, carry/carry has 4.2468% lower rollout loss,
+1.9775% lower day-5 loss, and 5.4747% lower day-10 loss. Raw GC/filter rollout
+losses are 11.483224/10.181461. Current rollout percentage reductions relative
+to raw GC are: filtered GC 11.3362% MSE and -33.6017% power-mismatch reduction;
+carry/carry 15.1016% and -14.5861%; reset/reset 9.6686% and -11.6542%. The two
+percentage columns normalize distinct diagnostics. The day-5 comparison now
+has modestly better MSE at similar aggregate mismatch, but this is not a
+matched-power causal experiment; at day 10 spectral mismatch differs more.
+This January–April subset is not annual evidence or a training-seed estimate.
+
+The literature plotter now supports an explicit completed subset, uses only
+the four intended comparisons in every figure/CSV, and includes separate
+day-10 amplitude/coherence outputs. Its multilead figure separates amplitude
+and coherence rather than comparing filtered M1. The per-feature plotter
+accepts explicit pooled sources and arbitrary identical completed cohorts,
+with per-metric rendering batches that merge only matching provenance. The
+legacy default four-date loader remains compatible with other scripts.
+
+New outputs are under
+`plots/analyze_models/{images,data}/resolution_eval/v24_literature_spectral_matched36_20261114/`.
+The score CSV and `REPORT.txt` cover rollout/day-5/day-10 metrics on all four
+models. The `by_feature/` subfolder contains both day-5 and day-10 sets for
+all 83 channels. Original four-date and 92-date outputs are preserved, with
+update pointers. Source snapshots accompany the new data. Final integrity
+and visual checks are in `validation.json` in that data directory. This task
+does not modify or publish the manuscript.
+
+Final validation passed: 24 aggregate figure files plus 57 per-feature files
+at each lead (138 PDF/PNG files total), with six seven-page atlases. Both
+feature summaries report all three metrics complete on the identical 36-date
+cohort. All active comparison CSVs contain exactly the four requested models;
+all 12 model/window score rows independently reproduce the pooled sources.
+All 114 historical four-date feature figures retain their original hashes.
+Representative aggregate and feature layouts were visually checked, and the
+day-10 exported power, amplitude and coherence match the pooled sources
+exactly for all 83 channels. The source and data snapshots support later
+updates without mixing cohorts.
+
+
+November 14 presentation addition: `improvement_summary_rollout_day5_day10.pdf`
+and `.png` summarize the same 36-date `comparison_scores.csv`. Separate panels
+show exact GraphCast MSE reduction and power-mismatch reduction relative to raw
+GraphCast for rollout, day 5 and day 10. GC is the explicit zero baseline;
+filtered GC, carry/carry and reset/reset have labelled bars. Both metrics use
+`100*(1-model_score/raw_GC_score)` independently; negative values denote
+worsening. All 12 input rows/formulas were independently verified and final
+labels visually inspected. No forecasts, scores or interpretation changed.
+Reproducer: `scripts/analyze_models/plot_v24_improvement_summary_20261114.py`.
+The figure manifest and source snapshot accompany the existing 36-date data.
+
+<a id="matched-reset-spectra-wave2-20261114"></a>
+### November 14: second GPU-test wave for the remaining matched spectra
+
+At the user's request, three more pending shards moved to GPU-test after the
+first three completed. Array `17560836_3–5` covers 34 dates at 50 minutes per
+task; retained `17553196_6–7` covers the final 22 dates at 61 minutes on regular
+GPU, preserving its queue age. This uses three GPU-test tasks, within the
+per-user running limit. The existing 36 completed dates and interim figures
+remain intact; no additional scientific result is claimed.
+
+Replacements were submitted held before canceling pending originals
+`17553196_3–5` and report `17553202`, then released. New report `17560837`
+depends on `afterok:17560836:17553196_6:17553196_7` and validates all eight
+shards. Source/campaign and scientific reference pins are unchanged. All
+replacement jobs were initially pending without holds. Each forecast task
+retains one `gpu80&pcie` GPU, four CPUs and 16 GiB RAM; measured first-wave
+execution was 24m33s–24m55s, with future queue delay unknown.
+
+Submission evidence is under
+`artifacts/evaluations/v24_matched_reset_spectra_20261113/submissions/`:
+`gputest_wave2_20261114_plan.json`, `gputest_wave2_20261114_jobs.json`, and
+`gputest_wave2_20261114_activation.json`. Final `gputest_wave2_20261114_queue.txt`
+confirms all five remaining forecasts pending without holds and the report
+waiting on the correct dependency. See the
+[updated protocol](../../../docs/experiments/v24_matched_reset_spectra_2026-11-13.md).
+
+
+<a id="appendix-e-matched36-20261114"></a>
+### November 14 — Appendix E adopts the fixed 36-date diagnostic
+
+User authorized rewriting Appendix E around the lead-dependent accuracy versus
+spectral-fidelity interpretation and explicitly retaining the 36-date data
+while the rest of the spectral campaign finishes. All current Appendix E
+numbers, Table 7 and Figures 11–18 now use the same 36 January–April dates.
+No new forecasts, training, filter fits or uncertainty estimates were run.
+
+The short red main-text paragraph and red appendix distinguish two findings:
+carry/carry improves both aggregate scores relative to the tested filtered-GC
+baseline (4.25% lower rollout exact GC MSE, power mismatch 67.14% versus
+78.28%); relative to reset/reset its lower MSE accompanies increased power
+mismatch. At day 5 the loss advantage is 2.84% and mismatch is 68.66% versus
+68.16% (0.50 percentage points). At day 10 the loss advantage is 10.20% and
+mismatch is 84.47% versus 75.74%. Over the full rollout, the advantage is
+6.01% with mismatch 67.14% versus 65.42%. This does not establish equal
+spectra or uniformly better tradeoffs than reset/reset. Five days identifies
+the K20 feedback-conditioned training tail, not the entire training horizon.
+
+The revised Table 7 and compact Figure 16 show both metrics as separate
+percentage reductions relative to raw GC for rollout/day5/day10. All plots
+retain raw GC, filtered GC, raw carry/carry and raw reset/reset. No filtered
+M1 or inference-only carry/reset is reintroduced. Raw amplitudes remain
+unchanged, and principal 122-date and five-seed results remain unchanged.
+
+Sources and products:
+- Frozen source pools: `artifacts/evaluations/v24_matched_spectra_completed_20261114/`.
+  The pooling script reuses the saved cohort and refuses changed outputs;
+  full-campaign reporting has a separate destination.
+- Paper script: `scripts/analyze_models/plot_v4_appendix_e_matched36_20261114.py`.
+- New plots/data: `plots/analyze_models/{images,data}/resolution_eval/v4_appendix_e_matched36_20261114/`.
+- Overleaf archive: `archive/Graphs/v4_appendix_e_matched36_20261114/`, including
+  every plotted curve, all 83 channels at 6/120/240h, cohort IDs, source/output
+  hashes and code snapshots. Full 40-lead pooled moments remain pinned in
+  the parent workspace. The filter JSON is retained losslessly compressed.
+
+All 12 score rows agree with the earlier frozen36 comparison export within
+1e-12. Exact native-grid losses are pooled before ratios; no spectral proxy
+replaces MSE. Numerical rerun drift is retained as a warning: reset loss is
+0.0629% higher pooled, with maximum individual relative difference 2.4649%.
+The appendix has no new date/seed confidence bands. Historical four-date and
+92-date-only artifacts remain available and are not mixed into these results.
+
+Final verification: 34-page PDF compiles without unresolved references or
+overfull boxes; main page 9 and Appendix E pages 26–34 were visually inspected.
+Independent review confirmed all table cells, eight figure hashes and the
+unchanged manuscript scope/widths. Published source, figures, fixed36 archive
+and `Overleaf/v4.pdf` to manuscript `main` as `710c74a`. Parent
+Weather_global repository was not committed or pushed. Validation record:
+`artifacts/evaluations/v4_appendix_e_matched36_20261114/validation.json`.
+
+
+<a id="smoothing-section46-20261114"></a>
+### November14 — Dedicated Section4.6 on smoothing and spectral fidelity
+
+User rejected the brief smoothing paragraph within Section4.5 and requested a
+separate Section4.6 explaining why spectra matter, citing literature, giving
+the GraphCast-style filtering procedure, and showing the four-model comparison.
+They authorize a main/appendix split now and defer page-space optimization.
+
+Implemented five red main paragraphs: power as scale-dependent variability;
+MSE-induced smoothing with citations to Lam2023 and Subich2025; degree-wise
+least-squares filtering fitted on32development2022dates and applied output-only;
+the four models on the fixed36dates; day5support and day10degradation. The
+existing day5amplitude/coherence and three-window percentage plots are now
+mainFigures7/8. Detailed filtering equations, score definitions, Table7,
+per-field/multilead diagnostics and physical powers stay in AppendixE.
+
+No data or scientific scores changed. Day5carry has2.84%lower MSE versusreset
+with0.50pp greater power mismatch. Atday10the relative advantage is10.20%,
+but absolute errors and power mismatch grow. Carry's exactMSE grows7.83→23.50.
+The equal-degree mean of the channel-weighted coherence curves decreases
+fromday5today10 for every model: GC0.50145→0.33215; GCfilter0.50141→0.33150;
+carry0.51263→0.37010; reset0.50925→0.35693. These confirm long-lead degradation
+without dismissing the ten-day forecast task. RawGCretains closest aggregate
+power matching; identical spectra or universal dominance overreset is notclaimed.
+
+Primary-source check: GraphCast arXiv:2212.12794v2 Supplement7.4.2 Eq35 defines
+the isotropic least-squares filter; our grid/resolution/scoring remain distinct.
+AMSE arXiv:2501.19374v2 Sections2.1–2.2 Eqs2–4 motivate amplitude/coherence and
+MSE smoothing; itsFigure3uses6h/5d/10d. No claim about deterministicMSE is based
+on its lagged-ensembleFigure4. Existing bibliography entries suffice.
+
+The fixed36archive `Overleaf/archive/Graphs/v4_appendix_e_matched36_20261114/`
+remains unchanged. New `v4_smoothing_section46_20261114/figure_mapping.json`
+records byte-identical renamedfigurecopies; originalarXivassets remainintact.
+All widthsarepreserved. One existingcommon-gridcaptionuses anunbreakablemodel
+name to prevent a new overfullline after renumbering9→11; its wording is intact.
+The rest of Sections1–4.5 is unchanged. PDFhas36pages, Section4.6startspage10,
+mainfigureson11/12; detailedAppendixEstartspage28. Compilation hasno warnings,
+references resolve, and reviewedpagesarelegible. Validation/beforefiles:
+`artifacts/evaluations/v4_smoothing_section46_20261114/`.
+
+Published Section 4.6, renamed figure copies and checked `Overleaf/v4.pdf`
+to manuscript `main` as `15823a8`. Remote and local manuscript heads
+match; the parent Weather_global repository was not committed or pushed.
+
+
+### November 14 — Replace the smoothing summary chart with a table
+
+The user requested converting main Figure 8 to a table and revising the
+Section 4.6 opening to motivate power spectra as an additional measure of
+quality, because lower MSE can come at the cost of spatial detail. The existing
+Appendix E percentage table is moved to main Table 2, replacing the chart;
+the duplicate appendix table is removed and all cross-references are updated.
+The old chart and all original assets remain available.
+
+Final metric convention after clarification: retain BOTH MSE reduction and
+power-mismatch reduction as percentages relative to raw GraphCast. Do not label
+these as raw loss values. Zero means baseline performance, not zero error;
+negative power-mismatch reduction means worse spectral fidelity. The user
+briefly considered absolute ERA5-relative power mismatch, then superseded that
+choice by keeping both reduction percentages with explicit labels. All 24
+numeric cells remain unchanged on the fixed 36-date cohort.
+
+All subsequent figure numbers are updated through byte-identical copies;
+widths and original arXiv files remain unchanged. Archive and mapping:
+`Overleaf/archive/Graphs/v4_smoothing_table_20261114/`. Frozen numerical data
+remain in `v4_appendix_e_matched36_20261114/`. No forecasts, filters or uncertainty
+calculations were rerun, and this edit adds no extremes claims. Validation and
+before-files are in `artifacts/evaluations/v4_smoothing_table_20261114/`.
+
+Final verification: all 24 cells and preserved figure identities/widths checked;
+the fixed36 archive is unchanged. Table 2 on page 11 was visually reviewed;
+the 35-page PDF has no compilation warnings. Published the revised manuscript,
+figure copies, table archive and compiled PDF to manuscript `main` as `35e618b`.
+The parent Weather_global repository was not committed or pushed.
+
+<a id="matched-reset-spectra-wave3-20261114"></a>
+### November 14 — Final two spectral shards moved to GPU-test
+
+Shards 00–05 have completed and passed their saved checks, providing 70/92
+dates. Applying the existing request to accelerate work through GPU-test,
+the remaining 22 dates move to `17572313_6–7`, each with a 50-minute limit,
+one `gpu80&pcie` GPU, four CPUs and 16 GiB RAM. No other user GPU-test jobs
+were queued at preparation; two tasks fit the three-running-job limit.
+Recent completed shards took 34–36 minutes, within this allocation.
+
+Replacement jobs were submitted held. Pending `17553196_6–7` and old report
+`17560837` were canceled and confirmed absent before replacement release.
+New report `17572314` depends on `afterok:17572313` and validates all eight
+shards, including the six already completed. Initial states are pending
+without holds. Campaign/source, checkpoint and scientific-reference pins
+are unchanged; fixed 36-date figures and manuscript artifacts are preserved.
+No final 92-date comparison or new scientific conclusion is claimed.
+
+Evidence is under the existing campaign's `submissions/` directory:
+`gputest_wave3_20261114_plan.json`, `gputest_wave3_20261114_jobs.json`, and
+`gputest_wave3_20261114_activation.json`. See the
+[protocol](../../../docs/experiments/v24_matched_reset_spectra_2026-11-13.md).
+Final `gputest_wave3_20261114_queue.txt` records task 6 configuring on
+`della-l02g13`, task 7 pending, and the report waiting on its correct dependency.
+
+<a id="v5-spectra-matched70-20261114"></a>
+### November 14: replot v5 on the completed 70-date intersection
+
+The user requested updated v5 graphs and correctly noted that the standard
+2023 protocol contains 122 starts (January 1–December 30, every third day).
+The 92-date spectra campaign was an interim match to the six completed GC/M1
+optimal-filter rerun shards, ending October 1. That rerun's last 30 starts were queued separately;
+the reset spectral campaign never included those additional dates. Completing
+its existing jobs therefore gives 92, not 122, matched spectra.
+
+When offered annual completion or an update now, the user explicitly chose
+the completed subset. We froze checked reset shards 00–05 before pooling:
+70 starts from January 1–July 27, all 40 six-hour leads and 83 channels.
+Every predictor uses those exact dates. No partial shard, four-date preview,
+new forecast, filter fitting or bootstrap draw is included.
+
+New pooled source: `artifacts/evaluations/v24_matched_spectra_v5_replot_20261114/`.
+New replotter: `scripts/analyze_models/plot_v5_matched_spectra.py`.
+It generates the five active v5 Figures 6 and 10–13, compact numerical exports
+and Table 1 values. Both `Overleaf/v5.tex` and standalone `v5_clean.tex` have
+synchronized active numbers; historical review deletions and 36-date data
+remain preserved. M1/R1 naming, compact legends and provisional status remain.
+Removed physical-power figures are not restored. The actual interim cohort
+and measured rerun drift remain in internal comments and manifests, following
+the author's existing presentation convention.
+
+| Endpoint | M1 loss reduction vs R1 | M1 power mismatch | R1 power mismatch |
+| --- | ---: | ---: | ---: |
+| Rollout | 5.9335% | 67.5267% | 66.0062% |
+| Day 5 | 2.9176% | 69.5045% | 68.9669% |
+| Day 10 | 9.6956% | 84.3515% | 76.3935% |
+
+Loss reductions use the exact saved native-grid GraphCast weighted MSE,
+pooled before ratios. Power mismatch uses date-pooled physical powers,
+equally averaged over the selected leads, 83 channels and degrees 1–179.
+M1 has 4.0637% lower rollout loss than filtered GC, with power mismatch
+67.5267% versus 78.4145%; raw GC retains the closer power score, 59.3066%.
+These are provisional point estimates, without new spectral uncertainty or
+full-year conclusions. Reset rerun drift versus the archived same-date loss
+is +0.0456% pooled and at most 2.4649% individually, retained as a warning.
+
+Both PDFs compile with no unresolved references or overfull boxes; the clean
+version retains ten main-text pages and 29 total pages. The five plots and
+Table 1 were visually checked. All 48 exported metric values match an
+independent calculation to 2.85e-14 absolute difference; portable replay
+matches all curve/layout signatures. Build, data and verification artifacts
+are under `artifacts/manuscripts/v5_spectral_matched70_20261114/`.
+The portable archive is
+[`Overleaf/archive/Graphs/v5_spectral_matched70_20261114/`](../../../Overleaf/archive/Graphs/v5_spectral_matched70_20261114/).
+
+Published the checked manuscript-folder update to
+`Reminguch/Non-Markovian-Weather` on `main` at
+`e85def324aac6c9e32f463ab6cb14a1531e74bb4`; the remote head was verified.
+The parent Weather_global repository was not committed or pushed. The
+replotting source and exact data are pinned in the new archive, independently
+of the parent workspace's uncommitted changes. The clean and tracked PDFs
+remain outside the Overleaf repository, under the build directory above.
+
+<a id="matched-reset-spectra-tail30-20261114"></a>
+### November 14 — Audit existing annual spectra and submit the missing reset dates
+
+Execution: running (submitted; initially pending); outcome: pending.
+The user explicitly authorized submitting
+the 30 missing matched-reset starts as nine short GPU-test jobs. This extends
+the existing spectral evaluation to the standard 122-date 2023 cohort; it does
+not change training, the checkpoint, the reset policy or the selected dates.
+
+The read-only inventory corrects an overbroad interpretation of the earlier
+92-date explanation. Both
+`artifacts/evaluations/v24_smoothing_m1_20261107/evaluate/*/statistics/` and
+`artifacts/evaluations/v24_smoothing_sweep_m1_20261109/evaluate/*/statistics/`
+contain 122 distinct per-date files, January 1–December 30 at a three-day stride,
+including all 30 October 4–December 30 dates. These store spherical moments for
+83 channels, degrees 0–179 and forty six-hour leads. Inspected metadata confirms
+the original M1 SWA SHA256
+`b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0`.
+Thus raw GC/M1 spectra need not be recomputed merely because the newer
+`v24_optimal_smoothing_v4_20261112` rerun currently has 92 completed dates.
+Older filtered variants are different treatments and cannot be substituted
+for the current optimal-filter comparison without checking compatibility.
+
+No alternative correct-R1 tail spectral moments or saved forecast fields were
+found in the searched local evaluation, plotting and archived-results roots,
+the empty `../Weather_ilya` directory, or the inspected saved-output roots under
+`della:/scratch/gpfs/DABANIN/lm8598/Weather_Global/`. The historical October 18
+matched-reset campaign has annual scalar losses, not the spectral moments
+needed here. The LH extreme-event forecast-cache manifest identifies seed 22
+carry at raw step 2000 (SHA256 `bbfd7f59…`), not original M1 SWA or matched R1,
+and only four surface variables. The November 6 annual MGDA campaign stores
+11-variable zonal spectra; those cannot substitute for the spherical diagnostic.
+These are scoped inventory findings, not proof that no other external cache exists.
+
+New campaign root: `artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/`.
+Use exactly the 30 standard initialization IDs from October 4 through
+December 30, split into three four-date and six three-date jobs. Request
+`gpu-test` with a 50-minute walltime for each of the nine jobs; the per-user
+limits are three running and 25 submitted tasks. Keep the original R1 SWA
+SHA256 `db0e8032ac47daebd4e9c8869e4eac3c325613156507512567f20f6382086ab6`,
+zero initial memory, reset before every step, cold full forecasts, zero warm-up,
+alpha one, forty leads and the established 83-channel spherical observer.
+The annual report must validate and combine the existing 92 reset dates with
+these 30 without duplicate dates or silent cohort changes. Preserve measured
+finite rerun drift as a warning, not a rejection gate.
+
+Before the tail submission, the original 92 campaign completed: final tasks
+`17572313_6` and `_7` finished in 23m42s and 23m28s, then report `17572314`
+completed in 1m09s. All eight shard checks cover 92 dates, and the inspected
+`v24_matched_reset_spectra_20261113/report/summary.json` records
+`status=complete`, `count=92`. GPU-test is empty at the reported preparation
+check; its verified limits remain three running and 25 submitted tasks. Expected
+tail runtime is approximately 15–25 minutes per task after starting, with an
+unknown queue delay and the requested 50-minute allocation.
+
+Submitted November 14 at 23:09:01 America/New_York (November 15 04:09:01 UTC):
+GPU array `17574447_0–8`, followed by CPU report `17574448` with
+`afterok:17574447`. The inspected submission records request nine tasks on
+`gpu-test`, each with one `gpu80&pcie` GPU, four CPUs, 16 GiB RAM and 50 minutes;
+the scheduler routes them to `gputest`. The report requests two CPUs, 12 GiB and
+30 minutes and writes `annual122_report/` inside the tail campaign. The initial
+queue snapshot shows all nine forecasts pending with reason `None`, and the
+report pending on `Dependency`; no task was held. GPU-test's user limit permits
+at most three simultaneous tasks and 25 submitted, so all nine can be queued
+without exceeding the submission limit.
+
+Saved preparation checks passed: all nine configurations preserve the original
+forecast settings, the 30 tail dates plus original 92 form exactly 122 unique
+standard starts, the inherited source is verified, and all seven arrays in the
+original 92 pool reproduce bit for bit. These checks validate preparation and
+pooling, not completed tail forecasts. Frozen source digest:
+`7a41a65f49c6b9c9b38da6757a09d0c45e520f2168328da435038bde6b887ba3`;
+campaign hash:
+`d8fee6b03eab86b34a4ec88553f65365f957b2e432dd2651247e5d494ba8aeaa`.
+
+Evidence: [preparation checks](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/checks/preparation_validation.json),
+[forecast submission](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/submissions/evaluate.json),
+[report submission](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/submissions/report.json),
+and [initial queue](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/submissions/initial_queue.txt).
+No tail completion or annual scientific result is claimed. The frozen 70-date
+v5 plots and their source archive remain intact, with no manuscript change.
+See the [updated protocol](../../../docs/experiments/v24_matched_reset_spectra_2026-11-13.md).
+
+A subsequent verified queue snapshot shows all nine forecasts still pending for
+`Priority`, with report `17574448` pending on its dependency. Evidence:
+[`submissions/verified_queue.txt`](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/submissions/verified_queue.txt).
+
+<a id="v5-spectra-matched122-20261115"></a>
+### November 15 — Validate the completed annual spectra and update v5
+
+Evaluation completion: 2026-11-14, 23:56:24 America/New_York.
+Recorded and manuscript update authorized: 2026-11-15 (America/New_York).
+Evaluation execution: completed.
+Scientific outcome: fixed-checkpoint annual spectral comparison; no new seed
+replication or spectral uncertainty estimates.
+
+The nine tail tasks `17574447_0–8` and annual CPU report `17574448` all finished
+`COMPLETED`, exit code `0:0`. Their nine saved shard checks cover
+4+4+4+3+3+3+3+3+3=30 dates. The completed annual report joins these with the
+original 92 reset dates, exactly matching the 122 unique standard starts from
+January 1 through December 30, 2023, every third day. Each date has all 40
+six-hour leads through 240 h, 83 channels and degrees 0–179. The reset model is
+the original matched SWA `db0e8032…`, with reset before every step and the
+unchanged cold/full forecast protocol.
+
+Evidence: [annual summary](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/annual122_report/summary.json),
+[report completion check](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/checks/report.json),
+and [pooled spectra](../../../artifacts/evaluations/v24_matched_reset_spectra_tail30_20261114/annual122_report/power_pooled.npz).
+The summary records `status=complete`, `scope=annual122`, `count=122`; its
+pooled SHA256 is
+`501a33216228a94e88b2f9739494fa1a661296d9c851ebdad1ed7137096e7a57`.
+The November 15 audit independently verified that digest, the exact ordered
+annual cohort, all nine complete checks and finite values in all seven numeric
+pooled arrays. The newer optimal-filter campaign
+`artifacts/evaluations/v24_optimal_smoothing_v4_20261112/` now also contains
+122 unique date statistics. Earlier 92-date/pending statements above are
+historical snapshots, superseded by this inspected evidence.
+
+Preserved numerical diagnostics: reset rerun pooled exact loss is
+10.359790727055467 versus archived 10.359537610436073, difference
++0.000253116619395 (about +0.00244%). Maximum local relative drift is
+0.0329456857334976 (3.29457%), exceeding the 0.001 (0.1%) advisory reference.
+The report retains its warning and all measured values; finite drift is not
+an acceptance gate. These observed differences do not establish a noise-based
+significance threshold. Nonfinite and source-integrity checks still apply.
+
+The automatic annual report deliberately records `plot_refresh=false` and
+preserves the original 92 pool. The user subsequently authorized replacing
+the active v5 70-date spectral presentation with the completed 122-date
+comparison and removing its provisional wording. Use separate replot root
+`artifacts/evaluations/v24_matched_spectra_v5_replot_20261115`, paper archive
+`Overleaf/archive/Graphs/v5_spectral_matched122_20261115`, and manuscript build
+root `artifacts/manuscripts/v5_spectral_matched122_20261115/build`.
+All earlier 36/70-date exports remain historical evidence. The original
+memory-policy bootstrap intervals and seed results remain a separate analysis;
+no intervals from an earlier spectral subset are transferred to the annual
+spectral figures. This update launches no new forecasts or training.
+
+The completed [annual replot summary](../../../artifacts/evaluations/v24_matched_spectra_v5_replot_20261115/summary.json)
+records `complete_matched_2023` and all four comparators: raw GraphCast, raw M1,
+development-filtered GraphCast and raw R1. Figures 6 and 10–13 are regenerated
+under `_v5_matched122` filenames; their numerical curves, Table 1 rows, code
+and source pins are in the
+[portable archive](../../../Overleaf/archive/Graphs/v5_spectral_matched122_20261115/summary.json).
+The [independent arithmetic check](../../../artifacts/evaluations/v24_matched_spectra_v5_replot_20261115/independent_numeric_validation.json)
+recomputes 48 metrics directly from pinned pooled NPZ files, with maximum
+absolute difference `1.4210854715202004e-14`. The plot summary checks matching
+dates/truth, spectral closure, finite values and unchanged raw M1/R1 powers
+and exact losses. No forecasts, filter fits or bootstrap draws were added.
+
+| Annual comparison | Day 5 | Rollout, 6–240 h | Day 10 |
+| --- | ---: | ---: | ---: |
+| M1 exact-GC-loss reduction versus R1 (%) | 2.8507 | 5.7560 | 9.2566 |
+| M1 minus R1 power mismatch (percentage points) | +0.5030 | +1.5053 | +7.9609 |
+| M1 exact-GC-loss reduction versus filtered GC (%) | 2.3561 | 4.0183 | 3.8324 |
+
+At day 5, absolute power mismatch is 69.5984% for M1 and 69.0954% for R1;
+at day 10 it is 84.3419% and 76.3811%. M1 lowers both exact loss and power
+mismatch relative to filtered GC, but raw GC retains the smallest power
+mismatch. The conclusion remains a tradeoff: lower M1 loss does not establish
+an advantage at identical spectral fidelity. Exact loss is pooled before
+forming reductions; power mismatch is the equal-channel/positive-degree mean
+absolute error of date-pooled prediction/truth power ratios. These remain
+fixed-checkpoint point estimates without spectral confidence intervals.
+
+Both `Overleaf/v5.tex` and `Overleaf/v5_clean.tex` now reference the five new
+annual PDFs, with revised Table 1, cohort descriptions, captions and numerical
+discussion. The active spectral text removes provisional wording while
+retaining the fixed-checkpoint and no-new-interval qualifications. Before-edit
+source copies and the exact numeric replacement map are preserved under
+`artifacts/manuscripts/v5_spectral_matched122_20261115/`; compilation evidence
+belongs in its separate `build/` directory.
+
+The [final manuscript validation](../../../artifacts/manuscripts/v5_spectral_matched122_20261115/validation.json)
+records successful marked and clean v5 PDFs (37 and 29 pages) with zero LaTeX
+warnings and no provisional-word occurrences. The clean main text remains
+ten pages. Annual numerical claims are checked, original collaborator comments
+are retained, and visual inspection of clean pages 9–10 and 22–25 found readable
+figures, captions, equations and table without clipping or overlap. The v96w
+response is synchronized and standalone/combined response builds pass. This
+completes the requested local manuscript update and its separately archived
+build evidence; original seed/bootstrap results and earlier cohort archives
+remain intact.
+
+<a id="v5-variable-spectral-audit-20261115"></a>
+### November 15 — Audit per-variable accuracy and spectra; select balanced illustrations
+
+Date: 2026-11-15 (America/New_York).
+Execution: completed analysis of existing evaluation outputs.
+Outcome: descriptive support for variable- and lead-dependent accuracy/spectral
+tradeoffs; selected illustrations are exploratory, not a confirmatory ranking.
+
+The user requested per-variable metrics and examples showing better and worse
+behavior after discussing a per-scale 25% power-retention criterion. We
+examined the same four fixed checkpoints (raw GC, M1, output-filtered GC and
+matched R1), all 122 standard 2023 starts, 40 leads and 83 variable/pressure
+channels. No new training, forecasts, Slurm jobs or manuscript edits were made.
+
+The existing optimal-filter `annual_pooled.npz` contains physical native-grid
+`grid_mse[lead,branch,variant,channel]`; the reset annual pool contains
+`normalized_grid_mse[lead,branch,channel]`, converted using the shared
+normalization scales squared. Channel RMSE is the square root after pooling
+MSE across the selected leads. Summing native channel MSE with GraphCast's
+original weights/scales reconstructs saved exact loss to `1.42e-14` maximum
+absolute difference. Spectral error power is not substituted for grid error.
+
+Retained the existing equal-degree mismatch and added a separately named
+truth-power-weighted mismatch within each physical channel:
+`100 * sum_{lead,degree=1..179} abs(Pf-Py) / sum_{lead,degree=1..179} Py`.
+Per-degree coherence is averaged with the same truth-power weights; the
+equal-degree coherence is also retained. No physical powers with unlike units
+are combined. The new weighting reduces weak-tail influence but can emphasize
+large-scale static structure because the saved spectra do not subtract a
+climatology. It is supplemental, not a replacement definition of the original
+manuscript's spectral score.
+
+All source files were checked against the completed v5 archive's pinned
+digests. Dates, channel layouts and truth spectra match. The reconstructed
+aggregate loss and equal-degree scores reproduce the existing annual table.
+The original finite reset-rerun drift warnings remain in the new summary;
+they are advisory and do not establish significance thresholds. An independent
+agent recomputed 72 metrics and 36 contrasts for T2m/T400/Z500/TP6h from the
+original arrays using scalar summation, with maximum discrepancy `2.84e-14`,
+and checked 144 temporal threshold-crossing rows.
+
+M1 versus R1 categories use only the observed signs of RMSE and
+truth-power-weighted mismatch differences. They are not acceptance tests:
+
+| Window | Lower RMSE / lower mismatch | Lower RMSE / higher mismatch | Higher RMSE / lower mismatch | Higher RMSE / higher mismatch |
+| --- | ---: | ---: | ---: | ---: |
+| Day 5 | 31 | 50 | 1 | 1 |
+| Day 10 | 8 | 73 | 0 | 2 |
+| Rollout | 7 | 75 | 0 | 1 |
+
+At day 10, the original equal-degree mismatch worsens in all 83 channels.
+This distinction must remain visible when discussing the favorable cases
+under power weighting. The selected illustrations are:
+
+| Field and lead | M1 RMSE reduction vs R1 (%) | Power-weighted mismatch difference (pp, M1 minus R1) | Interpretation |
+| --- | ---: | ---: | --- |
+| T2m, day 10 | 4.9817 | -0.3770 | Lower RMSE and power-weighted mismatch; equal-degree mismatch still increases |
+| T400, day 5 | 1.9411 | -0.0844 | Lower RMSE and both mismatch measures with higher coherence; later leads show a tradeoff |
+| U850, day 10 | 5.5588 | +16.1644 | Lower RMSE and higher coherence with markedly stronger attenuation |
+| Q100, day 10 | -1.0132 | +1.1805 | Modest deterioration in RMSE, both mismatch measures and coherence |
+
+T2m illustrates why a variable should not receive a permanent good/bad label:
+its day-5 power-weighted mismatch increases, while its day-10 value decreases.
+Q100 is an adverse example relative to R1, not a claim of worse skill against
+every comparator. All four predictors appear in the selected plots, and all
+83 channels remain in the tables and overview scatter plot.
+
+Per-channel temporal crossings use `Pf/Py < 1-deficit` at fixed degree, with
+deficits 20%, 25% and 30%, and degrees 4/10/20/40/80/160. The exports flag
+crossing by the first six-hour evaluation and later recovery across the
+threshold; an absent crossing is explicitly limited to the ten-day window.
+The per-variable figures show the full degree range 1–179, with the 25%
+amplitude threshold and 20–30% band. These quantify attenuation, not a general
+useful-forecast horizon or a release gate.
+
+Evidence and reproducibility:
+
+- [Analysis script](../../../scripts/analyze_models/analyze_v5_variable_spectra_20261115.py)
+- [Source pins, methods, warnings and validation](../../../plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/summary.json)
+- [All channel metrics](../../../plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/channel_metrics.csv)
+- [All contrasts](../../../plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/channel_contrasts.csv)
+- [Per-scale crossings](../../../plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/scale_crossings.csv)
+- [Selected examples and rationale](../../../plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/selection.json)
+- [Independent numeric audit](../../../plots/analyze_models/data/resolution_eval/v5_variable_spectral_audit_20261115/independent_validation.json)
+- [Accuracy and weighted spectral curves](../../../plots/analyze_models/images/resolution_eval/v5_variable_spectral_audit_20261115/selected_accuracy_and_spectral_metrics.pdf)
+- [Per-variable amplitude/coherence spectra](../../../plots/analyze_models/images/resolution_eval/v5_variable_spectral_audit_20261115/selected_scale_diagnostics.pdf)
+- [All-channel comparison](../../../plots/analyze_models/images/resolution_eval/v5_variable_spectral_audit_20261115/all_channels_accuracy_power.pdf)
+
+Run from the project root:
+`source scripts/graphcast_env.sh && MPLCONFIGDIR=/tmp/v5-variable-spectra-mpl python scripts/analyze_models/analyze_v5_variable_spectra_20261115.py --fields T2m,T400,U850,Q100`.
+The data export includes a script snapshot and digest; current repository
+changes are uncommitted. `--plot-only` reuses the compact audited exports.
+The selected figures were visually inspected. These findings support a
+balanced per-variable illustration set; manuscript insertion remains a
+separate editorial step.
+
+<a id="v5-variable-spectral-presentation-20261115"></a>
+## Authorized v5 variable-wise spectral presentation
+
+Date: 2026-11-15 (America/New_York). Category: analysis/presentation.
+User authorization: "let's do that", adopting the proposed Section 4.6 and
+Appendix C revision. This uses the existing fixed-checkpoint 122-date,
+40-lead evaluation; no new training, forecasts or Slurm jobs were launched.
+
+**Change and rationale.** Section 4.6 retains the GraphCast-weighted combined
+83-channel amplitude/coherence comparison. Appendix C now pairs amplitude
+and coherence in four-column figures at day 5 and day 10, with T2m, Z500,
+U850 and Q100. Z500 replaces the exploratory T400 illustration as a standard
+circulation diagnostic with scale-dependent attenuation and excess tail
+power. T2m illustrates relatively retained structure (with the terrain
+caveat), U850 an accuracy/attenuation tradeoff, and Q100 an adverse day-10
+result. Selection is explicitly post hoc and illustrative, not a ranking.
+The prior T400 exploration remains intact.
+
+**Numerical result.** Native-grid RMSE reductions of M1 relative to R1 are:
+
+| Field | Day 5 (%) | Day 10 (%) |
+|---|---:|---:|
+| T2m | 1.372487 | 4.981699 |
+| Z500 | 2.020252 | 4.597727 |
+| U850 | 1.756267 | 5.558820 |
+| Q100 | 0.843011 | -1.013207 |
+
+Physical squared errors are pooled over dates and area-weighted grid points
+before taking square roots; these are not aggregate GraphCast MSE reductions.
+M1 improves RMSE in 81/83 channels at each selected lead, while equal-degree
+power mismatch worsens for all 83 at day 10. The paper retains this adverse
+aggregate evidence and the complete channel exports. The scalar comparison
+moves to Appendix C Table 6; native-grid field reductions form Table 7.
+The original equal-degree score remains distinct from the supplementary
+ERA5-power-weighted mismatch, which emphasizes energetic scales.
+
+**Reference and limits.** The sqrt(0.75) line denotes a 25% power deficit
+only for a single channel at a given scale. In combined curves it is a
+weighted-amplitude reference, not a threshold on mean power loss or skill.
+Supporting 20/25/30% scale-crossing diagnostics preserve censoring and
+recrossings; no universal horizon or formal spectral equivalence is claimed.
+Day 5 retains the wording "similar aggregate power mismatch". The scores
+remain descriptive fixed-checkpoint point estimates without new uncertainty
+intervals or channel-wise significance tests. Existing finite rerun warnings
+are retained in source manifests, not used as failure gates.
+
+**Artifacts and validation.** Both `Overleaf/v5_clean.tex` and `v5.tex` are
+synchronized, along with the v96w response in TXT and TeX. Figure numbers
+6 and 10--15 are unchanged. All four new figure assets retain full plotted
+coordinates: Z500 amplitudes above one and Q100's negative coherence are
+visible; no power-mismatch annotations appear on coherence panels. The
+renderer agrees with independent channel exports at tolerance 1e-13 and
+detached replay reproduces every plotted-coordinate signature. PDFs were
+compiled and revised pages visually checked; obsolete historical figure
+references in the tracked copy were corrected without deleting the captions.
+
+- [Portable renderer, figures, complete channel data and provenance](../../../Overleaf/archive/Graphs/v5_variable_spectral_presentation_20261115/README.txt)
+- [Selection rationale](../../../Overleaf/archive/Graphs/v5_variable_spectral_presentation_20261115/selection.json)
+- [Exact selected RMSE values](../../../Overleaf/archive/Graphs/v5_variable_spectral_presentation_20261115/selected_native_grid_rmse.csv)
+- [Figure coordinate checks](../../../Overleaf/archive/Graphs/v5_variable_spectral_presentation_20261115/figure_checks.json)
+- [Detached replay check](../../../Overleaf/archive/Graphs/v5_variable_spectral_presentation_20261115/portable_replay_validation.json)
+- [Clean manuscript PDF](../../../artifacts/manuscripts/v5_variable_spectral_revision_20261115/build/v5_clean.pdf)
+- [Build/source validation](../../../artifacts/manuscripts/v5_variable_spectral_revision_20261115/validation.json)
+
+The build directory also retains the tracked manuscript and standalone/combined
+reviewer responses. Before-edit snapshots and page previews accompany it.
+
+<a id="v5-spectral-reference-explanation-20261115"></a>
+## Explain the attenuation reference and its M1/R1 interpretation
+
+Date: 2026-11-15. Category: analysis/presentation.
+User feedback: the sqrt(0.75) caption was cryptic and the main text did not
+explain why the line was chosen, cite the methodology, or say what to assess.
+
+Verified Subich et al. (2025), Section 3.1, at
+https://arxiv.org/html/2501.19374v2#S3.SS1. Their 25% per-scale power-deficit
+choice is illustrative. For combined curves, the weighted mean of amplitude
+ratios is not the square root of the weighted mean power ratio. Main text,
+caption, Appendix C and v96w replies now explain the line's purpose: compare
+where appreciable attenuation is reached; a lower-wavenumber first crossing
+means coarser scales are affected. Crossings use sampled integer degrees
+without interpolation. Spatial crossings at a fixed lead are distinguished
+from the separate per-channel crossing times at fixed wavenumbers.
+
+The unchanged combined-curve exports give day-5 M1/R1 first crossings of
+16/16 at sqrt(0.75), versus 7/12 at day 10. At sqrt(0.8) and sqrt(0.7), the
+pairs are 14/14 and 18/19 at day 5, versus 7/10 and 9/14 at day 10. Thus the
+qualitative contrast is stable across these nearby illustrative choices.
+The maximum absolute M1/R1 amplitude difference is 0.01759 at day 5 and
+0.14085 at day 10; maximum coherence differences are 0.01043 and 0.03373.
+The full curves support similar combined spectral behavior at day 5, while
+day 10 has stronger M1 attenuation despite generally slightly higher
+coherence. No formal equivalence or universal effective resolution is claimed.
+
+- [Derived crossings and interpretation](../../../Overleaf/archive/Graphs/v5_spectral_reference_explanation_20261115/README.txt)
+- [Crossing table](../../../Overleaf/archive/Graphs/v5_spectral_reference_explanation_20261115/combined_reference_crossings.csv)
+- [Source digest and curve differences](../../../Overleaf/archive/Graphs/v5_spectral_reference_explanation_20261115/interpretation.json)
+- [Updated clean PDF](../../../artifacts/manuscripts/v5_spectral_reference_explanation_20261115/build/v5_clean.pdf)
+- [Build checks](../../../artifacts/manuscripts/v5_spectral_reference_explanation_20261115/validation.json)
+
+Both manuscript versions and both response formats were synchronized. Existing
+figure arrays were reused; no forecasts or training were rerun. The earlier
+illustration revision was published as manuscript commit 5737cce; this follow-up
+retains its figures and adds interpretation and derived crossing evidence.
+
+### Appendix interpretation by variable (authorized follow-up, November 15)
+
+User accepted the proposed discussion beside Figures 11--12. Appendix C now
+interprets ranges below sqrt(0.75), alongside coherence and native-grid RMSE:
+day-5 T2m remains above the line for M1/R1 and U850 remains below from degree15;
+day-10 U850 remains below from5 for M1 versus9 for R1 despite lower M1 RMSE.
+T2m has only isolated M1 dips at day10; Z500's fine-scale excess power retains
+low coherence, while Q100 has a sustained deficit from11 for both models and
+slightly worse M1 RMSE. First crossings are not treated as sharp skill limits.
+The existing per-variable RMSE values and terrain caveat are preserved.
+
+Both manuscript sources are synchronized. The same 16 field/lead/model curves
+were inspected without rerunning forecasts. The retained range evidence and
+source digest are in
+[per_variable_evidence.json](../../../artifacts/manuscripts/v5_appendix_reference_interpretation_20261115/per_variable_evidence.json).
+Builds, before-edit snapshots, diffs and page previews are in
+`artifacts/manuscripts/v5_appendix_reference_interpretation_20261115/`.

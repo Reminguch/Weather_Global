@@ -1,0 +1,19 @@
+{
+  "status": "verified",
+  "count": 70,
+  "metric_values_checked": 48,
+  "maximum_absolute_difference": 2.842170943040401e-14,
+  "reference_audit": {
+    "path": "/tmp/v5_matched70_metric_audit.json",
+    "sha256": "5c36fb919d5458c76cd9031c65aba93e7eada3ed980f10776b95eb7a5d9eceb4"
+  },
+  "raw_and_export_replay_pngs_identical": true,
+  "five_figure_layout_and_curve_signatures_identical": true,
+  "visually_inspected_figures": [
+    "fig6_smoothing_day5_day10_v5_pending122.png",
+    "fig13_smoothing_lead_spectra_v5_pending122.png",
+    "fig11_smoothing_feature_amplitude_v5_pending122.png",
+    "fig10_smoothing_loss_v5_pending122.png",
+    "fig12_smoothing_feature_coherence_v5_pending122.png"
+  ]
+}

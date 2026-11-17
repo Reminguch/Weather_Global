@@ -1,0 +1,57 @@
+{
+  "source_commit": "710c74a05f4a8a30925f4c248e0ac7d9df087dce",
+  "fixed_cohort_count": 36,
+  "scope": "Presentation-only promotion to Section4.6; numeric inputs and existing figurebytes unchanged",
+  "figures": [
+    {
+      "previous": "fig12_smoothing_amplitude_coherence_matched36.pdf",
+      "current": "fig7_smoothing_amplitude_coherence_v4_matched36.pdf",
+      "sha256": "ceae3dcc2ed0414c76c89e16beebfb9040eabfe85e2edee6be5b12f8bab377cf"
+    },
+    {
+      "previous": "fig16_accuracy_power_summary_matched36.pdf",
+      "current": "fig8_accuracy_power_summary_v4_matched36.pdf",
+      "sha256": "5fa45ae579a1734d702dfeb5abc6a544970b2df0aa5081fa733e354bd6e73222"
+    },
+    {
+      "previous": "fig7_training_horizon_closed_loop.pdf",
+      "current": "fig9_training_horizon_closed_loop_v4.pdf",
+      "sha256": "0deb2433ce2637d193bb30f04f2c3532715576f0c18bf12ff2246c8743d45d44"
+    },
+    {
+      "previous": "fig8_training_horizon_open_loop.pdf",
+      "current": "fig10_training_horizon_open_loop_v4.pdf",
+      "sha256": "b3cf3b16b89770634eaf133f10fd2b48ec56b1a002e39e22c1f852a3e4583b85"
+    },
+    {
+      "previous": "fig9_common_grid_all_variables_v4_ci.pdf",
+      "current": "fig11_common_grid_all_variables_v4_ci.pdf",
+      "sha256": "6d721dcc365ac8fd303707ecdb9e4fdf2c8c2218698493678cfe3de455576214"
+    },
+    {
+      "previous": "fig10_city_forecasts.pdf",
+      "current": "fig12_city_forecasts_v4.pdf",
+      "sha256": "97efa3bb0d9026bb1ab2b51089a39106c7b118767eabc3f29d17b8b7413f818c"
+    },
+    {
+      "previous": "fig11_smoothing_accuracy_matched36.pdf",
+      "current": "fig13_smoothing_accuracy_v4_matched36.pdf",
+      "sha256": "d3c971bc1c8c9c37b21b1bde359fad29bb7174605d65a615fb8b46cba0e33749"
+    },
+    {
+      "previous": "fig13_smoothing_feature_amplitude_matched36.pdf",
+      "current": "fig14_smoothing_feature_amplitude_v4_matched36.pdf",
+      "sha256": "9850c8aaf2d7ddab821415b576f69343fc97afb4b0364dce81de8280524574ec"
+    },
+    {
+      "previous": "fig14_smoothing_feature_coherence_matched36.pdf",
+      "current": "fig15_smoothing_feature_coherence_v4_matched36.pdf",
+      "sha256": "32b9e0a770b6708a484557123b42b52e95b9ecb0630210ba86cfc9f82d4e963a"
+    },
+    {
+      "previous": "fig15_smoothing_lead_spectra_matched36.pdf",
+      "current": "fig16_smoothing_lead_spectra_v4_matched36.pdf",
+      "sha256": "2678e2d5b153983981108d131fb6b6dfa5b1571ea992ae8ee74be604dd04a85b"
+    }
+  ]
+}

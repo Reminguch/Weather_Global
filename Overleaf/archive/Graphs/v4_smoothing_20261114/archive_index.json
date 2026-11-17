@@ -1,0 +1,41 @@
+{
+  "revision_date": "2026-11-14",
+  "files": [
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/all_channels_day5_curves.npz",
+      "sha256": "e180271998e12d89aeb2351e1727b5325f1cd143c54a177bb95e3d1c58a8fff2"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/all_channels_day5_summary.csv",
+      "sha256": "62782740eb7951425de1c6c49f3bdff6da4f70281d239400114fdc97ae079e76"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/compute_contrast_ci.py",
+      "sha256": "1d30498a91c810605f3a0922b7d42c70088866b5755ef80ddb886a70f8b2ec5c"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/contrast_ci.json",
+      "sha256": "af74d2c1ebfc3504c0fa5515cac8118999cd1626166fb40f381c4a0093b15a76"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/feature_day5_curves.csv",
+      "sha256": "ca3bf19f822ce3bae090ec3210c7eb8436c0b8f611c566c35b3dae624159c52e"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/loss_by_lead.csv",
+      "sha256": "3a897e4cb9149d409397535c6689629c2589d95100ddf9157448fb220251c9dd"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/manifest.json",
+      "sha256": "07b2c97b71ec8cf6e5a665cda7fdf691139fbe6d708070ef53d87602f3a10644"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/plot_v4_smoothing_paper_20261114.py",
+      "sha256": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501"
+    },
+    {
+      "path": "archive/Graphs/v4_smoothing_20261114/weighted_spectral_curves.csv",
+      "sha256": "8b71572bf0c36765ef1a4b11e683752b4e0a86a46e751874342b46e7bc5564b9"
+    }
+  ]
+}

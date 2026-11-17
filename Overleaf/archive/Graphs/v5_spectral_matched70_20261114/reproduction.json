@@ -1,0 +1,382 @@
+{
+  "status": "verified",
+  "cohort": {
+    "count": 70,
+    "planned_final_count": 122,
+    "initialization_ids": [
+      "20230101T000000Z",
+      "20230104T000000Z",
+      "20230107T000000Z",
+      "20230110T000000Z",
+      "20230113T000000Z",
+      "20230116T000000Z",
+      "20230119T000000Z",
+      "20230122T000000Z",
+      "20230125T000000Z",
+      "20230128T000000Z",
+      "20230131T000000Z",
+      "20230203T000000Z",
+      "20230206T000000Z",
+      "20230209T000000Z",
+      "20230212T000000Z",
+      "20230215T000000Z",
+      "20230218T000000Z",
+      "20230221T000000Z",
+      "20230224T000000Z",
+      "20230227T000000Z",
+      "20230302T000000Z",
+      "20230305T000000Z",
+      "20230308T000000Z",
+      "20230311T000000Z",
+      "20230314T000000Z",
+      "20230317T000000Z",
+      "20230320T000000Z",
+      "20230323T000000Z",
+      "20230326T000000Z",
+      "20230329T000000Z",
+      "20230401T000000Z",
+      "20230404T000000Z",
+      "20230407T000000Z",
+      "20230410T000000Z",
+      "20230413T000000Z",
+      "20230416T000000Z",
+      "20230419T000000Z",
+      "20230422T000000Z",
+      "20230425T000000Z",
+      "20230428T000000Z",
+      "20230501T000000Z",
+      "20230504T000000Z",
+      "20230507T000000Z",
+      "20230510T000000Z",
+      "20230513T000000Z",
+      "20230516T000000Z",
+      "20230519T000000Z",
+      "20230522T000000Z",
+      "20230525T000000Z",
+      "20230528T000000Z",
+      "20230531T000000Z",
+      "20230603T000000Z",
+      "20230606T000000Z",
+      "20230609T000000Z",
+      "20230612T000000Z",
+      "20230615T000000Z",
+      "20230618T000000Z",
+      "20230621T000000Z",
+      "20230624T000000Z",
+      "20230627T000000Z",
+      "20230630T000000Z",
+      "20230703T000000Z",
+      "20230706T000000Z",
+      "20230709T000000Z",
+      "20230712T000000Z",
+      "20230715T000000Z",
+      "20230718T000000Z",
+      "20230721T000000Z",
+      "20230724T000000Z",
+      "20230727T000000Z"
+    ],
+    "first_initialization": "20230101T000000Z",
+    "last_initialization": "20230727T000000Z",
+    "source_cohort_status": "interim_matched_cohort",
+    "lead_hours": [
+      6,
+      12,
+      18,
+      24,
+      30,
+      36,
+      42,
+      48,
+      54,
+      60,
+      66,
+      72,
+      78,
+      84,
+      90,
+      96,
+      102,
+      108,
+      114,
+      120,
+      126,
+      132,
+      138,
+      144,
+      150,
+      156,
+      162,
+      168,
+      174,
+      180,
+      186,
+      192,
+      198,
+      204,
+      210,
+      216,
+      222,
+      228,
+      234,
+      240
+    ]
+  },
+  "source_manifest": {
+    "path": "artifacts/manuscripts/v5_spectral_matched70_20261114/manifest.json",
+    "sha256": "45e6cb481c22a136eaf70d5a13f91f64915db3e7ec0ea4a3f82c115d83594d65"
+  },
+  "source_summary": {
+    "path": "artifacts/manuscripts/v5_spectral_matched70_20261114/summary.json",
+    "sha256": "47ffa675b45d85c373abe3331ed377b5cdd9e1ab915b287e8781683e86f54dec"
+  },
+  "renderer": {
+    "path": "scripts/analyze_models/plot_v5_matched_spectra.py",
+    "sha256": "ee2552f6341aec77a4ec345642125b688cf12fa5dd65143ff3ee19fc2822f7e0"
+  },
+  "figures": [
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig6_smoothing_day5_day10_v5_pending122.pdf",
+      "sha256": "94e838c7f830b94fd75775f22289a2b99d3d9f45a0f011da30fa5223158d6b8f"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig6_smoothing_day5_day10_v5_pending122.png",
+      "sha256": "4076c3b187e02af1af593f29281e22bab9568923f2fe00c9ac71ea4ea2f43e4c"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig10_smoothing_loss_v5_pending122.pdf",
+      "sha256": "a31acf7452845f363a3512f8abcb683f50c7bf1a7b0ff0590bb9192cad6d4ef9"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig10_smoothing_loss_v5_pending122.png",
+      "sha256": "998d7de5e5cea906e77385b2927d7b4fe7a8e61d55210e395725e7d6c34cddf8"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig11_smoothing_feature_amplitude_v5_pending122.pdf",
+      "sha256": "3e79a063dfc13091045cbf3ff02efa7582c9bcb379ba3ba1a06a1d4112543020"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig11_smoothing_feature_amplitude_v5_pending122.png",
+      "sha256": "043fe476f3ff331008c45e861ee1e2da02b44d622b36d2791e0242979ec2b5b3"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig12_smoothing_feature_coherence_v5_pending122.pdf",
+      "sha256": "6c2f650e425c0cd966d45c1c4f1e728be839615684fefb3f9ac7e01d31c6fb16"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig12_smoothing_feature_coherence_v5_pending122.png",
+      "sha256": "0dd38394a0988806d051f35528f951a91d3b05b8dae04e95e7ff38f9089fd2ef"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig13_smoothing_lead_spectra_v5_pending122.pdf",
+      "sha256": "915e1cd0d8f2d18b44c9bce01971c283cf46778bfd4ccd49b7960b53145d5a10"
+    },
+    {
+      "path": "artifacts/manuscripts/v5_spectral_matched70_portable_final_20261114/fig13_smoothing_lead_spectra_v5_pending122.png",
+      "sha256": "a65dbeefe6a86577dc300c79d5996af3cea477c340ffa0efbd4f6b1a20218585"
+    }
+  ],
+  "figure_layout": {
+    "fig6_smoothing_day5_day10_v5_pending122": {
+      "size_inches": [
+        6.25,
+        3.8
+      ],
+      "axes": 4,
+      "lines_including_references": 20,
+      "coordinate_sha256": "8cbf51d86ec14c222d1051575a3db90b48afacd2eb1c5596e321f9c83139f645",
+      "legend": [
+        "GraphCast",
+        "M1",
+        "GC + optimal filter",
+        "R1"
+      ],
+      "axes_positions": [
+        [
+          0.09,
+          0.5449392712550607,
+          0.38888888888888895,
+          0.25506072874493935
+        ],
+        [
+          0.5761111111111111,
+          0.5449392712550607,
+          0.38888888888888884,
+          0.25506072874493935
+        ],
+        [
+          0.09,
+          0.16999999999999993,
+          0.38888888888888895,
+          0.25506072874493935
+        ],
+        [
+          0.5761111111111111,
+          0.16999999999999993,
+          0.38888888888888884,
+          0.25506072874493935
+        ]
+      ]
+    },
+    "fig10_smoothing_loss_v5_pending122": {
+      "size_inches": [
+        6.25,
+        2.65
+      ],
+      "axes": 1,
+      "lines_including_references": 5,
+      "coordinate_sha256": "3c5ff21b515e4b5628099ca36e1a1c0e1978dee48b4518dd9f2bea2a466face0",
+      "legend": [
+        "GraphCast",
+        "M1",
+        "GC + optimal filter",
+        "R1"
+      ],
+      "axes_positions": [
+        [
+          0.095,
+          0.27,
+          0.87,
+          0.69
+        ]
+      ]
+    },
+    "fig11_smoothing_feature_amplitude_v5_pending122": {
+      "size_inches": [
+        6.25,
+        3.8
+      ],
+      "axes": 4,
+      "lines_including_references": 20,
+      "coordinate_sha256": "069a95b5423d00d106a2a05547ad63e4fffd35fa8fd83479fd209301adca6f76",
+      "legend": [
+        "GraphCast",
+        "M1",
+        "GC + optimal filter",
+        "R1"
+      ],
+      "axes_positions": [
+        [
+          0.09,
+          0.6258823529411766,
+          0.37715517241379315,
+          0.2941176470588235
+        ],
+        [
+          0.5878448275862069,
+          0.6258823529411766,
+          0.37715517241379315,
+          0.2941176470588235
+        ],
+        [
+          0.09,
+          0.17000000000000004,
+          0.37715517241379315,
+          0.2941176470588235
+        ],
+        [
+          0.5878448275862069,
+          0.17000000000000004,
+          0.37715517241379315,
+          0.2941176470588235
+        ]
+      ]
+    },
+    "fig12_smoothing_feature_coherence_v5_pending122": {
+      "size_inches": [
+        6.25,
+        3.8
+      ],
+      "axes": 4,
+      "lines_including_references": 20,
+      "coordinate_sha256": "c3d7f17919b4fabeb8a37f7aa6c7f800623de2c4b0d13879b8beae1cfb01fbe7",
+      "legend": [
+        "GraphCast",
+        "M1",
+        "GC + optimal filter",
+        "R1"
+      ],
+      "axes_positions": [
+        [
+          0.09,
+          0.6258823529411766,
+          0.37715517241379315,
+          0.2941176470588235
+        ],
+        [
+          0.5878448275862069,
+          0.6258823529411766,
+          0.37715517241379315,
+          0.2941176470588235
+        ],
+        [
+          0.09,
+          0.17000000000000004,
+          0.37715517241379315,
+          0.2941176470588235
+        ],
+        [
+          0.5878448275862069,
+          0.17000000000000004,
+          0.37715517241379315,
+          0.2941176470588235
+        ]
+      ]
+    },
+    "fig13_smoothing_lead_spectra_v5_pending122": {
+      "size_inches": [
+        6.25,
+        5.6
+      ],
+      "axes": 6,
+      "lines_including_references": 30,
+      "coordinate_sha256": "b305a26b571ea567e59f7d8f832065d918c82ffac709595e25f186a01f3f2581",
+      "legend": [
+        "GraphCast",
+        "M1",
+        "GC + optimal filter",
+        "R1"
+      ],
+      "axes_positions": [
+        [
+          0.095,
+          0.66625,
+          0.375,
+          0.18374999999999997
+        ],
+        [
+          0.59,
+          0.66625,
+          0.375,
+          0.18374999999999997
+        ],
+        [
+          0.095,
+          0.390625,
+          0.375,
+          0.18374999999999997
+        ],
+        [
+          0.59,
+          0.390625,
+          0.375,
+          0.18374999999999997
+        ],
+        [
+          0.095,
+          0.11499999999999999,
+          0.375,
+          0.18374999999999997
+        ],
+        [
+          0.59,
+          0.11499999999999999,
+          0.375,
+          0.18374999999999997
+        ]
+      ]
+    }
+  },
+  "plotted_coordinates_and_layout_match": true,
+  "original_pooled_inputs_required": false,
+  "new_forecasts_or_metric_estimates": false
+}

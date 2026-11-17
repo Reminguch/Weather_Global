@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-14",
+  "files": {
+    "README.md": "a5dee5b63683199053a1a2e3d9b1d36550c5e7865c7ba3640f859a961b16cd04",
+    "all_channels_selected_leads_summary.csv": "3f341c34605246028bd6c39016212ffdaa765770af8e5c8bbbe348cfd8dcbd9c",
+    "exact_loss_by_lead.csv": "ca632ad062095f2064527bc5e66653c31afcb9615f76b931383e9d047fc36b50",
+    "manifest.json": "d4173c32c60adbcf7a7d3e36ec12aa196936eca77fa01215805af85bb42b14d8",
+    "physical_power_selected_fields.csv": "9b4ee20c0d877170520d6c16858ebc63cd52ba76a74d3c1052cdee903aff7dc6",
+    "plot_v4_memory_spectra_appendix_20261114.py": "2748c7659a3222be7da6f0355abc5e570c38491a36f257951560af489d736c63",
+    "plot_v4_smoothing_paper_20261114.py": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501",
+    "weighted_amplitude_coherence.csv": "57249632a308579e9ae7f19086284b345e99e05fa21791ae282493a8302f5dd8"
+  },
+  "manuscript_figures": {
+    "fig16_memory_loss_amplitude_coherence_v4.pdf": "418872f4f60431a0d3df6b3f412693efc07fcd96369591d4d405b7a973a2a8c2",
+    "fig17_memory_power_day5_v4.pdf": "6a70150d2f8bdcc2b712f9905c39c21c04c2ba21f0aab0a810115b28d7776eba",
+    "fig18_memory_power_day10_v4.pdf": "70591a1dc281df61745716c1fe8878ceab68f574ec7c366683b30f883db24241"
+  }
+}

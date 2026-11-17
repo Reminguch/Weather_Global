@@ -1,0 +1,224 @@
+{
+  "status": "saved_completed_92_date_subset_only",
+  "campaign_hash": "b69ebc7e623b2a2bab0645a6d020f8807645f70b5eadc76dced61b3e116449af",
+  "evaluation_count": 92,
+  "planned_count": 122,
+  "initialization_ids": [
+    "20230101T000000Z",
+    "20230104T000000Z",
+    "20230107T000000Z",
+    "20230110T000000Z",
+    "20230113T000000Z",
+    "20230116T000000Z",
+    "20230119T000000Z",
+    "20230122T000000Z",
+    "20230125T000000Z",
+    "20230128T000000Z",
+    "20230131T000000Z",
+    "20230203T000000Z",
+    "20230206T000000Z",
+    "20230209T000000Z",
+    "20230212T000000Z",
+    "20230215T000000Z",
+    "20230218T000000Z",
+    "20230221T000000Z",
+    "20230224T000000Z",
+    "20230227T000000Z",
+    "20230302T000000Z",
+    "20230305T000000Z",
+    "20230308T000000Z",
+    "20230311T000000Z",
+    "20230314T000000Z",
+    "20230317T000000Z",
+    "20230320T000000Z",
+    "20230323T000000Z",
+    "20230326T000000Z",
+    "20230329T000000Z",
+    "20230401T000000Z",
+    "20230404T000000Z",
+    "20230407T000000Z",
+    "20230410T000000Z",
+    "20230413T000000Z",
+    "20230416T000000Z",
+    "20230419T000000Z",
+    "20230422T000000Z",
+    "20230425T000000Z",
+    "20230428T000000Z",
+    "20230501T000000Z",
+    "20230504T000000Z",
+    "20230507T000000Z",
+    "20230510T000000Z",
+    "20230513T000000Z",
+    "20230516T000000Z",
+    "20230519T000000Z",
+    "20230522T000000Z",
+    "20230525T000000Z",
+    "20230528T000000Z",
+    "20230531T000000Z",
+    "20230603T000000Z",
+    "20230606T000000Z",
+    "20230609T000000Z",
+    "20230612T000000Z",
+    "20230615T000000Z",
+    "20230618T000000Z",
+    "20230621T000000Z",
+    "20230624T000000Z",
+    "20230627T000000Z",
+    "20230630T000000Z",
+    "20230703T000000Z",
+    "20230706T000000Z",
+    "20230709T000000Z",
+    "20230712T000000Z",
+    "20230715T000000Z",
+    "20230718T000000Z",
+    "20230721T000000Z",
+    "20230724T000000Z",
+    "20230727T000000Z",
+    "20230730T000000Z",
+    "20230802T000000Z",
+    "20230805T000000Z",
+    "20230808T000000Z",
+    "20230811T000000Z",
+    "20230814T000000Z",
+    "20230817T000000Z",
+    "20230820T000000Z",
+    "20230823T000000Z",
+    "20230826T000000Z",
+    "20230829T000000Z",
+    "20230901T000000Z",
+    "20230904T000000Z",
+    "20230907T000000Z",
+    "20230910T000000Z",
+    "20230913T000000Z",
+    "20230916T000000Z",
+    "20230919T000000Z",
+    "20230922T000000Z",
+    "20230925T000000Z",
+    "20230928T000000Z",
+    "20231001T000000Z"
+  ],
+  "scope": "Fixed original GC and M1 checkpoints, frozen filters fitted on 32 2022 starts; paired 92 completed 2023 starts. Not an annual result; no new forecasts or fits.",
+  "checkpoint": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/checkpoints/v24_Ilya/res1_batch4_temporal_lr_20260908/runs/di16_fast_mamba/swa/swa_step00500-02000.pkl",
+    "sha256": "b224e69b76608894e768715072674656f07024f8f48cd3d14cad688e8f7d35a0"
+  },
+  "baseline": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/data/graphcast/graphcast/params/GraphCast_small - ERA5 1979-2015 - resolution 1.0 - pressure levels 13 - mesh 2to5 - precipitation input and output.npz",
+    "checkpoint_sha256": "e9438d8ad31ca6e1d3397a33b2508f4bbb6ec16aed84629f9a64712bf756bc29"
+  },
+  "filter": {
+    "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json",
+    "sha256": "822eeba33b190db255e57397437af7329d19279fad544833f84cb3cf4d114e3f"
+  },
+  "loss_layout": {
+    "axes": [
+      "initialization",
+      "lead",
+      "model",
+      "variant"
+    ],
+    "shape": [
+      92,
+      40,
+      2,
+      3
+    ],
+    "models": [
+      "GC",
+      "M1"
+    ],
+    "variants": [
+      "raw",
+      "projected",
+      "optimal"
+    ]
+  },
+  "contrast_definition": "100 * (1 - mean(raw M1 native-grid GraphCast loss) / mean(filtered GC native-grid GraphCast loss)); pool losses before ratio",
+  "bootstrap": {
+    "replicates": 10000,
+    "block_length": 5,
+    "seed": 20260916,
+    "method": "Existing frozen bootstrap_endpoints: paired non-wrapping blocks of five consecutive initialization dates, sampled identically for both forecasts; percentile 2.5 and 97.5 bounds",
+    "interpretation": "Pointwise paired forecast-sample intervals for fixed checkpoints/filters; no training-seed or between-year uncertainty",
+    "additional_exclusions": "Does not quantify filter-estimation uncertainty; pointwise intervals, no simultaneous coverage claim"
+  },
+  "raw_m1_vs_optimal_gc": {
+    "rollout": {
+      "reduction_pct": 4.26429845269981,
+      "ci95_pct": [
+        3.3738172585159463,
+        5.343759982968169
+      ],
+      "raw_m1_loss": 9.768063645853125,
+      "optimal_gc_loss": 10.203156699099356
+    },
+    "day10": {
+      "reduction_pct": 4.631063507800626,
+      "ci95_pct": [
+        3.1631919646090303,
+        6.574627372786963
+      ],
+      "raw_m1_loss": 23.141245544165464,
+      "optimal_gc_loss": 24.26497179829439
+    }
+  },
+  "existing_filtered_pair_validation": {
+    "max_ci_absolute_difference_pct": 0.0,
+    "ci95_rows_lower_upper_columns_rollout_day10": [
+      [
+        4.124316717403193,
+        6.992997634495645
+      ],
+      [
+        5.955949926827271,
+        10.00635291692374
+      ]
+    ]
+  },
+  "power_metric": {
+    "definition": "100 * mean over 40 leads, 83 physical channels and degrees 1..179 of abs(date-pooled prediction power / date-pooled truth power - 1); equal weights on leads, channels and degrees, excluding degree zero",
+    "rollout_pct": {
+      "GC_raw": 59.41413039992864,
+      "GC_projected": 59.41413039992864,
+      "GC_optimal": 78.39950227081157,
+      "M1_raw": 67.52670048606886,
+      "M1_projected": 67.52670048606886,
+      "M1_optimal": 77.637142141
+    },
+    "interpretation": "Diagnostic of relative spectral power mismatch, not an energy fraction, phase metric or native-GraphCast-weighted loss; no spectral confidence intervals"
+  },
+  "sources": {
+    "evaluation_report": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/interim_20261113/report.json",
+      "sha256": "95fa8142a59c7d8b4886cc748ca164d9266b8b9585b24503645a1305c1158d74"
+    },
+    "manifest": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/manifest.json",
+      "sha256": "5f3db013c20adc4e76fc7d409a3d7071ad35958728fba38482d5cd4fa91a4dd6"
+    },
+    "paired_losses": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/interim_20261113/paired_losses.npz",
+      "sha256": "27cf6682eb44fd473b511a7e868bc373c77a3ca39fac36dbb685cf1ae56cbdd4"
+    },
+    "frozen_reporter": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/source/scripts/analyze_models/report_v24_optimal_smoothing.py",
+      "sha256": "f3c08625f60c6aa2cf94f7bf4db46ef00bea9e38fce47f01a5749bd30b1caa9c"
+    },
+    "power_summary": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/summary.json",
+      "sha256": "fdd1fd1ef3a85f901e8b199243e1ec0af69196a1bbff430605662bd07c707c92"
+    },
+    "power_csv": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/summary.csv",
+      "sha256": "7ab64c5b073d0c5ce361e855b0c5ef787c8e4b0d911b3cb4f4c0b6831a4b5592"
+    },
+    "power_pooled": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/power_pooled.npz",
+      "sha256": "c9c965a14c184bf85663d8bd0522018542fc31852db3c45b4180420cad771a47"
+    },
+    "script": {
+      "path": "/scratch/gpfs/DABANIN/iv9432/Weather_global/artifacts/evaluations/v24_smoothing_revision_20261114/compute_contrast_ci.py",
+      "sha256": "1d30498a91c810605f3a0922b7d42c70088866b5755ef80ddb886a70f8b2ec5c"
+    }
+  }
+}

@@ -1,0 +1,150 @@
+Spectral evidence: proposed manuscript presentation
+Recorded 2026-11-13 (America/New_York)
+
+Purpose
+Show whether M1's forecast-error advantage survives independently fitted output
+filtering, then distinguish spectral amplitude fidelity from pattern coherence.
+Use established diagnostics from GraphCast and AMSE. Figures use our own data;
+original AMSE figures are reference material, not additional model evaluations.
+
+Evidence used
+The new comparison uses the same 92 completed 2023 starts for every model and
+lead, with filters fitted independently on 32 starts in 2022. It is an interim
+subset of the planned 122 dates, not a completed annual result. Models are the
+public GraphCast_small backbone and the original selected M1 checkpoint, with
+raw and optimally filtered outputs. This is not a five-seed spectral experiment.
+The original GC/M1 figures reused saved outputs. The later requested matched
+reset/reset addition needs a new spectral evaluation because its original
+122-date evaluation saved only scalar metrics, not fields or spectral moments.
+Use the same 92 dates and original matched reset SWA, with no training or
+filter fitting. See ../experiments/v24_matched_reset_spectra_2026-11-13.md.
+Existing spectral point estimates have no confidence
+bands; the seed and date uncertainty bands in other manuscript figures must
+not be transferred to these spectral plots.
+
+Main-text figure 1: accuracy before and after filtering
+Follow GraphCast Fig.31: physical spectral RMSE versus forecast lead for Z500,
+T850, Q700 and T2m, plus relative RMSE panels. Show GC and M1, each raw and
+filtered, with common dates and truth. Explicitly label represented T179
+spectral RMSE: it is not identical to native-grid RMSE. The accompanying exact
+GraphCast-loss plot supplies the canonical native-grid aggregate comparison.
+Keep the complete ten-day lead range and mark M1's five-day feedback tail.
+Question: does M1 retain an error advantage after the filtering control?
+
+Main-text figure 2: amplitude and coherence
+Follow AMSE Fig.3 using forecast/truth amplitude ratio and spectral coherence
+against spherical degree, with wavelength as a secondary axis. Use a focused
+five-day panel; retain six-hour and ten-day versions in the full appendix set.
+For the focused five-day figure, use separate coherence and spectral-amplitude
+panels, with standalone PDF/PNG exports for each, as most recently requested
+on November 13. Retain the AMSE amplitude ratio sqrt(Pforecast/PERA5), explicitly
+labelled; it is not physical power or Pf/Pt. Overlay raw GC, raw M1, optimally
+filtered GC and raw matched reset/reset (purple) on the same dates; omit
+filtered M1. Use model colors and solid amplitude/dashed coherence curves. Raw and filtered GC
+coherence nearly coincide; interleave blue and teal dashes using equal dash/gap
+lengths and opposite phases, with matching linewidth and butt caps. Keep
+model legends in each panel and no markers or arrow.
+Plot the original values without offsets. Ratios are computed
+per channel before averaging with variable and pressure-level weights; do not
+take the square root of an averaged power ratio. No difference-standard-
+deviation normalization is needed for these dimensionless ratios.
+Question: are amplitude and spatial-pattern agreement changing together?
+
+Matched reset/reset addition to every figure
+Use the separately trained R_matched SWA, not inference-reset M1 or the older
+unmatched reset control. The exact-loss plot already uses its archived losses
+on the same 92 dates. The six spectral figures await raw spectral moments and
+will regenerate automatically after that evaluation. Include raw reset as a
+clearly labelled reference in both columns of the full amplitude/coherence
+figure; no optimally filtered reset is implied or evaluated. This comparison
+tests a memory-dependent tradeoff; do not presume joint improvement in advance.
+
+Appendix
+Include individual Z500/T850/Q700/T2m absolute spectra and normalized amplitudes
+at six hours, five days and ten days. Preserve the complete represented degree
+range and any excess power. Include the full lead-dependent exact-loss curves,
+filter fitting protocol, channel weights, projection convention, cohort dates,
+and provenance. Do not infer a general smoothing mechanism from one aggregate.
+The earlier mean-relative-power-error scatter can remain a secondary summary;
+it should not be the principal spectral evidence.
+
+Reading the AMSE comparison
+AMSE Fig.3 shows improved amplitude fidelity. Figs.4/12 assess lagged-ensemble
+mean RMSE, not individual-forecast MSE; their accuracy changes are mixed. At
+five days Fig.12 labels roughly 5% worse Q250 RMSE, 4% worse Q850, and 6% worse
+precipitation RMSE. These are rounded plot labels, not a global MSE score.
+No directly comparable aggregate deterministic GraphCast-loss result was found.
+Thus cite AMSE for spectral diagnostics without claiming its sharper fields
+preserve or worsen our particular deterministic loss by a known percentage.
+
+Interpretation for our paper
+On the interim subset, M1's raw output has lower exact loss and lower aggregate
+power mismatch than optimally filtered GC. Relative to raw GC, M1 improves
+loss but worsens mean power matching. These statements do not imply improvement
+at every degree or for every variable. Retain day ten as an extrapolation
+diagnostic because the manuscript claims ten-day accuracy improvements.
+Do not compare our 1-degree/ERA5/2023 scores numerically with AMSE's different
+resolution and verification setup. Do not add excluded full-GC training arms.
+
+The new plots retain an important numerical distinction: the filters optimize
+represented spherical error, whereas the canonical score is exact native-grid
+GraphCast loss. Reconstruction discards unresolved components, so filtered
+native-grid loss can be worse at early leads. Keep those curves visible. At
+five days raw M1 has 2.2379% lower exact loss than filtered GC; independently
+filtered M1 has 1.6333% lower loss than filtered GC. These are point estimates
+on the same 92 dates. The new loss plot uses the repeated paired raw GC as its
+denominator, not the archived canonical v4 trajectory.
+
+Publication sequence
+1. Review the new offline figures and choose the focused main-text panels.
+2. Replace interim plots using the already planned complete 122-date report
+   once it exists; preserve the interim cohort and figures as provenance.
+3. Add a short results paragraph and explicit amplitude-fidelity limitation.
+4. Link the full spectral and filtering appendix from the reviewer response.
+This plan does not itself edit or publish the manuscript.
+
+Sources and artifacts (paths relative to the project root)
+Original paper: https://arxiv.org/html/2501.19374v2
+GraphCast template: https://arxiv.org/html/2212.12794v2
+Original AMSE extracts: artifacts/literature/amse_2501.19374v2/
+New figures: plots/analyze_models/images/resolution_eval/v24_literature_spectral_comparison_20261113/
+Numeric curves and provenance: plots/analyze_models/data/resolution_eval/v24_literature_spectral_comparison_20261113/
+Source spectral report: plots/analyze_models/data/resolution_eval/v24_optimal_smoothing_v4_interim92_power_20261113/REPORT.md
+
+November 13: per-feature preview requested by the user
+Use by_feature/ inside v24_literature_spectral_preview4_20261113 for the new
+day-5 breakdown. All83 variable/pressure channels are included, with separate
+physical-power, amplitude-ratio and coherence atlases. The familiar-field
+panels show T2m, Z500, T850, Q700, precipitation and vertical velocity500hPa.
+The rank-selected panels include the three closest/poorest M1 channels by
+equal-degree power mismatch; they are not a suggested favorable main-text crop.
+
+State explicitly what "good spectrum" means. Equal-degree mean |Pf/Pt-1|
+measures relative shape errors across degrees1..179; sum|Pf-Pt|/sumPt weights
+the same errors by ERA5 power. Both remain in the numeric table, after pooling
+the four dates and excluding degree0. Per the user's subsequent clarification,
+panel labels compare M1 and original raw GC using the equal-degree percentage,
+with explicit model names; do not show two differently weighted M1 percentages
+together. Neither diagnostic is exact GraphCast loss.
+T2m is relatively good on both. Z500/T850 preserve large-scale power while
+small-scale matching is poor. Precipitation and W500 have large power deficits
+on both measures. Do not present Z50's extreme relative-tail error as the worst
+total-power field. The complete atlas and ranking preserve the counterexamples.
+
+Reproduce with:
+source scripts/graphcast_env.sh
+MPLCONFIGDIR=/tmp/weather-matplotlib python scripts/analyze_models/plot_v24_spectra_by_feature_20261113.py
+This only reads existing pooled moments and writes figures/tables. Four-date
+status, fixed-checkpoint scope, matched reset provenance and drift are retained.
+
+November 14 implementation
+The user approved manuscript corrections in red. v4.tex now adds Section4.6
+and AppendixE, with two main92-date figures and a separate4-date reset preview.
+Earlier blue changes remain blue. The revised claim is a better measured
+loss/power-mismatch tradeoff versus the tested filteredGC baseline, while rawGC
+retains better power matching. An equal-spectrum memory benefit is not claimed.
+The new rawM1-vs-filteredGC paired95% interval is3.3738–5.3438% for the4.2643%
+rollout reduction, computed from saved losses using the frozenreporter and
+existing10,000 five-start draws. Day10 is4.6311% [3.1632,6.5746]%. No forecasts
+or training were added. Figures and reproducible numerical exports are under
+v4_smoothing_paper_20261114 and archived in Overleaf/archive/Graphs/v4_smoothing_20261114.

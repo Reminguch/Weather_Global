@@ -1,0 +1,58 @@
+[
+  {
+    "path": "artifacts/evaluations/v24_matched_spectra_completed_20261114/gc_m1_reference/summary.json",
+    "sha256": "c7ac63b36db667018b377d0bc3576d7f46a375345fea39e4eb67bdbab26fb657",
+    "archived_path": "sources/artifacts/evaluations/v24_matched_spectra_completed_20261114/gc_m1_reference/summary.json"
+  },
+  {
+    "path": "artifacts/evaluations/v24_matched_spectra_completed_20261114/gc_m1_reference/power_pooled.npz",
+    "sha256": "fe6993dcada02f45ae7c133642bf82bf204e12fb79992cfc30859c6c5fd0c208",
+    "retained_in_parent_workspace": true
+  },
+  {
+    "path": "artifacts/evaluations/v24_matched_spectra_completed_20261114/reset/summary.json",
+    "sha256": "3b1a8c19842ba5111986a7cfa39baaaa37ff2e082188a32e73bcdf518c50897c",
+    "archived_path": "sources/artifacts/evaluations/v24_matched_spectra_completed_20261114/reset/summary.json"
+  },
+  {
+    "path": "artifacts/evaluations/v24_matched_spectra_completed_20261114/reset/power_pooled.npz",
+    "sha256": "73520e8a096307bc11d6c0adb39a2ae739447851a80c16dc5c7bf330e7af07bf",
+    "retained_in_parent_workspace": true
+  },
+  {
+    "path": "artifacts/evaluations/v24_matched_spectra_completed_20261114/cohort.json",
+    "sha256": "be9f3aa4c8e9fb9ae6bd132a86f66708334c151e033d9bc91d576aab2471fbdc",
+    "archived_path": "sources/artifacts/evaluations/v24_matched_spectra_completed_20261114/cohort.json"
+  },
+  {
+    "path": "artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json",
+    "sha256": "822eeba33b190db255e57397437af7329d19279fad544833f84cb3cf4d114e3f",
+    "archived_path": "sources/artifacts/evaluations/v24_optimal_smoothing_v4_20261112/filters.json.gz",
+    "compression": "gzip; source sha256 is for uncompressed content"
+  },
+  {
+    "path": "plots/analyze_models/data/resolution_eval/v24_literature_spectral_matched36_20261114/comparison_scores.csv",
+    "sha256": "7a502cb0c9ff221ce8c9441c427e2d8534c192e1664619e773bc47152eb04585",
+    "archived_path": "sources/plots/analyze_models/data/resolution_eval/v24_literature_spectral_matched36_20261114/comparison_scores.csv"
+  },
+  {
+    "path": "scripts/analyze_models/plot_v4_smoothing_paper_20261114.py",
+    "sha256": "9e1169112d0c451743598ebc9dec35691220d18e2800d50ebde1628ba0f70501",
+    "archived_path": "sources/scripts/analyze_models/plot_v4_smoothing_paper_20261114.py"
+  },
+  {
+    "path": "scripts/analyze_models/plot_v4_appendix_e_four_models_20261114.py",
+    "sha256": "543dbcfe08cd245f1f0dd23c151bd7d4180b23726930bd201de584ca6512f87f",
+    "archived_path": "sources/scripts/analyze_models/plot_v4_appendix_e_four_models_20261114.py"
+  },
+  {
+    "path": "scripts/analyze_models/plot_v4_memory_spectra_appendix_20261114.py",
+    "sha256": "2748c7659a3222be7da6f0355abc5e570c38491a36f257951560af489d736c63",
+    "archived_path": "sources/scripts/analyze_models/plot_v4_memory_spectra_appendix_20261114.py"
+  },
+  {
+    "path": "scripts/analyze_models/plot_v4_appendix_e_matched36_20261114.py",
+    "sha256": "2bbfeb614d59ffdb3853f39ab7b54c6db2c4a0c7a3e09f40fc0139af60b54c7e",
+    "archived_path": "sources/scripts/analyze_models/plot_v4_appendix_e_matched36_20261114.py"
+  }
+]

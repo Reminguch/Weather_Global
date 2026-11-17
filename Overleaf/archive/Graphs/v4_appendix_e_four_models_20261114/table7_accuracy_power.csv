@@ -1,0 +1,5 @@
+forecast_count,lead_count,model,label,exact_gc_rollout_loss,power_mismatch_pct
+4,40,GC,GraphCast,11.851948332219331,59.62183361197707
+4,40,M1,Carry/carry (M1),10.002799668006592,67.4916019730978
+4,40,GC_filter,GC + optimal filter,10.623955864661935,78.49913405807487
+4,40,reset,Reset/reset,10.164970060993923,65.99417130600169

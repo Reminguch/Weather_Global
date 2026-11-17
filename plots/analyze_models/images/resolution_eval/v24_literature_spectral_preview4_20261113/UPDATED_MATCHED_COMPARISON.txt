@@ -1,0 +1,4 @@
+The updated comparison of all four models on the same 36 completed dates is in:
+../v24_literature_spectral_matched36_20261114/
+Both day 5/day 10 feature plots are under its by_feature/ directory.
+This original directory is preserved for its historical cohort.

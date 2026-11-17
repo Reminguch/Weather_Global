@@ -1,0 +1,23 @@
+36-date matched comparisons — January 1 to April 16, 2023
+
+All four predictors use identical dates and leads: raw GraphCast, filtered
+GraphCast, raw carry/carry (M1), raw matched reset/reset. No filtered M1.
+
+Start with:
+  improvement_summary_rollout_day5_day10.pdf (labelled percentage summary)
+  exact_gc_loss_before_after_filtering.pdf
+  amse_style_amplitude_5d.pdf / amse_style_coherence_5d.pdf
+  amse_style_amplitude_10d.pdf / amse_style_coherence_10d.pdf
+  graphcast_style_spectra_5d.pdf / graphcast_style_spectra_10d.pdf
+
+The combined AMSE panels, 6-hour diagnostics and spectral RMSE are also here.
+by_feature/ contains both day 5 and day 10 plots for all 83 channels, with separate
+power, amplitude and coherence PDFs/PNGs and seven-page all-feature atlases.
+
+These 36 completed dates replace the four-date preview for this updated plot
+set. They cover January-April; the complete 92-date campaign is not finished.
+The old four-date and 92-date plots are preserved in their original directories.
+
+Scores, underlying arrays and provenance are in the matching data folder:
+plots/analyze_models/data/resolution_eval/v24_literature_spectral_matched36_20261114/
+See REPORT.txt and comparison_scores.csv. No new forecasts or filter fitting.

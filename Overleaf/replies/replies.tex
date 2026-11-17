@@ -1,0 +1,51 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+\emergencystretch=2em
+
+% Standalone reviewer response. Section and figure numbers refer to v4.tex.
+% Third-party references use plain arXiv identifiers, matching the OpenReview draft.
+\title{Response to Reviewer Jvjy}
+\author{Submission 50116}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.5em}
+
+We thank the reviewer for the constructive comments. In response, we have expanded the evaluation, added uncertainty estimates and independent training runs, and revised the memory comparison to use a consistently matched training and evaluation protocol. The revised manuscript also reports five independent retrainings of the selected configuration. We address the specific concerns below.
+
+\section*{W1: Does the memory comparison isolate the contribution of persistent memory?}
+
+We agree that resetting memory only at inference introduces a training--inference mismatch. \textcolor{blue}{Our revised memory comparison therefore uses} \textbf{carry/carry versus reset/reset}. The former is trained and evaluated with persistent memory; the latter is separately trained and evaluated with memory reset at every step, including during warm-up.
+
+Within this comparison, we match the architecture, parameter count, training data, $K=20$ training horizon, batch size, learning-rate schedule, number of optimizer updates, and checkpoint-averaging procedure. \textcolor{blue}{Both} policies are evaluated on the same forecast dates and leads using the exact GraphCast loss and a common GraphCast baseline. This addresses the concern about combining different configurations or loss calculations. Figure~6 presents the original matched checkpoint-averaged comparison and the independent unaveraged-checkpoint replication in separate panels.
+
+Under the matched protocol, carry/carry reduces ten-day GraphCast loss by \textbf{14.42\%}, compared with \textbf{9.16\%} for reset/reset. The paired advantage is \textbf{5.26 percentage points}, with a \textbf{95\% confidence interval of [4.70, 5.86]}. At day~10, the advantage is \textbf{8.02 percentage points [7.20, 9.05]}. These estimates replace the earlier unmatched 10.77-point comparison.
+
+These intervals quantify uncertainty over forecast dates for the tested checkpoints. The reset/reset control still has one training seed, so we do not present this as a multi-seed estimate of the memory advantage.
+
+\section*{W2 / Q1: Can the main model be evaluated on a larger independent test set with statistical uncertainty?}
+
+Yes. The principal evaluation now uses \textbf{122 forecast initializations spanning 2023}, at 00 UTC every third day, each evaluated at 40 six-hour leads through day~10. Correction training uses 2015--2021, and model selection uses the 32-initialization development sample from 2022. The 2023 evaluation is separate from model selection. The annual comparisons now use the selected \textbf{$K=20$ configuration}, addressing the concern about comparability with the earlier $K=22$ results.
+
+We also report \textbf{five independent retrainings} of the fixed selected configuration. Their mean GraphCast loss reduction is \textbf{14.17\% over the full ten-day rollout}, with a sample standard deviation of \textbf{0.43 percentage points}, and \textbf{21.03\% at day~10}, with a sample standard deviation of \textbf{0.75 percentage points}. Figure~4 and Appendix~A.4 report all five runs; the original selected checkpoint is reported separately and is not counted as a sixth seed.
+
+We distinguish variability across training runs from uncertainty associated with the sampled forecast dates. The former is shown as mean $\pm$ one standard deviation across the five retrainings. For the latter, we calculate paired block-bootstrap confidence intervals by resampling existing forecast results in groups of neighboring initialization dates. These intervals are shown in Figure~6's original matched-comparison panel and in Figures~5 and \textcolor{red}{9}. The procedure and its assumptions are documented in Appendices~A.3 and C.
+
+\section*{Q2: How does the method compare with parameter-matched GRU/LSTM or fixed-history corrections?}
+
+We do not claim that Mamba is superior to GRU/LSTM-based correction models, and we have no a priori expectation of a Mamba-specific forecasting advantage in this setting. Our working expectation is that other suitably designed recurrent architectures could also benefit from persistent temporal conditioning. Their relative performance, including comparison with fixed-history corrections, remains an empirical question.
+
+We chose Mamba for its selective state-space formulation and computational design, including hardware-aware parallel scanning and efficient recurrent inference (Gu and Dao, arXiv:2312.00752). This choice does not imply greater expressive power or forecasting accuracy than alternative recurrent architectures. In our current autoregressive pipeline, repeated GraphCast computation dominates the cost, and forecast feedback limits temporal parallelism. We therefore do not claim a measured end-to-end speed advantage from Mamba here.
+
+We have not added GRU/LSTM or fixed-history baselines. Our matched controls address whether retaining temporal state benefits the chosen correction architecture. Establishing which temporal architecture performs best would require additional comparisons, and we have limited our interpretation accordingly.
+
+\end{document}
